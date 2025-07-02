@@ -21,11 +21,22 @@ const Dashboard = () => {
     fechados: 0,
     naoFecharam: 0
   });
+  const [comissaoData, setComissaoData] = useState({
+    comissaoTotalMes: 0,
+    comissaoTotalGeral: 0,
+    comissoesPorConsultor: []
+  });
   const [loading, setLoading] = useState(true);
+
+  // Função para calcular comissão: R$ 5 para cada R$ 1.000 fechados
+  const calcularComissao = (valorFechado) => {
+    return (valorFechado / 1000) * 5;
+  };
 
   useEffect(() => {
     fetchDashboardData();
     fetchPipelineStats();
+    fetchComissaoData();
   }, []);
 
   const fetchDashboardData = async () => {
@@ -74,6 +85,83 @@ const Dashboard = () => {
       setPipelineStats(pipelineData);
     } catch (error) {
       console.error('Erro ao carregar estatísticas do pipeline:', error);
+    }
+  };
+
+  const fetchComissaoData = async () => {
+    try {
+      // Buscar todos os fechamentos
+      const response = await makeRequest('/fechamentos');
+      const fechamentos = await response.json();
+      
+      if (response.ok) {
+        // Obter mês atual
+        const agora = new Date();
+        const mesAtual = agora.getMonth() + 1; // getMonth() retorna 0-11
+        const anoAtual = agora.getFullYear();
+        
+        // Filtrar fechamentos do mês atual
+        const fechamentosMes = fechamentos.filter(f => {
+          const dataFechamento = new Date(f.data_fechamento);
+          return dataFechamento.getMonth() + 1 === mesAtual && 
+                 dataFechamento.getFullYear() === anoAtual;
+        });
+        
+        // Calcular comissão total do mês
+        const comissaoMes = fechamentosMes.reduce((total, f) => {
+          return total + calcularComissao(f.valor_fechado || 0);
+        }, 0);
+        
+        // Calcular comissão total geral
+        const comissaoGeral = fechamentos.reduce((total, f) => {
+          return total + calcularComissao(f.valor_fechado || 0);
+        }, 0);
+        
+        // Agrupar por consultor para comissões individuais
+        const comissoesPorConsultor = {};
+        
+        fechamentos.forEach(f => {
+          if (f.consultor_id && f.consultor_nome) {
+            if (!comissoesPorConsultor[f.consultor_id]) {
+              comissoesPorConsultor[f.consultor_id] = {
+                id: f.consultor_id,
+                nome: f.consultor_nome,
+                valorTotalMes: 0,
+                valorTotalGeral: 0,
+                comissaoMes: 0,
+                comissaoGeral: 0,
+                fechamentosMes: 0,
+                fechamentosGeral: 0
+              };
+            }
+            
+            const comissaoFechamento = calcularComissao(f.valor_fechado || 0);
+            
+            // Totais gerais
+            comissoesPorConsultor[f.consultor_id].valorTotalGeral += f.valor_fechado || 0;
+            comissoesPorConsultor[f.consultor_id].comissaoGeral += comissaoFechamento;
+            comissoesPorConsultor[f.consultor_id].fechamentosGeral += 1;
+            
+            // Verificar se é do mês atual
+            const dataFechamento = new Date(f.data_fechamento);
+            if (dataFechamento.getMonth() + 1 === mesAtual && 
+                dataFechamento.getFullYear() === anoAtual) {
+              comissoesPorConsultor[f.consultor_id].valorTotalMes += f.valor_fechado || 0;
+              comissoesPorConsultor[f.consultor_id].comissaoMes += comissaoFechamento;
+              comissoesPorConsultor[f.consultor_id].fechamentosMes += 1;
+            }
+          }
+        });
+        
+        setComissaoData({
+          comissaoTotalMes: comissaoMes,
+          comissaoTotalGeral: comissaoGeral,
+          comissoesPorConsultor: Object.values(comissoesPorConsultor)
+            .sort((a, b) => b.comissaoMes - a.comissaoMes) // Ordenar por comissão do mês
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao buscar dados de comissão:', error);
     }
   };
 
@@ -208,6 +296,57 @@ const Dashboard = () => {
             </div>
           </div>
 
+          {/* Card Comissão Total Geral */}
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '25px',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: 'linear-gradient(90deg, #8b5cf6, #7c3aed)'
+            }}></div>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '15px' }}>
+              <div style={{
+                width: '50px',
+                height: '50px',
+                background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: '15px'
+              }}>
+                <span style={{ fontSize: '20px' }}>💎</span>
+              </div>
+              <div>
+                <h3 style={{ margin: '0', fontSize: '18px', color: '#1f2937', fontWeight: '600' }}>
+                  Comissão Total
+                </h3>
+                <p style={{ margin: '0', fontSize: '14px', color: '#6b7280' }}>
+                  Acumulado geral
+                </p>
+              </div>
+            </div>
+            <div style={{ fontSize: '28px', fontWeight: '700', color: '#8b5cf6', marginBottom: '8px' }}>
+              {new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+              }).format(comissaoData.comissaoTotalGeral)}
+            </div>
+            <div style={{ fontSize: '14px', color: '#6b7280' }}>
+              Todas as vendas registradas
+            </div>
+          </div>
+
           {/* Card Agendamentos */}
           <div style={{
             background: 'white',
@@ -274,20 +413,20 @@ const Dashboard = () => {
               left: 0,
               right: 0,
               height: '4px',
-              background: 'linear-gradient(90deg, #8b5cf6, #7c3aed)'
+              background: 'linear-gradient(90deg, #ef4444, #dc2626)'
             }}></div>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '15px' }}>
               <div style={{
                 width: '50px',
                 height: '50px',
-                background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                background: 'linear-gradient(135deg, #ef4444, #dc2626)',
                 borderRadius: '12px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginRight: '15px'
               }}>
-                <span style={{ fontSize: '20px' }}>🎯</span>
+                <span style={{ fontSize: '20px' }}>📈</span>
               </div>
               <div>
                 <h3 style={{ margin: '0', fontSize: '18px', color: '#1f2937', fontWeight: '600' }}>
@@ -298,7 +437,7 @@ const Dashboard = () => {
                 </p>
               </div>
             </div>
-            <div style={{ fontSize: '28px', fontWeight: '700', color: '#8b5cf6', marginBottom: '8px' }}>
+            <div style={{ fontSize: '28px', fontWeight: '700', color: '#ef4444', marginBottom: '8px' }}>
               {taxaConversao}%
             </div>
             <div style={{ fontSize: '14px', color: '#6b7280' }}>
@@ -444,152 +583,141 @@ const Dashboard = () => {
             }}>
               {stats.estatisticasConsultores
                 .sort((a, b) => b.total_agendamentos - a.total_agendamentos) // Ordenar por quantidade de agendamentos
-                .map(consultor => (
-                <div key={consultor.id} style={{
-                  background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-                  borderRadius: '12px',
-                  padding: '20px',
-                  border: '1px solid #cbd5e1',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}>
-                  {/* Indicador visual baseado na quantidade de agendamentos */}
-                  <div style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: '4px',
-                    background: consultor.total_agendamentos > 20 
-                      ? 'linear-gradient(90deg, #10b981, #059669)' 
-                      : consultor.total_agendamentos > 10 
-                      ? 'linear-gradient(90deg, #3b82f6, #1d4ed8)'
-                      : 'linear-gradient(90deg, #f59e0b, #d97706)'
-                  }}></div>
+                .map(consultor => {
+                  // Buscar dados de comissão deste consultor
+                  const dadosComissao = comissaoData.comissoesPorConsultor.find(c => c.id === consultor.id) || {
+                    comissaoMes: 0,
+                    comissaoGeral: 0,
+                    valorTotalMes: 0,
+                    fechamentosMes: 0
+                  };
                   
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    marginBottom: '15px'
-                  }}>
-                    <div style={{
-                      width: '45px',
-                      height: '45px',
-                      background: consultor.total_agendamentos > 20 
-                        ? 'linear-gradient(135deg, #10b981, #059669)' 
-                        : consultor.total_agendamentos > 10 
-                        ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)'
-                        : 'linear-gradient(135deg, #f59e0b, #d97706)',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginRight: '12px',
-                      color: 'white',
-                      fontWeight: '700',
-                      fontSize: '18px'
+                  return (
+                    <div key={consultor.id} style={{
+                      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      border: '1px solid #cbd5e1',
+                      position: 'relative',
+                      overflow: 'hidden'
                     }}>
-                      {consultor.nome.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <h3 style={{
-                        fontSize: '16px',
-                        fontWeight: '600',
-                        color: '#1f2937',
-                        margin: '0',
-                        lineHeight: '1.2'
-                      }}>
-                        {consultor.nome}
-                      </h3>
-                      <p style={{
-                        fontSize: '12px',
-                        color: '#6b7280',
-                        margin: '0',
-                        fontWeight: '500'
-                      }}>
-                        {consultor.total_agendamentos > 20 ? '🏆 Top Performer' : 
-                         consultor.total_agendamentos > 10 ? '⭐ Ativo' : '🔄 Iniciante'}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {/* Grid de métricas */}
-                  <div style={{ display: 'grid', gap: '8px' }}>
-                    {/* Agendamentos Totais - Destaque */}
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '12px 15px',
-                      background: 'white',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                      border: '1px solid #e2e8f0'
-                    }}>
-                      <span style={{ fontWeight: '600', color: '#374151' }}>📅 Total de Agendamentos:</span>
+                      {/* Indicador visual baseado na quantidade de agendamentos */}
                       <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: '4px',
                         background: consultor.total_agendamentos > 20 
-                          ? '#dcfce7' : consultor.total_agendamentos > 10 
-                          ? '#dbeafe' : '#fef3c7',
-                        color: consultor.total_agendamentos > 20 
-                          ? '#166534' : consultor.total_agendamentos > 10 
-                          ? '#1e40af' : '#92400e',
-                        padding: '4px 12px',
-                        borderRadius: '12px',
-                        fontWeight: '700',
-                        fontSize: '15px'
+                          ? 'linear-gradient(90deg, #10b981, #059669)' 
+                          : consultor.total_agendamentos > 10 
+                          ? 'linear-gradient(90deg, #3b82f6, #1d4ed8)'
+                          : 'linear-gradient(90deg, #f59e0b, #d97706)'
+                      }}></div>
+                      
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        marginBottom: '15px'
                       }}>
-                        {consultor.total_agendamentos}
+                        <div style={{
+                          width: '45px',
+                          height: '45px',
+                          background: consultor.total_agendamentos > 20 
+                            ? 'linear-gradient(135deg, #10b981, #059669)' 
+                            : consultor.total_agendamentos > 10 
+                            ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)'
+                            : 'linear-gradient(135deg, #f59e0b, #d97706)',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginRight: '12px',
+                          color: 'white',
+                          fontWeight: '700',
+                          fontSize: '18px'
+                        }}>
+                          {consultor.nome.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <h3 style={{
+                            fontSize: '16px',
+                            fontWeight: '600',
+                            color: '#1f2937',
+                            margin: '0',
+                            lineHeight: '1.2'
+                          }}>
+                            {consultor.nome}
+                          </h3>
+                          <p style={{
+                            fontSize: '12px',
+                            color: '#6b7280',
+                            margin: '0',
+                            fontWeight: '500'
+                          }}>
+                            {consultor.total_agendamentos > 20 ? '🏆 Top Performer' : 
+                             consultor.total_agendamentos > 10 ? '⭐ Ativo' : '🔄 Iniciante'}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    
-                    {/* Agendamentos Hoje */}
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      padding: '10px 15px',
-                      background: 'white',
-                      borderRadius: '6px',
-                      fontSize: '13px'
-                    }}>
-                      <span>🔥 Hoje:</span>
-                      <strong style={{ color: '#3b82f6' }}>{consultor.agendamentos_hoje || 0}</strong>
-                    </div>
-                    
-                    {/* Taxa de Lembrados */}
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      padding: '10px 15px',
-                      background: 'white',
-                      borderRadius: '6px',
-                      fontSize: '13px'
-                    }}>
-                      <span>💬 Taxa Lembrados:</span>
-                      <strong style={{ color: '#059669' }}>
-                        {consultor.total_agendamentos > 0 
-                          ? Math.round((consultor.total_lembrados / consultor.total_agendamentos) * 100)
-                          : 0}%
-                      </strong>
-                    </div>
-                    
-                    {/* Fechamentos se for admin */}
-                    {isAdmin && (
-                      <>
+                      
+                      {/* Grid de métricas */}
+                      <div style={{ display: 'grid', gap: '8px' }}>
+                        {/* Agendamentos Totais - Destaque */}
                         <div style={{
                           display: 'flex',
                           justifyContent: 'space-between',
-                          padding: '10px 15px',
+                          alignItems: 'center',
+                          padding: '12px 15px',
                           background: 'white',
-                          borderRadius: '6px',
-                          fontSize: '13px'
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                          border: '1px solid #e2e8f0'
                         }}>
-                          <span>💰 Fechamentos/ano:</span>
-                          <strong style={{ color: '#10b981' }}>{consultor.fechamentos_mes || 0}</strong>
+                          <span style={{ fontWeight: '600', color: '#374151' }}>📅 Total de Agendamentos:</span>
+                          <div style={{
+                            background: consultor.total_agendamentos > 20 
+                              ? '#dcfce7' : consultor.total_agendamentos > 10 
+                              ? '#dbeafe' : '#fef3c7',
+                            color: consultor.total_agendamentos > 20 
+                              ? '#166534' : consultor.total_agendamentos > 10 
+                              ? '#1e40af' : '#92400e',
+                            padding: '4px 12px',
+                            borderRadius: '12px',
+                            fontWeight: '700',
+                            fontSize: '15px'
+                          }}>
+                            {consultor.total_agendamentos}
+                          </div>
                         </div>
                         
-                        {/* Valor Total dos Fechamentos */}
+                        {/* Comissão do Mês - NOVO */}
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '12px 15px',
+                          background: 'white',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                          border: '1px solid #e2e8f0'
+                        }}>
+                          <span style={{ fontWeight: '600', color: '#374151' }}>💰 Comissão (mês):</span>
+                          <div style={{
+                            color: '#f59e0b',
+                            fontWeight: '700',
+                            fontSize: '15px'
+                          }}>
+                            {new Intl.NumberFormat('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL'
+                            }).format(dadosComissao.comissaoMes)}
+                          </div>
+                        </div>
+                        
+                        {/* Agendamentos Hoje */}
                         <div style={{
                           display: 'flex',
                           justifyContent: 'space-between',
@@ -598,20 +726,84 @@ const Dashboard = () => {
                           borderRadius: '6px',
                           fontSize: '13px'
                         }}>
-                          <span>💵 Faturamento/ano:</span>
+                          <span>🔥 Hoje:</span>
+                          <strong style={{ color: '#3b82f6' }}>{consultor.agendamentos_hoje || 0}</strong>
+                        </div>
+                        
+                        {/* Taxa de Lembrados */}
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          padding: '10px 15px',
+                          background: 'white',
+                          borderRadius: '6px',
+                          fontSize: '13px'
+                        }}>
+                          <span>💬 Taxa Lembrados:</span>
                           <strong style={{ color: '#059669' }}>
-                            {new Intl.NumberFormat('pt-BR', {
-                              style: 'currency',
-                              currency: 'BRL',
-                              maximumFractionDigits: 0
-                            }).format(consultor.valor_total_mes || 0)}
+                            {consultor.total_agendamentos > 0 
+                              ? Math.round((consultor.total_lembrados / consultor.total_agendamentos) * 100)
+                              : 0}%
                           </strong>
                         </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
+                        
+                        {/* Comissão Total - NOVO */}
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          padding: '10px 15px',
+                          background: 'white',
+                          borderRadius: '6px',
+                          fontSize: '13px'
+                        }}>
+                          <span>💎 Comissão Total:</span>
+                          <strong style={{ color: '#8b5cf6' }}>
+                            {new Intl.NumberFormat('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL'
+                            }).format(dadosComissao.comissaoGeral)}
+                          </strong>
+                        </div>
+                        
+                        {/* Fechamentos se for admin */}
+                        {isAdmin && (
+                          <>
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              padding: '10px 15px',
+                              background: 'white',
+                              borderRadius: '6px',
+                              fontSize: '13px'
+                            }}>
+                              <span>💰 Fechamentos/ano:</span>
+                              <strong style={{ color: '#10b981' }}>{consultor.fechamentos_mes || 0}</strong>
+                            </div>
+                            
+                            {/* Valor Total dos Fechamentos */}
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              padding: '10px 15px',
+                              background: 'white',
+                              borderRadius: '6px',
+                              fontSize: '13px'
+                            }}>
+                              <span>💵 Faturamento/ano:</span>
+                              <strong style={{ color: '#059669' }}>
+                                {new Intl.NumberFormat('pt-BR', {
+                                  style: 'currency',
+                                  currency: 'BRL',
+                                  maximumFractionDigits: 0
+                                }).format(consultor.valor_total_mes || 0)}
+                              </strong>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           </div>
         )}

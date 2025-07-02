@@ -31,11 +31,20 @@ const Login = () => {
       return;
     }
 
+    // Validar se é um email válido
+    if (!formData.email.includes('@') || !formData.email.includes('.')) {
+      setError('Por favor, digite um email válido');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
-      const result = await login(formData.email, formData.senha);
+      // Normalizar email para minúsculas
+      const emailNormalizado = formData.email.toLowerCase();
+      
+      const result = await login(emailNormalizado, formData.senha);
       
       if (!result.success) {
         setError(result.error);
@@ -83,16 +92,16 @@ const Login = () => {
           )}
 
           <div className="form-group">
-            <label htmlFor="email">Email ou Nome</label>
+            <label htmlFor="email">Email</label>
             <div className="input-wrapper">
-              <span className="input-icon">👤</span>
+              <span className="input-icon">📧</span>
               <input
-                type="text"
+                type="email"
                 id="email"
                 name="email"
                 value={formData.email}
                 onChange={handleInputChange}
-                placeholder="admin@crm.com ou Nome do Consultor"
+                placeholder="admin@crm.com ou anajulia@investmoneysa.com.br"
                 disabled={loading}
                 required
               />
@@ -157,11 +166,11 @@ const Login = () => {
               <button
                 type="button"
                 className="demo-button demo-consultor"
-                onClick={() => setFormData({ email: 'André', senha: '123456' })}
+                onClick={() => setFormData({ email: 'anajulia@investmoneysa.com.br', senha: '123456' })}
                 disabled={loading}
               >
                 <span>🩺</span>
-                Consultor
+                Ana Julia
               </button>
             </div>
           </div>

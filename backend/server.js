@@ -64,6 +64,24 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'crm-secret-key-2024';
 
+// Função para normalizar nomes (remover acentos, espaços, converter para minúsculas)
+const normalizarNome = (nome) => {
+  if (!nome) return '';
+  
+  return nome
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+    .replace(/[^a-z0-9]/g, '') // Remove caracteres especiais e espaços
+    .trim();
+};
+
+// Função para gerar email do consultor
+const gerarEmailConsultor = (nome) => {
+  const nomeNormalizado = normalizarNome(nome);
+  return `${nomeNormalizado}@investmoneysa.com.br`;
+};
+
 // Middleware de autenticação
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -210,19 +228,28 @@ app.post('/api/login', async (req, res) => {
       }
     }
 
-    // Se não encontrou admin, tentar login como consultor (por nome)
-    if (!usuario) {
+    // Se não encontrou admin, tentar login como consultor (apenas por email)
+    if (!usuario && email.includes('@')) {
+      // Normalizar email para minúsculas
+      const emailNormalizado = email.toLowerCase();
+      console.log('🔍 Buscando consultor por email:', emailNormalizado);
+      
       const { data: consultores, error } = await supabase
         .from('consultores')
         .select('*')
-        .eq('nome', email) // Usando o campo 'email' como nome do consultor
+        .eq('email', emailNormalizado)
         .limit(1);
+
+      console.log('📊 Resultado da busca:', { consultores, error });
 
       if (error) throw error;
 
       if (consultores && consultores.length > 0) {
         usuario = consultores[0];
         tipoLogin = 'consultor';
+        console.log('✅ Consultor encontrado:', usuario.nome);
+      } else {
+        console.log('❌ Nenhum consultor encontrado com email:', emailNormalizado);
       }
     }
 
@@ -231,12 +258,18 @@ app.post('/api/login', async (req, res) => {
     }
 
     // Verificar senha
+    console.log('🔐 Verificando senha para usuário:', usuario.nome || usuario.email);
+    console.log('🔐 Senha digitada:', senha);
+    console.log('🔐 Hash no banco:', usuario.senha);
+    
     const senhaValida = await bcrypt.compare(senha, usuario.senha);
+    console.log('🔐 Senha válida?', senhaValida);
     
     // TEMPORÁRIO: Aceitar senha admin123 para admin
     const senhaTemporaria = senha === 'admin123' && usuario.email === 'admin@crm.com';
     
     if (!senhaValida && !senhaTemporaria) {
+      console.log('❌ Login falhou: senha inválida');
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
@@ -445,17 +478,24 @@ app.post('/api/consultores', authenticateToken, requireAdmin, async (req, res) =
       return res.status(400).json({ error: 'Senha é obrigatória!' });
     }
     
+    // Gerar email automático normalizado
+    const email = gerarEmailConsultor(nome);
+    
     // Hash da senha antes de salvar
     const saltRounds = 10;
     const senhaHash = await bcrypt.hash(senha, saltRounds);
     
     const { data, error } = await supabase
       .from('consultores')
-      .insert([{ nome, telefone, senha: senhaHash }])
+      .insert([{ nome, telefone, email, senha: senhaHash }])
       .select();
 
     if (error) throw error;
-    res.json({ id: data[0].id, message: 'Consultor cadastrado com sucesso!' });
+    res.json({ 
+      id: data[0].id, 
+      message: 'Consultor cadastrado com sucesso!',
+      email: email 
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -468,6 +508,11 @@ app.put('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res
     
     // Preparar dados para atualização
     const updateData = { nome, telefone };
+    
+    // Atualizar email sempre que o nome for alterado
+    if (nome) {
+      updateData.email = gerarEmailConsultor(nome);
+    }
     
     // Se uma nova senha foi fornecida, fazer hash dela
     if (senha && senha.trim() !== '') {
@@ -482,7 +527,31 @@ app.put('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res
       .select();
 
     if (error) throw error;
-    res.json({ id: data[0].id, message: 'Consultor atualizado com sucesso!' });
+    res.json({ 
+      id: data[0].id, 
+      message: 'Consultor atualizado com sucesso!',
+      email: updateData.email 
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Buscar consultor específico com senha (apenas admin)
+app.get('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const { data, error } = await supabase
+      .from('consultores')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    
+    // Retornar dados incluindo hash da senha (para admin verificar se existe)
+    res.json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -493,11 +562,15 @@ app.get('/api/pacientes', authenticateToken, async (req, res) => {
   try {
     let query = supabase
       .from('pacientes')
-      .select('*')
+      .select(`
+        *,
+        consultores(nome)
+      `)
       .order('created_at', { ascending: false });
 
-    // Se for consultor, filtrar apenas pacientes vinculados a ele através de agendamentos
+    // Se for consultor, filtrar pacientes atribuídos a ele OU vinculados através de agendamentos
     if (req.user.tipo === 'consultor') {
+      // Buscar pacientes com agendamentos deste consultor
       const { data: agendamentos, error: agendError } = await supabase
         .from('agendamentos')
         .select('paciente_id')
@@ -507,18 +580,28 @@ app.get('/api/pacientes', authenticateToken, async (req, res) => {
 
       const pacienteIds = agendamentos.map(a => a.paciente_id);
       
+      // Combinar: pacientes atribuídos diretamente OU com agendamentos
+      const conditions = [`consultor_id.eq.${req.user.consultor_id}`];
+      
       if (pacienteIds.length > 0) {
-        query = query.in('id', pacienteIds);
-      } else {
-        // Se não tem agendamentos, retorna lista vazia
-        return res.json([]);
+        conditions.push(`id.in.(${pacienteIds.join(',')})`);
       }
+      
+      // Aplicar filtro OR
+      query = query.or(conditions.join(','));
     }
 
     const { data, error } = await query;
 
     if (error) throw error;
-    res.json(data);
+    
+    // Reformatar dados para compatibilidade com frontend
+    const formattedData = data.map(paciente => ({
+      ...paciente,
+      consultor_nome: paciente.consultores?.nome
+    }));
+
+    res.json(formattedData);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -526,11 +609,22 @@ app.get('/api/pacientes', authenticateToken, async (req, res) => {
 
 app.post('/api/pacientes', authenticateToken, async (req, res) => {
   try {
-    const { nome, telefone, cpf, tipo_tratamento, status, observacoes } = req.body;
+    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id } = req.body;
+    
+    // Converter consultor_id para null se não fornecido
+    const consultorId = consultor_id && consultor_id.trim() !== '' ? parseInt(consultor_id) : null;
     
     const { data, error } = await supabase
       .from('pacientes')
-      .insert([{ nome, telefone, cpf, tipo_tratamento, status: status || 'lead', observacoes }])
+      .insert([{ 
+        nome, 
+        telefone, 
+        cpf, 
+        tipo_tratamento, 
+        status: status || 'lead', 
+        observacoes,
+        consultor_id: consultorId
+      }])
       .select();
 
     if (error) throw error;
@@ -543,11 +637,22 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
 app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, telefone, cpf, tipo_tratamento, status, observacoes } = req.body;
+    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id } = req.body;
+    
+    // Converter consultor_id para null se não fornecido
+    const consultorId = consultor_id && consultor_id.trim() !== '' ? parseInt(consultor_id) : null;
     
     const { data, error } = await supabase
       .from('pacientes')
-      .update({ nome, telefone, cpf, tipo_tratamento, status, observacoes })
+      .update({ 
+        nome, 
+        telefone, 
+        cpf, 
+        tipo_tratamento, 
+        status, 
+        observacoes,
+        consultor_id: consultorId
+      })
       .eq('id', id)
       .select();
 
@@ -675,6 +780,23 @@ app.put('/api/agendamentos/:id/lembrado', authenticateToken, async (req, res) =>
 
     if (error) throw error;
     res.json({ message: 'Paciente marcado como lembrado!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Deletar agendamento (apenas admin)
+app.delete('/api/agendamentos/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const { error } = await supabase
+      .from('agendamentos')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    res.json({ message: 'Agendamento removido com sucesso!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -938,7 +1060,11 @@ app.get('/api/fechamentos/:id/contrato', async (req, res) => {
 // === DASHBOARD/ESTATÍSTICAS === (Admin vê tudo, Consultor vê apenas seus dados)
 app.get('/api/dashboard', authenticateToken, async (req, res) => {
   try {
-    const hoje = new Date().toISOString().split('T')[0];
+    // Obter data atual do sistema (dinâmica/real)
+    const agora = new Date();
+    const hoje = agora.getFullYear() + '-' + 
+                 String(agora.getMonth() + 1).padStart(2, '0') + '-' + 
+                 String(agora.getDate()).padStart(2, '0');
 
     // Configurar filtros baseados no tipo de usuário
     const isConsultor = req.user.tipo === 'consultor';
@@ -1090,13 +1216,7 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
       };
     });
 
-    // Debug temporário
-    console.log('=== RESPOSTA FINAL ===');
-    const andreStats = estatisticasConsultores.find(c => c.nome && (c.nome.toLowerCase().includes('andré') || c.nome.toLowerCase().includes('andre')));
-    if (andreStats) {
-      console.log('Estatísticas do André sendo enviadas:', andreStats);
-    }
-    console.log('======================');
+    // Sistema pronto com dados reais e dinâmicos
 
     res.json({
       agendamentosHoje: agendamentosHoje.length,

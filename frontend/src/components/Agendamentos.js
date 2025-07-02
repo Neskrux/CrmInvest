@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Agendamentos = () => {
-  const { makeRequest } = useAuth();
+  const { makeRequest, isAdmin } = useAuth();
   const [agendamentos, setAgendamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [consultores, setConsultores] = useState([]);
@@ -42,22 +42,15 @@ const Agendamentos = () => {
     { value: 'cancelado', label: '⛔ Cancelado', color: '#6b7280' }
   ];
 
-  useEffect(() => {
-    fetchAgendamentos();
-    fetchPacientes();
-    fetchConsultores();
-    fetchClinicas();
-  }, []);
-
-  const fetchAgendamentos = async () => {
+  const fetchAgendamentos = useCallback(async () => {
     try {
+      setLoading(true);
       const response = await makeRequest('/agendamentos');
       const data = await response.json();
       
       if (response.ok) {
         setAgendamentos(data);
       } else {
-        console.error('Erro ao carregar agendamentos:', data.error);
         setMessage('Erro ao carregar agendamentos: ' + data.error);
       }
     } catch (error) {
@@ -66,9 +59,9 @@ const Agendamentos = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [makeRequest]);
 
-  const fetchPacientes = async () => {
+  const fetchPacientes = useCallback(async () => {
     try {
       const response = await makeRequest('/pacientes');
       const data = await response.json();
@@ -81,9 +74,9 @@ const Agendamentos = () => {
     } catch (error) {
       console.error('Erro ao carregar pacientes:', error);
     }
-  };
+  }, [makeRequest]);
 
-  const fetchConsultores = async () => {
+  const fetchConsultores = useCallback(async () => {
     try {
       const response = await makeRequest('/consultores');
       const data = await response.json();
@@ -96,9 +89,9 @@ const Agendamentos = () => {
     } catch (error) {
       console.error('Erro ao carregar consultores:', error);
     }
-  };
+  }, [makeRequest]);
 
-  const fetchClinicas = async () => {
+  const fetchClinicas = useCallback(async () => {
     try {
       const response = await makeRequest('/clinicas');
       const data = await response.json();
@@ -111,7 +104,14 @@ const Agendamentos = () => {
     } catch (error) {
       console.error('Erro ao carregar clínicas:', error);
     }
-  };
+  }, [makeRequest]);
+
+  useEffect(() => {
+    fetchAgendamentos();
+    fetchPacientes();
+    fetchConsultores(); 
+    fetchClinicas();
+  }, [fetchAgendamentos, fetchPacientes, fetchConsultores, fetchClinicas]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -170,9 +170,24 @@ const Agendamentos = () => {
   };
 
   const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    
+    // Se o paciente foi alterado, tentar pré-selecionar o consultor responsável
+    if (name === 'paciente_id' && value) {
+      const pacienteSelecionado = pacientes.find(p => p.id.toString() === value);
+      if (pacienteSelecionado && pacienteSelecionado.consultor_id) {
+        setFormData({
+          ...formData,
+          [name]: value,
+          consultor_id: pacienteSelecionado.consultor_id.toString()
+        });
+        return;
+      }
+    }
+    
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: value
     });
   };
 
@@ -223,22 +238,65 @@ const Agendamentos = () => {
     }
   };
 
+  const deletarAgendamento = async (agendamentoId, pacienteNome) => {
+    if (!window.confirm(`Tem certeza que deseja DELETAR o agendamento de ${pacienteNome}?\n\nEsta ação não pode ser desfeita!`)) {
+      return;
+    }
+
+    try {
+      const response = await makeRequest(`/agendamentos/${agendamentoId}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        setMessage('Agendamento removido com sucesso!');
+        fetchAgendamentos();
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        setMessage('Erro ao remover agendamento: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao remover agendamento:', error);
+      setMessage('Erro ao remover agendamento');
+    }
+  };
+
   const formatarData = (data) => {
-    return new Date(data).toLocaleDateString('pt-BR');
+    // Garantir que a data seja interpretada corretamente
+    const dataObj = new Date(data + 'T12:00:00'); // Forçar meio-dia para evitar timezone
+    return dataObj.toLocaleDateString('pt-BR');
   };
 
   const formatarHorario = (horario) => {
     return horario.substring(0, 5); // Remove os segundos
   };
 
+  // Função utilitária para obter data de hoje no formato correto (dinâmica/real)
+  const obterDataHoje = () => {
+    const hoje = new Date();
+    // Garantir que seja no timezone local, sempre atualizada
+    const ano = hoje.getFullYear();
+    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoje.getDate()).padStart(2, '0');
+    
+    return `${ano}-${mes}-${dia}`;
+  };
+
   const ehHoje = (data) => {
-    const hoje = new Date().toISOString().split('T')[0];
-    return data === hoje;
+    const hoje = obterDataHoje(); // Data real atual do sistema
+    
+    // Normalizar a data do agendamento (remover qualquer hora se existir)
+    const dataLimpa = data.split('T')[0]; // Pega só a parte da data (YYYY-MM-DD)
+    
+    return dataLimpa === hoje;
   };
 
   const ehPassado = (data) => {
-    const hoje = new Date().toISOString().split('T')[0];
-    return data < hoje;
+    const hoje = obterDataHoje();
+    const dataLimpa = data.split('T')[0]; // Pega só a parte da data
+    return dataLimpa < hoje;
   };
 
   const resetForm = () => {
@@ -288,8 +346,8 @@ const Agendamentos = () => {
     return matchConsultor && matchClinica && matchStatus && matchData;
   });
 
-  // Obter data atual para o input
-  const hoje = new Date().toISOString().split('T')[0];
+  // Obter data atual para o input (formato consistente)
+  const hoje = obterDataHoje();
 
   // Verificar se há filtros ativos
   const temFiltrosAtivos = filtroConsultor || filtroClinica || filtroDataInicio || filtroDataFim || filtroStatus;
@@ -799,11 +857,12 @@ const Agendamentos = () => {
                         </select>
                       </td>
                       <td>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                           <button
                             onClick={() => handleEdit(agendamento)}
                             className="btn btn-secondary"
                             style={{ padding: '0.5rem', fontSize: '0.85rem' }}
+                            title="Editar agendamento"
                           >
                             ✏️
                           </button>
@@ -814,6 +873,24 @@ const Agendamentos = () => {
                               style={{ padding: '0.5rem', fontSize: '0.85rem' }}
                             >
                               ✅
+                            </button>
+                          )}
+                          {/* Botão Deletar - só admin */}
+                          {isAdmin && (
+                            <button
+                              onClick={() => deletarAgendamento(agendamento.id, agendamento.paciente_nome)}
+                              className="btn"
+                              style={{ 
+                                padding: '0.5rem', 
+                                fontSize: '0.85rem',
+                                background: '#ef4444',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px'
+                              }}
+                              title="Deletar agendamento"
+                            >
+                              🗑️
                             </button>
                           )}
                         </div>

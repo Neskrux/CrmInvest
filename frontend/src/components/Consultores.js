@@ -1,24 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Consultores = () => {
-  const { makeRequest } = useAuth();
+  const { makeRequest, isAdmin } = useAuth();
   const [consultores, setConsultores] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingConsultor, setEditingConsultor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [showSenhaModal, setShowSenhaModal] = useState(false);
+  const [consultorSenha, setConsultorSenha] = useState(null);
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
     senha: ''
   });
 
-  useEffect(() => {
-    fetchConsultores();
-  }, []);
-
-  const fetchConsultores = async () => {
+  const fetchConsultores = useCallback(async () => {
     try {
       const response = await makeRequest('/consultores');
       const data = await response.json();
@@ -35,7 +33,11 @@ const Consultores = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [makeRequest]);
+
+  useEffect(() => {
+    fetchConsultores();
+  }, [fetchConsultores]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -113,6 +115,54 @@ const Consultores = () => {
     });
     setEditingConsultor(null);
     setShowModal(false);
+  };
+
+  const visualizarSenha = async (consultor) => {
+    try {
+      const response = await makeRequest(`/consultores/${consultor.id}`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        setConsultorSenha({
+          ...consultor,
+          temSenha: !!data.senha,
+          hashSenha: data.senha
+        });
+        setShowSenhaModal(true);
+      } else {
+        setMessage('Erro ao carregar dados do consultor: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar consultor:', error);
+      setMessage('Erro ao conectar com o servidor');
+    }
+  };
+
+  const redefinirSenha = async (consultorId, novaSenha) => {
+    try {
+      const consultor = consultores.find(c => c.id === consultorId);
+      const response = await makeRequest(`/consultores/${consultorId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          nome: consultor.nome,
+          telefone: consultor.telefone,
+          senha: novaSenha
+        })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        setMessage('Senha redefinida com sucesso!');
+        setShowSenhaModal(false);
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        setMessage('Erro ao redefinir senha: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao redefinir senha:', error);
+      setMessage('Erro ao redefinir senha');
+    }
   };
 
   return (
@@ -241,29 +291,58 @@ const Consultores = () => {
                 position: 'relative'
               }}
               className="card-grid-item">
-                {/* Botão de Editar no Canto */}
-                <button
-                  onClick={() => handleEdit(consultor)}
-                  style={{
-                    position: 'absolute',
-                    top: '1rem',
-                    right: '1rem',
-                    background: 'rgba(102, 126, 234, 0.1)',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '40px',
-                    height: '40px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    fontSize: '1.1rem'
-                  }}
-                  className="card-edit-btn"
-                >
-                  ✏️
-                </button>
+                {/* Botões de Ação no Canto */}
+                <div style={{
+                  position: 'absolute',
+                  top: '1rem',
+                  right: '1rem',
+                  display: 'flex',
+                  gap: '0.5rem'
+                }}>
+                  <button
+                    onClick={() => handleEdit(consultor)}
+                    style={{
+                      background: 'rgba(102, 126, 234, 0.1)',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '40px',
+                      height: '40px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      fontSize: '1.1rem'
+                    }}
+                    className="card-edit-btn"
+                    title="Editar consultor"
+                  >
+                    ✏️
+                  </button>
+
+                  {/* Botão de Visualizar Senha - apenas admin */}
+                  {isAdmin && (
+                    <button
+                      onClick={() => visualizarSenha(consultor)}
+                      style={{
+                        background: 'rgba(245, 158, 11, 0.1)',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '40px',
+                        height: '40px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        fontSize: '1.1rem'
+                      }}
+                      title="Visualizar/Alterar senha"
+                    >
+                      🔐
+                    </button>
+                  )}
+                </div>
 
                 {/* Header com Avatar e Nome */}
                 <div style={{ 
@@ -310,6 +389,37 @@ const Consultores = () => {
                 
                 {/* Informações */}
                 <div style={{ display: 'grid', gap: '1rem' }}>
+                  <div style={{ 
+                    background: '#f0f4ff', 
+                    padding: '1rem', 
+                    borderRadius: '12px',
+                    border: '1px solid #c7d2fe'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <span style={{ 
+                        fontSize: '1.2rem', 
+                        marginRight: '0.75rem',
+                        background: '#ddd6fe',
+                        padding: '0.5rem',
+                        borderRadius: '8px'
+                      }}>📧</span>
+                      <strong style={{ color: '#374151', fontSize: '0.95rem' }}>Login</strong>
+                    </div>
+                    <div style={{ 
+                      color: '#4338ca', 
+                      fontSize: '0.9rem',
+                      fontWeight: '600',
+                      marginLeft: '2.5rem',
+                      fontFamily: 'monospace',
+                      background: 'rgba(255, 255, 255, 0.7)',
+                      padding: '0.5rem',
+                      borderRadius: '6px',
+                      border: '1px solid #c7d2fe'
+                    }}>
+                      {consultor.email || `${consultor.nome?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')}@investmoneysa.com.br`}
+                    </div>
+                  </div>
+
                   <div style={{ 
                     background: '#f8fafc', 
                     padding: '1rem', 
@@ -438,6 +548,158 @@ const Consultores = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      
+      {/* Modal de Visualização/Alteração de Senha */}
+      {showSenhaModal && consultorSenha && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-header">
+              <h2 className="modal-title">
+                🔐 Senha de {consultorSenha.nome}
+              </h2>
+              <button 
+                className="close-btn"
+                onClick={() => setShowSenhaModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: '1rem 0' }}>
+              {/* Informações do Consultor */}
+              <div style={{ 
+                background: '#f8fafc', 
+                padding: '1.5rem', 
+                borderRadius: '12px',
+                marginBottom: '2rem',
+                border: '1px solid #e2e8f0'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
+                  <div style={{
+                    background: '#667eea',
+                    color: 'white',
+                    width: '50px',
+                    height: '50px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.5rem',
+                    marginRight: '1rem'
+                  }}>
+                    🩺
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#2d3748' }}>
+                      {consultorSenha.nome}
+                    </h3>
+                    <p style={{ margin: 0, color: '#718096', fontSize: '0.9rem' }}>
+                      Email: {consultorSenha.email || 'Não definido'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Status da Senha */}
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  background: consultorSenha.temSenha ? '#ecfdf5' : '#fef2f2',
+                  border: `1px solid ${consultorSenha.temSenha ? '#d1fae5' : '#fecaca'}`
+                }}>
+                  <span style={{ fontSize: '1.5rem', marginRight: '0.75rem' }}>
+                    {consultorSenha.temSenha ? '✅' : '❌'}
+                  </span>
+                  <div>
+                    <strong style={{ 
+                      color: consultorSenha.temSenha ? '#065f46' : '#dc2626',
+                      fontSize: '1rem'
+                    }}>
+                      {consultorSenha.temSenha ? 'Senha Configurada' : 'Sem Senha'}
+                    </strong>
+                    <p style={{ 
+                      margin: 0, 
+                      fontSize: '0.85rem',
+                      color: consultorSenha.temSenha ? '#047857' : '#b91c1c'
+                    }}>
+                      {consultorSenha.temSenha 
+                        ? 'Este consultor pode fazer login no sistema' 
+                        : 'Este consultor não pode fazer login (defina uma senha)'
+                      }
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Formulário para Nova Senha */}
+              <div>
+                <h4 style={{ 
+                  fontSize: '1.1rem', 
+                  marginBottom: '1rem',
+                  color: '#2d3748',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  🔄 {consultorSenha.temSenha ? 'Alterar Senha' : 'Definir Senha'}
+                </h4>
+                
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const novaSenha = e.target.novaSenha.value;
+                  if (novaSenha.length < 3) {
+                    alert('A senha deve ter pelo menos 3 caracteres');
+                    return;
+                  }
+                  if (window.confirm(`Tem certeza que deseja ${consultorSenha.temSenha ? 'alterar' : 'definir'} a senha de ${consultorSenha.nome}?`)) {
+                    redefinirSenha(consultorSenha.id, novaSenha);
+                  }
+                }}>
+                  <div className="form-group">
+                    <label className="form-label">Nova Senha *</label>
+                    <input
+                      type="password"
+                      name="novaSenha"
+                      className="form-input"
+                      placeholder="Digite a nova senha (mínimo 3 caracteres)"
+                      required
+                      minLength="3"
+                      style={{ fontSize: '1rem', padding: '0.75rem' }}
+                    />
+                    <small style={{ color: '#718096', fontSize: '0.85rem' }}>
+                      💡 Dica: Use uma senha simples e fácil de lembrar (ex: 123456)
+                    </small>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
+                    <button 
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setShowSenhaModal(false)}
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      type="submit"
+                      className="btn"
+                      style={{ 
+                        background: '#f59e0b',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '0.75rem 1.5rem'
+                      }}
+                    >
+                      🔐 {consultorSenha.temSenha ? 'Alterar Senha' : 'Definir Senha'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
           </div>
         </div>
       )}

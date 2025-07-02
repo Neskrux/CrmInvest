@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 const Pacientes = () => {
   const { makeRequest } = useAuth();
   const [pacientes, setPacientes] = useState([]);
+  const [consultores, setConsultores] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingPaciente, setEditingPaciente] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -14,7 +15,8 @@ const Pacientes = () => {
     cpf: '',
     tipo_tratamento: '',
     status: 'lead',
-    observacoes: ''
+    observacoes: '',
+    consultor_id: ''
   });
 
   // Status disponíveis para o pipeline
@@ -30,6 +32,7 @@ const Pacientes = () => {
 
   useEffect(() => {
     fetchPacientes();
+    fetchConsultores();
   }, []);
 
   const fetchPacientes = async () => {
@@ -48,6 +51,21 @@ const Pacientes = () => {
       setMessage('Erro ao conectar com o servidor');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchConsultores = async () => {
+    try {
+      const response = await makeRequest('/consultores');
+      const data = await response.json();
+      
+      if (response.ok) {
+        setConsultores(data);
+      } else {
+        console.error('Erro ao carregar consultores:', data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar consultores:', error);
     }
   };
 
@@ -79,7 +97,8 @@ const Pacientes = () => {
           cpf: '',
           tipo_tratamento: '',
           status: 'lead',
-          observacoes: ''
+          observacoes: '',
+          consultor_id: ''
         });
         fetchPacientes();
         setTimeout(() => setMessage(''), 3000);
@@ -100,7 +119,8 @@ const Pacientes = () => {
       cpf: paciente.cpf || '',
       tipo_tratamento: paciente.tipo_tratamento || '',
       status: paciente.status || 'lead',
-      observacoes: paciente.observacoes || ''
+      observacoes: paciente.observacoes || '',
+      consultor_id: paciente.consultor_id || ''
     });
     setShowModal(true);
   };
@@ -171,7 +191,8 @@ const Pacientes = () => {
       cpf: '',
       tipo_tratamento: '',
       status: 'lead',
-      observacoes: ''
+      observacoes: '',
+      consultor_id: ''
     });
     setEditingPaciente(null);
     setShowModal(false);
@@ -324,6 +345,7 @@ const Pacientes = () => {
               <thead>
                 <tr>
                   <th>Nome</th>
+                  <th>Consultor</th>
                   <th>Telefone</th>
                   <th>CPF</th>
                   <th>Tipo de Tratamento</th>
@@ -343,6 +365,36 @@ const Pacientes = () => {
                           <div style={{ fontSize: '0.85rem', color: '#718096', marginTop: '0.25rem' }}>
                             {paciente.observacoes}
                           </div>
+                        )}
+                      </td>
+                      <td>
+                        {paciente.consultor_nome ? (
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '0.5rem',
+                            padding: '0.25rem 0.75rem',
+                            background: '#f0f4ff',
+                            borderRadius: '8px',
+                            border: '1px solid #c7d2fe'
+                          }}>
+                            <span style={{ fontSize: '1rem' }}>👨‍⚕️</span>
+                            <span style={{ 
+                              fontSize: '0.9rem', 
+                              fontWeight: '500',
+                              color: '#4338ca' 
+                            }}>
+                              {paciente.consultor_nome}
+                            </span>
+                          </div>
+                        ) : (
+                          <span style={{ 
+                            color: '#9ca3af', 
+                            fontSize: '0.9rem',
+                            fontStyle: 'italic'
+                          }}>
+                            Não atribuído
+                          </span>
                         )}
                       </td>
                       <td>{formatarTelefone(paciente.telefone)}</td>
@@ -487,6 +539,23 @@ const Pacientes = () => {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Consultor Responsável</label>
+                <select
+                  name="consultor_id"
+                  className="form-select"
+                  value={formData.consultor_id}
+                  onChange={handleInputChange}
+                >
+                  <option value="">Selecione o consultor responsável</option>
+                  {consultores.map(consultor => (
+                    <option key={consultor.id} value={consultor.id}>
+                      {consultor.nome}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="form-group">
