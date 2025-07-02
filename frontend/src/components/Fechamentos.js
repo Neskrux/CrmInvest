@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Fechamentos = () => {
@@ -26,7 +26,8 @@ const Fechamentos = () => {
     data_fechamento: new Date().toISOString().split('T')[0],
     tipo_tratamento: '',
     forma_pagamento: '',
-    observacoes: ''
+    observacoes: '',
+    contrato: null
   });
   const [contratoSelecionado, setContratoSelecionado] = useState(null);
 
@@ -43,11 +44,7 @@ const Fechamentos = () => {
     'Cartão de Débito'
   ];
 
-  useEffect(() => {
-    carregarDados();
-  }, []);
-
-  const carregarDados = async () => {
+  const carregarDados = useCallback(async () => {
     try {
       setCarregando(true);
       setErro(null);
@@ -91,7 +88,11 @@ const Fechamentos = () => {
       setClinicas([]);
       setAgendamentos([]);
     }
-  };
+  }, [makeRequest]);
+
+  useEffect(() => {
+    carregarDados();
+  }, [carregarDados]);
 
   const filtrarFechamentos = () => {
     if (!Array.isArray(fechamentos)) {
@@ -159,7 +160,8 @@ const Fechamentos = () => {
       
       setNovoFechamento({ 
         ...fechamento, 
-        valor_formatado: valorFormatado 
+        valor_formatado: valorFormatado,
+        contrato: null
       });
     } else {
       setFechamentoEditando(null);
@@ -173,7 +175,8 @@ const Fechamentos = () => {
         data_fechamento: new Date().toISOString().split('T')[0],
         tipo_tratamento: '',
         forma_pagamento: '',
-        observacoes: ''
+        observacoes: '',
+        contrato: null
       });
     }
     setModalAberto(true);
@@ -193,7 +196,8 @@ const Fechamentos = () => {
       data_fechamento: new Date().toISOString().split('T')[0],
       tipo_tratamento: '',
       forma_pagamento: '',
-      observacoes: ''
+      observacoes: '',
+      contrato: null
     });
   };
 

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const AuthContext = createContext();
 
@@ -44,9 +44,42 @@ export const AuthProvider = ({ children }) => {
     return response;
   };
 
+  const verifyToken = useCallback(async () => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/verify-token', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+      } else {
+        localStorage.removeItem('token');
+        setUser(null);
+      }
+    } catch (error) {
+      console.error('Erro ao verificar token:', error);
+      localStorage.removeItem('token');
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    verifyToken();
+  }, [verifyToken]);
+
   const login = async (email, senha) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/login`, {
+      const response = await fetch('/api/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -56,69 +89,27 @@ export const AuthProvider = ({ children }) => {
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Erro no login');
+      if (response.ok) {
+        localStorage.setItem('token', data.token);
+        setUser(data.user);
+        return { success: true };
+      } else {
+        return { success: false, error: data.error };
       }
-
-      const { token: newToken, usuario } = data;
-      
-      setToken(newToken);
-      setUser(usuario);
-      localStorage.setItem('token', newToken);
-      localStorage.setItem('user', JSON.stringify(usuario));
-
-      return { success: true, user: usuario };
     } catch (error) {
       console.error('Erro no login:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: 'Erro de conexão' };
     }
   };
 
   const logout = () => {
-    setUser(null);
-    setToken(null);
     localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    setUser(null);
   };
 
-  const verifyToken = async () => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const response = await makeRequest('/verify-token');
-      
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.usuario);
-        localStorage.setItem('user', JSON.stringify(data.usuario));
-      } else {
-        logout();
-      }
-    } catch (error) {
-      console.error('Erro ao verificar token:', error);
-      logout();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    // Tentar recuperar usuário do localStorage
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (error) {
-        console.error('Erro ao parsear usuário salvo:', error);
-        localStorage.removeItem('user');
-      }
-    }
-
-    verifyToken();
-  }, []);
+  const isAuthenticated = !!user;
+  const isAdmin = user?.tipo === 'admin';
+  const isConsultor = user?.tipo === 'consultor';
 
   const value = {
     user,
@@ -127,9 +118,9 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     makeRequest,
-    isAuthenticated: !!user,
-    isAdmin: user?.tipo === 'admin',
-    isConsultor: user?.tipo === 'consultor'
+    isAuthenticated,
+    isAdmin,
+    isConsultor
   };
 
   return (
