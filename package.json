@@ -1,26 +1,15 @@
 {
   "name": "crm-plataforma",
   "version": "1.0.0",
-  "description": "CRM InvestMoney - Sistema completo de gestão de clientes",
-  "main": "backend/server.js",
+  "description": "Plataforma CRM para gestão de leads e agendamentos",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd backend && npm run dev",
     "client": "cd frontend && npm start",
-    "build": "cd frontend && npm install && npm run build",
-    "start": "cd backend && npm start",
-    "railway:build": "cd frontend && npm ci && npm run build && cd ../backend && npm ci",
-    "railway:start": "cd backend && npm start",
-    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
+    "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "build": "cd frontend && npm run build"
   },
-  "keywords": ["crm", "react", "nodejs", "supabase"],
-  "author": "InvestMoney",
-  "license": "MIT",
   "devDependencies": {
     "concurrently": "^8.2.2"
-  },
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=8.0.0"
   }
 } 

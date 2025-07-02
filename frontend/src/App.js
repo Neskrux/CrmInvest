@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import './App.css';
 
 // Contexts
@@ -24,40 +24,63 @@ const NavItem = ({ to, icon, label, isActive }) => (
 
 const Navigation = () => {
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin, isConsultor } = useAuth();
   
-  if (!user) return null;
-
-  const menuItems = [
-    { path: '/', label: 'Dashboard', icon: '📊' },
-    { path: '/pacientes', label: 'Pacientes', icon: '👥' },
-    { path: '/agendamentos', label: 'Agendamentos', icon: '📅' },
-    { path: '/fechamentos', label: 'Fechamentos', icon: '💰' },
-    ...(user.tipo === 'admin' ? [
-      { path: '/clinicas', label: 'Clínicas', icon: '🏥' },
-      { path: '/consultores', label: 'Consultores', icon: '👨‍💼' }
-    ] : [])
+  // Navegação para Admin (acesso total)
+  const adminNavItems = [
+    { to: '/', icon: '📊', label: 'Dashboard' },
+    { to: '/pacientes', icon: '👥', label: 'Pacientes' },
+    { to: '/agendamentos', icon: '📅', label: 'Agendamentos' },
+    { to: '/fechamentos', icon: '💰', label: 'Fechamentos' },
+    { to: '/consultores', icon: '🩺', label: 'Consultores' },
+    { to: '/clinicas', icon: '🏥', label: 'Clínicas' },
   ];
 
+  // Navegação para Consultor (acesso limitado)
+  const consultorNavItems = [
+    { to: '/', icon: '📊', label: 'Meu Dashboard' },
+    { to: '/pacientes', icon: '👥', label: 'Meus Pacientes' },
+    { to: '/agendamentos', icon: '📅', label: 'Meus Agendamentos' },
+    { to: '/fechamentos', icon: '💰', label: 'Meus Fechamentos' },
+  ];
+
+  const navItems = isAdmin ? adminNavItems : consultorNavItems;
+
+  const handleLogout = () => {
+    if (window.confirm('Tem certeza que deseja sair?')) {
+      logout();
+    }
+  };
+
   return (
-    <nav className="navbar">
-      <div className="nav-brand">
-        <h2>CRM InvestMoney</h2>
-        <span className="user-info">
-          👋 {user.nome} ({user.tipo === 'admin' ? 'Admin' : 'Consultor'})
-        </span>
+    <nav className="sidebar">
+      <div className="sidebar-header">
+        <h2>🩺 CRM Saúde</h2>
+        <div className="user-info">
+          <div className="user-avatar">
+            {isAdmin ? '👑' : '🩺'}
+          </div>
+          <div className="user-details">
+            <span className="user-name">{user?.nome}</span>
+            <span className="user-role">
+              {isAdmin ? 'Administrador' : 'Consultor'}
+            </span>
+          </div>
+        </div>
       </div>
-      
-      <div className="nav-menu">
-        {menuItems.map(item => (
-          <a key={item.path} href={item.path} className="nav-link">
-            <span className="nav-icon">{item.icon}</span>
-            {item.label}
-          </a>
+      <div className="nav-items">
+        {navItems.map(item => (
+          <NavItem
+            key={item.to}
+            to={item.to}
+            icon={item.icon}
+            label={item.label}
+            isActive={location.pathname === item.to}
+          />
         ))}
-        
-        <button onClick={logout} className="logout-btn">
-          🚪 Sair
+        <button className="logout-button" onClick={handleLogout}>
+          <span className="nav-icon">🚪</span>
+          <span className="nav-label">Sair</span>
         </button>
       </div>
     </nav>
@@ -75,27 +98,12 @@ const LoadingScreen = () => (
   </div>
 );
 
-// Componente de rota protegida
-const ProtectedRoute = ({ children }) => {
-  const { user, loading } = useAuth();
-  
-  if (loading) {
-    return <div className="loading">Carregando...</div>;
-  }
-  
-  return user ? children : <Navigate to="/login" />;
-};
+// Componente principal protegido
+const AuthenticatedApp = () => {
+  const { isAdmin } = useAuth();
 
-// Componente principal
-const AppContent = () => {
-  const { isAuthenticated, loading } = useAuth();
-
-  if (loading) {
-    return <LoadingScreen />;
-  }
-
-  return isAuthenticated ? (
-    <ProtectedRoute>
+  return (
+    <div className="app">
       <Navigation />
       <main className="main-content">
         <Routes>
@@ -105,7 +113,7 @@ const AppContent = () => {
           <Route path="/fechamentos" element={<Fechamentos />} />
           
           {/* Rotas apenas para Admin */}
-          {user.tipo === 'admin' && (
+          {isAdmin && (
             <>
               <Route path="/consultores" element={<Consultores />} />
               <Route path="/clinicas" element={<Clinicas />} />
@@ -116,8 +124,19 @@ const AppContent = () => {
           <Route path="*" element={<Dashboard />} />
         </Routes>
       </main>
-    </ProtectedRoute>
-  ) : <Login />;
+    </div>
+  );
+};
+
+// Componente principal
+const AppContent = () => {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  return isAuthenticated ? <AuthenticatedApp /> : <Login />;
 };
 
 function App() {

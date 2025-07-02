@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Fechamentos = () => {
@@ -26,8 +26,7 @@ const Fechamentos = () => {
     data_fechamento: new Date().toISOString().split('T')[0],
     tipo_tratamento: '',
     forma_pagamento: '',
-    observacoes: '',
-    contrato: null
+    observacoes: ''
   });
   const [contratoSelecionado, setContratoSelecionado] = useState(null);
 
@@ -44,7 +43,11 @@ const Fechamentos = () => {
     'Cartão de Débito'
   ];
 
-  const carregarDados = useCallback(async () => {
+  useEffect(() => {
+    carregarDados();
+  }, []);
+
+  const carregarDados = async () => {
     try {
       setCarregando(true);
       setErro(null);
@@ -88,11 +91,7 @@ const Fechamentos = () => {
       setClinicas([]);
       setAgendamentos([]);
     }
-  }, [makeRequest]);
-
-  useEffect(() => {
-    carregarDados();
-  }, [carregarDados]);
+  };
 
   const filtrarFechamentos = () => {
     if (!Array.isArray(fechamentos)) {
@@ -160,8 +159,7 @@ const Fechamentos = () => {
       
       setNovoFechamento({ 
         ...fechamento, 
-        valor_formatado: valorFormatado,
-        contrato: null
+        valor_formatado: valorFormatado 
       });
     } else {
       setFechamentoEditando(null);
@@ -175,8 +173,7 @@ const Fechamentos = () => {
         data_fechamento: new Date().toISOString().split('T')[0],
         tipo_tratamento: '',
         forma_pagamento: '',
-        observacoes: '',
-        contrato: null
+        observacoes: ''
       });
     }
     setModalAberto(true);
@@ -196,8 +193,7 @@ const Fechamentos = () => {
       data_fechamento: new Date().toISOString().split('T')[0],
       tipo_tratamento: '',
       forma_pagamento: '',
-      observacoes: '',
-      contrato: null
+      observacoes: ''
     });
   };
 
@@ -264,10 +260,16 @@ const Fechamentos = () => {
 
       console.log('Enviando dados com arquivo...'); // Debug
 
+      // Configurar URL base da API
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 
+        (process.env.NODE_ENV === 'production' 
+          ? 'https://seu-backend.vercel.app/api' 
+          : 'http://localhost:5000/api');
+      
       // Enviar dados - usar fetch diretamente para FormData
       const url = fechamentoEditando 
-        ? `http://localhost:5000/api/fechamentos/${fechamentoEditando.id}`
-        : 'http://localhost:5000/api/fechamentos';
+        ? `${API_BASE_URL}/fechamentos/${fechamentoEditando.id}`
+        : `${API_BASE_URL}/fechamentos`;
       
       const token = localStorage.getItem('token');
       const response = await fetch(url, {
@@ -683,8 +685,12 @@ const Fechamentos = () => {
                   <button 
                     onClick={async () => {
                       try {
+                        const API_BASE_URL = process.env.REACT_APP_API_URL || 
+                          (process.env.NODE_ENV === 'production' 
+                            ? 'https://seu-backend.vercel.app/api' 
+                            : 'http://localhost:5000/api');
                         const token = localStorage.getItem('token');
-                        const response = await fetch(`http://localhost:5000/api/fechamentos/${fechamento.id}/contrato?token=${token}`);
+                        const response = await fetch(`${API_BASE_URL}/fechamentos/${fechamento.id}/contrato?token=${token}`);
                         
                         if (!response.ok) {
                           const errorData = await response.json();

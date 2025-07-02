@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Pacientes = () => {
@@ -30,7 +30,12 @@ const Pacientes = () => {
     { value: 'reagendado', label: '🔄 Reagendado', color: '#a78bfa' }
   ];
 
-  const fetchPacientes = useCallback(async () => {
+  useEffect(() => {
+    fetchPacientes();
+    fetchConsultores();
+  }, []);
+
+  const fetchPacientes = async () => {
     try {
       const response = await makeRequest('/pacientes');
       const data = await response.json();
@@ -47,9 +52,9 @@ const Pacientes = () => {
     } finally {
       setLoading(false);
     }
-  }, [makeRequest]);
+  };
 
-  const fetchConsultores = useCallback(async () => {
+  const fetchConsultores = async () => {
     try {
       const response = await makeRequest('/consultores');
       const data = await response.json();
@@ -62,14 +67,7 @@ const Pacientes = () => {
     } catch (error) {
       console.error('Erro ao carregar consultores:', error);
     }
-  }, [makeRequest]);
-
-  useEffect(() => {
-    const loadData = async () => {
-      await Promise.all([fetchPacientes(), fetchConsultores()]);
-    };
-    loadData();
-  }, [fetchPacientes, fetchConsultores]);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();

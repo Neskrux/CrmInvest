@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Clinicas = () => {
@@ -71,6 +71,7 @@ const Clinicas = () => {
     'AL': ['Maceió', 'Arapiraca', 'Rio Largo', 'Palmeira dos Índios', 'União dos Palmares', 'Penedo'],
     'SE': ['Aracaju', 'Nossa Senhora do Socorro', 'Lagarto', 'Itabaiana', 'Estância', 'Tobias Barreto'],
     'PB': ['João Pessoa', 'Campina Grande', 'Santa Rita', 'Patos', 'Bayeux', 'Sousa', 'Cajazeiras'],
+    'PE': ['Recife', 'Jaboatão dos Guararapes', 'Olinda', 'Caruaru', 'Petrolina', 'Paulista'],
     'RN': ['Natal', 'Mossoró', 'Parnamirim', 'São Gonçalo do Amarante', 'Macaíba', 'Ceará-Mirim'],
     'PI': ['Teresina', 'Parnaíba', 'Picos', 'Piripiri', 'Floriano', 'Campo Maior', 'Barras'],
     'MA': ['São Luís', 'Imperatriz', 'São José de Ribamar', 'Timon', 'Caxias', 'Codó', 'Paço do Lumiar'],
@@ -83,7 +84,11 @@ const Clinicas = () => {
     'PA': ['Belém', 'Ananindeua', 'Santarém', 'Marabá', 'Parauapebas', 'Castanhal', 'Abaetetuba']
   };
 
-  const fetchClinicas = useCallback(async () => {
+  useEffect(() => {
+    fetchClinicas();
+  }, []);
+
+  const fetchClinicas = async () => {
     try {
       const response = await makeRequest('/clinicas');
       const data = await response.json();
@@ -100,11 +105,7 @@ const Clinicas = () => {
     } finally {
       setLoading(false);
     }
-  }, [makeRequest]);
-
-  useEffect(() => {
-    fetchClinicas();
-  }, [fetchClinicas]);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();

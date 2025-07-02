@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Dashboard = () => {
@@ -15,10 +15,11 @@ const Dashboard = () => {
     estatisticasConsultores: []
   });
   const [pipelineStats, setPipelineStats] = useState({
-    agendamentosTotal: 0,
-    agendamentosConfirmados: 0,
-    agendamentosCancelados: 0,
-    taxaConversao: 0
+    leads: 0,
+    agendados: 0,
+    compareceram: 0,
+    fechados: 0,
+    naoFecharam: 0
   });
   const [comissaoData, setComissaoData] = useState({
     comissaoTotalMes: 0,
@@ -27,7 +28,18 @@ const Dashboard = () => {
   });
   const [loading, setLoading] = useState(true);
 
-  const fetchDashboardData = useCallback(async () => {
+  // Função para calcular comissão: R$ 5 para cada R$ 1.000 fechados
+  const calcularComissao = (valorFechado) => {
+    return (valorFechado / 1000) * 5;
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+    fetchPipelineStats();
+    fetchComissaoData();
+  }, []);
+
+  const fetchDashboardData = async () => {
     try {
       const response = await makeRequest('/dashboard');
       const data = await response.json();
@@ -42,55 +54,70 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [makeRequest]);
+  };
 
-  const fetchPipelineStats = useCallback(async () => {
+  const fetchPipelineStats = async () => {
     try {
+      // Buscar estatísticas de pacientes por status
       const pacientesResponse = await makeRequest('/pacientes');
       const pacientes = await pacientesResponse.json();
 
+      // Buscar estatísticas de agendamentos por status
       const agendamentosResponse = await makeRequest('/agendamentos');
       const agendamentos = await agendamentosResponse.json();
 
+      // Contar por status
       const pipelineData = {
-        agendamentosTotal: pacientes.length + agendamentos.length,
-        agendamentosConfirmados: pacientes.filter(p => p.status === 'confirmado').length + 
-                              agendamentos.filter(a => a.status === 'confirmado').length,
-        agendamentosCancelados: pacientes.filter(p => p.status === 'cancelado').length + 
-                              agendamentos.filter(a => a.status === 'cancelado').length,
-        taxaConversao: (pipelineData.agendamentosConfirmados / pipelineData.agendamentosTotal) * 100
+        leads: pacientes.filter(p => p.status === 'lead').length,
+        agendados: pacientes.filter(p => p.status === 'agendado').length + 
+                  agendamentos.filter(a => a.status === 'agendado').length,
+        compareceram: pacientes.filter(p => p.status === 'compareceu').length + 
+                     agendamentos.filter(a => a.status === 'compareceu').length,
+        fechados: pacientes.filter(p => p.status === 'fechado').length + 
+                 agendamentos.filter(a => a.status === 'fechado').length,
+        naoFecharam: pacientes.filter(p => p.status === 'nao_fechou').length + 
+                    agendamentos.filter(a => a.status === 'nao_fechou').length,
+        naoCompareceram: agendamentos.filter(a => a.status === 'nao_compareceu').length,
+        reagendados: pacientes.filter(p => p.status === 'reagendado').length + 
+                    agendamentos.filter(a => a.status === 'reagendado').length
       };
 
       setPipelineStats(pipelineData);
     } catch (error) {
       console.error('Erro ao carregar estatísticas do pipeline:', error);
     }
-  }, [makeRequest]);
+  };
 
-  const fetchComissaoData = useCallback(async () => {
+  const fetchComissaoData = async () => {
     try {
+      // Buscar todos os fechamentos
       const response = await makeRequest('/fechamentos');
       const fechamentos = await response.json();
       
       if (response.ok) {
+        // Obter mês atual
         const agora = new Date();
-        const mesAtual = agora.getMonth() + 1;
+        const mesAtual = agora.getMonth() + 1; // getMonth() retorna 0-11
         const anoAtual = agora.getFullYear();
         
+        // Filtrar fechamentos do mês atual
         const fechamentosMes = fechamentos.filter(f => {
           const dataFechamento = new Date(f.data_fechamento);
           return dataFechamento.getMonth() + 1 === mesAtual && 
                  dataFechamento.getFullYear() === anoAtual;
         });
         
+        // Calcular comissão total do mês
         const comissaoMes = fechamentosMes.reduce((total, f) => {
           return total + calcularComissao(f.valor_fechado || 0);
         }, 0);
         
+        // Calcular comissão total geral
         const comissaoGeral = fechamentos.reduce((total, f) => {
           return total + calcularComissao(f.valor_fechado || 0);
         }, 0);
         
+        // Agrupar por consultor para comissões individuais
         const comissoesPorConsultor = {};
         
         fechamentos.forEach(f => {
@@ -110,10 +137,12 @@ const Dashboard = () => {
             
             const comissaoFechamento = calcularComissao(f.valor_fechado || 0);
             
+            // Totais gerais
             comissoesPorConsultor[f.consultor_id].valorTotalGeral += f.valor_fechado || 0;
             comissoesPorConsultor[f.consultor_id].comissaoGeral += comissaoFechamento;
             comissoesPorConsultor[f.consultor_id].fechamentosGeral += 1;
             
+            // Verificar se é do mês atual
             const dataFechamento = new Date(f.data_fechamento);
             if (dataFechamento.getMonth() + 1 === mesAtual && 
                 dataFechamento.getFullYear() === anoAtual) {
@@ -128,37 +157,20 @@ const Dashboard = () => {
           comissaoTotalMes: comissaoMes,
           comissaoTotalGeral: comissaoGeral,
           comissoesPorConsultor: Object.values(comissoesPorConsultor)
-            .sort((a, b) => b.comissaoMes - a.comissaoMes)
+            .sort((a, b) => b.comissaoMes - a.comissaoMes) // Ordenar por comissão do mês
         });
       }
     } catch (error) {
       console.error('Erro ao buscar dados de comissão:', error);
     }
-  }, [calcularComissao]);
+  };
 
   const hoje = new Date().toLocaleDateString('pt-BR');
 
-  const taxaConversao = pipelineStats.agendamentosTotal > 0 
-    ? Math.round((pipelineStats.agendamentosConfirmados / pipelineStats.agendamentosTotal) * 100)
+  // Calcular taxa de conversão
+  const taxaConversao = pipelineStats.leads > 0 
+    ? Math.round((pipelineStats.fechados / pipelineStats.leads) * 100)
     : 0;
-
-  const calcularComissao = (valorFechado) => {
-    return (valorFechado / 1000) * 5;
-  };
-
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await Promise.all([
-        fetchDashboardData(),
-        fetchPipelineStats(),
-        fetchComissaoData()
-      ]);
-      setLoading(false);
-    };
-    
-    loadData();
-  }, [fetchDashboardData, fetchPipelineStats, fetchComissaoData]);
 
   if (loading) {
     return (
@@ -429,7 +441,7 @@ const Dashboard = () => {
               {taxaConversao}%
             </div>
             <div style={{ fontSize: '14px', color: '#6b7280' }}>
-              {pipelineStats.agendamentosConfirmados} confirmados de {pipelineStats.agendamentosTotal} agendamentos
+              {pipelineStats.fechados} fechados de {pipelineStats.leads} leads
             </div>
           </div>
         </div>
@@ -482,7 +494,7 @@ const Dashboard = () => {
               border: '1px solid #fbbf24'
             }}>
               <div style={{ fontSize: '24px', fontWeight: '700', color: '#d97706', marginBottom: '5px' }}>
-                {pipelineStats.agendamentosTotal}
+                {pipelineStats.leads}
               </div>
               <div style={{ fontSize: '13px', color: '#92400e', fontWeight: '500' }}>🔍 Leads</div>
             </div>
@@ -495,9 +507,9 @@ const Dashboard = () => {
               border: '1px solid #60a5fa'
             }}>
               <div style={{ fontSize: '24px', fontWeight: '700', color: '#2563eb', marginBottom: '5px' }}>
-                {pipelineStats.agendamentosConfirmados}
+                {pipelineStats.agendados}
               </div>
-              <div style={{ fontSize: '13px', color: '#1d4ed8', fontWeight: '500' }}>📅 Confirmados</div>
+              <div style={{ fontSize: '13px', color: '#1d4ed8', fontWeight: '500' }}>📅 Agendados</div>
             </div>
             
             <div style={{
@@ -508,9 +520,9 @@ const Dashboard = () => {
               border: '1px solid #34d399'
             }}>
               <div style={{ fontSize: '24px', fontWeight: '700', color: '#059669', marginBottom: '5px' }}>
-                {pipelineStats.agendamentosCancelados}
+                {pipelineStats.compareceram}
               </div>
-              <div style={{ fontSize: '13px', color: '#047857', fontWeight: '500' }}>🎯 Cancelados</div>
+              <div style={{ fontSize: '13px', color: '#047857', fontWeight: '500' }}>🎯 Compareceram</div>
             </div>
             
             <div style={{
@@ -521,9 +533,9 @@ const Dashboard = () => {
               border: '1px solid #10b981'
             }}>
               <div style={{ fontSize: '24px', fontWeight: '700', color: '#10b981', marginBottom: '5px' }}>
-                {pipelineStats.agendamentosConfirmados}
+                {pipelineStats.fechados}
               </div>
-              <div style={{ fontSize: '13px', color: '#059669', fontWeight: '500' }}>💰 Confirmados</div>
+              <div style={{ fontSize: '13px', color: '#059669', fontWeight: '500' }}>💰 Fechados</div>
             </div>
           </div>
         </div>
