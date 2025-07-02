@@ -7,11 +7,11 @@
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd backend && npm run dev",
     "client": "cd frontend && npm start",
-    "build": "cd frontend && npm run build",
+    "build": "cd frontend && npm ci && npm run build",
     "build:backend": "cd backend && npm install",
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
     "start": "cd backend && npm start",
-    "vercel-build": "cd frontend && npm install && npm run build && cd ../backend && npm install"
+    "vercel-build": "cd frontend && npm ci && npm run build && cd ../backend && npm ci"
   },
   "keywords": ["crm", "react", "nodejs", "supabase"],
   "author": "InvestMoney",
