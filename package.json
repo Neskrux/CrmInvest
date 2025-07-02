@@ -2,13 +2,15 @@
   "name": "crm-plataforma",
   "version": "1.0.0",
   "description": "CRM InvestMoney - Sistema completo de gestão de clientes",
-  "main": "frontend/src/index.js",
+  "main": "backend/server.js",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd backend && npm run dev",
     "client": "cd frontend && npm start",
     "build": "cd frontend && npm install && npm run build",
-    "start": "cd frontend && npm start",
+    "start": "cd backend && npm start",
+    "railway:build": "cd frontend && npm ci && npm run build && cd ../backend && npm ci",
+    "railway:start": "cd backend && npm start",
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
   },
   "keywords": ["crm", "react", "nodejs", "supabase"],

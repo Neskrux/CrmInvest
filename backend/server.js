@@ -1185,8 +1185,6 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
     const { data: todosFechamentos, error: fechError } = await fechamentosConsultorQuery;
     if (fechError) throw fechError;
 
-
-
     // Processar estatísticas dos consultores
     const estatisticasConsultores = consultores.map(consultor => {
       // Filtrar agendamentos do consultor
@@ -1203,8 +1201,6 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
 
       const valorTotalConsultor = fechamentosConsultorMes.reduce((acc, f) => acc + parseFloat(f.valor_fechado || 0), 0);
 
-
-
       return {
         id: consultor.id,
         nome: consultor.nome,
@@ -1217,7 +1213,6 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
     });
 
     // Sistema pronto com dados reais e dinâmicos
-
     res.json({
       agendamentosHoje: agendamentosHoje.length,
       lembradosHoje: lembradosHoje.length,
@@ -1232,6 +1227,15 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// === SERVIR ARQUIVOS ESTÁTICOS DO REACT ===
+// Servir arquivos build do React (para produção)
+app.use(express.static(path.join(__dirname, '../frontend/build')));
+
+// Todas as rotas não-API devem retornar o React app
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/build', 'index.html'));
 });
 
 // Inicializar servidor
