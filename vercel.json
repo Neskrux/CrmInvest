@@ -1,6 +1,7 @@
 {
-  "buildCommand": "cd frontend && npm install && npm run build-vercel",
+  "buildCommand": "cd frontend && npm install --force && npx react-scripts build",
   "outputDirectory": "frontend/build",
+  "framework": null,
   "rewrites": [
     {
       "source": "/api/(.*)",
