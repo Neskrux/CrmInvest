@@ -4,11 +4,13 @@ import { useAuth } from '../contexts/AuthContext';
 const Pacientes = () => {
   const { makeRequest } = useAuth();
   const [pacientes, setPacientes] = useState([]);
+  const [novosLeads, setNovosLeads] = useState([]);
   const [consultores, setConsultores] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingPaciente, setEditingPaciente] = useState(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [activeTab, setActiveTab] = useState('pacientes');
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
@@ -21,19 +23,22 @@ const Pacientes = () => {
 
   // Status disponíveis para o pipeline
   const statusOptions = [
-    { value: 'lead', label: '🔍 Lead', color: '#fbbf24' },
-    { value: 'agendado', label: '📅 Agendado', color: '#60a5fa' },
-    { value: 'compareceu', label: '✅ Compareceu', color: '#34d399' },
-    { value: 'fechado', label: '💰 Fechado', color: '#10b981' },
-    { value: 'nao_fechou', label: '❌ Não Fechou', color: '#ef4444' },
-    { value: 'nao_compareceu', label: '🚫 Não Compareceu', color: '#f87171' },
-    { value: 'reagendado', label: '🔄 Reagendado', color: '#a78bfa' }
+    { value: 'lead', label: 'Lead', color: '#f59e0b' },
+    { value: 'agendado', label: 'Agendado', color: '#3b82f6' },
+    { value: 'compareceu', label: 'Compareceu', color: '#10b981' },
+    { value: 'fechado', label: 'Fechado', color: '#059669' },
+    { value: 'nao_fechou', label: 'Não Fechou', color: '#dc2626' },
+    { value: 'nao_compareceu', label: 'Não Compareceu', color: '#ef4444' },
+    { value: 'reagendado', label: 'Reagendado', color: '#8b5cf6' }
   ];
 
   useEffect(() => {
     fetchPacientes();
     fetchConsultores();
-  }, []);
+    if (activeTab === 'novos-leads') {
+      fetchNovosLeads();
+    }
+  }, [activeTab]);
 
   const fetchPacientes = async () => {
     try {
@@ -66,6 +71,45 @@ const Pacientes = () => {
       }
     } catch (error) {
       console.error('Erro ao carregar consultores:', error);
+    }
+  };
+
+  const fetchNovosLeads = async () => {
+    try {
+      const response = await makeRequest('/novos-leads');
+      const data = await response.json();
+      
+      if (response.ok) {
+        setNovosLeads(data);
+      } else {
+        console.error('Erro ao carregar novos leads:', data.error);
+        setMessage('Erro ao carregar novos leads: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar novos leads:', error);
+      setMessage('Erro ao conectar com o servidor');
+    }
+  };
+
+  const pegarLead = async (leadId) => {
+    try {
+      const response = await makeRequest(`/novos-leads/${leadId}/pegar`, {
+        method: 'PUT'
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        setMessage('Lead atribuído com sucesso!');
+        fetchNovosLeads();
+        fetchPacientes();
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        setMessage('Erro ao pegar lead: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao pegar lead:', error);
+      setMessage('Erro ao pegar lead');
     }
   };
 
@@ -164,9 +208,7 @@ const Pacientes = () => {
 
   const formatarTelefone = (telefone) => {
     if (!telefone) return '';
-    // Remove caracteres não numéricos
     const numbers = telefone.replace(/\D/g, '');
-    // Aplica máscara (xx) xxxxx-xxxx
     if (numbers.length === 11) {
       return `(${numbers.substring(0, 2)}) ${numbers.substring(2, 7)}-${numbers.substring(7)}`;
     }
@@ -175,9 +217,7 @@ const Pacientes = () => {
 
   const formatarCPF = (cpf) => {
     if (!cpf) return '';
-    // Remove caracteres não numéricos
     const numbers = cpf.replace(/\D/g, '');
-    // Aplica máscara xxx.xxx.xxx-xx
     if (numbers.length === 11) {
       return `${numbers.substring(0, 3)}.${numbers.substring(3, 6)}.${numbers.substring(6, 9)}-${numbers.substring(9)}`;
     }
@@ -201,257 +241,265 @@ const Pacientes = () => {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">👥 Gestão de Pacientes</h1>
+        <h1 className="page-title">Gestão de Pacientes</h1>
         <p className="page-subtitle">Cadastre e acompanhe seus pacientes e leads</p>
       </div>
 
-      {message && (
-        <div className={`alert ${message.includes('sucesso') ? 'alert-success' : 'alert-error'}`}>
-          {message}
-        </div>
+      {/* Navegação por abas */}
+      <div className="tabs">
+        <button
+          className={`tab ${activeTab === 'pacientes' ? 'active' : ''}`}
+          onClick={() => setActiveTab('pacientes')}
+        >
+          Pacientes
+        </button>
+        <button
+          className={`tab ${activeTab === 'novos-leads' ? 'active' : ''}`}
+          onClick={() => setActiveTab('novos-leads')}
+          style={{ position: 'relative' }}
+        >
+          Novos Leads
+          {novosLeads.length > 0 && (
+            <span className="tab-badge">{novosLeads.length}</span>
+          )}
+        </button>
+      </div>
+
+      {/* Conteúdo da aba Pacientes */}
+      {activeTab === 'pacientes' && (
+        <>
+          {message && (
+            <div className={`alert ${message.includes('sucesso') ? 'alert-success' : 'alert-error'}`}>
+              {message}
+            </div>
+          )}
+
+          {/* Resumo de Estatísticas */}
+          <div className="stats-grid" style={{ marginBottom: '2rem' }}>
+            <div className="stat-card">
+              <div className="stat-label">Leads</div>
+              <div className="stat-value">{pacientes.filter(p => p.status === 'lead').length}</div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">Agendados</div>
+              <div className="stat-value">{pacientes.filter(p => p.status === 'agendado').length}</div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">Fechados</div>
+              <div className="stat-value">{pacientes.filter(p => p.status === 'fechado').length}</div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">Total</div>
+              <div className="stat-value">{pacientes.length}</div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">Taxa Conversão</div>
+              <div className="stat-value">
+                {pacientes.length > 0 
+                  ? Math.round((pacientes.filter(p => p.status === 'fechado').length / pacientes.length) * 100)
+                  : 0}%
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 className="card-title">Lista de Pacientes</h2>
+              <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Novo Paciente
+              </button>
+            </div>
+
+            {loading ? (
+              <div className="loading">
+                <div className="spinner"></div>
+              </div>
+            ) : pacientes.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#6b7280', padding: '3rem' }}>
+                Nenhum paciente cadastrado ainda.
+              </div>
+            ) : (
+              <div className="table-container">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Nome</th>
+                      <th>Consultor</th>
+                      <th>Telefone</th>
+                      <th>CPF</th>
+                      <th>Tipo</th>
+                      <th>Status</th>
+                      <th>Cadastrado</th>
+                      <th style={{ width: '100px' }}>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pacientes.map(paciente => {
+                      const statusInfo = getStatusInfo(paciente.status);
+                      return (
+                        <tr key={paciente.id}>
+                          <td>
+                            <div>
+                              <strong>{paciente.nome}</strong>
+                              {paciente.observacoes && (
+                                <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+                                  {paciente.observacoes}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            {paciente.consultor_nome || (
+                              <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
+                                Não atribuído
+                              </span>
+                            )}
+                          </td>
+                          <td>{formatarTelefone(paciente.telefone)}</td>
+                          <td>{formatarCPF(paciente.cpf)}</td>
+                          <td>
+                            {paciente.tipo_tratamento && (
+                              <span className={`badge badge-${paciente.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
+                                {paciente.tipo_tratamento}
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            <select
+                              value={paciente.status}
+                              onChange={(e) => updateStatus(paciente.id, e.target.value)}
+                              style={{
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                backgroundColor: statusInfo.color + '10',
+                                color: statusInfo.color,
+                                border: `1px solid ${statusInfo.color}`,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {statusOptions.map(option => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td>{formatarData(paciente.created_at)}</td>
+                          <td>
+                            <button
+                              onClick={() => handleEdit(paciente)}
+                              className="btn btn-sm btn-secondary"
+                            >
+                              Editar
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
       )}
 
-      {/* Resumo de Estatísticas */}
-      <div style={{ 
-        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', 
-        padding: '2rem', 
-        borderRadius: '16px', 
-        marginBottom: '2rem',
-        border: '1px solid #cbd5e0',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)'
-      }}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          marginBottom: '1.5rem' 
-        }}>
-          <h3 style={{ 
-            fontSize: '1.2rem', 
-            fontWeight: '600', 
-            color: '#2d3748', 
-            margin: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            📊 Resumo do Pipeline
-          </h3>
-          <button 
-            className="btn btn-primary"
-            onClick={() => setShowModal(true)}
-            style={{ 
-              padding: '0.75rem 1.5rem',
-              fontSize: '1rem',
-              fontWeight: '600'
-            }}
-          >
-            ➕ Novo Paciente
-          </button>
-        </div>
-        
-        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
-          <div style={{ 
-            background: 'white', 
-            padding: '1.5rem', 
-            borderRadius: '12px', 
-            textAlign: 'center',
-            border: '1px solid #e2e8f0',
-            borderLeft: '4px solid #fbbf24'
-          }}>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#fbbf24', marginBottom: '0.5rem' }}>
-              {pacientes.filter(p => p.status === 'lead').length}
+      {/* Conteúdo da aba Novos Leads */}
+      {activeTab === 'novos-leads' && (
+        <>
+          {message && (
+            <div className={`alert ${message.includes('sucesso') ? 'alert-success' : 'alert-error'}`}>
+              {message}
             </div>
-            <div style={{ color: '#718096', fontSize: '0.9rem', fontWeight: '500' }}>🔍 Leads</div>
-          </div>
-          
-          <div style={{ 
-            background: 'white', 
-            padding: '1.5rem', 
-            borderRadius: '12px', 
-            textAlign: 'center',
-            border: '1px solid #e2e8f0',
-            borderLeft: '4px solid #60a5fa'
-          }}>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#60a5fa', marginBottom: '0.5rem' }}>
-              {pacientes.filter(p => p.status === 'agendado').length}
-            </div>
-            <div style={{ color: '#718096', fontSize: '0.9rem', fontWeight: '500' }}>📅 Agendados</div>
-          </div>
-          
-          <div style={{ 
-            background: 'white', 
-            padding: '1.5rem', 
-            borderRadius: '12px', 
-            textAlign: 'center',
-            border: '1px solid #e2e8f0',
-            borderLeft: '4px solid #10b981'
-          }}>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#10b981', marginBottom: '0.5rem' }}>
-              {pacientes.filter(p => p.status === 'fechado').length}
-            </div>
-            <div style={{ color: '#718096', fontSize: '0.9rem', fontWeight: '500' }}>💰 Fechados</div>
-          </div>
-          
-          <div style={{ 
-            background: 'white', 
-            padding: '1.5rem', 
-            borderRadius: '12px', 
-            textAlign: 'center',
-            border: '1px solid #e2e8f0',
-            borderLeft: '4px solid #667eea'
-          }}>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#667eea', marginBottom: '0.5rem' }}>
-              {pacientes.length}
-            </div>
-            <div style={{ color: '#718096', fontSize: '0.9rem', fontWeight: '500' }}>👥 Total</div>
-          </div>
-          
-          <div style={{ 
-            background: 'white', 
-            padding: '1.5rem', 
-            borderRadius: '12px', 
-            textAlign: 'center',
-            border: '1px solid #e2e8f0',
-            borderLeft: '4px solid #34d399'
-          }}>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#34d399', marginBottom: '0.5rem' }}>
-              {pacientes.length > 0 
-                ? Math.round((pacientes.filter(p => p.status === 'fechado').length / pacientes.length) * 100)
-                : 0}%
-            </div>
-            <div style={{ color: '#718096', fontSize: '0.9rem', fontWeight: '500' }}>📈 Taxa Conversão</div>
-          </div>
-        </div>
-      </div>
+          )}
 
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">📋 Lista Completa de Pacientes</h2>
-          <div style={{ fontSize: '0.9rem', color: '#718096' }}>
-            {pacientes.length} paciente(s) cadastrado(s)
-          </div>
-        </div>
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Novos Leads Disponíveis</h2>
+              <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                {novosLeads.length} lead(s) disponível(eis)
+              </div>
+            </div>
 
-        {loading ? (
-          <p>Carregando pacientes...</p>
-        ) : pacientes.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#718096', padding: '2rem' }}>
-            Nenhum paciente cadastrado ainda. Clique em "Novo Paciente" para começar.
-          </p>
-        ) : (
-          <div className="table-container">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Nome</th>
-                  <th>Consultor</th>
-                  <th>Telefone</th>
-                  <th>CPF</th>
-                  <th>Tipo de Tratamento</th>
-                  <th>Status</th>
-                  <th>Cadastrado em</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pacientes.map(paciente => {
-                  const statusInfo = getStatusInfo(paciente.status);
-                  return (
-                    <tr key={paciente.id}>
-                      <td>
-                        <strong>{paciente.nome}</strong>
-                        {paciente.observacoes && (
-                          <div style={{ fontSize: '0.85rem', color: '#718096', marginTop: '0.25rem' }}>
-                            {paciente.observacoes}
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        {paciente.consultor_nome ? (
-                          <div style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '0.5rem',
-                            padding: '0.25rem 0.75rem',
-                            background: '#f0f4ff',
-                            borderRadius: '8px',
-                            border: '1px solid #c7d2fe'
-                          }}>
-                            <span style={{ fontSize: '1rem' }}>👨‍⚕️</span>
-                            <span style={{ 
-                              fontSize: '0.9rem', 
-                              fontWeight: '500',
-                              color: '#4338ca' 
-                            }}>
-                              {paciente.consultor_nome}
-                            </span>
-                          </div>
-                        ) : (
-                          <span style={{ 
-                            color: '#9ca3af', 
-                            fontSize: '0.9rem',
-                            fontStyle: 'italic'
-                          }}>
-                            Não atribuído
-                          </span>
-                        )}
-                      </td>
-                      <td>{formatarTelefone(paciente.telefone)}</td>
-                      <td>{formatarCPF(paciente.cpf)}</td>
-                      <td>
-                        {paciente.tipo_tratamento && (
-                          <span style={{
-                            padding: '0.25rem 0.75rem',
-                            borderRadius: '12px',
-                            fontSize: '0.85rem',
-                            background: paciente.tipo_tratamento === 'Estético' ? '#e3f2fd' : '#f3e5f5',
-                            color: paciente.tipo_tratamento === 'Estético' ? '#1565c0' : '#7b1fa2',
-                            border: `1px solid ${paciente.tipo_tratamento === 'Estético' ? '#1976d2' : '#9c27b0'}`
-                          }}>
-                            {paciente.tipo_tratamento === 'Estético' ? '✨ Estético' : '🦷 Odontológico'}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        <select
-                          value={paciente.status}
-                          onChange={(e) => updateStatus(paciente.id, e.target.value)}
-                          style={{
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '8px',
-                            fontSize: '0.85rem',
-                            backgroundColor: statusInfo.color + '20',
-                            color: statusInfo.color,
-                            border: `1px solid ${statusInfo.color}`,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {statusOptions.map(option => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td>{formatarData(paciente.created_at)}</td>
-                      <td>
-                        <button
-                          onClick={() => handleEdit(paciente)}
-                          className="btn btn-secondary"
-                          style={{ padding: '0.5rem', fontSize: '0.85rem' }}
-                        >
-                          ✏️ Editar
-                        </button>
-                      </td>
+            {loading ? (
+              <div className="loading">
+                <div className="spinner"></div>
+              </div>
+            ) : novosLeads.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#6b7280', padding: '3rem' }}>
+                Nenhum lead novo disponível no momento.
+              </div>
+            ) : (
+              <div className="table-container">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Nome</th>
+                      <th>Telefone</th>
+                      <th>CPF</th>
+                      <th>Tipo</th>
+                      <th>Status</th>
+                      <th>Cadastrado</th>
+                      <th style={{ width: '120px' }}>Ações</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody>
+                    {novosLeads.map(lead => {
+                      const statusInfo = getStatusInfo(lead.status);
+                      return (
+                        <tr key={lead.id}>
+                          <td>
+                            <div>
+                              <strong>{lead.nome}</strong>
+                              {lead.observacoes && (
+                                <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+                                  {lead.observacoes}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td>{formatarTelefone(lead.telefone)}</td>
+                          <td>{formatarCPF(lead.cpf)}</td>
+                          <td>
+                            {lead.tipo_tratamento && (
+                              <span className={`badge badge-${lead.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
+                                {lead.tipo_tratamento}
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            <span className="badge badge-warning">
+                              {statusInfo.label}
+                            </span>
+                          </td>
+                          <td>{formatarData(lead.created_at)}</td>
+                          <td>
+                            <button
+                              onClick={() => pegarLead(lead.id)}
+                              className="btn btn-primary"
+                            >
+                              Pegar Lead
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       {/* Modal de Cadastro/Edição */}
       {showModal && (
@@ -459,17 +507,14 @@ const Pacientes = () => {
           <div className="modal">
             <div className="modal-header">
               <h2 className="modal-title">
-                {editingPaciente ? '✏️ Editar Paciente' : '➕ Novo Paciente/Lead'}
+                {editingPaciente ? 'Editar Paciente' : 'Novo Paciente'}
               </h2>
-              <button 
-                className="close-btn"
-                onClick={resetForm}
-              >
-                ✕
+              <button className="close-btn" onClick={resetForm}>
+                ×
               </button>
             </div>
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} className="modal-body">
               <div className="form-group">
                 <label className="form-label">Nome Completo *</label>
                 <input
@@ -518,9 +563,9 @@ const Pacientes = () => {
                     value={formData.tipo_tratamento}
                     onChange={handleInputChange}
                   >
-                    <option value="">Selecione o tipo de tratamento</option>
-                    <option value="Estético">✨ Estético</option>
-                    <option value="Odontológico">🦷 Odontológico</option>
+                    <option value="">Selecione</option>
+                    <option value="Estético">Estético</option>
+                    <option value="Odontológico">Odontológico</option>
                   </select>
                 </div>
 
@@ -549,7 +594,7 @@ const Pacientes = () => {
                   value={formData.consultor_id}
                   onChange={handleInputChange}
                 >
-                  <option value="">Selecione o consultor responsável</option>
+                  <option value="">Selecione (opcional)</option>
                   {consultores.map(consultor => (
                     <option key={consultor.id} value={consultor.id}>
                       {consultor.nome}
@@ -565,24 +610,17 @@ const Pacientes = () => {
                   className="form-textarea"
                   value={formData.observacoes}
                   onChange={handleInputChange}
-                  placeholder="Informações adicionais sobre o paciente..."
+                  placeholder="Informações adicionais..."
                   rows="3"
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-                <button 
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={resetForm}
-                >
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={resetForm}>
                   Cancelar
                 </button>
-                <button 
-                  type="submit"
-                  className="btn btn-primary"
-                >
-                  {editingPaciente ? '💾 Atualizar Paciente' : '💾 Cadastrar Paciente'}
+                <button type="submit" className="btn btn-primary">
+                  {editingPaciente ? 'Atualizar' : 'Cadastrar'}
                 </button>
               </div>
             </form>

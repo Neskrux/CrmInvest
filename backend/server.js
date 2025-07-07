@@ -12,8 +12,21 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Configuração CORS para Vercel
+const corsOptions = {
+  origin: [
+    'http://localhost:3000',
+    'https://localhost:3000',
+    process.env.FRONTEND_URL,
+    /\.vercel\.app$/
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -386,11 +399,20 @@ app.get('/api/clinicas', authenticateToken, async (req, res) => {
 
 app.get('/api/clinicas/cidades', authenticateToken, async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const { estado } = req.query;
+    
+    let query = supabase
       .from('clinicas')
       .select('cidade')
       .not('cidade', 'is', null)
       .not('cidade', 'eq', '');
+
+    // Filtrar por estado se especificado
+    if (estado) {
+      query = query.eq('estado', estado);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     
@@ -471,7 +493,7 @@ app.get('/api/consultores', authenticateToken, async (req, res) => {
 
 app.post('/api/consultores', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { nome, telefone, senha } = req.body;
+    const { nome, telefone, senha, pix } = req.body;
     
     // Validar se senha foi fornecida
     if (!senha || senha.trim() === '') {
@@ -487,7 +509,7 @@ app.post('/api/consultores', authenticateToken, requireAdmin, async (req, res) =
     
     const { data, error } = await supabase
       .from('consultores')
-      .insert([{ nome, telefone, email, senha: senhaHash }])
+      .insert([{ nome, telefone, email, senha: senhaHash, pix }])
       .select();
 
     if (error) throw error;
@@ -501,13 +523,87 @@ app.post('/api/consultores', authenticateToken, requireAdmin, async (req, res) =
   }
 });
 
+// === CADASTRO PÚBLICO DE CONSULTORES === (Sem autenticação)
+app.post('/api/consultores/cadastro', async (req, res) => {
+  try {
+    const { nome, telefone, email, senha, cpf, pix } = req.body;
+    
+    // Validar campos obrigatórios
+    if (!nome || !telefone || !email || !senha || !cpf || !pix) {
+      return res.status(400).json({ error: 'Todos os campos são obrigatórios!' });
+    }
+    
+    // Validar formato do email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Email inválido!' });
+    }
+    
+    // Validar se email já existe
+    const { data: emailExistente, error: emailError } = await supabase
+      .from('consultores')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .limit(1);
+
+    if (emailError) throw emailError;
+    
+    if (emailExistente && emailExistente.length > 0) {
+      return res.status(400).json({ error: 'Este email já está cadastrado!' });
+    }
+    
+    // Validar se CPF já existe
+    const { data: cpfExistente, error: cpfError } = await supabase
+      .from('consultores')
+      .select('id')
+      .eq('cpf', cpf)
+      .limit(1);
+
+    if (cpfError) throw cpfError;
+    
+    if (cpfExistente && cpfExistente.length > 0) {
+      return res.status(400).json({ error: 'Este CPF já está cadastrado!' });
+    }
+    
+    // Hash da senha
+    const saltRounds = 10;
+    const senhaHash = await bcrypt.hash(senha, saltRounds);
+    
+    // Inserir consultor
+    const { data, error } = await supabase
+      .from('consultores')
+      .insert([{ 
+        nome, 
+        telefone, 
+        email: email.toLowerCase(), 
+        senha: senhaHash, 
+        cpf, 
+        pix,
+        tipo: 'consultor',
+        ativo: true
+      }])
+      .select();
+
+    if (error) throw error;
+    
+    res.json({ 
+      id: data[0].id, 
+      message: 'Consultor cadastrado com sucesso! Agora você pode fazer login.',
+      email: email.toLowerCase()
+    });
+  } catch (error) {
+    console.error('Erro no cadastro:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.put('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, telefone, senha } = req.body;
+    const { nome, telefone, senha, pix } = req.body;
     
     // Preparar dados para atualização
-    const updateData = { nome, telefone };
+    const updateData = { nome, telefone, pix };
     
     // Atualizar email sempre que o nome for alterado
     if (nome) {
@@ -675,6 +771,52 @@ app.put('/api/pacientes/:id/status', authenticateToken, async (req, res) => {
 
     if (error) throw error;
     res.json({ message: 'Status atualizado com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === NOVOS LEADS === (Funcionalidade para pegar leads)
+app.get('/api/novos-leads', authenticateToken, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('pacientes')
+      .select('*')
+      .is('consultor_id', null)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/novos-leads/:id/pegar', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Verificar se o lead ainda está disponível
+    const { data: pacienteAtual, error: checkError } = await supabase
+      .from('pacientes')
+      .select('consultor_id')
+      .eq('id', id)
+      .single();
+
+    if (checkError) throw checkError;
+
+    if (pacienteAtual.consultor_id !== null) {
+      return res.status(400).json({ error: 'Este lead já foi atribuído a outro consultor!' });
+    }
+
+    // Atribuir o lead ao consultor atual
+    const { error } = await supabase
+      .from('pacientes')
+      .update({ consultor_id: req.user.consultor_id })
+      .eq('id', id);
+
+    if (error) throw error;
+    res.json({ message: 'Lead atribuído com sucesso!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

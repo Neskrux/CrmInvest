@@ -235,8 +235,8 @@ const Clinicas = () => {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">🏥 Gestão de Clínicas</h1>
-        <p className="page-subtitle">Cadastre as clínicas parceiras do sistema</p>
+        <h1 className="page-title">Clínicas</h1>
+        <p className="page-subtitle">Gerencie as clínicas parceiras</p>
       </div>
 
       {message && (
@@ -247,82 +247,64 @@ const Clinicas = () => {
 
       <div className="card">
         <div className="card-header">
-          <h2 className="card-title">🏥 Lista de Clínicas</h2>
+          <h2 className="card-title">Lista de Clínicas</h2>
+          <button 
+            className="btn btn-primary"
+            onClick={() => setShowModal(true)}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Nova Clínica
+          </button>
         </div>
 
         {/* Seção de Filtros */}
         <div style={{ 
-          background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', 
-          padding: '2rem', 
-          borderRadius: '16px', 
-          marginBottom: '2rem',
-          border: '1px solid #cbd5e0',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)'
+          padding: '1.5rem', 
+          marginBottom: '1.5rem',
+          backgroundColor: '#f9fafb',
+          borderRadius: '8px',
+          border: '1px solid #e5e7eb'
         }}>
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
             alignItems: 'center', 
-            marginBottom: '1.5rem' 
+            marginBottom: '1rem' 
           }}>
             <h3 style={{ 
-              fontSize: '1.2rem', 
+              fontSize: '1.1rem', 
               fontWeight: '600', 
-              color: '#2d3748', 
-              margin: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
+              color: '#1a1d23', 
+              margin: 0
             }}>
-              🔍 Filtros de Busca
+              Filtros de Busca
             </h3>
-            <button 
-              className="btn btn-primary"
-              onClick={() => setShowModal(true)}
-              style={{ 
-                padding: '0.75rem 1.5rem',
-                fontSize: '1rem',
-                fontWeight: '600'
-              }}
-            >
-              ➕ Nova Clínica
-            </button>
+            {(filtroEstado || filtroCity) && (
+              <button 
+                onClick={() => {
+                  setFiltroEstado('');
+                  setFiltroCity('');
+                }}
+                className="btn btn-secondary"
+                style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+              >
+                Limpar Filtros
+              </button>
+            )}
           </div>
           
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
-            gap: '1.5rem',
-            alignItems: 'end'
-          }}>
-            {/* Filtro por Estado */}
+          <div className="grid grid-2">
             <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ 
-                fontSize: '1rem', 
-                color: '#374151', 
-                marginBottom: '0.5rem',
-                fontWeight: '500',
-                display: 'block'
-              }}>
-                🗺️ Estado:
-              </label>
+              <label className="form-label">Estado</label>
               <select
                 value={filtroEstado}
                 onChange={(e) => {
                   setFiltroEstado(e.target.value);
-                  setFiltroCity(''); // Limpar filtro de cidade
+                  setFiltroCity('');
                 }}
                 className="form-select"
-                style={{
-                  padding: '0.875rem 1rem',
-                  borderRadius: '12px',
-                  border: '2px solid #d1d5db',
-                  fontSize: '1rem',
-                  background: 'white',
-                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-                  transition: 'all 0.2s ease',
-                  cursor: 'pointer'
-                }}
               >
                 <option value="">Todos os estados</option>
                 {estadosDisponiveis.map(estado => {
@@ -336,32 +318,12 @@ const Clinicas = () => {
               </select>
             </div>
 
-            {/* Filtro por Cidade */}
             <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ 
-                fontSize: '1rem', 
-                color: '#374151', 
-                marginBottom: '0.5rem',
-                fontWeight: '500',
-                display: 'block'
-              }}>
-                🌆 Cidade:
-              </label>
+              <label className="form-label">Cidade</label>
               <select
                 value={filtroCity}
                 onChange={(e) => setFiltroCity(e.target.value)}
                 className="form-select"
-                style={{
-                  padding: '0.875rem 1rem',
-                  borderRadius: '12px',
-                  border: '2px solid #d1d5db',
-                  fontSize: '1rem',
-                  background: 'white',
-                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-                  transition: 'all 0.2s ease',
-                  cursor: 'pointer',
-                  opacity: (!filtroEstado && cidadesDisponiveis.length > 20) ? 0.6 : 1
-                }}
                 disabled={!filtroEstado && cidadesDisponiveis.length > 20}
               >
                 <option value="">Todas as cidades</option>
@@ -370,205 +332,93 @@ const Clinicas = () => {
                 ))}
               </select>
             </div>
-
-            {/* Botão Limpar Filtros */}
-            {(filtroEstado || filtroCity) && (
-              <div className="form-group" style={{ margin: 0 }}>
-                <label style={{ 
-                  fontSize: '1rem', 
-                  color: 'transparent', 
-                  marginBottom: '0.5rem',
-                  fontWeight: '500',
-                  display: 'block'
-                }}>
-                  .
-                </label>
-                <button 
-                  onClick={() => {
-                    setFiltroEstado('');
-                    setFiltroCity('');
-                  }}
-                  className="btn btn-secondary"
-                  style={{ 
-                    padding: '0.875rem 1.5rem',
-                    fontSize: '1rem',
-                    borderRadius: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    width: '100%',
-                    justifyContent: 'center'
-                  }}
-                >
-                  🗑️ Limpar Filtros
-                </button>
-              </div>
-            )}
           </div>
 
-          {/* Contador de resultados */}
           {(filtroEstado || filtroCity) && (
             <div style={{ 
-              marginTop: '1.5rem', 
-              padding: '1rem 1.5rem', 
-              background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)', 
-              borderRadius: '12px',
-              border: '1px solid #93c5fd',
-              color: '#1e40af',
-              fontSize: '1rem',
-              fontWeight: '500',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
+              marginTop: '1rem', 
+              padding: '0.75rem', 
+              backgroundColor: '#f3f4f6', 
+              borderRadius: '6px',
+              color: '#4b5563',
+              fontSize: '0.9rem'
             }}>
-              📍 Exibindo <strong style={{ margin: '0 0.25rem', color: '#1d4ed8' }}>{clinicasFiltradas.length}</strong> 
-              de {clinicas.length} clínica(s)
-              {filtroEstado && ` • Estado: ${filtroEstado}`}
-              {filtroCity && ` • Cidade: ${filtroCity}`}
+              Mostrando <strong>{clinicasFiltradas.length}</strong> de {clinicas.length} clínica(s)
             </div>
           )}
         </div>
 
         {loading ? (
-          <p>Carregando clínicas...</p>
+          <div className="loading">
+            <div className="spinner"></div>
+          </div>
         ) : clinicasFiltradas.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#718096', padding: '2rem' }}>
+          <p style={{ textAlign: 'center', color: '#6b7280', padding: '2rem' }}>
             {filtroEstado || filtroCity
-              ? `Nenhuma clínica encontrada com os filtros aplicados.`
-              : 'Nenhuma clínica cadastrada ainda. Clique em "Nova Clínica" para começar.'
+              ? 'Nenhuma clínica encontrada com os filtros aplicados.'
+              : 'Nenhuma clínica cadastrada ainda.'
             }
           </p>
         ) : (
-          <div className="grid grid-2">
-              {clinicasFiltradas.map(clinica => (
-                <div key={clinica.id} className="card card-grid-item" style={{ margin: 0, position: 'relative' }}>
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    marginBottom: '1rem',
-                    paddingBottom: '0.75rem',
-                    borderBottom: '2px solid #667eea'
-                  }}>
-                    <span style={{ fontSize: '2rem', marginRight: '0.75rem' }}>🏥</span>
-                    <h3 style={{ 
-                      fontSize: '1.25rem', 
-                      fontWeight: '600', 
-                      color: '#2d3748',
-                      margin: 0,
-                      flex: 1
-                    }}>
-                      {clinica.nome}
-                    </h3>
-                    <button
-                      onClick={() => handleEdit(clinica)}
-                      className="btn-edit card-edit-btn"
-                    >
-                      ✏️
-                    </button>
-                  </div>
-                  
-                  <div style={{ display: 'grid', gap: '0.75rem' }}>
-                    {clinica.endereco && (
-                      <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-                        <span style={{ marginRight: '0.5rem' }}>📍</span>
-                        <span style={{ color: '#4a5568' }}>{clinica.endereco}</span>
-                      </div>
-                    )}
-
-                    {clinica.bairro && (
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <span style={{ marginRight: '0.5rem' }}>🏘️</span>
-                        <span style={{ color: '#4a5568' }}>{clinica.bairro}</span>
-                      </div>
-                    )}
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      {clinica.cidade && (
-                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                          <span style={{ marginRight: '0.25rem' }}>🌆</span>
-                          <span style={{ 
-                            color: '#667eea', 
-                            fontWeight: '600',
-                            padding: '0.25rem 0.5rem',
-                            background: '#e3f2fd',
-                            borderRadius: '12px',
-                            fontSize: '0.85rem'
-                          }}>
-                            {clinica.cidade}
-                          </span>
-                        </div>
+          <div className="table-container">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Endereço</th>
+                  <th>Bairro</th>
+                  <th>Cidade/Estado</th>
+                  <th>Nicho</th>
+                  <th>Contato</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clinicasFiltradas.map(clinica => (
+                  <tr key={clinica.id}>
+                    <td>
+                      <strong>{clinica.nome}</strong>
+                    </td>
+                    <td>{clinica.endereco || '-'}</td>
+                    <td>{clinica.bairro || '-'}</td>
+                    <td>
+                      {clinica.cidade && clinica.estado ? (
+                        <span>{clinica.cidade}/{clinica.estado}</span>
+                      ) : '-'}
+                    </td>
+                    <td>
+                      {clinica.nicho ? (
+                        <span className="badge" style={{ backgroundColor: '#e5e7eb', color: '#374151' }}>
+                          {clinica.nicho}
+                        </span>
+                      ) : '-'}
+                    </td>
+                    <td>
+                      {clinica.telefone && (
+                        <div>{formatarTelefone(clinica.telefone)}</div>
                       )}
-
-                      {clinica.estado && (
-                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                          <span style={{ marginRight: '0.25rem' }}>🗺️</span>
-                          <span style={{ 
-                            color: '#059669', 
-                            fontWeight: '600',
-                            padding: '0.25rem 0.5rem',
-                            background: '#d1fae5',
-                            borderRadius: '12px',
-                            fontSize: '0.85rem'
-                          }}>
-                            {clinica.estado}
-                          </span>
-                        </div>
+                      {clinica.email && (
+                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>{clinica.email}</div>
                       )}
-
-                      {clinica.nicho && (
-                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                          <span style={{ marginRight: '0.25rem' }}>
-                            {clinica.nicho === 'Estético' ? '✨' : 
-                             clinica.nicho === 'Odontológico' ? '🦷' : '🎯'}
-                          </span>
-                          <span style={{ 
-                            color: clinica.nicho === 'Estético' ? '#7c3aed' : 
-                                   clinica.nicho === 'Odontológico' ? '#dc2626' : '#f59e0b',
-                            fontWeight: '600',
-                            padding: '0.25rem 0.5rem',
-                            background: clinica.nicho === 'Estético' ? '#f3e8ff' : 
-                                       clinica.nicho === 'Odontológico' ? '#fef2f2' : '#fef3c7',
-                            borderRadius: '12px',
-                            fontSize: '0.85rem'
-                          }}>
-                            {clinica.nicho}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {clinica.telefone && (
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <span style={{ marginRight: '0.5rem' }}>📞</span>
-                        <span style={{ color: '#4a5568' }}>{formatarTelefone(clinica.telefone)}</span>
-                      </div>
-                    )}
-                    
-                    {clinica.email && (
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <span style={{ marginRight: '0.5rem' }}>📧</span>
-                        <a 
-                          href={`mailto:${clinica.email}`}
-                          style={{ color: '#667eea', textDecoration: 'none' }}
-                        >
-                          {clinica.email}
-                        </a>
-                      </div>
-                    )}
-                    
-                    <div style={{ 
-                      marginTop: '1rem',
-                      paddingTop: '0.75rem',
-                      borderTop: '1px solid #e2e8f0',
-                      fontSize: '0.85rem',
-                      color: '#718096'
-                    }}>
-                      Cadastrada em: {formatarData(clinica.created_at)}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                      {!clinica.telefone && !clinica.email && '-'}
+                    </td>
+                    <td>
+                      <button
+                        onClick={() => handleEdit(clinica)}
+                        className="btn-action"
+                        title="Editar"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -578,17 +428,17 @@ const Clinicas = () => {
           <div className="modal" style={{ maxWidth: '700px' }}>
             <div className="modal-header">
               <h2 className="modal-title">
-                {editingClinica ? '✏️ Editar Clínica' : '🏥 Nova Clínica'}
+                {editingClinica ? 'Editar Clínica' : 'Nova Clínica'}
               </h2>
               <button 
                 className="close-btn"
                 onClick={resetForm}
               >
-                ✕
+                ×
               </button>
             </div>
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} autoComplete="off">
               <div className="form-group">
                 <label className="form-label">Nome da Clínica *</label>
                 <input
@@ -635,7 +485,7 @@ const Clinicas = () => {
 
                 <div className="form-group">
                   <label className="form-label">Cidade *</label>
-                  {cidadesSugeridas.length > 0 ? (
+                  {cidadesSugeridas.length > 0 && formData.cidade !== 'OUTRA' ? (
                     <select
                       name="cidade"
                       className="form-select"
@@ -647,16 +497,16 @@ const Clinicas = () => {
                       {cidadesSugeridas.map(cidade => (
                         <option key={cidade} value={cidade}>{cidade}</option>
                       ))}
-                      <option value="OUTRA">➕ Outra cidade</option>
+                      <option value="OUTRA">Outra cidade</option>
                     </select>
                   ) : (
                     <input
                       type="text"
                       name="cidade"
                       className="form-input"
-                      value={formData.cidade}
+                      value={formData.cidade === 'OUTRA' ? '' : formData.cidade}
                       onChange={handleInputChange}
-                      placeholder={formData.estado ? "Digite o nome da cidade" : "Selecione o estado primeiro"}
+                      placeholder="Digite o nome da cidade"
                       disabled={!formData.estado}
                       required
                     />
@@ -676,40 +526,19 @@ const Clinicas = () => {
                 </div>
               </div>
 
-              {/* Campo personalizado para cidade se "OUTRA" for selecionada */}
-              {formData.cidade === 'OUTRA' && (
-                <div className="form-group">
-                  <label className="form-label">Nome da Cidade *</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="Digite o nome da cidade"
-                    onChange={(e) => setFormData(prev => ({ ...prev, cidade: e.target.value }))}
-                    required
-                  />
-                </div>
-              )}
-
               <div className="form-group">
-                <label className="form-label">🎯 Nicho da Clínica *</label>
+                <label className="form-label">Nicho da Clínica *</label>
                 <select
                   name="nicho"
                   className="form-select"
                   value={formData.nicho}
                   onChange={handleInputChange}
                   required
-                  style={{
-                    padding: '0.75rem 1rem',
-                    borderRadius: '8px',
-                    border: '2px solid #d1d5db',
-                    fontSize: '1rem',
-                    background: 'white'
-                  }}
                 >
                   <option value="">Selecione o nicho</option>
-                  <option value="Estético">✨ Estético</option>
-                  <option value="Odontológico">🦷 Odontológico</option>
-                  <option value="Ambos">🎯 Ambos (Estético + Odontológico)</option>
+                  <option value="Estético">Estético</option>
+                  <option value="Odontológico">Odontológico</option>
+                  <option value="Ambos">Ambos (Estético + Odontológico)</option>
                 </select>
               </div>
 
@@ -751,7 +580,7 @@ const Clinicas = () => {
                   type="submit"
                   className="btn btn-primary"
                 >
-                  {editingClinica ? '💾 Atualizar Clínica' : '💾 Cadastrar Clínica'}
+                  {editingClinica ? 'Atualizar Clínica' : 'Cadastrar Clínica'}
                 </button>
               </div>
             </form>

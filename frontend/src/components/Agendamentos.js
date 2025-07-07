@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Agendamentos = () => {
-  const { makeRequest, isAdmin } = useAuth();
+  const { makeRequest } = useAuth();
   const [agendamentos, setAgendamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [consultores, setConsultores] = useState([]);
@@ -32,25 +32,32 @@ const Agendamentos = () => {
 
   // Status disponíveis para agendamentos
   const statusOptions = [
-    { value: 'agendado', label: '📅 Agendado', color: '#60a5fa' },
-    { value: 'lembrado', label: '✅ Lembrado', color: '#34d399' },
-    { value: 'compareceu', label: '🎯 Compareceu', color: '#10b981' },
-    { value: 'nao_compareceu', label: '🚫 Não Compareceu', color: '#f87171' },
-    { value: 'fechado', label: '💰 Fechado', color: '#059669' },
-    { value: 'nao_fechou', label: '❌ Não Fechou', color: '#ef4444' },
-    { value: 'reagendado', label: '🔄 Reagendado', color: '#a78bfa' },
-    { value: 'cancelado', label: '⛔ Cancelado', color: '#6b7280' }
+    { value: 'agendado', label: 'Agendado', color: '#2563eb' },
+    { value: 'lembrado', label: 'Lembrado', color: '#059669' },
+    { value: 'compareceu', label: 'Compareceu', color: '#10b981' },
+    { value: 'nao_compareceu', label: 'Não Compareceu', color: '#dc2626' },
+    { value: 'fechado', label: 'Fechado', color: '#059669' },
+    { value: 'nao_fechou', label: 'Não Fechou', color: '#ef4444' },
+    { value: 'reagendado', label: 'Reagendado', color: '#8b5cf6' },
+    { value: 'cancelado', label: 'Cancelado', color: '#6b7280' }
   ];
 
-  const fetchAgendamentos = useCallback(async () => {
+  useEffect(() => {
+    fetchAgendamentos();
+    fetchPacientes();
+    fetchConsultores();
+    fetchClinicas();
+  }, []);
+
+  const fetchAgendamentos = async () => {
     try {
-      setLoading(true);
       const response = await makeRequest('/agendamentos');
       const data = await response.json();
       
       if (response.ok) {
         setAgendamentos(data);
       } else {
+        console.error('Erro ao carregar agendamentos:', data.error);
         setMessage('Erro ao carregar agendamentos: ' + data.error);
       }
     } catch (error) {
@@ -59,9 +66,9 @@ const Agendamentos = () => {
     } finally {
       setLoading(false);
     }
-  }, [makeRequest]);
+  };
 
-  const fetchPacientes = useCallback(async () => {
+  const fetchPacientes = async () => {
     try {
       const response = await makeRequest('/pacientes');
       const data = await response.json();
@@ -74,9 +81,9 @@ const Agendamentos = () => {
     } catch (error) {
       console.error('Erro ao carregar pacientes:', error);
     }
-  }, [makeRequest]);
+  };
 
-  const fetchConsultores = useCallback(async () => {
+  const fetchConsultores = async () => {
     try {
       const response = await makeRequest('/consultores');
       const data = await response.json();
@@ -89,9 +96,9 @@ const Agendamentos = () => {
     } catch (error) {
       console.error('Erro ao carregar consultores:', error);
     }
-  }, [makeRequest]);
+  };
 
-  const fetchClinicas = useCallback(async () => {
+  const fetchClinicas = async () => {
     try {
       const response = await makeRequest('/clinicas');
       const data = await response.json();
@@ -104,14 +111,7 @@ const Agendamentos = () => {
     } catch (error) {
       console.error('Erro ao carregar clínicas:', error);
     }
-  }, [makeRequest]);
-
-  useEffect(() => {
-    fetchAgendamentos();
-    fetchPacientes();
-    fetchConsultores(); 
-    fetchClinicas();
-  }, [fetchAgendamentos, fetchPacientes, fetchConsultores, fetchClinicas]);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -170,24 +170,9 @@ const Agendamentos = () => {
   };
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    
-    // Se o paciente foi alterado, tentar pré-selecionar o consultor responsável
-    if (name === 'paciente_id' && value) {
-      const pacienteSelecionado = pacientes.find(p => p.id.toString() === value);
-      if (pacienteSelecionado && pacienteSelecionado.consultor_id) {
-        setFormData({
-          ...formData,
-          [name]: value,
-          consultor_id: pacienteSelecionado.consultor_id.toString()
-        });
-        return;
-      }
-    }
-    
     setFormData({
       ...formData,
-      [name]: value
+      [e.target.name]: e.target.value
     });
   };
 
@@ -238,65 +223,22 @@ const Agendamentos = () => {
     }
   };
 
-  const deletarAgendamento = async (agendamentoId, pacienteNome) => {
-    if (!window.confirm(`Tem certeza que deseja DELETAR o agendamento de ${pacienteNome}?\n\nEsta ação não pode ser desfeita!`)) {
-      return;
-    }
-
-    try {
-      const response = await makeRequest(`/agendamentos/${agendamentoId}`, {
-        method: 'DELETE'
-      });
-
-      const data = await response.json();
-      
-      if (response.ok) {
-        setMessage('Agendamento removido com sucesso!');
-        fetchAgendamentos();
-        setTimeout(() => setMessage(''), 3000);
-      } else {
-        setMessage('Erro ao remover agendamento: ' + data.error);
-      }
-    } catch (error) {
-      console.error('Erro ao remover agendamento:', error);
-      setMessage('Erro ao remover agendamento');
-    }
-  };
-
   const formatarData = (data) => {
-    // Garantir que a data seja interpretada corretamente
-    const dataObj = new Date(data + 'T12:00:00'); // Forçar meio-dia para evitar timezone
-    return dataObj.toLocaleDateString('pt-BR');
+    return new Date(data).toLocaleDateString('pt-BR');
   };
 
   const formatarHorario = (horario) => {
     return horario.substring(0, 5); // Remove os segundos
   };
 
-  // Função utilitária para obter data de hoje no formato correto (dinâmica/real)
-  const obterDataHoje = () => {
-    const hoje = new Date();
-    // Garantir que seja no timezone local, sempre atualizada
-    const ano = hoje.getFullYear();
-    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
-    const dia = String(hoje.getDate()).padStart(2, '0');
-    
-    return `${ano}-${mes}-${dia}`;
-  };
-
   const ehHoje = (data) => {
-    const hoje = obterDataHoje(); // Data real atual do sistema
-    
-    // Normalizar a data do agendamento (remover qualquer hora se existir)
-    const dataLimpa = data.split('T')[0]; // Pega só a parte da data (YYYY-MM-DD)
-    
-    return dataLimpa === hoje;
+    const hoje = new Date().toISOString().split('T')[0];
+    return data === hoje;
   };
 
   const ehPassado = (data) => {
-    const hoje = obterDataHoje();
-    const dataLimpa = data.split('T')[0]; // Pega só a parte da data
-    return dataLimpa < hoje;
+    const hoje = new Date().toISOString().split('T')[0];
+    return data < hoje;
   };
 
   const resetForm = () => {
@@ -346,8 +288,8 @@ const Agendamentos = () => {
     return matchConsultor && matchClinica && matchStatus && matchData;
   });
 
-  // Obter data atual para o input (formato consistente)
-  const hoje = obterDataHoje();
+  // Obter data atual para o input
+  const hoje = new Date().toISOString().split('T')[0];
 
   // Verificar se há filtros ativos
   const temFiltrosAtivos = filtroConsultor || filtroClinica || filtroDataInicio || filtroDataFim || filtroStatus;
@@ -355,7 +297,7 @@ const Agendamentos = () => {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">📅 Sistema de Agendamentos</h1>
+        <h1 className="page-title">Agendamentos</h1>
         <p className="page-subtitle">Gerencie consultas e acompanhe o pipeline de vendas</p>
       </div>
 
@@ -365,222 +307,78 @@ const Agendamentos = () => {
         </div>
       )}
 
-      {/* Resumo de Estatísticas dos Agendamentos */}
-      <div style={{ 
-        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', 
-        padding: '2rem', 
-        borderRadius: '16px', 
-        marginBottom: '2rem',
-        border: '1px solid #cbd5e0',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)'
-      }}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          marginBottom: '1.5rem' 
-        }}>
-          <h3 style={{ 
-            fontSize: '1.2rem', 
-            fontWeight: '600', 
-            color: '#2d3748', 
-            margin: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            📊 Dashboard de Agendamentos
-          </h3>
-          <button 
-            className="btn btn-primary"
-            onClick={() => setShowModal(true)}
-            style={{ 
-              padding: '0.75rem 1.5rem',
-              fontSize: '1rem',
-              fontWeight: '600'
-            }}
-          >
-            ➕ Novo Agendamento
-          </button>
+      {/* Dashboard de Agendamentos */}
+      <div className="stats-grid" style={{ marginBottom: '2rem' }}>
+        <div className="stat-card">
+          <div className="stat-label">Agendados</div>
+          <div className="stat-value" style={{ color: '#2563eb' }}>
+            {agendamentos.filter(a => a.status === 'agendado').length}
+          </div>
         </div>
         
-        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
-          <div style={{ 
-            background: 'white', 
-            padding: '1.5rem', 
-            borderRadius: '12px', 
-            textAlign: 'center',
-            border: '1px solid #e2e8f0',
-            borderLeft: '4px solid #60a5fa'
-          }}>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#60a5fa', marginBottom: '0.5rem' }}>
-              {agendamentos.filter(a => a.status === 'agendado').length}
-            </div>
-            <div style={{ color: '#718096', fontSize: '0.9rem', fontWeight: '500' }}>📅 Agendados</div>
-          </div>
-          
-          <div style={{ 
-            background: 'white', 
-            padding: '1.5rem', 
-            borderRadius: '12px', 
-            textAlign: 'center',
-            border: '1px solid #e2e8f0',
-            borderLeft: '4px solid #34d399'
-          }}>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#34d399', marginBottom: '0.5rem' }}>
-              {agendamentos.filter(a => a.status === 'lembrado').length}
-            </div>
-            <div style={{ color: '#718096', fontSize: '0.9rem', fontWeight: '500' }}>✅ Lembrados</div>
-          </div>
-          
-          <div style={{ 
-            background: 'white', 
-            padding: '1.5rem', 
-            borderRadius: '12px', 
-            textAlign: 'center',
-            border: '1px solid #e2e8f0',
-            borderLeft: '4px solid #10b981'
-          }}>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#10b981', marginBottom: '0.5rem' }}>
-              {agendamentos.filter(a => a.status === 'compareceu').length}
-            </div>
-            <div style={{ color: '#718096', fontSize: '0.9rem', fontWeight: '500' }}>🎯 Compareceram</div>
-          </div>
-          
-          <div style={{ 
-            background: 'white', 
-            padding: '1.5rem', 
-            borderRadius: '12px', 
-            textAlign: 'center',
-            border: '1px solid #e2e8f0',
-            borderLeft: '4px solid #059669'
-          }}>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#059669', marginBottom: '0.5rem' }}>
-              {agendamentos.filter(a => a.status === 'fechado').length}
-            </div>
-            <div style={{ color: '#718096', fontSize: '0.9rem', fontWeight: '500' }}>💰 Fechados</div>
-          </div>
-          
-          <div style={{ 
-            background: 'white', 
-            padding: '1.5rem', 
-            borderRadius: '12px', 
-            textAlign: 'center',
-            border: '1px solid #e2e8f0',
-            borderLeft: '4px solid #ef4444'
-          }}>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#ef4444', marginBottom: '0.5rem' }}>
-              {agendamentos.filter(a => a.status === 'nao_fechou').length}
-            </div>
-            <div style={{ color: '#718096', fontSize: '0.9rem', fontWeight: '500' }}>❌ Não Fecharam</div>
-          </div>
-          
-          <div style={{ 
-            background: 'white', 
-            padding: '1.5rem', 
-            borderRadius: '12px', 
-            textAlign: 'center',
-            border: '1px solid #e2e8f0',
-            borderLeft: '4px solid #f97316'
-          }}>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#f97316', marginBottom: '0.5rem' }}>
-              {agendamentos.filter(a => ehHoje(a.data_agendamento)).length}
-            </div>
-            <div style={{ color: '#718096', fontSize: '0.9rem', fontWeight: '500' }}>🔥 Hoje</div>
-          </div>
-          
-          <div style={{ 
-            background: 'white', 
-            padding: '1.5rem', 
-            borderRadius: '12px', 
-            textAlign: 'center',
-            border: '1px solid #e2e8f0',
-            borderLeft: '4px solid #667eea'
-          }}>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#667eea', marginBottom: '0.5rem' }}>
-              {agendamentos.length}
-            </div>
-            <div style={{ color: '#718096', fontSize: '0.9rem', fontWeight: '500' }}>📋 Total</div>
-          </div>
-          
-          <div style={{ 
-            background: 'white', 
-            padding: '1.5rem', 
-            borderRadius: '12px', 
-            textAlign: 'center',
-            border: '1px solid #e2e8f0',
-            borderLeft: '4px solid #a78bfa'
-          }}>
-            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#a78bfa', marginBottom: '0.5rem' }}>
-              {agendamentos.length > 0 
-                ? Math.round((agendamentos.filter(a => a.status === 'fechado').length / agendamentos.length) * 100)
-                : 0}%
-            </div>
-            <div style={{ color: '#718096', fontSize: '0.9rem', fontWeight: '500' }}>📈 Taxa Fechamento</div>
+        <div className="stat-card">
+          <div className="stat-label">Lembrados</div>
+          <div className="stat-value" style={{ color: '#059669' }}>
+            {agendamentos.filter(a => a.status === 'lembrado').length}
           </div>
         </div>
-
-        {/* Alerta para agendamentos de hoje */}
-        {agendamentos.filter(a => ehHoje(a.data_agendamento)).length > 0 && (
-          <div style={{ 
-            marginTop: '1.5rem', 
-            padding: '1rem 1.5rem', 
-            background: 'linear-gradient(135deg, #fef3c7 0%, #fbbf24 20%)', 
-            borderRadius: '12px',
-            border: '1px solid #f59e0b',
-            color: '#92400e',
-            fontSize: '1rem',
-            fontWeight: '500',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            🔥 <strong>Atenção!</strong> Você tem <strong>{agendamentos.filter(a => ehHoje(a.data_agendamento)).length}</strong> 
-            agendamento(s) para hoje! Não se esqueça de fazer os lembretes.
+        
+        <div className="stat-card">
+          <div className="stat-label">Compareceram</div>
+          <div className="stat-value" style={{ color: '#10b981' }}>
+            {agendamentos.filter(a => a.status === 'compareceu').length}
           </div>
-        )}
+        </div>
+        
+        <div className="stat-card">
+          <div className="stat-label">Fechados</div>
+          <div className="stat-value" style={{ color: '#059669' }}>
+            {agendamentos.filter(a => a.status === 'fechado').length}
+          </div>
+        </div>
       </div>
+
+      {/* Alerta para agendamentos de hoje */}
+      {agendamentos.filter(a => ehHoje(a.data_agendamento)).length > 0 && (
+        <div className="alert alert-warning" style={{ marginBottom: '2rem' }}>
+          <strong>Atenção!</strong> Você tem <strong>{agendamentos.filter(a => ehHoje(a.data_agendamento)).length}</strong> 
+          agendamento(s) para hoje! Não se esqueça de fazer os lembretes.
+        </div>
+      )}
 
       <div className="card">
         <div className="card-header">
-          <h2 className="card-title">📋 Lista Completa de Agendamentos</h2>
+          <h2 className="card-title">Lista de Agendamentos</h2>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <div style={{ fontSize: '0.9rem', color: '#718096' }}>
-              {agendamentos.length} agendamento(s) cadastrado(s)
-            </div>
-            {/* Botão Filtros */}
             <button 
               className="btn btn-secondary"
               onClick={() => setMostrarFiltros(!mostrarFiltros)}
-              style={{ 
-                position: 'relative',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}
+              style={{ position: 'relative' }}
             >
-              🔍 Filtros
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 4h18M7 8h10M10 12h4M12 16h0" />
+              </svg>
+              Filtros
               {temFiltrosAtivos && (
                 <span style={{
                   position: 'absolute',
-                  top: '-0.25rem',
-                  right: '-0.25rem',
-                  background: '#ef4444',
-                  color: 'white',
-                  borderRadius: '50%',
-                  width: '1.25rem',
-                  height: '1.25rem',
-                  fontSize: '0.75rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  {[filtroConsultor, filtroClinica, filtroDataInicio, filtroDataFim, filtroStatus].filter(Boolean).length}
-                </span>
+                  top: '-5px',
+                  right: '-5px',
+                  width: '8px',
+                  height: '8px',
+                  backgroundColor: '#ef4444',
+                  borderRadius: '50%'
+                }} />
               )}
-              <span style={{ marginLeft: '0.25rem' }}>
-                {mostrarFiltros ? '▲' : '▼'}
-              </span>
+            </button>
+            <button 
+              className="btn btn-primary"
+              onClick={() => setShowModal(true)}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Novo Agendamento
             </button>
           </div>
         </div>
@@ -588,178 +386,123 @@ const Agendamentos = () => {
         {/* Filtros - Só aparece quando mostrarFiltros é true */}
         {mostrarFiltros && (
           <div style={{ 
-            background: '#f8fafc', 
             padding: '1.5rem', 
-            borderRadius: '12px', 
             marginBottom: '1.5rem',
-            border: '2px solid #e2e8f0',
-            animation: 'slideDown 0.3s ease-out'
+            backgroundColor: '#f9fafb',
+            borderRadius: '8px',
+            border: '1px solid #e5e7eb'
           }}>
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between', 
-            marginBottom: '1rem' 
-          }}>
-            <h3 style={{ 
-              fontSize: '1.1rem', 
-              fontWeight: '600', 
-              color: '#2d3748', 
-              margin: 0,
-              display: 'flex',
-              alignItems: 'center'
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between', 
+              marginBottom: '1rem' 
             }}>
-              🔍 Filtros de Busca
-            </h3>
+              <h3 style={{ 
+                fontSize: '1.1rem', 
+                fontWeight: '600', 
+                color: '#1a1d23', 
+                margin: 0
+              }}>
+                Filtros de Busca
+              </h3>
+              {temFiltrosAtivos && (
+                <button 
+                  onClick={limparFiltros}
+                  className="btn btn-secondary"
+                  style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+                >
+                  Limpar Filtros
+                </button>
+              )}
+            </div>
+            
+            <div className="grid grid-2" style={{ marginBottom: '1rem' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Consultor</label>
+                <select
+                  value={filtroConsultor}
+                  onChange={(e) => setFiltroConsultor(e.target.value)}
+                  className="form-select"
+                >
+                  <option value="">Todos os consultores</option>
+                  {consultores.map(consultor => (
+                    <option key={consultor.id} value={consultor.id}>
+                      {consultor.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Clínica</label>
+                <select
+                  value={filtroClinica}
+                  onChange={(e) => setFiltroClinica(e.target.value)}
+                  className="form-select"
+                >
+                  <option value="">Todas as clínicas</option>
+                  {clinicas.map(clinica => (
+                    <option key={clinica.id} value={clinica.id}>
+                      {clinica.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-3">
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Data Início</label>
+                <input
+                  type="date"
+                  value={filtroDataInicio}
+                  onChange={(e) => setFiltroDataInicio(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Data Fim</label>
+                <input
+                  type="date"
+                  value={filtroDataFim}
+                  onChange={(e) => setFiltroDataFim(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Status</label>
+                <select
+                  value={filtroStatus}
+                  onChange={(e) => setFiltroStatus(e.target.value)}
+                  className="form-select"
+                >
+                  <option value="">Todos os status</option>
+                  {statusOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Contador de resultados */}
             {temFiltrosAtivos && (
-              <button 
-                onClick={limparFiltros}
-                className="btn btn-secondary"
-                style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
-              >
-                🗑️ Limpar Filtros
-              </button>
+              <div style={{ 
+                marginTop: '1rem', 
+                padding: '0.75rem', 
+                backgroundColor: '#f3f4f6', 
+                borderRadius: '6px',
+                color: '#4b5563',
+                fontSize: '0.9rem'
+              }}>
+                Mostrando <strong>{agendamentosFiltrados.length}</strong> de {agendamentos.length} agendamento(s)
+              </div>
             )}
           </div>
-          
-          <div className="grid grid-2" style={{ marginBottom: '1rem' }}>
-            {/* Filtro por Consultor */}
-            <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ fontSize: '0.9rem', color: '#4a5568', marginBottom: '0.5rem' }}>
-                👨‍⚕️ Consultor:
-              </label>
-              <select
-                value={filtroConsultor}
-                onChange={(e) => setFiltroConsultor(e.target.value)}
-                style={{
-                  padding: '0.75rem',
-                  borderRadius: '8px',
-                  border: '2px solid #cbd5e0',
-                  fontSize: '0.95rem',
-                  background: 'white'
-                }}
-              >
-                <option value="">Todos os consultores</option>
-                {consultores.map(consultor => (
-                  <option key={consultor.id} value={consultor.id}>
-                    {consultor.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Filtro por Clínica */}
-            <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ fontSize: '0.9rem', color: '#4a5568', marginBottom: '0.5rem' }}>
-                🏥 Clínica:
-              </label>
-              <select
-                value={filtroClinica}
-                onChange={(e) => setFiltroClinica(e.target.value)}
-                style={{
-                  padding: '0.75rem',
-                  borderRadius: '8px',
-                  border: '2px solid #cbd5e0',
-                  fontSize: '0.95rem',
-                  background: 'white'
-                }}
-              >
-                <option value="">Todas as clínicas</option>
-                {clinicas.map(clinica => (
-                  <option key={clinica.id} value={clinica.id}>
-                    {clinica.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-3">
-            {/* Filtro por Data Início */}
-            <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ fontSize: '0.9rem', color: '#4a5568', marginBottom: '0.5rem' }}>
-                📅 Data Início:
-              </label>
-              <input
-                type="date"
-                value={filtroDataInicio}
-                onChange={(e) => setFiltroDataInicio(e.target.value)}
-                style={{
-                  padding: '0.75rem',
-                  borderRadius: '8px',
-                  border: '2px solid #cbd5e0',
-                  fontSize: '0.95rem',
-                  background: 'white'
-                }}
-              />
-            </div>
-
-            {/* Filtro por Data Fim */}
-            <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ fontSize: '0.9rem', color: '#4a5568', marginBottom: '0.5rem' }}>
-                📅 Data Fim:
-              </label>
-              <input
-                type="date"
-                value={filtroDataFim}
-                onChange={(e) => setFiltroDataFim(e.target.value)}
-                style={{
-                  padding: '0.75rem',
-                  borderRadius: '8px',
-                  border: '2px solid #cbd5e0',
-                  fontSize: '0.95rem',
-                  background: 'white'
-                }}
-              />
-            </div>
-
-            {/* Filtro por Status */}
-            <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ fontSize: '0.9rem', color: '#4a5568', marginBottom: '0.5rem' }}>
-                📊 Status:
-              </label>
-              <select
-                value={filtroStatus}
-                onChange={(e) => setFiltroStatus(e.target.value)}
-                style={{
-                  padding: '0.75rem',
-                  borderRadius: '8px',
-                  border: '2px solid #cbd5e0',
-                  fontSize: '0.95rem',
-                  background: 'white'
-                }}
-              >
-                <option value="">Todos os status</option>
-                {statusOptions.map(option => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Contador de resultados */}
-          {temFiltrosAtivos && (
-            <div style={{ 
-              marginTop: '1rem', 
-              padding: '0.75rem', 
-              background: '#e3f2fd', 
-              borderRadius: '8px',
-              color: '#1565c0',
-              fontSize: '0.95rem',
-              display: 'flex',
-              alignItems: 'center'
-            }}>
-              📍 Mostrando <strong style={{ margin: '0 0.25rem' }}>{agendamentosFiltrados.length}</strong> 
-              de {agendamentos.length} agendamento(s)
-              {filtroConsultor && ` • Consultor: ${consultores.find(c => c.id.toString() === filtroConsultor)?.nome}`}
-              {filtroClinica && ` • Clínica: ${clinicas.find(c => c.id.toString() === filtroClinica)?.nome}`}
-              {filtroStatus && ` • Status: ${statusOptions.find(s => s.value === filtroStatus)?.label}`}
-              {(filtroDataInicio || filtroDataFim) && ` • Período: ${filtroDataInicio ? formatarData(filtroDataInicio) : '...'} até ${filtroDataFim ? formatarData(filtroDataFim) : '...'}`}
-            </div>
-          )}
-        </div>
         )}
 
         {loading ? (
@@ -790,48 +533,38 @@ const Agendamentos = () => {
                   const statusInfo = getStatusInfo(agendamento.status);
                   return (
                     <tr key={agendamento.id} style={{
-                      backgroundColor: ehHoje(agendamento.data_agendamento) ? '#fffbf0' : 'transparent'
+                      backgroundColor: ehHoje(agendamento.data_agendamento) ? '#fef3c7' : 'transparent'
                     }}>
                       <td>
                         <strong>{agendamento.paciente_nome}</strong>
                         {agendamento.paciente_telefone && (
-                          <div style={{ fontSize: '0.85rem', color: '#718096' }}>
-                            📞 {agendamento.paciente_telefone}
+                          <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                            {agendamento.paciente_telefone}
                           </div>
                         )}
                         {agendamento.observacoes && (
-                          <div style={{ fontSize: '0.85rem', color: '#718096', marginTop: '0.25rem' }}>
-                            💭 {agendamento.observacoes}
+                          <div style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                            {agendamento.observacoes}
                           </div>
                         )}
                       </td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                          <span style={{ marginRight: '0.5rem' }}>🩺</span>
-                          {agendamento.consultor_nome}
-                        </div>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                          <span style={{ marginRight: '0.5rem' }}>🏥</span>
-                          {agendamento.clinica_nome}
-                        </div>
-                      </td>
+                      <td>{agendamento.consultor_nome}</td>
+                      <td>{agendamento.clinica_nome}</td>
                       <td>
                         <span style={{
                           fontWeight: ehHoje(agendamento.data_agendamento) ? 'bold' : 'normal',
-                          color: ehHoje(agendamento.data_agendamento) ? '#ff9800' : 'inherit'
+                          color: ehHoje(agendamento.data_agendamento) ? '#f59e0b' : 'inherit'
                         }}>
                           {formatarData(agendamento.data_agendamento)}
                           {ehHoje(agendamento.data_agendamento) && (
-                            <div style={{ fontSize: '0.75rem', color: '#ff9800' }}>
+                            <div style={{ fontSize: '0.75rem', color: '#f59e0b' }}>
                               HOJE
                             </div>
                           )}
                         </span>
                       </td>
                       <td>
-                        <strong style={{ color: '#667eea' }}>
+                        <strong style={{ color: '#2563eb' }}>
                           {formatarHorario(agendamento.horario)}
                         </strong>
                       </td>
@@ -839,14 +572,11 @@ const Agendamentos = () => {
                         <select
                           value={agendamento.status}
                           onChange={(e) => updateStatus(agendamento.id, e.target.value)}
+                          className="status-select"
                           style={{
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '8px',
-                            fontSize: '0.85rem',
-                            backgroundColor: statusInfo.color + '20',
+                            backgroundColor: statusInfo.color + '10',
                             color: statusInfo.color,
-                            border: `1px solid ${statusInfo.color}`,
-                            cursor: 'pointer'
+                            border: `1px solid ${statusInfo.color}`
                           }}
                         >
                           {statusOptions.map(option => (
@@ -857,40 +587,26 @@ const Agendamentos = () => {
                         </select>
                       </td>
                       <td>
-                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button
                             onClick={() => handleEdit(agendamento)}
-                            className="btn btn-secondary"
-                            style={{ padding: '0.5rem', fontSize: '0.85rem' }}
-                            title="Editar agendamento"
+                            className="btn-action"
+                            title="Editar"
                           >
-                            ✏️
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
                           </button>
                           {!agendamento.lembrado && !ehPassado(agendamento.data_agendamento) && agendamento.status === 'agendado' && (
                             <button
                               onClick={() => marcarComoLembrado(agendamento.id)}
-                              className="btn btn-success"
-                              style={{ padding: '0.5rem', fontSize: '0.85rem' }}
+                              className="btn-action btn-success"
+                              title="Marcar como lembrado"
                             >
-                              ✅
-                            </button>
-                          )}
-                          {/* Botão Deletar - só admin */}
-                          {isAdmin && (
-                            <button
-                              onClick={() => deletarAgendamento(agendamento.id, agendamento.paciente_nome)}
-                              className="btn"
-                              style={{ 
-                                padding: '0.5rem', 
-                                fontSize: '0.85rem',
-                                background: '#ef4444',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px'
-                              }}
-                              title="Deletar agendamento"
-                            >
-                              🗑️
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                              </svg>
                             </button>
                           )}
                         </div>
@@ -910,17 +626,17 @@ const Agendamentos = () => {
           <div className="modal">
             <div className="modal-header">
               <h2 className="modal-title">
-                {editingAgendamento ? '✏️ Editar Agendamento' : '📅 Novo Agendamento'}
+                {editingAgendamento ? 'Editar Agendamento' : 'Novo Agendamento'}
               </h2>
               <button 
                 className="close-btn"
                 onClick={resetForm}
               >
-                ✕
+                ×
               </button>
             </div>
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} autoComplete="off">
               <div className="form-group">
                 <label className="form-label">Paciente *</label>
                 <select
@@ -938,7 +654,7 @@ const Agendamentos = () => {
                   ))}
                 </select>
                 {pacientes.length === 0 && (
-                  <p style={{ fontSize: '0.85rem', color: '#718096', marginTop: '0.25rem' }}>
+                  <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.25rem' }}>
                     Nenhum paciente cadastrado. Cadastre um paciente primeiro.
                   </p>
                 )}
@@ -992,6 +708,7 @@ const Agendamentos = () => {
                     onChange={handleInputChange}
                     min={hoje}
                     required
+                    autoComplete="off"
                   />
                 </div>
 
@@ -1004,6 +721,7 @@ const Agendamentos = () => {
                     value={formData.horario}
                     onChange={handleInputChange}
                     required
+                    autoComplete="off"
                   />
                 </div>
 
@@ -1033,6 +751,7 @@ const Agendamentos = () => {
                   onChange={handleInputChange}
                   placeholder="Informações adicionais sobre o agendamento..."
                   rows="3"
+                  autoComplete="off"
                 />
               </div>
 
@@ -1048,7 +767,7 @@ const Agendamentos = () => {
                   type="submit"
                   className="btn btn-primary"
                 >
-                  {editingAgendamento ? '💾 Atualizar Agendamento' : '📅 Criar Agendamento'}
+                  {editingAgendamento ? 'Atualizar Agendamento' : 'Criar Agendamento'}
                 </button>
               </div>
             </form>

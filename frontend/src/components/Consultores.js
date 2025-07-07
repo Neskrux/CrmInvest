@@ -10,10 +10,13 @@ const Consultores = () => {
   const [message, setMessage] = useState('');
   const [showSenhaModal, setShowSenhaModal] = useState(false);
   const [consultorSenha, setConsultorSenha] = useState(null);
+  const [showPixModal, setShowPixModal] = useState(false);
+  const [pixSelecionado, setPixSelecionado] = useState('');
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
-    senha: ''
+    senha: '',
+    pix: ''
   });
 
   const fetchConsultores = useCallback(async () => {
@@ -64,7 +67,8 @@ const Consultores = () => {
         setFormData({
           nome: '',
           telefone: '',
-          senha: ''
+          senha: '',
+          pix: ''
         });
         fetchConsultores();
         setTimeout(() => setMessage(''), 3000);
@@ -82,7 +86,8 @@ const Consultores = () => {
     setFormData({
       nome: consultor.nome || '',
       telefone: consultor.telefone || '',
-      senha: consultor.senha || ''
+      senha: consultor.senha || '',
+      pix: consultor.pix || ''
     });
     setShowModal(true);
   };
@@ -100,18 +105,49 @@ const Consultores = () => {
 
   const formatarTelefone = (telefone) => {
     if (!telefone) return '';
+    // Remove todos os caracteres não numéricos
     const numbers = telefone.replace(/\D/g, '');
+    
+    // Formata baseado no tamanho
     if (numbers.length === 11) {
+      // Celular: (11) 99999-9999
       return `(${numbers.substring(0, 2)}) ${numbers.substring(2, 7)}-${numbers.substring(7)}`;
+    } else if (numbers.length === 10) {
+      // Fixo: (11) 9999-9999
+      return `(${numbers.substring(0, 2)}) ${numbers.substring(2, 6)}-${numbers.substring(6)}`;
+    } else if (numbers.length === 9 && numbers[0] === '9') {
+      // Celular sem DDD: 99999-9999
+      return `${numbers.substring(0, 5)}-${numbers.substring(5)}`;
+    } else if (numbers.length === 8) {
+      // Fixo sem DDD: 9999-9999
+      return `${numbers.substring(0, 4)}-${numbers.substring(4)}`;
     }
+    // Se não se encaixar em nenhum formato padrão, retorna como está
     return telefone;
+  };
+
+  const formatarEmail = (consultor) => {
+    if (consultor.email) {
+      return consultor.email;
+    }
+    // Gera email padronizado se não existir
+    const nomeNormalizado = consultor.nome
+      ?.toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s]/g, '')
+      .trim()
+      .replace(/\s+/g, '');
+    
+    return `${nomeNormalizado}@investmoneysa.com.br`;
   };
 
   const resetForm = () => {
     setFormData({
       nome: '',
       telefone: '',
-      senha: ''
+      senha: '',
+      pix: ''
     });
     setEditingConsultor(null);
     setShowModal(false);
@@ -136,6 +172,37 @@ const Consultores = () => {
       console.error('Erro ao carregar consultor:', error);
       setMessage('Erro ao conectar com o servidor');
     }
+  };
+
+  const copiarPix = async (pix) => {
+    try {
+      await navigator.clipboard.writeText(pix);
+      setMessage('PIX copiado para a área de transferência!');
+      setTimeout(() => setMessage(''), 2000);
+    } catch (error) {
+      // Fallback para navegadores mais antigos
+      const textArea = document.createElement('textarea');
+      textArea.value = pix;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setMessage('PIX copiado para a área de transferência!');
+      setTimeout(() => setMessage(''), 2000);
+    }
+  };
+
+  const mostrarPixCompleto = (pix) => {
+    setPixSelecionado(pix);
+    setShowPixModal(true);
+  };
+
+  const formatarPixExibicao = (pix) => {
+    if (!pix) return '-';
+    if (pix.length > 15) {
+      return pix.substring(0, 15) + '...';
+    }
+    return pix;
   };
 
   const redefinirSenha = async (consultorId, novaSenha) => {
@@ -168,8 +235,8 @@ const Consultores = () => {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">🩺 Gestão de Consultores</h1>
-        <p className="page-subtitle">Cadastre os consultores da sua empresa</p>
+        <h1 className="page-title">Consultores</h1>
+        <p className="page-subtitle">Gerencie a equipe de consultores</p>
       </div>
 
       {message && (
@@ -178,302 +245,129 @@ const Consultores = () => {
         </div>
       )}
 
-      {/* Resumo de Informações */}
-      <div style={{ 
-        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', 
-        padding: '2rem', 
-        borderRadius: '16px', 
-        marginBottom: '2rem',
-        border: '1px solid #cbd5e0',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)'
-      }}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          marginBottom: '1.5rem' 
-        }}>
-          <h3 style={{ 
-            fontSize: '1.2rem', 
-            fontWeight: '600', 
-            color: '#2d3748', 
-            margin: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            📊 Informações da Equipe
-          </h3>
+      <div className="card">
+        <div className="card-header">
+          <h2 className="card-title">Equipe de Consultores</h2>
           <button 
             className="btn btn-primary"
             onClick={() => setShowModal(true)}
-            style={{ 
-              padding: '0.75rem 1.5rem',
-              fontSize: '1rem',
-              fontWeight: '600'
-            }}
           >
-            ➕ Novo Consultor
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Novo Consultor
           </button>
-        </div>
-        
-        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-          <div style={{ 
-            background: 'white', 
-            padding: '2rem', 
-            borderRadius: '12px', 
-            textAlign: 'center',
-            border: '1px solid #e2e8f0',
-            borderLeft: '4px solid #667eea'
-          }}>
-            <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#667eea', marginBottom: '0.5rem' }}>
-              {consultores.length}
-            </div>
-            <div style={{ color: '#718096', fontSize: '1rem', fontWeight: '500' }}>🩺 Total de Consultores</div>
-          </div>
-          
-          <div style={{ 
-            background: 'white', 
-            padding: '2rem', 
-            borderRadius: '12px', 
-            textAlign: 'center',
-            border: '1px solid #e2e8f0',
-            borderLeft: '4px solid #10b981'
-          }}>
-            <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#10b981', marginBottom: '0.5rem' }}>
-              {consultores.filter(c => c.telefone && c.telefone.trim() !== '').length}
-            </div>
-            <div style={{ color: '#718096', fontSize: '1rem', fontWeight: '500' }}>📞 Com Telefone</div>
-          </div>
-          
-          <div style={{ 
-            background: 'white', 
-            padding: '2rem', 
-            borderRadius: '12px', 
-            textAlign: 'center',
-            border: '1px solid #e2e8f0',
-            borderLeft: '4px solid #fbbf24'
-          }}>
-            <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#fbbf24', marginBottom: '0.5rem' }}>
-              {consultores.length > 0 
-                ? Math.round((consultores.filter(c => c.telefone && c.telefone.trim() !== '').length / consultores.length) * 100)
-                : 0}%
-            </div>
-            <div style={{ color: '#718096', fontSize: '1rem', fontWeight: '500' }}>📈 Taxa Contato</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">👨‍⚕️ Equipe de Consultores</h2>
-          <div style={{ fontSize: '0.9rem', color: '#718096' }}>
-            {consultores.length} consultor(es) cadastrado(s)
-          </div>
         </div>
 
         {loading ? (
-          <p>Carregando consultores...</p>
+          <div className="loading">
+            <div className="spinner"></div>
+          </div>
         ) : consultores.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#718096', padding: '2rem' }}>
-            Nenhum consultor cadastrado ainda. Clique em "Novo Consultor" para começar.
+          <p style={{ textAlign: 'center', color: '#6b7280', padding: '2rem' }}>
+            Nenhum consultor cadastrado ainda.
           </p>
         ) : (
-          <div className="grid grid-2">
-            {consultores.map(consultor => (
-              <div key={consultor.id} style={{ 
-                background: 'white', 
-                padding: '2rem', 
-                borderRadius: '16px', 
-                border: '1px solid #e2e8f0',
-                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
-                transition: 'all 0.3s ease',
-                position: 'relative'
-              }}
-              className="card-grid-item">
-                {/* Botões de Ação no Canto */}
-                <div style={{
-                  position: 'absolute',
-                  top: '1rem',
-                  right: '1rem',
-                  display: 'flex',
-                  gap: '0.5rem'
-                }}>
-                  <button
-                    onClick={() => handleEdit(consultor)}
-                    style={{
-                      background: 'rgba(102, 126, 234, 0.1)',
-                      border: 'none',
-                      borderRadius: '50%',
-                      width: '40px',
-                      height: '40px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      fontSize: '1.1rem'
-                    }}
-                    className="card-edit-btn"
-                    title="Editar consultor"
-                  >
-                    ✏️
-                  </button>
-
-                  {/* Botão de Visualizar Senha - apenas admin */}
-                  {isAdmin && (
-                    <button
-                      onClick={() => visualizarSenha(consultor)}
-                      style={{
-                        background: 'rgba(245, 158, 11, 0.1)',
-                        border: 'none',
-                        borderRadius: '50%',
-                        width: '40px',
-                        height: '40px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        fontSize: '1.1rem'
-                      }}
-                      title="Visualizar/Alterar senha"
-                    >
-                      🔐
-                    </button>
-                  )}
-                </div>
-
-                {/* Header com Avatar e Nome */}
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  marginBottom: '1.5rem',
-                  paddingBottom: '1rem',
-                  borderBottom: '3px solid #667eea'
-                }}>
-                  <div style={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                    width: '60px',
-                    height: '60px',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '1.8rem',
-                    marginRight: '1rem',
-                    boxShadow: '0 4px 8px rgba(102, 126, 234, 0.3)'
-                  }}>
-                    🩺
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <h3 style={{ 
-                      fontSize: '1.4rem', 
-                      fontWeight: '700', 
-                      color: '#2d3748',
-                      margin: 0,
-                      marginBottom: '0.25rem'
-                    }}>
-                      {consultor.nome}
-                    </h3>
-                    <div style={{ 
-                      fontSize: '0.9rem', 
-                      color: '#667eea',
-                      fontWeight: '500'
-                    }}>
-                      Consultor
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Informações */}
-                <div style={{ display: 'grid', gap: '1rem' }}>
-                  <div style={{ 
-                    background: '#f0f4ff', 
-                    padding: '1rem', 
-                    borderRadius: '12px',
-                    border: '1px solid #c7d2fe'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <span style={{ 
-                        fontSize: '1.2rem', 
-                        marginRight: '0.75rem',
-                        background: '#ddd6fe',
-                        padding: '0.5rem',
-                        borderRadius: '8px'
-                      }}>📧</span>
-                      <strong style={{ color: '#374151', fontSize: '0.95rem' }}>Login</strong>
-                    </div>
-                    <div style={{ 
-                      color: '#4338ca', 
-                      fontSize: '0.9rem',
-                      fontWeight: '600',
-                      marginLeft: '2.5rem',
-                      fontFamily: 'monospace',
-                      background: 'rgba(255, 255, 255, 0.7)',
-                      padding: '0.5rem',
-                      borderRadius: '6px',
-                      border: '1px solid #c7d2fe'
-                    }}>
-                      {consultor.email || `${consultor.nome?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')}@investmoneysa.com.br`}
-                    </div>
-                  </div>
-
-                  <div style={{ 
-                    background: '#f8fafc', 
-                    padding: '1rem', 
-                    borderRadius: '12px',
-                    border: '1px solid #e2e8f0'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <span style={{ 
-                        fontSize: '1.2rem', 
-                        marginRight: '0.75rem',
-                        background: '#e3f2fd',
-                        padding: '0.5rem',
-                        borderRadius: '8px'
-                      }}>📞</span>
-                      <strong style={{ color: '#374151', fontSize: '0.95rem' }}>Contato</strong>
-                    </div>
-                    <div style={{ 
-                      color: consultor.telefone ? '#4a5568' : '#9ca3af', 
-                      fontSize: '1rem',
-                      fontWeight: '500',
-                      marginLeft: '2.5rem'
-                    }}>
-                      {consultor.telefone ? formatarTelefone(consultor.telefone) : 'Não informado'}
-                    </div>
-                  </div>
-                  
-                  <div style={{ 
-                    background: '#f8fafc', 
-                    padding: '1rem', 
-                    borderRadius: '12px',
-                    border: '1px solid #e2e8f0'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <span style={{ 
-                        fontSize: '1.2rem', 
-                        marginRight: '0.75rem',
-                        background: '#ecfdf5',
-                        padding: '0.5rem',
-                        borderRadius: '8px'
-                      }}>📅</span>
-                      <strong style={{ color: '#374151', fontSize: '0.95rem' }}>Cadastrado</strong>
-                    </div>
-                    <div style={{ 
-                      color: '#4a5568', 
-                      fontSize: '1rem',
-                      fontWeight: '500',
-                      marginLeft: '2.5rem'
-                    }}>
+          <div className="table-container">
+            <table className="table consultores-table">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Email de Acesso</th>
+                  <th>Telefone</th>
+                  <th>PIX</th>
+                  <th>Data de Cadastro</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {consultores.map(consultor => (
+                  <tr key={consultor.id}>
+                    <td>
+                      <strong>{consultor.nome}</strong>
+                    </td>
+                    <td className="text-wrap">
+                      <span className="email-cell">
+                        {formatarEmail(consultor)}
+                      </span>
+                    </td>
+                    <td>
+                      {consultor.telefone ? formatarTelefone(consultor.telefone) : '-'}
+                    </td>
+                    <td>
+                      {consultor.pix ? (
+                        <div className="pix-container">
+                          <span 
+                            className="pix-text pix-tooltip"
+                            data-pix={consultor.pix}
+                            style={{ 
+                              fontFamily: 'monospace', 
+                              fontSize: '0.8rem',
+                              color: '#1f2937'
+                            }}
+                          >
+                            {formatarPixExibicao(consultor.pix)}
+                          </span>
+                          <div className="pix-buttons">
+                            <button
+                              onClick={() => mostrarPixCompleto(consultor.pix)}
+                              className="btn-action"
+                              title="Ver PIX completo"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => copiarPix(consultor.pix)}
+                              className="btn-action"
+                              title="Copiar PIX"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
+                    <td>
                       {formatarData(consultor.created_at)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          onClick={() => handleEdit(consultor)}
+                          className="btn-action"
+                          title="Editar"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                          </svg>
+                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => visualizarSenha(consultor)}
+                            className="btn-action"
+                            title="Gerenciar senha"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -484,17 +378,17 @@ const Consultores = () => {
           <div className="modal">
             <div className="modal-header">
               <h2 className="modal-title">
-                {editingConsultor ? '✏️ Editar Consultor' : '🩺 Novo Consultor'}
+                {editingConsultor ? 'Editar Consultor' : 'Novo Consultor'}
               </h2>
               <button 
                 className="close-btn"
                 onClick={resetForm}
               >
-                ✕
+                ×
               </button>
             </div>
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} autoComplete="off">
               <div className="form-group">
                 <label className="form-label">Nome Completo *</label>
                 <input
@@ -505,6 +399,7 @@ const Consultores = () => {
                   onChange={handleInputChange}
                   placeholder="Digite o nome do consultor"
                   required
+                  autoComplete="off"
                 />
               </div>
 
@@ -517,6 +412,7 @@ const Consultores = () => {
                   value={formData.telefone}
                   onChange={handleInputChange}
                   placeholder="(11) 99999-9999"
+                  autoComplete="off"
                 />
               </div>
 
@@ -529,7 +425,27 @@ const Consultores = () => {
                   value={formData.senha}
                   onChange={handleInputChange}
                   placeholder="Digite a senha do consultor"
+                  autoComplete="new-password"
                 />
+                <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                  O email de acesso será gerado automaticamente baseado no nome
+                </small>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Chave PIX</label>
+                <input
+                  type="text"
+                  name="pix"
+                  className="form-input"
+                  value={formData.pix}
+                  onChange={handleInputChange}
+                  placeholder="CPF, Email, Telefone ou Chave Aleatória"
+                  autoComplete="off"
+                />
+                <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                  Chave PIX para recebimento de comissões
+                </small>
               </div>
 
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
@@ -544,7 +460,7 @@ const Consultores = () => {
                   type="submit"
                   className="btn btn-primary"
                 >
-                  {editingConsultor ? '💾 Atualizar Consultor' : '💾 Cadastrar Consultor'}
+                  {editingConsultor ? 'Atualizar Consultor' : 'Cadastrar Consultor'}
                 </button>
               </div>
             </form>
@@ -558,146 +474,137 @@ const Consultores = () => {
           <div className="modal">
             <div className="modal-header">
               <h2 className="modal-title">
-                🔐 Senha de {consultorSenha.nome}
+                Gerenciar Senha - {consultorSenha.nome}
               </h2>
               <button 
                 className="close-btn"
                 onClick={() => setShowSenhaModal(false)}
               >
-                ✕
+                ×
               </button>
             </div>
 
             <div style={{ padding: '1rem 0' }}>
-              {/* Informações do Consultor */}
               <div style={{ 
-                background: '#f8fafc', 
-                padding: '1.5rem', 
-                borderRadius: '12px',
-                marginBottom: '2rem',
-                border: '1px solid #e2e8f0'
+                padding: '1rem',
+                borderRadius: '8px',
+                backgroundColor: consultorSenha.temSenha ? '#f0fdf4' : '#fef2f2',
+                border: `1px solid ${consultorSenha.temSenha ? '#86efac' : '#fecaca'}`,
+                marginBottom: '1.5rem'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
-                  <div style={{
-                    background: '#667eea',
-                    color: 'white',
-                    width: '50px',
-                    height: '50px',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '1.5rem',
-                    marginRight: '1rem'
-                  }}>
-                    🩺
-                  </div>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#2d3748' }}>
-                      {consultorSenha.nome}
-                    </h3>
-                    <p style={{ margin: 0, color: '#718096', fontSize: '0.9rem' }}>
-                      Email: {consultorSenha.email || 'Não definido'}
-                    </p>
-                  </div>
+                <div style={{ fontSize: '0.875rem', color: consultorSenha.temSenha ? '#166534' : '#dc2626' }}>
+                  {consultorSenha.temSenha ? 'Senha configurada' : 'Sem senha definida'}
                 </div>
-
-                {/* Status da Senha */}
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center',
-                  padding: '1rem',
-                  borderRadius: '8px',
-                  background: consultorSenha.temSenha ? '#ecfdf5' : '#fef2f2',
-                  border: `1px solid ${consultorSenha.temSenha ? '#d1fae5' : '#fecaca'}`
-                }}>
-                  <span style={{ fontSize: '1.5rem', marginRight: '0.75rem' }}>
-                    {consultorSenha.temSenha ? '✅' : '❌'}
-                  </span>
-                  <div>
-                    <strong style={{ 
-                      color: consultorSenha.temSenha ? '#065f46' : '#dc2626',
-                      fontSize: '1rem'
-                    }}>
-                      {consultorSenha.temSenha ? 'Senha Configurada' : 'Sem Senha'}
-                    </strong>
-                    <p style={{ 
-                      margin: 0, 
-                      fontSize: '0.85rem',
-                      color: consultorSenha.temSenha ? '#047857' : '#b91c1c'
-                    }}>
-                      {consultorSenha.temSenha 
-                        ? 'Este consultor pode fazer login no sistema' 
-                        : 'Este consultor não pode fazer login (defina uma senha)'
-                      }
-                    </p>
-                  </div>
+                <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                  {consultorSenha.temSenha 
+                    ? 'Este consultor pode fazer login no sistema' 
+                    : 'Este consultor não pode fazer login'
+                  }
                 </div>
               </div>
 
-              {/* Formulário para Nova Senha */}
-              <div>
-                <h4 style={{ 
-                  fontSize: '1.1rem', 
-                  marginBottom: '1rem',
-                  color: '#2d3748',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  🔄 {consultorSenha.temSenha ? 'Alterar Senha' : 'Definir Senha'}
-                </h4>
-                
-                <form onSubmit={(e) => {
-                  e.preventDefault();
-                  const novaSenha = e.target.novaSenha.value;
-                  if (novaSenha.length < 3) {
-                    alert('A senha deve ter pelo menos 3 caracteres');
-                    return;
-                  }
-                  if (window.confirm(`Tem certeza que deseja ${consultorSenha.temSenha ? 'alterar' : 'definir'} a senha de ${consultorSenha.nome}?`)) {
-                    redefinirSenha(consultorSenha.id, novaSenha);
-                  }
-                }}>
-                  <div className="form-group">
-                    <label className="form-label">Nova Senha *</label>
-                    <input
-                      type="password"
-                      name="novaSenha"
-                      className="form-input"
-                      placeholder="Digite a nova senha (mínimo 3 caracteres)"
-                      required
-                      minLength="3"
-                      style={{ fontSize: '1rem', padding: '0.75rem' }}
-                    />
-                    <small style={{ color: '#718096', fontSize: '0.85rem' }}>
-                      💡 Dica: Use uma senha simples e fácil de lembrar (ex: 123456)
-                    </small>
-                  </div>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const novaSenha = e.target.novaSenha.value;
+                if (novaSenha.length < 3) {
+                  alert('A senha deve ter pelo menos 3 caracteres');
+                  return;
+                }
+                if (window.confirm(`Tem certeza que deseja ${consultorSenha.temSenha ? 'alterar' : 'definir'} a senha?`)) {
+                  redefinirSenha(consultorSenha.id, novaSenha);
+                }
+              }}>
+                <div className="form-group">
+                  <label className="form-label">Nova Senha</label>
+                  <input
+                    type="password"
+                    name="novaSenha"
+                    className="form-input"
+                    placeholder="Digite a nova senha (mínimo 3 caracteres)"
+                    required
+                    minLength="3"
+                  />
+                  <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                    Use uma senha simples e fácil de lembrar
+                  </small>
+                </div>
 
-                  <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
-                    <button 
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => setShowSenhaModal(false)}
-                    >
-                      Cancelar
-                    </button>
-                    <button 
-                      type="submit"
-                      className="btn"
-                      style={{ 
-                        background: '#f59e0b',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        padding: '0.75rem 1.5rem'
-                      }}
-                    >
-                      🔐 {consultorSenha.temSenha ? 'Alterar Senha' : 'Definir Senha'}
-                    </button>
-                  </div>
-                </form>
+                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
+                  <button 
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowSenhaModal(false)}
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit"
+                    className="btn btn-primary"
+                  >
+                    {consultorSenha.temSenha ? 'Alterar Senha' : 'Definir Senha'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Visualização do PIX */}
+      {showPixModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">PIX Completo</h2>
+              <button 
+                className="close-btn"
+                onClick={() => setShowPixModal(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem' }}>
+              <div style={{ 
+                padding: '1rem',
+                borderRadius: '8px',
+                backgroundColor: '#f3f4f6',
+                border: '1px solid #e5e7eb',
+                marginBottom: '1.5rem'
+              }}>
+                <div style={{ 
+                  fontFamily: 'monospace', 
+                  fontSize: '1rem', 
+                  color: '#1f2937',
+                  wordBreak: 'break-all',
+                  lineHeight: '1.5'
+                }}>
+                  {pixSelecionado}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                <button 
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowPixModal(false)}
+                >
+                  Fechar
+                </button>
+                <button 
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    copiarPix(pixSelecionado);
+                    setShowPixModal(false);
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  Copiar PIX
+                </button>
               </div>
             </div>
           </div>

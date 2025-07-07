@@ -13,13 +13,24 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [token, setToken] = useState(() => {
+    const savedToken = localStorage.getItem('token');
+    // Verificar se o token é válido (não vazio e não 'null' string)
+    return savedToken && savedToken !== 'null' && savedToken.trim() !== '' ? savedToken : null;
+  });
 
   // Configurar URL base da API
   const API_BASE_URL = process.env.REACT_APP_API_URL || 
     (process.env.NODE_ENV === 'production' 
-      ? 'https://seu-backend.vercel.app/api' 
+      ? '/api' 
       : 'http://localhost:5000/api');
+
+  const clearAllData = () => {
+    console.log('Limpando todos os dados de autenticação');
+    setUser(null);
+    setToken(null);
+    localStorage.clear();
+  };
 
   const makeRequest = async (url, options = {}) => {
     const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
@@ -78,48 +89,81 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    clearAllData();
   };
 
   const verifyToken = async () => {
-    if (!token) {
+    if (!token || token.trim() === '' || token === 'null') {
+      console.log('Nenhum token válido encontrado - redirecionando para login');
+      clearAllData();
       setLoading(false);
       return;
     }
 
+    console.log('Verificando token...');
     try {
       const response = await makeRequest('/verify-token');
       
       if (response.ok) {
         const data = await response.json();
+        console.log('Token válido - usuário autenticado:', data.usuario.email);
         setUser(data.usuario);
         localStorage.setItem('user', JSON.stringify(data.usuario));
       } else {
-        logout();
+        console.log('Token inválido - fazendo logout');
+        clearAllData();
       }
     } catch (error) {
       console.error('Erro ao verificar token:', error);
-      logout();
+      clearAllData();
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    // Tentar recuperar usuário do localStorage
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (error) {
-        console.error('Erro ao parsear usuário salvo:', error);
-        localStorage.removeItem('user');
+    console.log('🔄 Iniciando verificação de autenticação...');
+    
+    // Verificar se há dados corrompidos e limpar se necessário
+    try {
+      const savedUser = localStorage.getItem('user');
+      const savedToken = localStorage.getItem('token');
+      
+      console.log('📊 Estado inicial:', { 
+        hasUser: !!savedUser, 
+        hasToken: !!savedToken,
+        tokenState: !!token 
+      });
+
+      // Se há dados inconsistentes, limpar tudo
+      if ((savedUser && !savedToken) || (!savedUser && savedToken)) {
+        console.log('⚠️ Dados inconsistentes no localStorage - limpando');
+        clearAllData();
+        setLoading(false);
+        return;
       }
+      
+      // Se há usuário salvo mas token é inválido
+      if (savedUser && savedToken && (!token || token.trim() === '' || token === 'null')) {
+        console.log('⚠️ Token inválido mas usuário salvo - limpando');
+        clearAllData();
+        setLoading(false);
+        return;
+      }
+      
+      // Tentar fazer parse do usuário se existir
+      if (savedUser) {
+        JSON.parse(savedUser);
+      }
+      
+    } catch (error) {
+      console.log('💥 Dados corrompidos no localStorage - limpando');
+      clearAllData();
+      setLoading(false);
+      return;
     }
 
+    // Se chegou até aqui, verificar token
     verifyToken();
   }, []);
 
@@ -130,10 +174,19 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     makeRequest,
-    isAuthenticated: !!user,
+    isAuthenticated: !!user && !!token,
     isAdmin: user?.tipo === 'admin',
     isConsultor: user?.tipo === 'consultor'
   };
+
+  // Log do estado atual para debug
+  console.log('🔍 AuthContext State:', {
+    hasUser: !!user,
+    hasToken: !!token,
+    loading,
+    isAuthenticated: !!user && !!token,
+    userType: user?.tipo
+  });
 
   return (
     <AuthContext.Provider value={value}>
