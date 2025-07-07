@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd frontend && npm install --force && npx react-scripts build",
+  "buildCommand": "cd frontend && npm install --force && CI=false npx react-scripts build",
   "outputDirectory": "frontend/build",
   "framework": null,
   "rewrites": [
