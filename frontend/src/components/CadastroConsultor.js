@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import logoBrasaoPreto from '../images/logobrasaopreto.png';
 
 const CadastroConsultor = ({ onVoltar, onCadastroSucesso }) => {
   const [formData, setFormData] = useState({
@@ -189,7 +190,7 @@ const CadastroConsultor = ({ onVoltar, onCadastroSucesso }) => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: '#f9fafb',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -197,26 +198,40 @@ const CadastroConsultor = ({ onVoltar, onCadastroSucesso }) => {
     }}>
       <div style={{
         background: 'white',
-        borderRadius: '20px',
+        borderRadius: '8px',
         padding: '3rem',
-        boxShadow: '0 30px 60px rgba(0, 0, 0, 0.2)',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)',
+        border: '1px solid #e5e7eb',
         width: '100%',
         maxWidth: '600px'
       }}>
+        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <img 
+            src={logoBrasaoPreto} 
+            alt="CRM System" 
+            style={{ 
+              width: '70px', 
+              height: '70px', 
+              marginBottom: '1rem',
+              objectFit: 'contain'
+            }} 
+          />
           <h1 style={{
             fontSize: '2rem',
             fontWeight: '700',
             color: '#1a1d23',
-            marginBottom: '0.5rem'
+            marginBottom: '0.75rem',
+            letterSpacing: '-0.025em'
           }}>
-            Cadastre-se como Consultor
+            Cadastro de Consultor
           </h1>
           <p style={{
             fontSize: '1rem',
-            color: '#6b7280'
+            color: '#4b5563',
+            lineHeight: '1.5'
           }}>
-            Preencha os dados abaixo para começar a ganhar dinheiro conosco
+            Preencha os dados abaixo para criar sua conta
           </p>
         </div>
 
@@ -381,16 +396,16 @@ const CadastroConsultor = ({ onVoltar, onCadastroSucesso }) => {
                   style={{
                     width: '1.25rem',
                     height: '1.25rem',
-                    accentColor: '#667eea'
+                    accentColor: '#1a1d23'
                   }}
                 />
                 <span style={{ fontSize: '0.875rem', color: '#374151' }}>
                   Aceito os{' '}
-                  <a href="#" style={{ color: '#667eea', textDecoration: 'underline' }}>
+                  <a href="#" style={{ color: '#1a1d23', textDecoration: 'underline' }}>
                     termos de uso
                   </a>{' '}
                   e{' '}
-                  <a href="#" style={{ color: '#667eea', textDecoration: 'underline' }}>
+                  <a href="#" style={{ color: '#1a1d23', textDecoration: 'underline' }}>
                     política de privacidade
                   </a>
                 </span>
@@ -407,7 +422,7 @@ const CadastroConsultor = ({ onVoltar, onCadastroSucesso }) => {
                 padding: '1rem',
                 background: '#fee2e2',
                 border: '1px solid #fecaca',
-                borderRadius: '8px',
+                borderRadius: '6px',
                 color: '#dc2626',
                 fontSize: '0.875rem'
               }}>
@@ -422,13 +437,22 @@ const CadastroConsultor = ({ onVoltar, onCadastroSucesso }) => {
                 style={{
                   flex: '1',
                   padding: '0.75rem',
-                  background: '#f3f4f6',
-                  color: '#374151',
-                  border: 'none',
-                  borderRadius: '8px',
+                  background: 'white',
+                  color: '#1a1d23',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
                   fontSize: '1rem',
                   fontWeight: '500',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.target.style.background = '#f9fafb';
+                  e.target.style.borderColor = '#9ca3af';
+                }}
+                onMouseOut={(e) => {
+                  e.target.style.background = 'white';
+                  e.target.style.borderColor = '#d1d5db';
                 }}
               >
                 Voltar
@@ -439,13 +463,26 @@ const CadastroConsultor = ({ onVoltar, onCadastroSucesso }) => {
                 style={{
                   flex: '2',
                   padding: '0.75rem',
-                  background: loading ? '#9ca3af' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: loading ? '#9ca3af' : '#1a1d23',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '8px',
+                  borderRadius: '6px',
                   fontSize: '1rem',
-                  fontWeight: '600',
-                  cursor: loading ? 'not-allowed' : 'pointer'
+                  fontWeight: '500',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseOver={(e) => {
+                  if (!loading) {
+                    e.target.style.background = '#0f1114';
+                    e.target.style.transform = 'translateY(-1px)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!loading) {
+                    e.target.style.background = '#1a1d23';
+                    e.target.style.transform = 'translateY(0)';
+                  }
                 }}
               >
                 {loading ? 'Cadastrando...' : 'Cadastrar'}
@@ -454,17 +491,29 @@ const CadastroConsultor = ({ onVoltar, onCadastroSucesso }) => {
           </div>
         </form>
 
+        {/* Info Box */}
         <div style={{
           marginTop: '2rem',
           padding: '1rem',
-          background: '#f0f9ff',
-          borderRadius: '8px',
-          border: '1px solid #bae6fd'
+          background: '#f9fafb',
+          borderRadius: '6px',
+          border: '1px solid #e5e7eb'
         }}>
-          <h4 style={{ color: '#0369a1', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-            💡 Informações importantes:
+          <h4 style={{ 
+            color: '#374151', 
+            fontSize: '0.875rem', 
+            fontWeight: '600', 
+            marginBottom: '0.5rem' 
+          }}>
+            Informações importantes:
           </h4>
-          <ul style={{ color: '#0369a1', fontSize: '0.75rem', margin: 0, paddingLeft: '1rem' }}>
+          <ul style={{ 
+            color: '#6b7280', 
+            fontSize: '0.75rem', 
+            margin: 0, 
+            paddingLeft: '1rem',
+            lineHeight: '1.4'
+          }}>
             <li>Seu PIX deve ser o mesmo CPF informado</li>
             <li>Você receberá R$ 5 de comissão a cada R$ 1.000 fechados</li>
             <li>Seu login será feito com o e-mail informado</li>

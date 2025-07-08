@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import logoBrasaoPreto from '../images/logobrasaopreto.png';
 
 const Login = ({ onVoltar }) => {
   const { login } = useAuth();
@@ -48,23 +49,16 @@ const Login = ({ onVoltar }) => {
         maxWidth: '400px'
       }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <h1 style={{
-            fontSize: '2rem',
-            fontWeight: '700',
-            color: '#1a1d23',
-            marginBottom: '0.5rem',
-            letterSpacing: '-0.025em'
-          }}>
-            CRM System
-          </h1>
-          <p style={{
-            fontSize: '0.875rem',
-            color: '#6b7280',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            Enterprise Edition
-          </p>
+          <img 
+            src={logoBrasaoPreto} 
+            alt="CRM System" 
+            style={{ 
+              width: '80px', 
+              height: '80px', 
+              marginBottom: '2rem',
+              objectFit: 'contain'
+            }} 
+          />
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -173,7 +167,7 @@ const Login = ({ onVoltar }) => {
         fontSize: '0.875rem',
         opacity: 0.8
       }}>
-        <p>&copy; 2024 CRM System. Todos os direitos reservados.</p>
+        <p>&copy; 2025 GIMTECH Solutions. Todos os direitos reservados.</p>
       </div>
     </div>
   );

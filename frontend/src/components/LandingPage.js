@@ -1,4 +1,5 @@
 import React from 'react';
+import logoHorizontalPreto from '../images/logohorizontalpreto.png';
 
 const LandingPage = ({ onCadastro, onLogin }) => {
   return (
@@ -22,28 +23,20 @@ const LandingPage = ({ onCadastro, onLogin }) => {
       }}>
         {/* Logo e Título */}
         <div style={{ marginBottom: '3rem' }}>
-          <h1 style={{
-            fontSize: '2.5rem',
-            fontWeight: '700',
-            color: '#1a1d23',
-            marginBottom: '0.5rem',
-            letterSpacing: '-0.025em'
-          }}>
-            CRM System
-          </h1>
-          <p style={{
-            fontSize: '0.875rem',
-            color: '#6b7280',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            fontWeight: '500'
-          }}>
-            Enterprise Edition
-          </p>
+          <img 
+            src={logoHorizontalPreto} 
+            alt="CRM System" 
+            style={{ 
+              width: '250px',
+              maxWidth: '80%',
+              height: 'auto',
+              marginBottom: '1.5rem',
+              objectFit: 'contain'
+            }} 
+          />
           <p style={{
             fontSize: '1rem',
             color: '#4b5563',
-            marginTop: '1rem',
             lineHeight: '1.5'
           }}>
             Sistema profissional de gestão de consultores e vendas
@@ -182,7 +175,7 @@ const LandingPage = ({ onCadastro, onLogin }) => {
           fontSize: '0.75rem',
           color: '#9ca3af'
         }}>
-          <p>&copy; 2024 CRM System. Todos os direitos reservados.</p>
+          <p>&copy; 2025 GIMTECH Solutions. Todos os direitos reservados.</p>
         </div>
       </div>
     </div>

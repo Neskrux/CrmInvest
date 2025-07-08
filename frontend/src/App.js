@@ -11,6 +11,9 @@ import Consultores from './components/Consultores';
 import Clinicas from './components/Clinicas';
 import Agendamentos from './components/Agendamentos';
 import Fechamentos from './components/Fechamentos';
+import logoBrasao from './images/logobrasao.png';
+import logoHorizontal from './images/logohorizontal.png';
+import logoHorizontalPreto from './images/logohorizontalpreto.png';
 
 function AppContent() {
   const { user, logout, loading } = useAuth();
@@ -93,8 +96,16 @@ function AppContent() {
     <div className="App">
       <aside className="sidebar">
         <div className="sidebar-header">
-          <h1 className="sidebar-title">CRM System</h1>
-          <p className="sidebar-subtitle">Enterprise Edition</p>
+          <img 
+            src={logoBrasao} 
+            alt="CRM System" 
+            style={{ 
+              width: '60px', 
+              height: '60px', 
+              marginBottom: '0.75rem',
+              objectFit: 'contain'
+            }} 
+          />
         </div>
 
         <nav className="sidebar-nav">
@@ -238,7 +249,15 @@ function AppContent() {
 
       <main className="main-content">
         <header className="main-header">
-          <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+            <img 
+              src={logoHorizontalPreto} 
+              alt="CRM System" 
+              style={{ 
+                height: '40px', 
+                objectFit: 'contain'
+              }} 
+            />
             <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#111827', margin: 0 }}>
               {activeTab === 'dashboard' && 'Dashboard'}
               {activeTab === 'pacientes' && 'Gestão de Pacientes'}
