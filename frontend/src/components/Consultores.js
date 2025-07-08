@@ -235,7 +235,7 @@ const Consultores = () => {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Consultores</h1>
+        <h1 className="page-title">Gerenciar Consultores</h1>
         <p className="page-subtitle">Gerencie a equipe de consultores</p>
       </div>
 

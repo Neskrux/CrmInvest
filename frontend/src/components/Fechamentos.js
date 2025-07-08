@@ -398,7 +398,7 @@ const Fechamentos = () => {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Fechamentos</h1>
+        <h1 className="page-title">Gerenciar Fechamentos</h1>
         <p className="page-subtitle">Gerencie os fechamentos de vendas</p>
       </div>
 

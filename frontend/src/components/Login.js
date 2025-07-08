@@ -112,28 +112,7 @@ const Login = ({ onVoltar }) => {
             paddingTop: '1rem',
             borderTop: '1px solid #e5e7eb'
           }}>
-            <button
-              type="button"
-              onClick={handleDemoLogin}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#2563eb',
-                fontSize: '0.875rem',
-                cursor: 'pointer',
-                textDecoration: 'underline',
-                marginBottom: '0.5rem'
-              }}
-            >
-              Usar conta demonstração
-            </button>
-            <p style={{
-              fontSize: '0.75rem',
-              color: '#9ca3af',
-              marginBottom: '1rem'
-            }}>
-              admin@investmoneysa.com.br / 123456
-            </p>
+           
             
             {onVoltar && (
               <button

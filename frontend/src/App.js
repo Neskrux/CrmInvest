@@ -183,42 +183,40 @@ function AppContent() {
             </a>
           </div>
 
-          {user.tipo === 'admin' && (
-            <>
-              <div className="nav-item">
-                <a
-                  href="#consultores"
-                  className={`nav-link ${activeTab === 'consultores' ? 'active' : ''}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setActiveTab('consultores');
-                  }}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
-                  Consultores
-                </a>
-              </div>
+          <div className="nav-item">
+            <a
+              href="#clinicas"
+              className={`nav-link ${activeTab === 'clinicas' ? 'active' : ''}`}
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveTab('clinicas');
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
+              Clínicas
+            </a>
+          </div>
 
-              <div className="nav-item">
-                <a
-                  href="#clinicas"
-                  className={`nav-link ${activeTab === 'clinicas' ? 'active' : ''}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setActiveTab('clinicas');
-                  }}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                    <polyline points="9 22 9 12 15 12 15 22" />
-                  </svg>
-                  Clínicas
-                </a>
-              </div>
-            </>
+          {user.tipo === 'admin' && (
+            <div className="nav-item">
+              <a
+                href="#consultores"
+                className={`nav-link ${activeTab === 'consultores' ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setActiveTab('consultores');
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                Consultores
+              </a>
+            </div>
           )}
         </nav>
 
@@ -254,26 +252,52 @@ function AppContent() {
               src={logoHorizontalPreto} 
               alt="CRM System" 
               style={{ 
-                height: '40px', 
+                height: '32px', 
                 objectFit: 'contain'
               }} 
             />
-            <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#111827', margin: 0 }}>
-              {activeTab === 'dashboard' && 'Dashboard'}
-              {activeTab === 'pacientes' && 'Gestão de Pacientes'}
-              {activeTab === 'consultores' && 'Gerenciar Consultores'}
-              {activeTab === 'clinicas' && 'Gerenciar Clínicas'}
-              {activeTab === 'agendamentos' && 'Agendamentos'}
-              {activeTab === 'fechamentos' && 'Fechamentos'}
-            </h2>
           </div>
-          <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-            {new Date().toLocaleDateString('pt-BR', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+              {new Date().toLocaleDateString('pt-BR', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </div>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.75rem',
+              padding: '0.5rem 1rem',
+              backgroundColor: '#f9fafb',
+              borderRadius: '8px',
+              border: '1px solid #e5e7eb'
+            }}>
+              <div style={{ 
+                width: '32px', 
+                height: '32px',
+                backgroundColor: '#e5e7eb',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: '#4b5563'
+              }}>
+                {getUserInitials()}
+              </div>
+              <div>
+                <div style={{ fontSize: '0.875rem', fontWeight: '500', color: '#1f2937' }}>
+                  {user.nome}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                  {user.tipo === 'admin' ? 'Administrador' : 'Consultor'}
+                </div>
+              </div>
+            </div>
           </div>
         </header>
 

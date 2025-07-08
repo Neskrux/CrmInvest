@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Clinicas = () => {
-  const { makeRequest } = useAuth();
+  const { makeRequest, user } = useAuth();
   const [clinicas, setClinicas] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingClinica, setEditingClinica] = useState(null);
@@ -10,6 +10,8 @@ const Clinicas = () => {
   const [message, setMessage] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroCity, setFiltroCity] = useState('');
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [viewingClinica, setViewingClinica] = useState(null);
   const [formData, setFormData] = useState({
     nome: '',
     endereco: '',
@@ -20,6 +22,9 @@ const Clinicas = () => {
     telefone: '',
     email: ''
   });
+
+  // Verificar se usuário é consultor
+  const isConsultor = user?.tipo === 'consultor';
 
   // Estados brasileiros
   const estadosBrasileiros = [
@@ -71,7 +76,6 @@ const Clinicas = () => {
     'AL': ['Maceió', 'Arapiraca', 'Rio Largo', 'Palmeira dos Índios', 'União dos Palmares', 'Penedo'],
     'SE': ['Aracaju', 'Nossa Senhora do Socorro', 'Lagarto', 'Itabaiana', 'Estância', 'Tobias Barreto'],
     'PB': ['João Pessoa', 'Campina Grande', 'Santa Rita', 'Patos', 'Bayeux', 'Sousa', 'Cajazeiras'],
-    'PE': ['Recife', 'Jaboatão dos Guararapes', 'Olinda', 'Caruaru', 'Petrolina', 'Paulista'],
     'RN': ['Natal', 'Mossoró', 'Parnamirim', 'São Gonçalo do Amarante', 'Macaíba', 'Ceará-Mirim'],
     'PI': ['Teresina', 'Parnaíba', 'Picos', 'Piripiri', 'Floriano', 'Campo Maior', 'Barras'],
     'MA': ['São Luís', 'Imperatriz', 'São José de Ribamar', 'Timon', 'Caxias', 'Codó', 'Paço do Lumiar'],
@@ -82,7 +86,7 @@ const Clinicas = () => {
     'AP': ['Macapá', 'Santana', 'Laranjal do Jari', 'Oiapoque', 'Mazagão', 'Porto Grande'],
     'AM': ['Manaus', 'Parintins', 'Itacoatiara', 'Manacapuru', 'Coari', 'Tefé', 'Tabatinga'],
     'PA': ['Belém', 'Ananindeua', 'Santarém', 'Marabá', 'Parauapebas', 'Castanhal', 'Abaetetuba']
-  };
+   };
 
   useEffect(() => {
     fetchClinicas();
@@ -165,21 +169,14 @@ const Clinicas = () => {
     setShowModal(true);
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value
-    });
+  const handleView = (clinica) => {
+    setViewingClinica(clinica);
+    setViewModalOpen(true);
+  };
 
-    // Limpar cidade se estado mudar
-    if (name === 'estado') {
-      setFormData(prev => ({
-        ...prev,
-        estado: value,
-        cidade: '' // Limpar cidade quando estado muda
-      }));
-    }
+  const closeViewModal = () => {
+    setViewModalOpen(false);
+    setViewingClinica(null);
   };
 
   const formatarData = (data) => {
@@ -210,6 +207,23 @@ const Clinicas = () => {
     setShowModal(false);
   };
 
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value
+    });
+
+    // Limpar cidade se estado mudar
+    if (name === 'estado') {
+      setFormData(prev => ({
+        ...prev,
+        estado: value,
+        cidade: '' // Limpar cidade quando estado muda
+      }));
+    }
+  };
+
   // Filtrar clínicas
   const clinicasFiltradas = clinicas.filter(clinica => {
     const matchEstado = !filtroEstado || clinica.estado === filtroEstado;
@@ -235,8 +249,8 @@ const Clinicas = () => {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Clínicas</h1>
-        <p className="page-subtitle">Gerencie as clínicas parceiras</p>
+        <h1 className="page-title">{isConsultor ? 'Visualizar Clínicas' : 'Gerenciar Clínicas'}</h1>
+        <p className="page-subtitle">{isConsultor ? 'Visualize as clínicas parceiras' : 'Gerencie as clínicas parceiras'}</p>
       </div>
 
       {message && (
@@ -248,15 +262,17 @@ const Clinicas = () => {
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Lista de Clínicas</h2>
-          <button 
-            className="btn btn-primary"
-            onClick={() => setShowModal(true)}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            Nova Clínica
-          </button>
+          {!isConsultor && (
+            <button 
+              className="btn btn-primary"
+              onClick={() => setShowModal(true)}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Nova Clínica
+            </button>
+          )}
         </div>
 
         {/* Seção de Filtros */}
@@ -402,17 +418,43 @@ const Clinicas = () => {
                       )}
                       {!clinica.telefone && !clinica.email && '-'}
                     </td>
-                    <td>
-                      <button
-                        onClick={() => handleEdit(clinica)}
-                        className="btn-action"
-                        title="Editar"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                        </svg>
-                      </button>
+                                        <td>
+                      {isConsultor ? (
+                        <button
+                          onClick={() => handleView(clinica)}
+                          className="btn-action"
+                          title="Visualizar"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleEdit(clinica)}
+                            className="btn-action"
+                            title="Editar"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleView(clinica)}
+                            className="btn-action"
+                            title="Visualizar"
+                            style={{ marginLeft: '0.5rem' }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -587,6 +629,98 @@ const Clinicas = () => {
           </div>
         </div>
       )}
+
+             {/* Modal de Visualização */}
+       {viewModalOpen && viewingClinica && (
+         <div className="modal-overlay">
+           <div className="modal" style={{ maxWidth: '600px' }}>
+             <div className="modal-header">
+               <h2 className="modal-title">
+                 Detalhes da Clínica
+               </h2>
+               <button 
+                 className="close-btn"
+                 onClick={closeViewModal}
+               >
+                 ×
+               </button>
+             </div>
+ 
+             <div style={{ padding: '1.5rem' }}>
+               <div style={{ display: 'grid', gap: '1rem' }}>
+                 <div>
+                   <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Nome da Clínica</label>
+                   <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.nome}</p>
+                 </div>
+                 
+                 {viewingClinica.endereco && (
+                   <div>
+                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Endereço</label>
+                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.endereco}</p>
+                   </div>
+                 )}
+                 
+                 {viewingClinica.bairro && (
+                   <div>
+                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Bairro</label>
+                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.bairro}</p>
+                   </div>
+                 )}
+                 
+                 {(viewingClinica.cidade || viewingClinica.estado) && (
+                   <div>
+                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Localização</label>
+                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                       {viewingClinica.cidade && viewingClinica.estado 
+                         ? `${viewingClinica.cidade}, ${viewingClinica.estado}`
+                         : viewingClinica.cidade || viewingClinica.estado
+                       }
+                     </p>
+                   </div>
+                 )}
+                 
+                 {viewingClinica.nicho && (
+                   <div>
+                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Nicho</label>
+                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.nicho}</p>
+                   </div>
+                 )}
+                 
+                 {viewingClinica.telefone && (
+                   <div>
+                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Telefone</label>
+                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{formatarTelefone(viewingClinica.telefone)}</p>
+                   </div>
+                 )}
+                 
+                 {viewingClinica.email && (
+                   <div>
+                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>E-mail</label>
+                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.email}</p>
+                   </div>
+                 )}
+                 
+                 {viewingClinica.created_at && (
+                   <div>
+                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Data de Cadastro</label>
+                     <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>{formatarData(viewingClinica.created_at)}</p>
+                   </div>
+                 )}
+               </div>
+               
+               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem' }}>
+                 <button 
+                   type="button"
+                   className="btn btn-secondary"
+                   onClick={closeViewModal}
+                 >
+                   Fechar
+                 </button>
+               </div>
+             </div>
+           </div>
+         </div>
+       )}
     </div>
   );
 };

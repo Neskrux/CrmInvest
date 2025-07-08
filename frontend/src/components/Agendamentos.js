@@ -297,7 +297,7 @@ const Agendamentos = () => {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Agendamentos</h1>
+        <h1 className="page-title">Gerenciar Agendamentos</h1>
         <p className="page-subtitle">Gerencie consultas e acompanhe o pipeline de vendas</p>
       </div>
 
