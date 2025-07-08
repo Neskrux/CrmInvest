@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd frontend && npm install --force && CI=false DISABLE_ESLINT_PLUGIN=true npx react-scripts build",
+  "buildCommand": "cd frontend && npm install --force && CI=false DISABLE_ESLINT_PLUGIN=true npm run build-vercel",
   "outputDirectory": "frontend/build",
   "framework": null,
   "env": {

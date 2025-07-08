@@ -1,15 +1,13 @@
 {
-  "name": "crm-plataforma",
+  "name": "crm-system",
   "version": "1.0.0",
-  "description": "Plataforma CRM para gestão de leads e agendamentos",
+  "description": "CRM System with Frontend and Backend",
   "scripts": {
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "server": "cd backend && npm run dev",
-    "client": "cd frontend && npm start",
-    "build": "cd frontend && npm run build",
-    "vercel-build": "cd frontend && npm install && npm run build"
+    "build": "cd frontend && npm install --force && chmod +x node_modules/.bin/react-scripts && CI=false DISABLE_ESLINT_PLUGIN=true npm run build",
+    "install": "cd frontend && npm install --force && cd ../backend && npm install",
+    "start": "cd backend && node server.js"
   },
-  "devDependencies": {
-    "concurrently": "^8.2.2"
+  "engines": {
+    "node": ">=14.x"
   }
 } 
