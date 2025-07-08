@@ -77,22 +77,10 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'crm-secret-key-2024';
 
-// Função para normalizar nomes (remover acentos, espaços, converter para minúsculas)
-const normalizarNome = (nome) => {
-  if (!nome) return '';
-  
-  return nome
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-    .replace(/[^a-z0-9]/g, '') // Remove caracteres especiais e espaços
-    .trim();
-};
-
-// Função para gerar email do consultor
-const gerarEmailConsultor = (nome) => {
-  const nomeNormalizado = normalizarNome(nome);
-  return `${nomeNormalizado}@investmoneysa.com.br`;
+// Função para normalizar emails (converter para minúsculas e limpar espaços)
+const normalizarEmail = (email) => {
+  if (!email) return '';
+  return email.toLowerCase().trim();
 };
 
 // Middleware de autenticação
@@ -243,8 +231,8 @@ app.post('/api/login', async (req, res) => {
 
     // Se não encontrou admin, tentar login como consultor (apenas por email)
     if (!usuario && email.includes('@')) {
-      // Normalizar email para minúsculas
-      const emailNormalizado = email.toLowerCase();
+      // Normalizar email para busca
+      const emailNormalizado = normalizarEmail(email);
       console.log('🔍 Buscando consultor por email:', emailNormalizado);
       
       const { data: consultores, error } = await supabase
@@ -493,15 +481,32 @@ app.get('/api/consultores', authenticateToken, async (req, res) => {
 
 app.post('/api/consultores', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { nome, telefone, senha, pix } = req.body;
+    const { nome, telefone, email, senha, pix } = req.body;
     
-    // Validar se senha foi fornecida
+    // Validar campos obrigatórios
     if (!senha || senha.trim() === '') {
       return res.status(400).json({ error: 'Senha é obrigatória!' });
     }
     
-    // Gerar email automático normalizado
-    const email = gerarEmailConsultor(nome);
+    if (!email || email.trim() === '') {
+      return res.status(400).json({ error: 'Email é obrigatório!' });
+    }
+    
+    // Normalizar email
+    const emailNormalizado = normalizarEmail(email);
+    
+    // Verificar se email já existe
+    const { data: emailExistente, error: emailError } = await supabase
+      .from('consultores')
+      .select('id')
+      .eq('email', emailNormalizado)
+      .limit(1);
+
+    if (emailError) throw emailError;
+    
+    if (emailExistente && emailExistente.length > 0) {
+      return res.status(400).json({ error: 'Este email já está cadastrado!' });
+    }
     
     // Hash da senha antes de salvar
     const saltRounds = 10;
@@ -509,14 +514,14 @@ app.post('/api/consultores', authenticateToken, requireAdmin, async (req, res) =
     
     const { data, error } = await supabase
       .from('consultores')
-      .insert([{ nome, telefone, email, senha: senhaHash, pix }])
+      .insert([{ nome, telefone, email: emailNormalizado, senha: senhaHash, pix }])
       .select();
 
     if (error) throw error;
     res.json({ 
       id: data[0].id, 
       message: 'Consultor cadastrado com sucesso!',
-      email: email 
+      email: emailNormalizado
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -539,11 +544,14 @@ app.post('/api/consultores/cadastro', async (req, res) => {
       return res.status(400).json({ error: 'Email inválido!' });
     }
     
+    // Normalizar email antes de salvar
+    const emailNormalizado = normalizarEmail(email);
+    
     // Validar se email já existe
     const { data: emailExistente, error: emailError } = await supabase
       .from('consultores')
       .select('id')
-      .eq('email', email.toLowerCase())
+      .eq('email', emailNormalizado)
       .limit(1);
 
     if (emailError) throw emailError;
@@ -575,7 +583,7 @@ app.post('/api/consultores/cadastro', async (req, res) => {
       .insert([{ 
         nome, 
         telefone, 
-        email: email.toLowerCase(), 
+        email: emailNormalizado, 
         senha: senhaHash, 
         cpf, 
         pix,
@@ -589,7 +597,7 @@ app.post('/api/consultores/cadastro', async (req, res) => {
     res.json({ 
       id: data[0].id, 
       message: 'Consultor cadastrado com sucesso! Agora você pode fazer login.',
-      email: email.toLowerCase()
+      email: emailNormalizado
     });
   } catch (error) {
     console.error('Erro no cadastro:', error);
@@ -600,14 +608,30 @@ app.post('/api/consultores/cadastro', async (req, res) => {
 app.put('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, telefone, senha, pix } = req.body;
+    const { nome, telefone, email, senha, pix } = req.body;
     
     // Preparar dados para atualização
     const updateData = { nome, telefone, pix };
     
-    // Atualizar email sempre que o nome for alterado
-    if (nome) {
-      updateData.email = gerarEmailConsultor(nome);
+    // Atualizar email se fornecido
+    if (email && email.trim() !== '') {
+      const emailNormalizado = normalizarEmail(email);
+      
+      // Verificar se email já existe em outro consultor
+      const { data: emailExistente, error: emailError } = await supabase
+        .from('consultores')
+        .select('id')
+        .eq('email', emailNormalizado)
+        .neq('id', id)
+        .limit(1);
+
+      if (emailError) throw emailError;
+      
+      if (emailExistente && emailExistente.length > 0) {
+        return res.status(400).json({ error: 'Este email já está sendo usado por outro consultor!' });
+      }
+      
+      updateData.email = emailNormalizado;
     }
     
     // Se uma nova senha foi fornecida, fazer hash dela
@@ -626,7 +650,7 @@ app.put('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res
     res.json({ 
       id: data[0].id, 
       message: 'Consultor atualizado com sucesso!',
-      email: updateData.email 
+      email: updateData.email
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

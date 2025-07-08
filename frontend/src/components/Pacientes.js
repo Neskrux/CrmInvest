@@ -29,7 +29,8 @@ const Pacientes = () => {
     { value: 'fechado', label: 'Fechado', color: '#059669' },
     { value: 'nao_fechou', label: 'Não Fechou', color: '#dc2626' },
     { value: 'nao_compareceu', label: 'Não Compareceu', color: '#ef4444' },
-    { value: 'reagendado', label: 'Reagendado', color: '#8b5cf6' }
+    { value: 'reagendado', label: 'Reagendado', color: '#8b5cf6' },
+    { value: 'nao_passou_cpf', label: 'Não passou CPF', color: '#6366f1' }
   ];
 
   useEffect(() => {

@@ -350,7 +350,8 @@ const Dashboard = () => {
       fechado: '#059669',
       nao_fechou: '#ef4444',
       nao_compareceu: '#f87171',
-      reagendado: '#8b5cf6'
+      reagendado: '#8b5cf6',
+      nao_passou_cpf: '#6366f1'
     };
     return colors[status] || '#6b7280';
   };

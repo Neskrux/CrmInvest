@@ -15,6 +15,7 @@ const Consultores = () => {
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
+    email: '',
     senha: '',
     pix: ''
   });
@@ -67,6 +68,7 @@ const Consultores = () => {
         setFormData({
           nome: '',
           telefone: '',
+          email: '',
           senha: '',
           pix: ''
         });
@@ -86,6 +88,7 @@ const Consultores = () => {
     setFormData({
       nome: consultor.nome || '',
       telefone: consultor.telefone || '',
+      email: consultor.email || '',
       senha: consultor.senha || '',
       pix: consultor.pix || ''
     });
@@ -146,6 +149,7 @@ const Consultores = () => {
     setFormData({
       nome: '',
       telefone: '',
+      email: '',
       senha: '',
       pix: ''
     });
@@ -417,6 +421,23 @@ const Consultores = () => {
               </div>
 
               <div className="form-group">
+                <label className="form-label">Email para Login *</label>
+                <input
+                  type="email"
+                  name="email"
+                  className="form-input"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  placeholder="consultor@email.com"
+                  required
+                  autoComplete="off"
+                />
+                <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                  Email que será usado para fazer login no sistema
+                </small>
+              </div>
+
+              <div className="form-group">
                 <label className="form-label">Senha</label>
                 <input
                   type="password"
@@ -428,7 +449,7 @@ const Consultores = () => {
                   autoComplete="new-password"
                 />
                 <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
-                  O email de acesso será gerado automaticamente baseado no nome
+                  Senha para acesso ao sistema
                 </small>
               </div>
 

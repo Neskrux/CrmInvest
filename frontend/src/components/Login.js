@@ -73,6 +73,13 @@ const Login = ({ onVoltar }) => {
               required
               autoFocus
             />
+            <div style={{ 
+              fontSize: '0.75rem', 
+              color: '#6b7280', 
+              marginTop: '0.25rem' 
+            }}>
+              Use o email informado no seu cadastro
+            </div>
           </div>
 
           <div className="form-group">
