@@ -177,7 +177,11 @@ const CadastroConsultor = ({ onVoltar, onCadastroSucesso }) => {
       if (response.ok) {
         onCadastroSucesso();
       } else {
-        setErrors({ general: data.error || 'Erro ao cadastrar consultor' });
+        let errorMsg = data.error || 'Erro ao cadastrar consultor';
+        if (errorMsg && errorMsg.toLowerCase().includes('consultores_email_key')) {
+          errorMsg = 'Já existe um consultor cadastrado com este e-mail. Por favor, utilize outro e-mail.';
+        }
+        setErrors({ general: errorMsg });
       }
     } catch (error) {
       console.error('Erro no cadastro:', error);
