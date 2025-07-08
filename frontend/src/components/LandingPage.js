@@ -4,7 +4,7 @@ const LandingPage = ({ onCadastro, onLogin }) => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: '#f9fafb',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -12,143 +12,177 @@ const LandingPage = ({ onCadastro, onLogin }) => {
     }}>
       <div style={{
         background: 'white',
-        borderRadius: '20px',
+        borderRadius: '8px',
         padding: '3rem',
-        boxShadow: '0 30px 60px rgba(0, 0, 0, 0.2)',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)',
+        border: '1px solid #e5e7eb',
         width: '100%',
-        maxWidth: '600px',
+        maxWidth: '500px',
         textAlign: 'center'
       }}>
+        {/* Logo e Título */}
         <div style={{ marginBottom: '3rem' }}>
           <h1 style={{
             fontSize: '2.5rem',
-            fontWeight: '800',
+            fontWeight: '700',
             color: '#1a1d23',
-            marginBottom: '1rem',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text'
+            marginBottom: '0.5rem',
+            letterSpacing: '-0.025em'
           }}>
-            Bem-vindo ao CRM
+            CRM System
           </h1>
           <p style={{
-            fontSize: '1.125rem',
+            fontSize: '0.875rem',
             color: '#6b7280',
-            marginBottom: '2rem',
-            lineHeight: '1.6'
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            fontWeight: '500'
           }}>
-            Transforme sua vida profissional com nossa plataforma
+            Enterprise Edition
+          </p>
+          <p style={{
+            fontSize: '1rem',
+            color: '#4b5563',
+            marginTop: '1rem',
+            lineHeight: '1.5'
+          }}>
+            Sistema profissional de gestão de consultores e vendas
           </p>
         </div>
 
+        {/* Botões de Ação */}
         <div style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: '2rem'
+          gap: '1rem'
         }}>
           <button
             onClick={onCadastro}
             style={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: '#1a1d23',
               color: 'white',
               border: 'none',
-              padding: '1.5rem 2rem',
-              borderRadius: '12px',
-              fontSize: '1.25rem',
-              fontWeight: '600',
+              padding: '1rem 2rem',
+              borderRadius: '6px',
+              fontSize: '1rem',
+              fontWeight: '500',
               cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 8px 20px rgba(102, 126, 234, 0.3)'
+              transition: 'all 0.15s ease'
             }}
             onMouseOver={(e) => {
-              e.target.style.transform = 'translateY(-2px)';
-              e.target.style.boxShadow = '0 12px 30px rgba(102, 126, 234, 0.4)';
+              e.target.style.background = '#0f1114';
+              e.target.style.transform = 'translateY(-1px)';
             }}
             onMouseOut={(e) => {
-              e.target.style.transform = 'translateY(0px)';
-              e.target.style.boxShadow = '0 8px 20px rgba(102, 126, 234, 0.3)';
+              e.target.style.background = '#1a1d23';
+              e.target.style.transform = 'translateY(0)';
             }}
           >
-            <div style={{ marginBottom: '0.5rem' }}>
-              💰 Quer ganhar uma renda extra?
-            </div>
-            <div style={{ fontSize: '0.875rem', opacity: '0.9' }}>
-              Cadastre-se e comece a lucrar conosco
-            </div>
+            Cadastrar como Consultor
           </button>
 
           <button
             onClick={onLogin}
             style={{
               background: 'white',
-              color: '#667eea',
-              border: '2px solid #667eea',
-              padding: '1.5rem 2rem',
-              borderRadius: '12px',
-              fontSize: '1.25rem',
-              fontWeight: '600',
+              color: '#1a1d23',
+              border: '1px solid #d1d5db',
+              padding: '1rem 2rem',
+              borderRadius: '6px',
+              fontSize: '1rem',
+              fontWeight: '500',
               cursor: 'pointer',
-              transition: 'all 0.3s ease'
+              transition: 'all 0.15s ease'
             }}
             onMouseOver={(e) => {
-              e.target.style.background = '#667eea';
-              e.target.style.color = 'white';
-              e.target.style.transform = 'translateY(-2px)';
+              e.target.style.background = '#f9fafb';
+              e.target.style.borderColor = '#9ca3af';
             }}
             onMouseOut={(e) => {
               e.target.style.background = 'white';
-              e.target.style.color = '#667eea';
-              e.target.style.transform = 'translateY(0px)';
+              e.target.style.borderColor = '#d1d5db';
             }}
           >
-            <div style={{ marginBottom: '0.5rem' }}>
-              👤 Já sou um consultor...
-            </div>
-            <div style={{ fontSize: '0.875rem', opacity: '0.8' }}>
-              Entre em sua conta
-            </div>
+            Acessar Sistema
           </button>
         </div>
 
+        {/* Informações do Sistema */}
         <div style={{
           marginTop: '3rem',
-          padding: '1.5rem',
-          background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-          borderRadius: '12px',
-          border: '1px solid #e2e8f0'
+          paddingTop: '2rem',
+          borderTop: '1px solid #e5e7eb'
         }}>
-          <h3 style={{
-            fontSize: '1.125rem',
-            fontWeight: '600',
-            color: '#374151',
-            marginBottom: '1rem'
-          }}>
-            Por que escolher nosso CRM?
-          </h3>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gridTemplateColumns: 'repeat(3, 1fr)',
             gap: '1rem',
-            fontSize: '0.875rem',
-            color: '#6b7280'
+            textAlign: 'center'
           }}>
             <div>
-              <strong>💼 Comissões</strong>
-              <br />
-              R$ 5 por cada R$ 1000 fechados
+              <div style={{
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                color: '#1a1d23',
+                marginBottom: '0.25rem'
+              }}>
+                R$ 5
+              </div>
+              <div style={{
+                fontSize: '0.75rem',
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}>
+                Por mil
+              </div>
             </div>
             <div>
-              <strong>📊 Gestão</strong>
-              <br />
-              Plataforma completa
+              <div style={{
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                color: '#1a1d23',
+                marginBottom: '0.25rem'
+              }}>
+                100%
+              </div>
+              <div style={{
+                fontSize: '0.75rem',
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}>
+                Online
+              </div>
             </div>
             <div>
-              <strong>🚀 Crescimento</strong>
-              <br />
-              Oportunidades ilimitadas
+              <div style={{
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                color: '#1a1d23',
+                marginBottom: '0.25rem'
+              }}>
+                24/7
+              </div>
+              <div style={{
+                fontSize: '0.75rem',
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}>
+                Suporte
+              </div>
             </div>
           </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          marginTop: '2rem',
+          fontSize: '0.75rem',
+          color: '#9ca3af'
+        }}>
+          <p>&copy; 2024 CRM System. Todos os direitos reservados.</p>
         </div>
       </div>
     </div>
