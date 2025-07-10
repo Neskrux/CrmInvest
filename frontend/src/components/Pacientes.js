@@ -182,10 +182,30 @@ const Pacientes = () => {
     setShowModal(true);
   };
 
+  // Função para formatar telefone
+  function maskTelefone(value) {
+    return value
+      .replace(/\D/g, '')
+      .replace(/(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{5})(\d)/, '$1-$2')
+      .replace(/(-\d{4})\d+?$/, '$1');
+  }
+  // Função para formatar CPF
+  function maskCPF(value) {
+    return value
+      .replace(/\D/g, '')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  }
+
   const handleInputChange = (e) => {
+    let { name, value } = e.target;
+    if (name === 'telefone') value = maskTelefone(value);
+    if (name === 'cpf') value = maskCPF(value);
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: value
     });
   };
 
@@ -650,21 +670,13 @@ const Pacientes = () => {
                   </select>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Status</label>
-                  <select
-                    name="status"
-                    className="form-select"
-                    value={formData.status}
-                    onChange={handleInputChange}
-                  >
-                    {statusOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {/* Remover o campo de status do formulário/modal de cadastro/edição: */}
+                {/* Substituir o bloco: */}
+                {/* <div className="form-group"> */}
+                {/*   <label className="form-label">Status</label> */}
+                {/*   <select ...>...</select> */}
+                {/* </div> */}
+                {/* por nada (remover do JSX) */}
               </div>
 
               <div className="form-group">
