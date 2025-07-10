@@ -20,28 +20,13 @@ const Fechamentos = () => {
     paciente_id: '',
     consultor_id: '',
     clinica_id: '',
-    agendamento_id: '',
     valor_fechado: '',
     valor_formatado: '',
     data_fechamento: new Date().toISOString().split('T')[0],
     tipo_tratamento: '',
-    forma_pagamento: '',
     observacoes: ''
   });
   const [contratoSelecionado, setContratoSelecionado] = useState(null);
-
-  const formasPagamento = [
-    'À vista',
-    'Parcelado 2x',
-    'Parcelado 3x',
-    'Parcelado 4x',
-    'Parcelado 6x',
-    'Parcelado 12x',
-    'PIX',
-    'Boleto',
-    'Cartão de Crédito',
-    'Cartão de Débito'
-  ];
 
   useEffect(() => {
     carregarDados();
@@ -163,12 +148,10 @@ const Fechamentos = () => {
         paciente_id: '',
         consultor_id: '',
         clinica_id: '',
-        agendamento_id: '',
         valor_fechado: '',
         valor_formatado: '',
         data_fechamento: new Date().toISOString().split('T')[0],
         tipo_tratamento: '',
-        forma_pagamento: '',
         observacoes: ''
       });
     }
@@ -183,12 +166,10 @@ const Fechamentos = () => {
       paciente_id: '',
       consultor_id: '',
       clinica_id: '',
-      agendamento_id: '',
       valor_fechado: '',
       valor_formatado: '',
       data_fechamento: new Date().toISOString().split('T')[0],
       tipo_tratamento: '',
-      forma_pagamento: '',
       observacoes: ''
     });
   };
@@ -232,14 +213,9 @@ const Fechamentos = () => {
         formData.append('clinica_id', parseInt(novoFechamento.clinica_id));
       }
       
-      if (novoFechamento.agendamento_id && novoFechamento.agendamento_id.trim() !== '') {
-        formData.append('agendamento_id', parseInt(novoFechamento.agendamento_id));
-      }
-      
       formData.append('valor_fechado', parseFloat(novoFechamento.valor_fechado));
       formData.append('data_fechamento', novoFechamento.data_fechamento);
       formData.append('tipo_tratamento', novoFechamento.tipo_tratamento || '');
-      formData.append('forma_pagamento', novoFechamento.forma_pagamento || '');
       formData.append('observacoes', novoFechamento.observacoes || '');
       
       if (contratoSelecionado) {
@@ -336,6 +312,36 @@ const Fechamentos = () => {
       valor_fechado: valorNumerico,
       valor_formatado: valorFormatado
     });
+  };
+
+  const handlePacienteChange = async (pacienteId) => {
+    setNovoFechamento({...novoFechamento, paciente_id: pacienteId});
+    
+    if (pacienteId) {
+      // Buscar o paciente selecionado
+      const paciente = pacientes.find(p => p.id === parseInt(pacienteId));
+      
+      if (paciente && paciente.consultor_id) {
+        // Se o paciente tem consultor, selecionar automaticamente
+        setNovoFechamento(prev => ({
+          ...prev,
+          paciente_id: pacienteId,
+          consultor_id: paciente.consultor_id.toString()
+        }));
+      }
+      
+      // Buscar último agendamento do paciente para pegar a clínica
+      const ultimoAgendamento = agendamentos
+        .filter(a => a.paciente_id === parseInt(pacienteId))
+        .sort((a, b) => new Date(b.data_agendamento) - new Date(a.data_agendamento))[0];
+      
+      if (ultimoAgendamento && ultimoAgendamento.clinica_id) {
+        setNovoFechamento(prev => ({
+          ...prev,
+          clinica_id: ultimoAgendamento.clinica_id.toString()
+        }));
+      }
+    }
   };
 
   const downloadContrato = async (fechamento) => {
@@ -527,7 +533,6 @@ const Fechamentos = () => {
                     <th>Consultor</th>
                     <th>Clínica</th>
                     <th>Tipo</th>
-                    <th>Forma Pgto</th>
                     <th style={{ textAlign: 'right' }}>Valor</th>
                     <th style={{ width: '120px' }}>Ações</th>
                   </tr>
@@ -560,7 +565,6 @@ const Fechamentos = () => {
                             </span>
                           )}
                         </td>
-                        <td>{fechamento.forma_pagamento || 'N/A'}</td>
                         <td style={{ textAlign: 'right', fontWeight: '600' }}>
                           {formatarMoeda(fechamento.valor_fechado)}
                         </td>
@@ -617,7 +621,7 @@ const Fechamentos = () => {
       {/* Modal */}
       {modalAberto && (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: '700px' }}>
+          <div className="modal">
             <div className="modal-header">
               <h2 className="modal-title">
                 {fechamentoEditando ? 'Editar Fechamento' : 'Novo Fechamento'}
@@ -627,23 +631,25 @@ const Fechamentos = () => {
               </button>
             </div>
 
-            <div className="modal-body">
-              <div className="grid grid-2">
-                <div className="form-group">
-                  <label className="form-label">Paciente *</label>
-                  <select 
-                    className="form-select"
-                    value={novoFechamento.paciente_id}
-                    onChange={(e) => setNovoFechamento({...novoFechamento, paciente_id: e.target.value})}
-                    required
-                  >
-                    <option value="">Selecione</option>
-                    {pacientes.map(p => (
-                      <option key={p.id} value={p.id}>{p.nome}</option>
-                    ))}
-                  </select>
-                </div>
+            <form onSubmit={(e) => { e.preventDefault(); salvarFechamento(); }}>
+              <div className="form-group">
+                <label className="form-label">Paciente *</label>
+                <select 
+                  className="form-select"
+                  value={novoFechamento.paciente_id}
+                  onChange={(e) => handlePacienteChange(e.target.value)}
+                  required
+                >
+                  <option value="">Selecione um paciente</option>
+                  {pacientes.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.nome} {p.telefone && `- ${p.telefone}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
+              <div className="grid grid-2">
                 <div className="form-group">
                   <label className="form-label">Valor (R$) *</label>
                   <input 
@@ -655,9 +661,7 @@ const Fechamentos = () => {
                     required
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-2">
                 <div className="form-group">
                   <label className="form-label">Consultor</label>
                   <select 
@@ -665,26 +669,26 @@ const Fechamentos = () => {
                     value={novoFechamento.consultor_id}
                     onChange={(e) => setNovoFechamento({...novoFechamento, consultor_id: e.target.value})}
                   >
-                    <option value="">Selecione</option>
+                    <option value="">Selecione um consultor</option>
                     {consultores.map(c => (
                       <option key={c.id} value={c.id}>{c.nome}</option>
                     ))}
                   </select>
                 </div>
+              </div>
 
-                <div className="form-group">
-                  <label className="form-label">Clínica</label>
-                  <select 
-                    className="form-select"
-                    value={novoFechamento.clinica_id}
-                    onChange={(e) => setNovoFechamento({...novoFechamento, clinica_id: e.target.value})}
-                  >
-                    <option value="">Selecione</option>
-                    {clinicas.map(c => (
-                      <option key={c.id} value={c.id}>{c.nome}</option>
-                    ))}
-                  </select>
-                </div>
+              <div className="form-group">
+                <label className="form-label">Clínica</label>
+                <select 
+                  className="form-select"
+                  value={novoFechamento.clinica_id}
+                  onChange={(e) => setNovoFechamento({...novoFechamento, clinica_id: e.target.value})}
+                >
+                  <option value="">Selecione uma clínica</option>
+                  {clinicas.map(c => (
+                    <option key={c.id} value={c.id}>{c.nome}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-2">
@@ -699,24 +703,6 @@ const Fechamentos = () => {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Agendamento</label>
-                  <select 
-                    className="form-select"
-                    value={novoFechamento.agendamento_id}
-                    onChange={(e) => setNovoFechamento({...novoFechamento, agendamento_id: e.target.value})}
-                  >
-                    <option value="">Nenhum</option>
-                    {agendamentos.map(a => (
-                      <option key={a.id} value={a.id}>
-                        {a.paciente_nome} - {new Date(a.data_agendamento).toLocaleDateString('pt-BR')}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-2">
-                <div className="form-group">
                   <label className="form-label">Tipo de Tratamento</label>
                   <select 
                     className="form-select"
@@ -726,20 +712,6 @@ const Fechamentos = () => {
                     <option value="">Selecione</option>
                     <option value="Estético">Estético</option>
                     <option value="Odontológico">Odontológico</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Forma de Pagamento</label>
-                  <select 
-                    className="form-select"
-                    value={novoFechamento.forma_pagamento}
-                    onChange={(e) => setNovoFechamento({...novoFechamento, forma_pagamento: e.target.value})}
-                  >
-                    <option value="">Selecione</option>
-                    {formasPagamento.map(f => (
-                      <option key={f} value={f}>{f}</option>
-                    ))}
                   </select>
                 </div>
               </div>
@@ -770,15 +742,22 @@ const Fechamentos = () => {
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
-                <button className="btn btn-secondary" onClick={fecharModal}>
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                <button 
+                  type="button"
+                  className="btn btn-secondary" 
+                  onClick={fecharModal}
+                >
                   Cancelar
                 </button>
-                <button className="btn btn-primary" onClick={salvarFechamento}>
+                <button 
+                  type="submit"
+                  className="btn btn-primary"
+                >
                   {fechamentoEditando ? 'Atualizar' : 'Salvar'}
                 </button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}

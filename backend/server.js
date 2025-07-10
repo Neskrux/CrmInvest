@@ -948,6 +948,15 @@ app.post('/api/agendamentos', authenticateToken, async (req, res) => {
       .select();
 
     if (error) throw error;
+
+    // Atualizar status do paciente para "agendado"
+    if (paciente_id) {
+      await supabase
+        .from('pacientes')
+        .update({ status: 'agendado' })
+        .eq('id', paciente_id);
+    }
+
     res.json({ id: data[0].id, message: 'Agendamento criado com sucesso!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -966,6 +975,15 @@ app.put('/api/agendamentos/:id', authenticateToken, async (req, res) => {
       .select();
 
     if (error) throw error;
+
+    // Se mudou o paciente do agendamento, atualizar status do novo paciente
+    if (paciente_id) {
+      await supabase
+        .from('pacientes')
+        .update({ status: 'agendado' })
+        .eq('id', paciente_id);
+    }
+
     res.json({ id: data[0].id, message: 'Agendamento atualizado com sucesso!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1067,11 +1085,9 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
       paciente_id, 
       consultor_id, 
       clinica_id, 
-      agendamento_id,
       valor_fechado, 
       data_fechamento, 
       tipo_tratamento,
-      forma_pagamento,
       observacoes 
     } = req.body;
 
@@ -1083,7 +1099,6 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
     // Converter campos opcionais para null se não enviados ou vazios
     const consultorId = consultor_id && consultor_id.trim() !== '' ? parseInt(consultor_id) : null;
     const clinicaId = clinica_id && clinica_id.trim() !== '' ? parseInt(clinica_id) : null;
-    const agendamentoId = agendamento_id && agendamento_id.trim() !== '' ? parseInt(agendamento_id) : null;
 
     // Dados do contrato
     const contratoArquivo = req.file.filename;
@@ -1096,11 +1111,9 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
         paciente_id: parseInt(paciente_id), 
         consultor_id: consultorId, 
         clinica_id: clinicaId, 
-        agendamento_id: agendamentoId,
         valor_fechado: parseFloat(valor_fechado), 
         data_fechamento, 
         tipo_tratamento: tipo_tratamento || null,
-        forma_pagamento: forma_pagamento || null,
         observacoes: observacoes || null,
         contrato_arquivo: contratoArquivo,
         contrato_nome_original: contratoNomeOriginal,
@@ -1125,13 +1138,7 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
         .eq('id', paciente_id);
     }
 
-    // Atualizar status do agendamento para "fechado" se existir
-    if (agendamento_id) {
-      await supabase
-        .from('agendamentos')
-        .update({ status: 'fechado' })
-        .eq('id', agendamento_id);
-    }
+
 
     res.json({ 
       id: data[0].id, 
@@ -1157,18 +1164,15 @@ app.put('/api/fechamentos/:id', authenticateToken, async (req, res) => {
       paciente_id, 
       consultor_id, 
       clinica_id, 
-      agendamento_id,
       valor_fechado, 
       data_fechamento, 
       tipo_tratamento,
-      forma_pagamento,
       observacoes 
     } = req.body;
 
     // Converter campos opcionais para null se não enviados ou vazios
     const consultorId = consultor_id && consultor_id.trim() !== '' ? parseInt(consultor_id) : null;
     const clinicaId = clinica_id && clinica_id.trim() !== '' ? parseInt(clinica_id) : null;
-    const agendamentoId = agendamento_id && agendamento_id.trim() !== '' ? parseInt(agendamento_id) : null;
     
     const { data, error } = await supabase
       .from('fechamentos')
@@ -1176,11 +1180,9 @@ app.put('/api/fechamentos/:id', authenticateToken, async (req, res) => {
         paciente_id: parseInt(paciente_id), 
         consultor_id: consultorId, 
         clinica_id: clinicaId, 
-        agendamento_id: agendamentoId,
         valor_fechado: parseFloat(valor_fechado), 
         data_fechamento, 
         tipo_tratamento: tipo_tratamento || null,
-        forma_pagamento: forma_pagamento || null,
         observacoes: observacoes || null 
       })
       .eq('id', id)
