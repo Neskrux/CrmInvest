@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import logoBrasaoPreto from '../images/logobrasaopreto.png';
 
-const CadastroConsultor = ({ onVoltar, onCadastroSucesso }) => {
+const CadastroConsultor = () => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
@@ -175,7 +177,7 @@ const CadastroConsultor = ({ onVoltar, onCadastroSucesso }) => {
       const data = await response.json();
       
       if (response.ok) {
-        onCadastroSucesso();
+        navigate('/cadastro-sucesso');
       } else {
         let errorMsg = data.error || 'Erro ao cadastrar consultor';
         if (errorMsg && errorMsg.toLowerCase().includes('consultores_email_key')) {
@@ -437,7 +439,7 @@ const CadastroConsultor = ({ onVoltar, onCadastroSucesso }) => {
             <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
               <button
                 type="button"
-                onClick={onVoltar}
+                onClick={() => navigate('/')}
                 style={{
                   flex: '1',
                   padding: '0.75rem',

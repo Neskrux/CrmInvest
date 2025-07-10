@@ -1,7 +1,9 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import logoHorizontalPreto from '../images/logohorizontalpreto.png';
 
-const LandingPage = ({ onCadastro, onLogin }) => {
+const LandingPage = () => {
+  const navigate = useNavigate();
   return (
     <div style={{
       minHeight: '100vh',
@@ -50,7 +52,32 @@ const LandingPage = ({ onCadastro, onLogin }) => {
           gap: '1rem'
         }}>
           <button
-            onClick={onCadastro}
+            onClick={() => navigate('/captura-lead')}
+            style={{
+              background: '#1a1d23',
+              color: 'white',
+              border: 'none',
+              padding: '1rem 2rem',
+              borderRadius: '6px',
+              fontSize: '1rem',
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.background = '#0f1114';
+              e.target.style.transform = 'translateY(-1px)';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.background = '#1a1d23';
+              e.target.style.transform = 'translateY(0)';
+            }}
+          >
+            Cadastrar Paciente
+          </button>
+
+          <button
+            onClick={() => navigate('/cadastro')}
             style={{
               background: '#1a1d23',
               color: 'white',
@@ -75,7 +102,7 @@ const LandingPage = ({ onCadastro, onLogin }) => {
           </button>
 
           <button
-            onClick={onLogin}
+            onClick={() => navigate('/login')}
             style={{
               background: 'white',
               color: '#1a1d23',

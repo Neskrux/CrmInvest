@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
 import './App.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LandingPage from './components/LandingPage';
 import CadastroConsultor from './components/CadastroConsultor';
 import CadastroSucesso from './components/CadastroSucesso';
+import CapturaLead from './components/CapturaLead';
+import CapturaSucesso from './components/CapturaSucesso';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Pacientes from './components/Pacientes';
@@ -17,8 +20,20 @@ import logoHorizontalPreto from './images/logohorizontalpreto.png';
 
 function AppContent() {
   const { user, logout, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [currentView, setCurrentView] = useState('landing'); // landing, cadastro, cadastro-sucesso, login
+  const location = useLocation();
+  
+  // Determinar aba ativa baseada na rota atual
+  const getActiveTab = () => {
+    const path = location.pathname;
+    if (path.includes('/pacientes')) return 'pacientes';
+    if (path.includes('/consultores')) return 'consultores';
+    if (path.includes('/clinicas')) return 'clinicas';
+    if (path.includes('/agendamentos')) return 'agendamentos';
+    if (path.includes('/fechamentos')) return 'fechamentos';
+    return 'dashboard';
+  };
+  
+  const activeTab = getActiveTab();
 
   if (loading) {
     return (
@@ -30,55 +45,31 @@ function AppContent() {
 
   // Se o usuário não está autenticado, mostrar as páginas de entrada
   if (!user) {
-    if (currentView === 'landing') {
-      return (
-        <LandingPage 
-          onCadastro={() => setCurrentView('cadastro')}
-          onLogin={() => setCurrentView('login')}
-        />
-      );
-    }
-    
-    if (currentView === 'cadastro') {
-      return (
-        <CadastroConsultor 
-          onVoltar={() => setCurrentView('landing')}
-          onCadastroSucesso={() => setCurrentView('cadastro-sucesso')}
-        />
-      );
-    }
-    
-    if (currentView === 'cadastro-sucesso') {
-      return (
-        <CadastroSucesso 
-          onIrParaLogin={() => setCurrentView('login')}
-        />
-      );
-    }
-    
-    if (currentView === 'login') {
-      return <Login onVoltar={() => setCurrentView('landing')} />;
-    }
+    return (
+      <Routes>
+        <Route path="/cadastro" element={<CadastroConsultor />} />
+        <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
   }
 
   // Se o usuário está autenticado, mostrar a aplicação principal
   const renderContent = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return <Dashboard />;
-      case 'pacientes':
-        return <Pacientes />;
-      case 'consultores':
-        return <Consultores />;
-      case 'clinicas':
-        return <Clinicas />;
-      case 'agendamentos':
-        return <Agendamentos />;
-      case 'fechamentos':
-        return <Fechamentos />;
-      default:
-        return <Dashboard />;
-    }
+    return (
+      <Routes>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/pacientes" element={<Pacientes />} />
+        <Route path="/consultores" element={<Consultores />} />
+        <Route path="/clinicas" element={<Clinicas />} />
+        <Route path="/agendamentos" element={<Agendamentos />} />
+        <Route path="/fechamentos" element={<Fechamentos />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    );
   };
 
   const getUserInitials = () => {
@@ -110,13 +101,9 @@ function AppContent() {
 
         <nav className="sidebar-nav">
           <div className="nav-item">
-            <a
-              href="#dashboard"
+            <Link
+              to="/dashboard"
               className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`}
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveTab('dashboard');
-              }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="3" y="3" width="7" height="7" />
@@ -125,17 +112,13 @@ function AppContent() {
                 <rect x="3" y="14" width="7" height="7" />
               </svg>
               Dashboard
-            </a>
+            </Link>
           </div>
 
           <div className="nav-item">
-            <a
-              href="#pacientes"
+            <Link
+              to="/pacientes"
               className={`nav-link ${activeTab === 'pacientes' ? 'active' : ''}`}
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveTab('pacientes');
-              }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -144,17 +127,13 @@ function AppContent() {
                 <path d="M16 3.13a4 4 0 0 1 0 7.75" />
               </svg>
               Pacientes
-            </a>
+            </Link>
           </div>
 
           <div className="nav-item">
-            <a
-              href="#agendamentos"
+            <Link
+              to="/agendamentos"
               className={`nav-link ${activeTab === 'agendamentos' ? 'active' : ''}`}
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveTab('agendamentos');
-              }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -163,59 +142,47 @@ function AppContent() {
                 <line x1="3" y1="10" x2="21" y2="10" />
               </svg>
               Agendamentos
-            </a>
+            </Link>
           </div>
 
           <div className="nav-item">
-            <a
-              href="#fechamentos"
+            <Link
+              to="/fechamentos"
               className={`nav-link ${activeTab === 'fechamentos' ? 'active' : ''}`}
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveTab('fechamentos');
-              }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="12" y1="1" x2="12" y2="23" />
                 <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
               </svg>
               Fechamentos
-            </a>
+            </Link>
           </div>
 
           <div className="nav-item">
-            <a
-              href="#clinicas"
+            <Link
+              to="/clinicas"
               className={`nav-link ${activeTab === 'clinicas' ? 'active' : ''}`}
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveTab('clinicas');
-              }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                 <polyline points="9 22 9 12 15 12 15 22" />
               </svg>
               Clínicas
-            </a>
+            </Link>
           </div>
 
           {user.tipo === 'admin' && (
             <div className="nav-item">
-              <a
-                href="#consultores"
+              <Link
+                to="/consultores"
                 className={`nav-link ${activeTab === 'consultores' ? 'active' : ''}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  setActiveTab('consultores');
-                }}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                   <circle cx="12" cy="7" r="4" />
                 </svg>
                 Consultores
-              </a>
+              </Link>
             </div>
           )}
         </nav>
@@ -312,7 +279,16 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <Router>
+        <Routes>
+          {/* Rotas públicas - Captura de leads */}
+          <Route path="/captura-lead" element={<CapturaLead />} />
+          <Route path="/captura-sucesso" element={<CapturaSucesso />} />
+          
+          {/* Rotas da aplicação principal */}
+          <Route path="/*" element={<AppContent />} />
+        </Routes>
+      </Router>
     </AuthProvider>
   );
 }

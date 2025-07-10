@@ -1,7 +1,9 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import logoBrasaoPreto from '../images/logobrasaopreto.png';
 
-const CadastroSucesso = ({ onIrParaLogin }) => {
+const CadastroSucesso = () => {
+  const navigate = useNavigate();
   return (
     <div style={{
       minHeight: '100vh',
@@ -103,7 +105,7 @@ const CadastroSucesso = ({ onIrParaLogin }) => {
         </div>
 
         <button
-          onClick={onIrParaLogin}
+                      onClick={() => navigate('/login')}
           style={{
             width: '100%',
             padding: '1rem',

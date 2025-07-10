@@ -605,6 +605,60 @@ app.post('/api/consultores/cadastro', async (req, res) => {
   }
 });
 
+// === CADASTRO PÚBLICO DE PACIENTES/LEADS === (Sem autenticação)
+app.post('/api/leads/cadastro', async (req, res) => {
+  try {
+    const { nome, telefone, tipo_tratamento, cpf, observacoes } = req.body;
+    
+    // Validar campos obrigatórios
+    if (!nome || !telefone || !cpf) {
+      return res.status(400).json({ error: 'Nome, telefone e CPF são obrigatórios!' });
+    }
+    
+    // Validar nome (mínimo 2 caracteres)
+    if (nome.trim().length < 2) {
+      return res.status(400).json({ error: 'Nome deve ter pelo menos 2 caracteres!' });
+    }
+    
+    // Validar telefone (formato básico)
+    const telefoneRegex = /^[\(\)\s\-\+\d]{10,15}$/;
+    if (!telefoneRegex.test(telefone.replace(/\s/g, ''))) {
+      return res.status(400).json({ error: 'Telefone inválido!' });
+    }
+    
+    // Validar CPF (11 dígitos)
+    const cpfNumeros = cpf.replace(/\D/g, '');
+    if (cpfNumeros.length !== 11) {
+      return res.status(400).json({ error: 'CPF deve ter 11 dígitos!' });
+    }
+    
+    // Inserir lead/paciente
+    const { data, error } = await supabase
+      .from('pacientes')
+      .insert([{ 
+        nome: nome.trim(), 
+        telefone: telefone.trim(), 
+        cpf: cpfNumeros,
+        tipo_tratamento: tipo_tratamento || null,
+        status: 'lead', 
+        observacoes: observacoes || null,
+        consultor_id: null // Lead público não tem consultor inicial
+      }])
+      .select();
+
+    if (error) throw error;
+    
+    res.json({ 
+      id: data[0].id, 
+      message: 'Cadastro realizado com sucesso! Entraremos em contato em breve.',
+      nome: nome.trim()
+    });
+  } catch (error) {
+    console.error('Erro no cadastro de lead:', error);
+    res.status(500).json({ error: 'Erro interno do servidor. Tente novamente.' });
+  }
+});
+
 app.put('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;

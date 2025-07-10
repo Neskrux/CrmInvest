@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import logoBrasaoPreto from '../images/logobrasaopreto.png';
 
-const Login = ({ onVoltar }) => {
+const Login = () => {
+  const navigate = useNavigate();
   const { login } = useAuth();
   const [formData, setFormData] = useState({ email: '', senha: '' });
   const [error, setError] = useState('');
@@ -121,11 +123,10 @@ const Login = ({ onVoltar }) => {
           }}>
            
             
-            {onVoltar && (
-              <button
-                type="button"
-                onClick={onVoltar}
-                style={{
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              style={{
                   background: '#f3f4f6',
                   color: '#374151',
                   border: 'none',
@@ -138,7 +139,6 @@ const Login = ({ onVoltar }) => {
               >
                 ← Voltar
               </button>
-            )}
           </div>
         </form>
       </div>
