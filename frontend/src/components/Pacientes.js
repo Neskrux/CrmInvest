@@ -27,6 +27,8 @@ const Pacientes = () => {
     observacoes: '',
     consultor_id: ''
   });
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewPaciente, setViewPaciente] = useState(null);
 
   // Status disponíveis para o pipeline
   const statusOptions = [
@@ -180,6 +182,11 @@ const Pacientes = () => {
       consultor_id: paciente.consultor_id || ''
     });
     setShowModal(true);
+  };
+
+  const handleView = (paciente) => {
+    setViewPaciente(paciente);
+    setShowViewModal(true);
   };
 
   // Função para formatar telefone
@@ -498,9 +505,24 @@ const Pacientes = () => {
                           <td>
                             <button
                               onClick={() => handleEdit(paciente)}
-                              className="btn btn-sm btn-secondary"
+                              className="btn-action"
+                              title="Editar"
                             >
-                              Editar
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => handleView(paciente)}
+                              className="btn-action"
+                              title="Visualizar"
+                              style={{ marginLeft: '0.5rem' }}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                              </svg>
                             </button>
                           </td>
                         </tr>
@@ -717,6 +739,56 @@ const Pacientes = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de visualização: */}
+      {showViewModal && viewPaciente && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-header">
+              <h2 className="modal-title">Visualizar Paciente</h2>
+              <button className="close-btn" onClick={() => setShowViewModal(false)}>×</button>
+            </div>
+            <div style={{ padding: '1.5rem' }}>
+              <div className="form-group">
+                <label className="form-label">Nome Completo</label>
+                <input type="text" className="form-input" value={viewPaciente.nome || '-'} readOnly />
+              </div>
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">Telefone</label>
+                  <input type="text" className="form-input" value={viewPaciente.telefone || '-'} readOnly />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">CPF</label>
+                  <input type="text" className="form-input" value={viewPaciente.cpf || '-'} readOnly />
+                </div>
+              </div>
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">Tipo de Tratamento</label>
+                  <input type="text" className="form-input" value={viewPaciente.tipo_tratamento || '-'} readOnly />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Status</label>
+                  <input type="text" className="form-input" value={getStatusInfo(viewPaciente.status).label || '-'} readOnly />
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Consultor Responsável</label>
+                <input type="text" className="form-input" value={consultores.find(c => String(c.id) === String(viewPaciente.consultor_id))?.nome || '-'} readOnly />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Observações</label>
+                <textarea className="form-textarea" value={viewPaciente.observacoes || '-'} readOnly rows="3" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Cadastrado em</label>
+                <input type="text" className="form-input" value={viewPaciente.created_at ? formatarData(viewPaciente.created_at) : '-'} readOnly />
+              </div>
+            </div>
           </div>
         </div>
       )}
