@@ -40,7 +40,9 @@ const Agendamentos = () => {
     { value: 'nao_fechou', label: 'Não Fechou', color: '#ef4444' },
     { value: 'reagendado', label: 'Reagendado', color: '#8b5cf6' },
     { value: 'cancelado', label: 'Cancelado', color: '#6b7280' },
-    { value: 'nao_passou_cpf', label: 'Não passou CPF', color: '#6366f1' }
+    { value: 'nao_passou_cpf', label: 'Não passou CPF', color: '#6366f1' },
+    { value: 'aguardando_fechamento', label: 'Aguardando Fechamento', color: '#fbbf24' },
+    { value: 'nao_quer_reagendar', label: 'Não quer reagendar', color: '#9ca3af' }
   ];
 
   useEffect(() => {

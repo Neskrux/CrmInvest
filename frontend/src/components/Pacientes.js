@@ -11,6 +11,13 @@ const Pacientes = () => {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState('pacientes');
+  const [mostrarFiltros, setMostrarFiltros] = useState(false);
+  const [filtroNome, setFiltroNome] = useState('');
+  const [filtroTelefone, setFiltroTelefone] = useState('');
+  const [filtroCPF, setFiltroCPF] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState('');
+  const [filtroConsultor, setFiltroConsultor] = useState('');
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
@@ -30,7 +37,12 @@ const Pacientes = () => {
     { value: 'nao_fechou', label: 'Não Fechou', color: '#dc2626' },
     { value: 'nao_compareceu', label: 'Não Compareceu', color: '#ef4444' },
     { value: 'reagendado', label: 'Reagendado', color: '#8b5cf6' },
-    { value: 'nao_passou_cpf', label: 'Não passou CPF', color: '#6366f1' }
+    { value: 'nao_passou_cpf', label: 'Não passou CPF', color: '#6366f1' },
+    { value: 'sem_cedente', label: 'Sem cedente (CPF Aprovado)', color: '#fbbf24' },
+    { value: 'nao_tem_interesse', label: 'Não tem interesse', color: '#9ca3af' },
+    { value: 'em_conversa', label: 'Em conversa', color: '#0ea5e9' },
+    { value: 'cpf_reprovado', label: 'CPF Reprovado', color: '#ef4444' },
+    { value: 'nao_tem_outro_cpf', label: 'Não tem outro CPF', color: '#a3a3a3' }
   ];
 
   useEffect(() => {
@@ -239,6 +251,16 @@ const Pacientes = () => {
     setShowModal(false);
   };
 
+  const pacientesFiltrados = pacientes.filter(p => {
+    const matchNome = !filtroNome || p.nome.toLowerCase().includes(filtroNome.toLowerCase());
+    const matchTelefone = !filtroTelefone || (p.telefone || '').includes(filtroTelefone);
+    const matchCPF = !filtroCPF || (p.cpf || '').includes(filtroCPF);
+    const matchTipo = !filtroTipo || p.tipo_tratamento === filtroTipo;
+    const matchStatus = !filtroStatus || p.status === filtroStatus;
+    const matchConsultor = !filtroConsultor || String(p.consultor_id) === filtroConsultor;
+    return matchNome && matchTelefone && matchCPF && matchTipo && matchStatus && matchConsultor;
+  });
+
   return (
     <div>
       <div className="page-header">
@@ -307,6 +329,64 @@ const Pacientes = () => {
             </div>
           </div>
 
+          <div className="card" style={{ marginBottom: '1.5rem' }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 className="card-title" style={{ fontSize: '1.1rem' }}>Filtros</h2>
+              <button className="btn btn-secondary" onClick={() => setMostrarFiltros(!mostrarFiltros)}>
+                {mostrarFiltros ? 'Ocultar Filtros' : 'Filtros'}
+              </button>
+            </div>
+            {mostrarFiltros && (
+              <div style={{ padding: '1.5rem', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                <div className="grid grid-3" style={{ gap: '1rem', marginBottom: '1rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Nome</label>
+                    <input type="text" className="form-input" value={filtroNome} onChange={e => setFiltroNome(e.target.value)} placeholder="Buscar por nome" />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Telefone</label>
+                    <input type="text" className="form-input" value={filtroTelefone} onChange={e => setFiltroTelefone(e.target.value)} placeholder="Buscar por telefone" />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">CPF</label>
+                    <input type="text" className="form-input" value={filtroCPF} onChange={e => setFiltroCPF(e.target.value)} placeholder="Buscar por CPF" />
+                  </div>
+                </div>
+                <div className="grid grid-3" style={{ gap: '1rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Tipo de Tratamento</label>
+                    <select className="form-select" value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}>
+                      <option value="">Todos</option>
+                      <option value="Estético">Estético</option>
+                      <option value="Odontológico">Odontológico</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Status</label>
+                    <select className="form-select" value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}>
+                      <option value="">Todos</option>
+                      {statusOptions.map(option => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Consultor</label>
+                    <select className="form-select" value={filtroConsultor} onChange={e => setFiltroConsultor(e.target.value)}>
+                      <option value="">Todos</option>
+                      {consultores.map(c => (
+                        <option key={c.id} value={String(c.id)}>{c.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <button className="btn btn-sm btn-secondary" style={{ marginTop: '1rem' }} onClick={() => {
+                  setFiltroNome(''); setFiltroTelefone(''); setFiltroCPF(''); setFiltroTipo(''); setFiltroStatus(''); setFiltroConsultor('');
+                }}>Limpar Filtros</button>
+              </div>
+            )}
+          </div>
+
           <div className="card">
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 className="card-title">Lista de Pacientes</h2>
@@ -323,7 +403,7 @@ const Pacientes = () => {
               <div className="loading">
                 <div className="spinner"></div>
               </div>
-            ) : pacientes.length === 0 ? (
+            ) : pacientesFiltrados.length === 0 ? (
               <div style={{ textAlign: 'center', color: '#6b7280', padding: '3rem' }}>
                 Nenhum paciente cadastrado ainda.
               </div>
@@ -343,7 +423,7 @@ const Pacientes = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {pacientes.map(paciente => {
+                    {pacientesFiltrados.map(paciente => {
                       const statusInfo = getStatusInfo(paciente.status);
                       return (
                         <tr key={paciente.id}>

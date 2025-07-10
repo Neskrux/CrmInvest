@@ -762,7 +762,7 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
     const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id } = req.body;
     
     // Converter consultor_id para null se não fornecido
-    const consultorId = consultor_id && consultor_id.trim() !== '' ? parseInt(consultor_id) : null;
+    const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
     
     const { data, error } = await supabase
       .from('pacientes')
@@ -790,7 +790,7 @@ app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
     const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id } = req.body;
     
     // Converter consultor_id para null se não fornecido
-    const consultorId = consultor_id && consultor_id.trim() !== '' ? parseInt(consultor_id) : null;
+    const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
     
     const { data, error } = await supabase
       .from('pacientes')
@@ -1073,8 +1073,8 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
     }
 
     // Converter campos opcionais para null se não enviados ou vazios
-    const consultorId = consultor_id && consultor_id.trim() !== '' ? parseInt(consultor_id) : null;
-    const clinicaId = clinica_id && clinica_id.trim() !== '' ? parseInt(clinica_id) : null;
+    const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
+    const clinicaId = clinica_id && String(clinica_id).trim() !== '' ? parseInt(clinica_id) : null;
 
     // Dados do contrato
     const contratoArquivo = req.file.filename;
@@ -1147,8 +1147,8 @@ app.put('/api/fechamentos/:id', authenticateToken, async (req, res) => {
     } = req.body;
 
     // Converter campos opcionais para null se não enviados ou vazios
-    const consultorId = consultor_id && consultor_id.trim() !== '' ? parseInt(consultor_id) : null;
-    const clinicaId = clinica_id && clinica_id.trim() !== '' ? parseInt(clinica_id) : null;
+    const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
+    const clinicaId = clinica_id && String(clinica_id).trim() !== '' ? parseInt(clinica_id) : null;
     
     const { data, error } = await supabase
       .from('fechamentos')
