@@ -54,7 +54,7 @@ const upload = multer({
 
 // Supabase client
 const supabaseUrl = process.env.SUPABASE_URL || 'https://your-project-id.supabase.co';
-const supabaseKey = process.env.SUPABASE_KEY || 'your-anon-key-here';
+const supabaseKey = process.env.SUPABASE_SERVICEKEY || 'your-anon-key-here';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Supabase Admin para upload de arquivos
