@@ -1091,19 +1091,19 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
       observacoes 
     } = req.body;
 
-    // Verificar se o arquivo foi enviado
-    if (!req.file) {
-      return res.status(400).json({ error: 'Contrato em PDF é obrigatório!' });
-    }
+    // Temporariamente opcional - descomentar quando resolver o upload no Vercel
+    // if (!req.file) {
+    //   return res.status(400).json({ error: 'Contrato em PDF é obrigatório!' });
+    // }
 
     // Converter campos opcionais para null se não enviados ou vazios
     const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
     const clinicaId = clinica_id && String(clinica_id).trim() !== '' ? parseInt(clinica_id) : null;
 
-    // Dados do contrato
-    const contratoArquivo = req.file.filename;
-    const contratoNomeOriginal = req.file.originalname;
-    const contratoTamanho = req.file.size;
+    // Dados do contrato (se houver arquivo)
+    const contratoArquivo = req.file ? req.file.filename : null;
+    const contratoNomeOriginal = req.file ? req.file.originalname : null;
+    const contratoTamanho = req.file ? req.file.size : null;
     
     const { data, error } = await supabase
       .from('fechamentos')

@@ -186,10 +186,11 @@ const Fechamentos = () => {
         return;
       }
 
-      if (!fechamentoEditando && !contratoSelecionado) {
-        alert('Por favor, selecione o contrato em PDF!');
-        return;
-      }
+      // Temporariamente opcional - descomentar quando resolver o upload no Vercel
+      // if (!fechamentoEditando && !contratoSelecionado) {
+      //   alert('Por favor, selecione o contrato em PDF!');
+      //   return;
+      // }
 
       if (contratoSelecionado && contratoSelecionado.type !== 'application/pdf') {
         alert('Apenas arquivos PDF são permitidos para o contrato!');
@@ -222,10 +223,7 @@ const Fechamentos = () => {
         formData.append('contrato', contratoSelecionado);
       }
 
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 
-        (process.env.NODE_ENV === 'production' 
-          ? 'https://seu-backend.vercel.app/api' 
-          : 'http://localhost:5000/api');
+      const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
       
       const url = fechamentoEditando 
         ? `${API_BASE_URL}/fechamentos/${fechamentoEditando.id}`
@@ -346,10 +344,7 @@ const Fechamentos = () => {
 
   const downloadContrato = async (fechamento) => {
     try {
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 
-        (process.env.NODE_ENV === 'production' 
-          ? 'https://seu-backend.vercel.app/api' 
-          : 'http://localhost:5000/api');
+      const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
       
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/fechamentos/${fechamento.id}/contrato?token=${token}`);
