@@ -106,10 +106,15 @@ const normalizarEmail = (email) => {
   return email.toLowerCase().trim();
 };
 
-// Middleware de autenticação
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+// Middleware especial para upload que preserva headers
+const authenticateUpload = (req, res, next) => {
+  // Para upload com FormData, o header pode vir em minúsculas
+  const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  console.log('📤 Upload - Todos os headers:', req.headers);
+  console.log('📤 Upload - Authorization:', authHeader);
+  console.log('📤 Upload - Token:', token ? 'presente' : 'ausente');
 
   if (!token) {
     return res.status(401).json({ error: 'Token de acesso requerido' });
@@ -117,6 +122,31 @@ const authenticateToken = (req, res, next) => {
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
+      console.log('📤 Erro ao verificar token no upload:', err.message);
+      return res.status(403).json({ error: 'Token inválido' });
+    }
+    req.user = user;
+    next();
+  });
+};
+
+// Middleware de autenticação
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  // Log para debug
+  console.log('🔐 Autenticação - Headers recebidos:', Object.keys(req.headers));
+  console.log('🔐 Authorization header:', authHeader);
+  console.log('🔐 Token extraído:', token ? 'presente' : 'ausente');
+
+  if (!token) {
+    return res.status(401).json({ error: 'Token de acesso requerido' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      console.log('🔐 Erro ao verificar token:', err.message);
       return res.status(403).json({ error: 'Token inválido' });
     }
     req.user = user;
@@ -1102,7 +1132,7 @@ app.get('/api/fechamentos', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async (req, res) => {
+app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), async (req, res) => {
   try {
     const { 
       paciente_id, 

@@ -229,11 +229,11 @@ const Fechamentos = () => {
         formData.append('contrato', contratoSelecionado);
       }
 
-      const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+      const API_BASE_URL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5000/api';
       
       const url = fechamentoEditando 
-        ? `${API_BASE_URL}/fechamentos/${fechamentoEditando.id}`
-        : `${API_BASE_URL}/fechamentos`;
+        ? `${API_BASE_URL}/api/fechamentos/${fechamentoEditando.id}`
+        : `${API_BASE_URL}/api/fechamentos`;
       
       console.log('🔐 Enviando requisição com token:', token ? 'presente' : 'ausente');
       
@@ -353,7 +353,7 @@ const Fechamentos = () => {
 
   const downloadContrato = async (fechamento) => {
     try {
-      const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+      const API_BASE_URL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5000/api';
       
       const token = localStorage.getItem('token');
       if (!token || token === 'null' || token.trim() === '') {
@@ -362,7 +362,7 @@ const Fechamentos = () => {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/fechamentos/${fechamento.id}/contrato`, {
+      const response = await fetch(`${API_BASE_URL}/api/fechamentos/${fechamento.id}/contrato`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
