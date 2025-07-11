@@ -34,22 +34,8 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Configuração do Multer para upload de arquivos
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, 'uploads');
-    // Criar pasta se não existir
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    // Gerar nome único para o arquivo
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const extension = path.extname(file.originalname);
-    cb(null, `contrato-${uniqueSuffix}${extension}`);
-  }
-});
+// Usar memoryStorage para funcionar no Vercel
+const storage = multer.memoryStorage();
 
 // Filtros para upload
 const fileFilter = (req, file, cb) => {
@@ -73,6 +59,41 @@ const upload = multer({
 const supabaseUrl = process.env.SUPABASE_URL || 'https://your-project-id.supabase.co';
 const supabaseKey = process.env.SUPABASE_KEY || 'your-anon-key-here';
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Configurar Supabase Storage
+const STORAGE_BUCKET = 'contratos';
+
+// Função para fazer upload para Supabase Storage
+const uploadToSupabase = async (file) => {
+  try {
+    // Gerar nome único para o arquivo
+    const timestamp = Date.now();
+    const randomId = Math.round(Math.random() * 1E9);
+    const fileName = `contrato-${timestamp}-${randomId}.pdf`;
+    
+    // Fazer upload para o Supabase Storage
+    const { data, error } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(fileName, file.buffer, {
+        contentType: 'application/pdf',
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) throw error;
+    
+    // Retornar informações do arquivo
+    return {
+      fileName: fileName,
+      originalName: file.originalname,
+      size: file.size,
+      path: data.path
+    };
+  } catch (error) {
+    console.error('Erro no upload para Supabase:', error);
+    throw error;
+  }
+};
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'crm-secret-key-2024';
@@ -1091,19 +1112,31 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
       observacoes 
     } = req.body;
 
-    // Temporariamente opcional - descomentar quando resolver o upload no Vercel
-    // if (!req.file) {
-    //   return res.status(400).json({ error: 'Contrato em PDF é obrigatório!' });
-    // }
+    // Verificar se o arquivo foi enviado
+    if (!req.file) {
+      return res.status(400).json({ error: 'Contrato em PDF é obrigatório!' });
+    }
 
     // Converter campos opcionais para null se não enviados ou vazios
     const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
     const clinicaId = clinica_id && String(clinica_id).trim() !== '' ? parseInt(clinica_id) : null;
 
     // Dados do contrato (se houver arquivo)
-    const contratoArquivo = req.file ? req.file.filename : null;
-    const contratoNomeOriginal = req.file ? req.file.originalname : null;
-    const contratoTamanho = req.file ? req.file.size : null;
+    let contratoArquivo = null;
+    let contratoNomeOriginal = null;
+    let contratoTamanho = null;
+    
+    // Se houver arquivo, fazer upload para Supabase Storage
+    if (req.file) {
+      try {
+        const uploadResult = await uploadToSupabase(req.file);
+        contratoArquivo = uploadResult.fileName;
+        contratoNomeOriginal = uploadResult.originalName;
+        contratoTamanho = uploadResult.size;
+      } catch (uploadError) {
+        return res.status(500).json({ error: 'Erro ao fazer upload do contrato: ' + uploadError.message });
+      }
+    }
     
     const { data, error } = await supabase
       .from('fechamentos')
@@ -1122,10 +1155,11 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
       .select();
 
     if (error) {
-      // Se houve erro, remover o arquivo que foi feito upload
-      const filePath = path.join(__dirname, 'uploads', contratoArquivo);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+      // Se houve erro, remover o arquivo do Supabase Storage
+      if (contratoArquivo) {
+        await supabase.storage
+          .from(STORAGE_BUCKET)
+          .remove([contratoArquivo]);
       }
       throw error;
     }
@@ -1146,13 +1180,7 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
       contrato: contratoNomeOriginal
     });
   } catch (error) {
-    // Se houve erro e arquivo foi feito upload, remover arquivo
-    if (req.file) {
-      const filePath = path.join(__dirname, 'uploads', req.file.filename);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    }
+    console.error('Erro ao criar fechamento:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1216,11 +1244,14 @@ app.delete('/api/fechamentos/:id', authenticateToken, async (req, res) => {
 
     if (error) throw error;
 
-    // Remover arquivo de contrato se existir
+    // Remover arquivo de contrato do Supabase Storage se existir
     if (fechamento?.contrato_arquivo) {
-      const filePath = path.join(__dirname, 'uploads', fechamento.contrato_arquivo);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+      try {
+        await supabase.storage
+          .from(STORAGE_BUCKET)
+          .remove([fechamento.contrato_arquivo]);
+      } catch (storageError) {
+        console.error('Erro ao remover arquivo do storage:', storageError);
       }
     }
 
@@ -1262,18 +1293,26 @@ app.get('/api/fechamentos/:id/contrato', async (req, res) => {
       return res.status(404).json({ error: 'Contrato não encontrado!' });
     }
 
-    const filePath = path.join(__dirname, 'uploads', fechamento.contrato_arquivo);
-    
-    if (!fs.existsSync(filePath)) {
+    // Buscar arquivo do Supabase Storage
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .download(fechamento.contrato_arquivo);
+
+    if (downloadError || !fileData) {
+      console.error('Erro ao baixar arquivo:', downloadError);
       return res.status(404).json({ error: 'Arquivo de contrato não encontrado!' });
     }
+
+    // Converter Blob para Buffer
+    const buffer = Buffer.from(await fileData.arrayBuffer());
 
     // Configurar headers para download
     res.setHeader('Content-Disposition', `attachment; filename="${fechamento.contrato_nome_original}"`);
     res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Length', buffer.length);
 
     // Enviar arquivo
-    res.sendFile(filePath);
+    res.send(buffer);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -186,11 +186,10 @@ const Fechamentos = () => {
         return;
       }
 
-      // Temporariamente opcional - descomentar quando resolver o upload no Vercel
-      // if (!fechamentoEditando && !contratoSelecionado) {
-      //   alert('Por favor, selecione o contrato em PDF!');
-      //   return;
-      // }
+      if (!fechamentoEditando && !contratoSelecionado) {
+        alert('Por favor, selecione o contrato em PDF!');
+        return;
+      }
 
       if (contratoSelecionado && contratoSelecionado.type !== 'application/pdf') {
         alert('Apenas arquivos PDF são permitidos para o contrato!');
