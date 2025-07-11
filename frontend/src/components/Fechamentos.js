@@ -176,6 +176,13 @@ const Fechamentos = () => {
 
   const salvarFechamento = async () => {
     try {
+      const token = localStorage.getItem('token');
+      if (!token || token === 'null' || token.trim() === '') {
+        alert('Sua sessão expirou. Faça login novamente.');
+        window.location.href = '/login';
+        return;
+      }
+
       if (!novoFechamento.paciente_id) {
         alert('Por favor, selecione um paciente!');
         return;
@@ -228,7 +235,6 @@ const Fechamentos = () => {
         ? `${API_BASE_URL}/fechamentos/${fechamentoEditando.id}`
         : `${API_BASE_URL}/fechamentos`;
       
-      const token = localStorage.getItem('token');
       const response = await fetch(url, {
         method: fechamentoEditando ? 'PUT' : 'POST',
         headers: {
