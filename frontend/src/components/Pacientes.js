@@ -439,14 +439,14 @@ const Pacientes = () => {
                 <table className="table">
                   <thead>
                     <tr>
-                      <th>Nome</th>
-                      <th>Consultor</th>
-                      <th>Telefone</th>
-                      <th>CPF</th>
-                      <th>Tipo</th>
-                      <th>Status</th>
-                      <th>Cadastrado</th>
-                      <th style={{ width: '100px' }}>Ações</th>
+                      <th style={{ width: '20%' }}>Nome</th>
+                      <th style={{ width: '15%' }}>Consultor</th>
+                      <th style={{ width: '12%' }}>Telefone</th>
+                      <th style={{ width: '12%' }}>CPF</th>
+                      <th style={{ width: '10%' }}>Tipo</th>
+                      <th style={{ width: '15%' }}>Status</th>
+                      <th style={{ width: '10%' }}>Cadastrado</th>
+                      <th style={{ width: '6%' }}>Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -481,18 +481,28 @@ const Pacientes = () => {
                             )}
                           </td>
                           <td>
-                            <span 
-                              className="badge"
+                            <select
+                              value={paciente.status}
+                              onChange={(e) => updateStatus(paciente.id, e.target.value)}
                               style={{
-                                backgroundColor: statusInfo.color,
-                                color: 'white',
                                 padding: '0.25rem 0.5rem',
                                 borderRadius: '4px',
-                                fontSize: '0.75rem'
+                                fontSize: '0.75rem',
+                                backgroundColor: statusInfo.color + '20',
+                                color: statusInfo.color,
+                                border: `1px solid ${statusInfo.color}`,
+                                cursor: 'pointer',
+                                width: '100%',
+                                minWidth: '140px',
+                                maxWidth: '100%'
                               }}
                             >
-                              {statusOptions.find(option => option.value === paciente.status)?.label || paciente.status}
-                            </span>
+                              {statusOptions.map(option => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
                           </td>
                           <td>{formatarData(paciente.created_at)}</td>
                           <td>
