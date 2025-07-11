@@ -439,14 +439,14 @@ const Pacientes = () => {
                 <table className="table">
                   <thead>
                     <tr>
-                      <th style={{ width: '20%' }}>Nome</th>
-                      <th style={{ width: '15%' }}>Consultor</th>
-                      <th style={{ width: '12%' }}>Telefone</th>
-                      <th style={{ width: '12%' }}>CPF</th>
-                      <th style={{ width: '10%' }}>Tipo</th>
-                      <th style={{ width: '15%' }}>Status</th>
-                      <th style={{ width: '10%' }}>Cadastrado</th>
-                      <th style={{ width: '6%' }}>Ações</th>
+                      <th>Nome</th>
+                      <th>Consultor</th>
+                      <th>Telefone</th>
+                      <th>CPF</th>
+                      <th>Tipo</th>
+                      <th>Status</th>
+                      <th>Cadastrado</th>
+                      <th style={{ width: '100px' }}>Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -488,13 +488,10 @@ const Pacientes = () => {
                                 padding: '0.25rem 0.5rem',
                                 borderRadius: '4px',
                                 fontSize: '0.75rem',
-                                backgroundColor: statusInfo.color + '20',
+                                backgroundColor: statusInfo.color + '10',
                                 color: statusInfo.color,
                                 border: `1px solid ${statusInfo.color}`,
-                                cursor: 'pointer',
-                                width: '100%',
-                                minWidth: '140px',
-                                maxWidth: '100%'
+                                cursor: 'pointer'
                               }}
                             >
                               {statusOptions.map(option => (

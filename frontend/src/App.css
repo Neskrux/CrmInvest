@@ -310,7 +310,7 @@ body {
   padding: 1rem;
   border-bottom: 1px solid #f3f4f6;
   white-space: nowrap;
-  overflow: visible;
+  overflow: hidden;
   text-overflow: ellipsis;
 }
 
