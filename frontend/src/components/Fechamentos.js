@@ -229,11 +229,12 @@ const Fechamentos = () => {
         formData.append('contrato', contratoSelecionado);
       }
 
-      const API_BASE_URL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5000/api';
+      // Corrigir base da URL para evitar /api/api/fechamentos
+      const API_BASE_URL = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000/api';
       
       const url = fechamentoEditando 
-        ? `${API_BASE_URL}/api/fechamentos/${fechamentoEditando.id}`
-        : `${API_BASE_URL}/api/fechamentos`;
+        ? `${API_BASE_URL}/fechamentos/${fechamentoEditando.id}`
+        : `${API_BASE_URL}/fechamentos`;
       
       console.log('🔐 Enviando requisição com token:', token ? 'presente' : 'ausente');
       
