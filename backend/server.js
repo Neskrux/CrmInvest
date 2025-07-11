@@ -58,7 +58,9 @@ const upload = multer({
 // Supabase client
 const supabaseUrl = process.env.SUPABASE_URL || 'https://your-project-id.supabase.co';
 const supabaseKey = process.env.SUPABASE_KEY || 'your-anon-key-here';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || supabaseKey; // Service role key para Storage
 const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey); // Cliente admin para Storage
 
 // Configurar Supabase Storage
 const STORAGE_BUCKET = 'contratos';
@@ -71,8 +73,8 @@ const uploadToSupabase = async (file) => {
     const randomId = Math.round(Math.random() * 1E9);
     const fileName = `contrato-${timestamp}-${randomId}.pdf`;
     
-    // Fazer upload para o Supabase Storage
-    const { data, error } = await supabase.storage
+    // Fazer upload para o Supabase Storage usando cliente admin
+    const { data, error } = await supabaseAdmin.storage
       .from(STORAGE_BUCKET)
       .upload(fileName, file.buffer, {
         contentType: 'application/pdf',
@@ -1134,7 +1136,11 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
         contratoNomeOriginal = uploadResult.originalName;
         contratoTamanho = uploadResult.size;
       } catch (uploadError) {
-        return res.status(500).json({ error: 'Erro ao fazer upload do contrato: ' + uploadError.message });
+        console.error('Erro detalhado no upload:', uploadError);
+        return res.status(500).json({ 
+          error: 'Erro ao fazer upload do contrato: ' + uploadError.message,
+          details: process.env.NODE_ENV === 'development' ? uploadError : undefined
+        });
       }
     }
     
@@ -1157,7 +1163,7 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
     if (error) {
       // Se houve erro, remover o arquivo do Supabase Storage
       if (contratoArquivo) {
-        await supabase.storage
+        await supabaseAdmin.storage
           .from(STORAGE_BUCKET)
           .remove([contratoArquivo]);
       }
@@ -1247,7 +1253,7 @@ app.delete('/api/fechamentos/:id', authenticateToken, async (req, res) => {
     // Remover arquivo de contrato do Supabase Storage se existir
     if (fechamento?.contrato_arquivo) {
       try {
-        await supabase.storage
+        await supabaseAdmin.storage
           .from(STORAGE_BUCKET)
           .remove([fechamento.contrato_arquivo]);
       } catch (storageError) {
@@ -1294,7 +1300,7 @@ app.get('/api/fechamentos/:id/contrato', async (req, res) => {
     }
 
     // Buscar arquivo do Supabase Storage
-    const { data: fileData, error: downloadError } = await supabase.storage
+    const { data: fileData, error: downloadError } = await supabaseAdmin.storage
       .from(STORAGE_BUCKET)
       .download(fechamento.contrato_arquivo);
 

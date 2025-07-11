@@ -16,35 +16,43 @@
    - **Allowed MIME types**: `application/pdf`
 4. Clique em **Create bucket**
 
-### 3. Configurar Políticas de Acesso
+### 3. Configurar Políticas de Acesso (IMPORTANTE!)
+
+**OPÇÃO 1 - Usar Service Role Key (RECOMENDADO):**
+1. No Supabase, vá em **Settings** → **API**
+2. Copie a **service_role key** (NÃO a anon key)
+3. No Vercel, adicione a variável de ambiente:
+   - `SUPABASE_SERVICE_KEY`: Cole a service role key
+
+**OPÇÃO 2 - Políticas Públicas (Menos Seguro):**
 1. Clique no bucket `contratos`
 2. Vá na aba **Policies**
 3. Clique em **New Policy**
 4. Selecione **For full customization**
-5. Configure:
+5. Configure políticas públicas:
 
 #### Política de INSERT (Upload)
 ```sql
--- Nome: Permitir upload autenticado
+-- Nome: Permitir upload público
 -- Operação: INSERT
 
-(auth.role() = 'authenticated'::text)
+true
 ```
 
 #### Política de SELECT (Download)
 ```sql
--- Nome: Permitir download autenticado
+-- Nome: Permitir download público
 -- Operação: SELECT
 
-(auth.role() = 'authenticated'::text)
+true
 ```
 
 #### Política de DELETE (Remover)
 ```sql
--- Nome: Permitir delete autenticado
+-- Nome: Permitir delete público
 -- Operação: DELETE
 
-(auth.role() = 'authenticated'::text)
+true
 ```
 
 ### 4. Verificar Variáveis de Ambiente
