@@ -57,6 +57,11 @@ const supabaseUrl = process.env.SUPABASE_URL || 'https://your-project-id.supabas
 const supabaseKey = process.env.SUPABASE_KEY || 'your-anon-key-here';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Supabase Admin para upload de arquivos
+const supabaseAdminUrl = process.env.SUPABASE_ADMIN_URL || 'https://your-project-id.supabase.co';
+const supabaseAdminKey = process.env.SUPABASE_ADMIN_KEY || 'your-anon-key-here';
+const supabaseAdmin = createClient(supabaseAdminUrl, supabaseAdminKey);
+
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'crm-secret-key-2024';
 
@@ -1055,15 +1060,29 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
       return res.status(400).json({ error: 'Contrato em PDF é obrigatório!' });
     }
 
+    // Gerar nome único para o arquivo
+    const timestamp = Date.now();
+    const randomId = Math.round(Math.random() * 1E9);
+    const fileName = `contrato-${timestamp}-${randomId}.pdf`;
+
+    // Upload para o Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+      .from('contratos')
+      .upload(fileName, req.file.buffer, {
+        contentType: 'application/pdf',
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (uploadError) {
+      return res.status(500).json({ error: 'Erro ao fazer upload do contrato: ' + uploadError.message });
+    }
+
     // Converter campos opcionais para null se não enviados ou vazios
     const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
     const clinicaId = clinica_id && String(clinica_id).trim() !== '' ? parseInt(clinica_id) : null;
 
-    // Dados do contrato
-    const contratoArquivo = req.file.filename;
-    const contratoNomeOriginal = req.file.originalname;
-    const contratoTamanho = req.file.size;
-    
+    // Salvar no banco
     const { data, error } = await supabase
       .from('fechamentos')
       .insert([{ 
@@ -1074,16 +1093,15 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
         data_fechamento, 
         tipo_tratamento: tipo_tratamento || null,
         observacoes: observacoes || null,
-        contrato_arquivo: contratoArquivo,
-        contrato_nome_original: contratoNomeOriginal,
-        contrato_tamanho: contratoTamanho
+        contrato_arquivo: fileName,
+        contrato_nome_original: req.file.originalname,
+        contrato_tamanho: req.file.size
       }])
       .select();
 
     if (error) {
-      // Se houve erro, remover o arquivo que foi feito upload
-      // Remover: const filePath = path.join(__dirname, 'uploads', contratoArquivo);
-      // Remover: if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
+      // Se houve erro, remover o arquivo do Storage
+      await supabaseAdmin.storage.from('contratos').remove([fileName]);
       throw error;
     }
 
@@ -1095,19 +1113,12 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
         .eq('id', paciente_id);
     }
 
-
-
     res.json({ 
       id: data[0].id, 
       message: 'Fechamento registrado com sucesso!',
-      contrato: contratoNomeOriginal
+      contrato: req.file.originalname
     });
   } catch (error) {
-    // Se houve erro e arquivo foi feito upload, remover arquivo
-    if (req.file) {
-      // Remover: const filePath = path.join(__dirname, 'uploads', req.file.filename);
-      // Remover: if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
-    }
     res.status(500).json({ error: error.message });
   }
 });
