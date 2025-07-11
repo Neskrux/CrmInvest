@@ -481,25 +481,18 @@ const Pacientes = () => {
                             )}
                           </td>
                           <td>
-                            <select
-                              value={paciente.status}
-                              onChange={(e) => updateStatus(paciente.id, e.target.value)}
+                            <span 
+                              className="badge"
                               style={{
+                                backgroundColor: statusInfo.color,
+                                color: 'white',
                                 padding: '0.25rem 0.5rem',
                                 borderRadius: '4px',
-                                fontSize: '0.75rem',
-                                backgroundColor: statusInfo.color + '10',
-                                color: statusInfo.color,
-                                border: `1px solid ${statusInfo.color}`,
-                                cursor: 'pointer'
+                                fontSize: '0.75rem'
                               }}
                             >
-                              {statusOptions.map(option => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
+                              {statusOptions.find(option => option.value === paciente.status)?.label || paciente.status}
+                            </span>
                           </td>
                           <td>{formatarData(paciente.created_at)}</td>
                           <td>
