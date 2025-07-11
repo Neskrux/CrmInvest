@@ -10,13 +10,6 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    // Limpeza preventiva quando o Login é exibido
-    console.log('🧹 Login exibido - fazendo limpeza preventiva do localStorage');
-    localStorage.clear();
-    sessionStorage.clear();
-  }, []);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');

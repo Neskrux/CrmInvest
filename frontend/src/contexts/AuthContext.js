@@ -29,7 +29,8 @@ export const AuthProvider = ({ children }) => {
     console.log('Limpando todos os dados de autenticação');
     setUser(null);
     setToken(null);
-    localStorage.clear();
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
   };
 
   const makeRequest = async (url, options = {}) => {
@@ -40,8 +41,10 @@ export const AuthProvider = ({ children }) => {
       ...(options.headers || {})
     };
 
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
+    // Sempre buscar o token atual do localStorage
+    const currentToken = localStorage.getItem('token');
+    if (currentToken && currentToken !== 'null' && currentToken.trim() !== '') {
+      headers.Authorization = `Bearer ${currentToken}`;
     }
 
     const response = await fetch(fullUrl, {
@@ -76,10 +79,13 @@ export const AuthProvider = ({ children }) => {
 
       const { token: newToken, usuario } = data;
       
-      setToken(newToken);
-      setUser(usuario);
+      // Salvar token no localStorage e no state
       localStorage.setItem('token', newToken);
       localStorage.setItem('user', JSON.stringify(usuario));
+      setToken(newToken);
+      setUser(usuario);
+
+      console.log('✅ Login realizado com sucesso:', { usuario: usuario.nome, token: newToken ? 'presente' : 'ausente' });
 
       return { success: true, user: usuario };
     } catch (error) {
@@ -93,7 +99,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const verifyToken = async () => {
-    if (!token || token.trim() === '' || token === 'null') {
+    const currentToken = localStorage.getItem('token');
+    
+    if (!currentToken || currentToken === 'null' || currentToken.trim() === '') {
       console.log('Nenhum token válido encontrado - redirecionando para login');
       clearAllData();
       setLoading(false);
@@ -106,8 +114,9 @@ export const AuthProvider = ({ children }) => {
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Token válido - usuário autenticado:', data.usuario.email);
+        console.log('Token válido - usuário autenticado:', data.usuario.nome || data.usuario.email);
         setUser(data.usuario);
+        setToken(currentToken);
         localStorage.setItem('user', JSON.stringify(data.usuario));
       } else {
         console.log('Token inválido - fazendo logout');

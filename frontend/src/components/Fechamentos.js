@@ -235,10 +235,13 @@ const Fechamentos = () => {
         ? `${API_BASE_URL}/fechamentos/${fechamentoEditando.id}`
         : `${API_BASE_URL}/fechamentos`;
       
+      console.log('🔐 Enviando requisição com token:', token ? 'presente' : 'ausente');
+      
       const response = await fetch(url, {
         method: fechamentoEditando ? 'PUT' : 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
+          // NÃO incluir 'Content-Type' ao usar FormData
         },
         body: formData
       });
@@ -250,6 +253,7 @@ const Fechamentos = () => {
         fecharModal();
         alert(fechamentoEditando ? 'Fechamento atualizado!' : `Fechamento registrado com sucesso! Contrato: ${result.contrato || 'anexado'}`);
       } else {
+        console.error('Erro na resposta:', result);
         alert('Erro: ' + (result.error || 'Erro desconhecido'));
       }
     } catch (error) {
@@ -352,7 +356,17 @@ const Fechamentos = () => {
       const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
       
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/fechamentos/${fechamento.id}/contrato?token=${token}`);
+      if (!token || token === 'null' || token.trim() === '') {
+        alert('Sua sessão expirou. Faça login novamente.');
+        window.location.href = '/login';
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/fechamentos/${fechamento.id}/contrato`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
 
       if (!response.ok) {
         const data = await response.json();

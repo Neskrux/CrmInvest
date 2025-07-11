@@ -1267,24 +1267,10 @@ app.delete('/api/fechamentos/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Rota para download de contratos (aceita token via query parameter)
-app.get('/api/fechamentos/:id/contrato', async (req, res) => {
+// Rota para download de contratos (aceita token via header Authorization)
+app.get('/api/fechamentos/:id/contrato', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { token } = req.query;
-
-    // Verificar se token foi fornecido
-    if (!token) {
-      return res.status(401).json({ error: 'Token de acesso requerido' });
-    }
-
-    // Verificar e validar o token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-      return res.status(401).json({ error: 'Token inválido' });
-    }
 
     // Buscar dados do fechamento
     const { data: fechamento, error } = await supabase
@@ -1299,27 +1285,24 @@ app.get('/api/fechamentos/:id/contrato', async (req, res) => {
       return res.status(404).json({ error: 'Contrato não encontrado!' });
     }
 
-    // Buscar arquivo do Supabase Storage
-    const { data: fileData, error: downloadError } = await supabaseAdmin.storage
+    // Fazer download do arquivo do Supabase Storage
+    const { data, error: downloadError } = await supabaseAdmin.storage
       .from(STORAGE_BUCKET)
       .download(fechamento.contrato_arquivo);
 
-    if (downloadError || !fileData) {
+    if (downloadError) {
       console.error('Erro ao baixar arquivo:', downloadError);
-      return res.status(404).json({ error: 'Arquivo de contrato não encontrado!' });
+      return res.status(500).json({ error: 'Erro ao baixar arquivo' });
     }
 
-    // Converter Blob para Buffer
-    const buffer = Buffer.from(await fileData.arrayBuffer());
-
     // Configurar headers para download
-    res.setHeader('Content-Disposition', `attachment; filename="${fechamento.contrato_nome_original}"`);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Length', buffer.length);
-
-    // Enviar arquivo
-    res.send(buffer);
+    res.setHeader('Content-Disposition', `attachment; filename="${fechamento.contrato_nome_original || 'contrato.pdf'}"`);
+    
+    // Enviar o arquivo
+    res.send(data);
   } catch (error) {
+    console.error('Erro ao baixar contrato:', error);
     res.status(500).json({ error: error.message });
   }
 });
