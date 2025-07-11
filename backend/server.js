@@ -1187,11 +1187,7 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
     });
   } catch (error) {
     console.error('Erro ao criar fechamento:', error);
-    // Sempre retorna JSON, mesmo em erro
-    res.status(500).json({ 
-      error: error && error.message ? error.message : 'Erro desconhecido',
-      details: typeof error === 'object' ? error : String(error)
-    });
+    res.status(500).json({ error: error.message });
   }
 });
 

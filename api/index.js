@@ -30,26 +30,9 @@ app.use(cors(corsOptions));
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
-// Servir arquivos estáticos da pasta uploads
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
 // Configuração do Multer para upload de arquivos
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, 'uploads');
-    // Criar pasta se não existir
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    // Gerar nome único para o arquivo
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const extension = path.extname(file.originalname);
-    cb(null, `contrato-${uniqueSuffix}${extension}`);
-  }
-});
+// Trocar para memoryStorage para funcionar no Vercel
+const storage = multer.memoryStorage();
 
 // Filtros para upload
 const fileFilter = (req, file, cb) => {
@@ -1099,10 +1082,8 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
 
     if (error) {
       // Se houve erro, remover o arquivo que foi feito upload
-      const filePath = path.join(__dirname, 'uploads', contratoArquivo);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+      // Remover: const filePath = path.join(__dirname, 'uploads', contratoArquivo);
+      // Remover: if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
       throw error;
     }
 
@@ -1124,10 +1105,8 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
   } catch (error) {
     // Se houve erro e arquivo foi feito upload, remover arquivo
     if (req.file) {
-      const filePath = path.join(__dirname, 'uploads', req.file.filename);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+      // Remover: const filePath = path.join(__dirname, 'uploads', req.file.filename);
+      // Remover: if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
     }
     res.status(500).json({ error: error.message });
   }
@@ -1194,10 +1173,8 @@ app.delete('/api/fechamentos/:id', authenticateToken, async (req, res) => {
 
     // Remover arquivo de contrato se existir
     if (fechamento?.contrato_arquivo) {
-      const filePath = path.join(__dirname, 'uploads', fechamento.contrato_arquivo);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+      // Remover: const filePath = path.join(__dirname, 'uploads', fechamento.contrato_arquivo);
+      // Remover: if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
     }
 
     res.json({ message: 'Fechamento removido com sucesso!' });
@@ -1238,18 +1215,16 @@ app.get('/api/fechamentos/:id/contrato', async (req, res) => {
       return res.status(404).json({ error: 'Contrato não encontrado!' });
     }
 
-    const filePath = path.join(__dirname, 'uploads', fechamento.contrato_arquivo);
-    
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'Arquivo de contrato não encontrado!' });
-    }
+    // Remover: const filePath = path.join(__dirname, 'uploads', fechamento.contrato_arquivo);
+    // Remover: if (!fs.existsSync(filePath)) { return res.status(404).json({ error: 'Arquivo de contrato não encontrado!' }); }
 
     // Configurar headers para download
     res.setHeader('Content-Disposition', `attachment; filename="${fechamento.contrato_nome_original}"`);
     res.setHeader('Content-Type', 'application/pdf');
 
     // Enviar arquivo
-    res.sendFile(filePath);
+    // Remover: res.sendFile(filePath);
+    res.send(fechamento.contrato_arquivo); // Envia o conteúdo do arquivo diretamente
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
