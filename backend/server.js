@@ -58,7 +58,7 @@ const upload = multer({
 // Supabase client
 const supabaseUrl = process.env.SUPABASE_URL || 'https://your-project-id.supabase.co';
 const supabaseKey = process.env.SUPABASE_KEY || 'your-anon-key-here';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || supabaseKey; // Service role key para Storage
+const supabaseServiceKey = process.env.SUPABASE_KEY || supabaseKey; // Service role key para Storage
 const supabase = createClient(supabaseUrl, supabaseKey);
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey); // Cliente admin para Storage
 
