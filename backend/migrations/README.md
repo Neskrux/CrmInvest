@@ -22,6 +22,7 @@ Se suas migrações não estão funcionando, execute este script completo:
 |----------|-----------|--------|
 | **011** | Adiciona campo `pix` na tabela consultores | 🆕 **Necessário** |
 | **012** | Adiciona `email`, `senha`, `cpf`, `tipo`, `ativo` | 🆕 **Necessário** |
+| **013** | Adiciona campos de contrato para fechamentos | 🆕 **CRÍTICO** |
 
 ## 🎯 **Campos Adicionados**
 
@@ -43,6 +44,15 @@ ALTER TABLE consultores ADD COLUMN IF NOT EXISTS tipo VARCHAR(50) DEFAULT 'consu
 ALTER TABLE consultores ADD COLUMN IF NOT EXISTS ativo BOOLEAN DEFAULT true;
 ```
 
+### **Migração 013: Campos de Contrato (CRÍTICO)**
+```sql
+-- Para upload de contratos PDF nos fechamentos
+ALTER TABLE fechamentos ADD COLUMN IF NOT EXISTS contrato_arquivo TEXT;
+ALTER TABLE fechamentos ADD COLUMN IF NOT EXISTS contrato_nome_original TEXT;
+ALTER TABLE fechamentos ADD COLUMN IF NOT EXISTS contrato_tamanho INTEGER;
+ALTER TABLE fechamentos ADD COLUMN IF NOT EXISTS contrato_upload_data TIMESTAMP DEFAULT NOW();
+```
+
 ## 🔍 **Como Verificar se Funcionou**
 
 Após executar, rode no Supabase:
@@ -60,6 +70,18 @@ WHERE table_name = 'consultores';
 - ✅ `cpf` (varchar)
 - ✅ `tipo` (varchar)
 - ✅ `ativo` (boolean)
+
+**Para verificar campos de contrato:**
+```sql
+SELECT column_name, data_type FROM information_schema.columns 
+WHERE table_name = 'fechamentos' AND column_name LIKE 'contrato_%';
+```
+
+**Deve aparecer:**
+- ✅ `contrato_arquivo` (text)
+- ✅ `contrato_nome_original` (text)
+- ✅ `contrato_tamanho` (integer)
+- ✅ `contrato_upload_data` (timestamp)
 
 ## 🚨 **Problemas Comuns**
 
@@ -84,6 +106,7 @@ Após executar as migrações, você terá:
 3. ✅ **Sistema de senhas** para consultores
 4. ✅ **Cadastro público** funcionando
 5. ✅ **Dados completos** de consultores
+6. ✅ **Upload de contratos** funcionando nos fechamentos
 
 ## 🎉 **Próximos Passos**
 
