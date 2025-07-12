@@ -363,10 +363,7 @@ app.post('/api/login', async (req, res) => {
     const senhaValida = await bcrypt.compare(senha, usuario.senha);
     console.log('🔐 Senha válida?', senhaValida);
     
-    // TEMPORÁRIO: Aceitar senha admin123 para admin
-    const senhaTemporaria = (senha === 'admin123' || senha === '123456') && usuario.email === 'admin@investmoneysa.com.br';
-    
-    if (!senhaValida && !senhaTemporaria) {
+    if (!senhaValida) {
       console.log('❌ Login falhou: senha inválida');
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
@@ -1368,11 +1365,15 @@ app.get('/api/fechamentos/:id/contrato', authenticateToken, async (req, res) => 
 // === DASHBOARD/ESTATÍSTICAS === (Admin vê tudo, Consultor vê apenas seus dados)
 app.get('/api/dashboard', authenticateToken, async (req, res) => {
   try {
-    // Obter data atual do sistema (dinâmica/real)
+    // Obter data atual no fuso horário do Brasil (UTC-3)
     const agora = new Date();
-    const hoje = agora.getFullYear() + '-' + 
-                 String(agora.getMonth() + 1).padStart(2, '0') + '-' + 
-                 String(agora.getDate()).padStart(2, '0');
+    const brasilTime = new Date(agora.toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
+    const hoje = brasilTime.getFullYear() + '-' + 
+                 String(brasilTime.getMonth() + 1).padStart(2, '0') + '-' + 
+                 String(brasilTime.getDate()).padStart(2, '0');
+    
+    console.log('📅 Data atual no Brasil:', hoje);
+    console.log('📅 Data UTC do servidor:', agora.toISOString().split('T')[0]);
 
     // Configurar filtros baseados no tipo de usuário
     const isConsultor = req.user.tipo === 'consultor';
