@@ -4,12 +4,14 @@
   "framework": null,
   "env": {
     "CI": "false",
-    "DISABLE_ESLINT_PLUGIN": "true"
+    "DISABLE_ESLINT_PLUGIN": "true",
+    "NODE_ENV": "production"
   },
   "build": {
     "env": {
       "CI": "false",
-      "DISABLE_ESLINT_PLUGIN": "true"
+      "DISABLE_ESLINT_PLUGIN": "true",
+      "NODE_ENV": "production"
     }
   },
   "rewrites": [
@@ -20,7 +22,9 @@
   ],
   "functions": {
     "api/index.js": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "memory": 1024
     }
-  }
+  },
+  "regions": ["gru1"]
 } 

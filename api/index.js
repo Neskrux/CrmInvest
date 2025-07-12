@@ -17,6 +17,8 @@ const corsOptions = {
   origin: [
     'http://localhost:3000',
     'https://localhost:3000',
+    'https://crm-invest.vercel.app',
+    'https://crm-invest-*.vercel.app',
     process.env.FRONTEND_URL,
     /\.vercel\.app$/
   ],
@@ -52,18 +54,28 @@ const upload = multer({
   }
 });
 
-// Supabase client
-const supabaseUrl = process.env.SUPABASE_URL || 'https://your-project-id.supabase.co';
-const supabaseKey = process.env.SUPABASE_SERVICEKEY || 'your-anon-key-here';
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Supabase client - CORRIGIDO
+const supabaseUrl = process.env.SUPABASE_URL || 'https://yomvfjabpomcvfnusgm.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvbXZmamJhcGJvbWN2Zm51c2dtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTEzOTEyMzcsImV4cCI6MjA2Njk2NzIzN30.1CNcC_LBqDBHXKIiUUcxLDXWHfrtx6-IBOc4rHvDb-4';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvbXZmamJhcGJvbWN2Zm51c2dtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTM5MTIzNywiZXhwIjoyMDY2OTY3MjM3fQ.l_dMjGQRQjJDsqUdH-BwbqctZZFeZ8kyX1cVgKSgibc';
 
-// Supabase Admin para upload de arquivos
-const supabaseAdminUrl = process.env.SUPABASE_ADMIN_URL || 'https://your-project-id.supabase.co';
-const supabaseAdminKey = process.env.SUPABASE_ADMIN_KEY || 'your-anon-key-here';
-const supabaseAdmin = createClient(supabaseAdminUrl, supabaseAdminKey);
+// Cliente Supabase para operações normais
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// JWT Secret
-const JWT_SECRET = process.env.JWT_SECRET || 'crm-secret-key-2024';
+// Cliente Supabase Admin para operações privilegiadas (Storage, etc.)
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+// Configurar Supabase Storage
+const STORAGE_BUCKET = 'contratos';
+
+// JWT Secret - CORRIGIDO
+const JWT_SECRET = process.env.JWT_SECRET || 'DasRGZ7BT3A47YF/0coBWUZ2qpsMcBfGRXV7C2ymOTHnmwPribCSuQOQlsZ6SNf2erKp29aysgDvAtUFBmcm1g==';
+
+// Função para normalizar emails (converter para minúsculas e limpar espaços)
+const normalizarEmail = (email) => {
+  if (!email) return '';
+  return email.toLowerCase().trim();
+};
 
 // Função para normalizar nomes (remover acentos, espaços, converter para minúsculas)
 const normalizarNome = (nome) => {
@@ -83,10 +95,47 @@ const gerarEmailConsultor = (nome) => {
   return `${nomeNormalizado}@investmoneysa.com.br`;
 };
 
-// Middleware de autenticação
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+// Função para fazer upload para Supabase Storage
+const uploadToSupabase = async (file) => {
+  try {
+    // Gerar nome único para o arquivo
+    const timestamp = Date.now();
+    const randomId = Math.round(Math.random() * 1E9);
+    const fileName = `contrato-${timestamp}-${randomId}.pdf`;
+    
+    // Fazer upload para o Supabase Storage usando cliente admin
+    const { data, error } = await supabaseAdmin.storage
+      .from(STORAGE_BUCKET)
+      .upload(fileName, file.buffer, {
+        contentType: 'application/pdf',
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) throw error;
+    
+    // Retornar informações do arquivo
+    return {
+      fileName: fileName,
+      originalName: file.originalname,
+      size: file.size,
+      path: data.path
+    };
+  } catch (error) {
+    console.error('Erro no upload para Supabase:', error);
+    throw error;
+  }
+};
+
+// Middleware especial para upload que preserva headers
+const authenticateUpload = (req, res, next) => {
+  // Para upload com FormData, o header pode vir em minúsculas
+  const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  console.log('📤 Upload - Todos os headers:', req.headers);
+  console.log('📤 Upload - Authorization:', authHeader);
+  console.log('📤 Upload - Token:', token ? 'presente' : 'ausente');
 
   if (!token) {
     return res.status(401).json({ error: 'Token de acesso requerido' });
@@ -94,6 +143,31 @@ const authenticateToken = (req, res, next) => {
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
+      console.log('📤 Erro ao verificar token no upload:', err.message);
+      return res.status(403).json({ error: 'Token inválido' });
+    }
+    req.user = user;
+    next();
+  });
+};
+
+// Middleware de autenticação
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  // Log para debug
+  console.log('🔐 Autenticação - Headers recebidos:', Object.keys(req.headers));
+  console.log('🔐 Authorization header:', authHeader);
+  console.log('🔐 Token extraído:', token ? 'presente' : 'ausente');
+
+  if (!token) {
+    return res.status(401).json({ error: 'Token de acesso requerido' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      console.log('🔐 Erro ao verificar token:', err.message);
       return res.status(403).json({ error: 'Token inválido' });
     }
     req.user = user;
@@ -151,6 +225,12 @@ CREATE TABLE IF NOT EXISTS consultores (
   id SERIAL PRIMARY KEY,
   nome TEXT NOT NULL,
   telefone TEXT,
+  email TEXT,
+  senha TEXT,
+  cpf TEXT,
+  pix TEXT,
+  tipo TEXT DEFAULT 'consultor',
+  ativo BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -163,6 +243,7 @@ CREATE TABLE IF NOT EXISTS pacientes (
   tipo_tratamento TEXT,
   status TEXT DEFAULT 'lead',
   observacoes TEXT,
+  consultor_id INTEGER REFERENCES consultores(id),
   created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -192,6 +273,22 @@ CREATE TABLE IF NOT EXISTS fechamentos (
   tipo_tratamento TEXT,
   forma_pagamento TEXT,
   observacoes TEXT,
+  contrato_arquivo TEXT,
+  contrato_nome_original TEXT,
+  contrato_tamanho INTEGER,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Tabela de usuários admin
+CREATE TABLE IF NOT EXISTS usuarios (
+  id SERIAL PRIMARY KEY,
+  nome TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  senha TEXT NOT NULL,
+  tipo TEXT DEFAULT 'admin',
+  ativo BOOLEAN DEFAULT TRUE,
+  consultor_id INTEGER REFERENCES consultores(id),
+  ultimo_login TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW()
 );
   `);
@@ -231,8 +328,8 @@ app.post('/api/login', async (req, res) => {
 
     // Se não encontrou admin, tentar login como consultor (apenas por email)
     if (!usuario && email.includes('@')) {
-      // Normalizar email para minúsculas
-      const emailNormalizado = email.toLowerCase();
+      // Normalizar email para busca
+      const emailNormalizado = normalizarEmail(email);
       console.log('🔍 Buscando consultor por email:', emailNormalizado);
       
       const { data: consultores, error } = await supabase
@@ -295,7 +392,7 @@ app.post('/api/login', async (req, res) => {
       tokenData.consultor_id = usuario.consultor_id;
     } else {
       tokenData.consultor_id = usuario.id; // Para consultores, o ID deles é o consultor_id
-      tokenData.email = null;
+      tokenData.email = usuario.email;
     }
 
     const token = jwt.sign(tokenData, JWT_SECRET, { expiresIn: '8h' });
@@ -324,21 +421,41 @@ app.post('/api/logout', authenticateToken, (req, res) => {
   res.json({ message: 'Logout realizado com sucesso' });
 });
 
+// CORRIGIDO: Endpoint verify-token para funcionar com consultores
 app.get('/api/verify-token', authenticateToken, async (req, res) => {
   try {
-    // Buscar dados atualizados do usuário
-    const { data: usuario, error } = await supabase
-      .from('usuarios')
-      .select(`
-        *,
-        consultores(nome, telefone)
-      `)
-      .eq('id', req.user.id)
-      .eq('ativo', true)
-      .single();
+    let usuario = null;
+    
+    // Se for admin, buscar na tabela usuarios
+    if (req.user.tipo === 'admin') {
+      const { data: usuarioAdmin, error } = await supabase
+        .from('usuarios')
+        .select(`
+          *,
+          consultores(nome, telefone)
+        `)
+        .eq('id', req.user.id)
+        .eq('ativo', true)
+        .single();
 
-    if (error || !usuario) {
-      return res.status(401).json({ error: 'Usuário não encontrado' });
+      if (error || !usuarioAdmin) {
+        return res.status(401).json({ error: 'Usuário não encontrado' });
+      }
+      
+      usuario = usuarioAdmin;
+    } else {
+      // Se for consultor, buscar na tabela consultores
+      const { data: consultorData, error } = await supabase
+        .from('consultores')
+        .select('*')
+        .eq('id', req.user.id)
+        .single();
+
+      if (error || !consultorData) {
+        return res.status(401).json({ error: 'Consultor não encontrado' });
+      }
+      
+      usuario = consultorData;
     }
 
     const { senha: _, ...dadosUsuario } = usuario;
@@ -346,10 +463,12 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
     res.json({
       usuario: {
         ...dadosUsuario,
-        consultor_nome: usuario.consultores?.nome || null
+        tipo: req.user.tipo,
+        consultor_nome: req.user.tipo === 'admin' ? usuario.consultores?.nome || null : usuario.nome
       }
     });
   } catch (error) {
+    console.error('Erro ao verificar token:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1043,7 +1162,7 @@ app.get('/api/fechamentos', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async (req, res) => {
+app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), async (req, res) => {
   try {
     const { 
       paciente_id, 
@@ -1060,29 +1179,31 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
       return res.status(400).json({ error: 'Contrato em PDF é obrigatório!' });
     }
 
-    // Gerar nome único para o arquivo
-    const timestamp = Date.now();
-    const randomId = Math.round(Math.random() * 1E9);
-    const fileName = `contrato-${timestamp}-${randomId}.pdf`;
-
-    // Upload para o Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
-      .from('contratos')
-      .upload(fileName, req.file.buffer, {
-        contentType: 'application/pdf',
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (uploadError) {
-      return res.status(500).json({ error: 'Erro ao fazer upload do contrato: ' + uploadError.message });
-    }
-
     // Converter campos opcionais para null se não enviados ou vazios
     const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
     const clinicaId = clinica_id && String(clinica_id).trim() !== '' ? parseInt(clinica_id) : null;
 
-    // Salvar no banco
+    // Dados do contrato (se houver arquivo)
+    let contratoArquivo = null;
+    let contratoNomeOriginal = null;
+    let contratoTamanho = null;
+    
+    // Se houver arquivo, fazer upload para Supabase Storage
+    if (req.file) {
+      try {
+        const uploadResult = await uploadToSupabase(req.file);
+        contratoArquivo = uploadResult.fileName;
+        contratoNomeOriginal = uploadResult.originalName;
+        contratoTamanho = uploadResult.size;
+      } catch (uploadError) {
+        console.error('Erro detalhado no upload:', uploadError);
+        return res.status(500).json({ 
+          error: 'Erro ao fazer upload do contrato: ' + uploadError.message,
+          details: process.env.NODE_ENV === 'development' ? uploadError : undefined
+        });
+      }
+    }
+    
     const { data, error } = await supabase
       .from('fechamentos')
       .insert([{ 
@@ -1093,15 +1214,19 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
         data_fechamento, 
         tipo_tratamento: tipo_tratamento || null,
         observacoes: observacoes || null,
-        contrato_arquivo: fileName,
-        contrato_nome_original: req.file.originalname,
-        contrato_tamanho: req.file.size
+        contrato_arquivo: contratoArquivo,
+        contrato_nome_original: contratoNomeOriginal,
+        contrato_tamanho: contratoTamanho
       }])
       .select();
 
     if (error) {
-      // Se houve erro, remover o arquivo do Storage
-      await supabaseAdmin.storage.from('contratos').remove([fileName]);
+      // Se houve erro, remover o arquivo do Supabase Storage
+      if (contratoArquivo) {
+        await supabaseAdmin.storage
+          .from(STORAGE_BUCKET)
+          .remove([contratoArquivo]);
+      }
       throw error;
     }
 
@@ -1116,9 +1241,10 @@ app.post('/api/fechamentos', authenticateToken, upload.single('contrato'), async
     res.json({ 
       id: data[0].id, 
       message: 'Fechamento registrado com sucesso!',
-      contrato: req.file.originalname
+      contrato: contratoNomeOriginal
     });
   } catch (error) {
+    console.error('Erro ao criar fechamento:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1182,10 +1308,15 @@ app.delete('/api/fechamentos/:id', authenticateToken, async (req, res) => {
 
     if (error) throw error;
 
-    // Remover arquivo de contrato se existir
+    // Remover arquivo de contrato do Supabase Storage se existir
     if (fechamento?.contrato_arquivo) {
-      // Remover: const filePath = path.join(__dirname, 'uploads', fechamento.contrato_arquivo);
-      // Remover: if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
+      try {
+        await supabaseAdmin.storage
+          .from(STORAGE_BUCKET)
+          .remove([fechamento.contrato_arquivo]);
+      } catch (storageError) {
+        console.error('Erro ao remover arquivo do storage:', storageError);
+      }
     }
 
     res.json({ message: 'Fechamento removido com sucesso!' });
@@ -1194,24 +1325,10 @@ app.delete('/api/fechamentos/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Rota para download de contratos (aceita token via query parameter)
-app.get('/api/fechamentos/:id/contrato', async (req, res) => {
+// Rota para download de contratos (aceita token via header Authorization)
+app.get('/api/fechamentos/:id/contrato', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { token } = req.query;
-
-    // Verificar se token foi fornecido
-    if (!token) {
-      return res.status(401).json({ error: 'Token de acesso requerido' });
-    }
-
-    // Verificar e validar o token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-      return res.status(401).json({ error: 'Token inválido' });
-    }
 
     // Buscar dados do fechamento
     const { data: fechamento, error } = await supabase
@@ -1226,17 +1343,24 @@ app.get('/api/fechamentos/:id/contrato', async (req, res) => {
       return res.status(404).json({ error: 'Contrato não encontrado!' });
     }
 
-    // Remover: const filePath = path.join(__dirname, 'uploads', fechamento.contrato_arquivo);
-    // Remover: if (!fs.existsSync(filePath)) { return res.status(404).json({ error: 'Arquivo de contrato não encontrado!' }); }
+    // Fazer download do arquivo do Supabase Storage
+    const { data, error: downloadError } = await supabaseAdmin.storage
+      .from(STORAGE_BUCKET)
+      .download(fechamento.contrato_arquivo);
+
+    if (downloadError) {
+      console.error('Erro ao baixar arquivo:', downloadError);
+      return res.status(500).json({ error: 'Erro ao baixar arquivo' });
+    }
 
     // Configurar headers para download
-    res.setHeader('Content-Disposition', `attachment; filename="${fechamento.contrato_nome_original}"`);
     res.setHeader('Content-Type', 'application/pdf');
-
-    // Enviar arquivo
-    // Remover: res.sendFile(filePath);
-    res.send(fechamento.contrato_arquivo); // Envia o conteúdo do arquivo diretamente
+    res.setHeader('Content-Disposition', `attachment; filename="${fechamento.contrato_nome_original || 'contrato.pdf'}"`);
+    
+    // Enviar o arquivo
+    res.send(data);
   } catch (error) {
+    console.error('Erro ao baixar contrato:', error);
     res.status(500).json({ error: error.message });
   }
 });
