@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Fechamentos = () => {
-  const { makeRequest } = useAuth();
+  const { makeRequest, isAdmin } = useAuth();
   const [fechamentos, setFechamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [consultores, setConsultores] = useState([]);
@@ -98,15 +98,18 @@ const Fechamentos = () => {
 
   const calcularEstatisticas = () => {
     const fechamentosFiltrados = filtrarFechamentos();
-    const total = fechamentosFiltrados.length;
-    const valorTotal = fechamentosFiltrados.reduce((acc, f) => acc + parseFloat(f.valor_fechado || 0), 0);
+    // Considerar apenas fechamentos aprovados para estatísticas
+    const fechamentosAprovados = fechamentosFiltrados.filter(f => f.aprovado === 'aprovado');
+    
+    const total = fechamentosAprovados.length;
+    const valorTotal = fechamentosAprovados.reduce((acc, f) => acc + parseFloat(f.valor_fechado || 0), 0);
     const ticketMedio = total > 0 ? valorTotal / total : 0;
     
     const hoje = new Date().toISOString().split('T')[0];
-    const fechamentosHoje = fechamentosFiltrados.filter(f => f.data_fechamento === hoje).length;
+    const fechamentosHoje = fechamentosAprovados.filter(f => f.data_fechamento === hoje).length;
 
     const mesAtual = new Date();
-    const fechamentosMes = fechamentosFiltrados.filter(f => {
+    const fechamentosMes = fechamentosAprovados.filter(f => {
       const dataFechamento = new Date(f.data_fechamento);
       return dataFechamento.getMonth() === mesAtual.getMonth() && 
              dataFechamento.getFullYear() === mesAtual.getFullYear();
@@ -285,6 +288,34 @@ const Fechamentos = () => {
         console.error('Erro ao excluir fechamento:', error);
         alert('Erro ao excluir: ' + error.message);
       }
+    }
+  };
+
+  // Função para alterar status de aprovação
+  const alterarStatusAprovacao = async (fechamentoId, novoStatus) => {
+    try {
+      console.log(`Alterando status do fechamento ${fechamentoId} para ${novoStatus}`);
+      
+      const endpoint = novoStatus === 'aprovado' ? 'aprovar' : 'reprovar';
+      const response = await makeRequest(`/fechamentos/${fechamentoId}/${endpoint}`, { 
+        method: 'PUT' 
+      });
+      
+      console.log('Resposta da API:', response.status);
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Sucesso:', result);
+        carregarDados();
+        alert(`Fechamento ${novoStatus === 'aprovado' ? 'aprovado' : 'reprovado'} com sucesso!`);
+      } else {
+        const error = await response.json();
+        console.error('Erro da API:', error);
+        alert('Erro ao alterar status: ' + (error.error || 'Erro desconhecido'));
+      }
+    } catch (error) {
+      console.error('Erro na requisição:', error);
+      alert('Erro de conexão: ' + error.message);
     }
   };
 
@@ -553,7 +584,8 @@ const Fechamentos = () => {
                     <th>Clínica</th>
                     <th>Tipo</th>
                     <th style={{ textAlign: 'right' }}>Valor</th>
-                    <th style={{ width: '120px' }}>Ações</th>
+                    <th>Status</th>
+                    <th style={{ width: '180px' }}>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -586,6 +618,31 @@ const Fechamentos = () => {
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: '600' }}>
                           {formatarMoeda(fechamento.valor_fechado)}
+                        </td>
+                        <td>
+                          {/* Campo select para alterar status (apenas admin) */}
+                          {isAdmin ? (
+                            <select 
+                              value={fechamento.aprovado || 'pendente'} 
+                              onChange={(e) => alterarStatusAprovacao(fechamento.id, e.target.value)}
+                              className="form-select"
+                              style={{ minWidth: '120px' }}
+                            >
+                              <option value="pendente">Pendente</option>
+                              <option value="aprovado">Aprovado</option>
+                              <option value="reprovado">Reprovado</option>
+                            </select>
+                          ) : (
+                            <span className={`badge ${
+                              fechamento.aprovado === 'aprovado' ? 'badge-success' : 
+                              fechamento.aprovado === 'reprovado' ? 'badge-danger' : 
+                              'badge-warning'
+                            }`}>
+                              {fechamento.aprovado === 'aprovado' ? 'Aprovado' : 
+                               fechamento.aprovado === 'reprovado' ? 'Reprovado' : 
+                               'Pendente'}
+                            </span>
+                          )}
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>

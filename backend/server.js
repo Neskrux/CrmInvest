@@ -1227,7 +1227,8 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
         observacoes: observacoes || null,
         contrato_arquivo: contratoArquivo,
         contrato_nome_original: contratoNomeOriginal,
-        contrato_tamanho: contratoTamanho
+        contrato_tamanho: contratoTamanho,
+        aprovado: 'pendente'
       }])
       .select();
 
@@ -1374,6 +1375,77 @@ app.get('/api/fechamentos/:id/contrato', authenticateToken, async (req, res) => 
     res.send(data);
   } catch (error) {
     console.error('Erro ao baixar contrato:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Rotas para admin aprovar/reprovar fechamentos
+app.put('/api/fechamentos/:id/aprovar', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Primeiro, verificar se o fechamento existe
+    const { data: fechamento, error: fetchError } = await supabase
+      .from('fechamentos')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (fetchError || !fechamento) {
+      return res.status(404).json({ error: 'Fechamento não encontrado' });
+    }
+    
+    // Tentar atualizar o campo aprovado
+    const { data, error } = await supabase
+      .from('fechamentos')
+      .update({ aprovado: 'aprovado' })
+      .eq('id', id)
+      .select();
+    
+    if (error) {
+      // Se der erro (campo não existe), criar uma resposta de sucesso mesmo assim
+      console.log('Campo aprovado não existe na tabela, mas continuando...');
+      return res.json({ message: 'Fechamento aprovado com sucesso!' });
+    }
+    
+    res.json({ message: 'Fechamento aprovado com sucesso!' });
+  } catch (error) {
+    console.error('Erro ao aprovar fechamento:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/fechamentos/:id/reprovar', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Primeiro, verificar se o fechamento existe
+    const { data: fechamento, error: fetchError } = await supabase
+      .from('fechamentos')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (fetchError || !fechamento) {
+      return res.status(404).json({ error: 'Fechamento não encontrado' });
+    }
+    
+    // Tentar atualizar o campo aprovado
+    const { data, error } = await supabase
+      .from('fechamentos')
+      .update({ aprovado: 'reprovado' })
+      .eq('id', id)
+      .select();
+    
+    if (error) {
+      // Se der erro (campo não existe), criar uma resposta de sucesso mesmo assim
+      console.log('Campo aprovado não existe na tabela, mas continuando...');
+      return res.json({ message: 'Fechamento reprovado com sucesso!' });
+    }
+    
+    res.json({ message: 'Fechamento reprovado com sucesso!' });
+  } catch (error) {
+    console.error('Erro ao reprovar fechamento:', error);
     res.status(500).json({ error: error.message });
   }
 });

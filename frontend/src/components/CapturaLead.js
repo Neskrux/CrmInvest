@@ -10,7 +10,9 @@ const CapturaLead = () => {
     telefone: '',
     tipo_tratamento: '',
     cpf: '',
-    observacoes: ''
+    observacoes: '',
+    melhor_dia1: '',
+    melhor_dia2: ''
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -82,13 +84,26 @@ const CapturaLead = () => {
     
     setLoading(true);
     
+    // Concatenar os melhores dias/horários à observação
+    let observacoesComDias = formData.observacoes || '';
+    if (formData.melhor_dia1) {
+      observacoesComDias += `\n1º Melhor dia/horário: ${formData.melhor_dia1}`;
+    }
+    if (formData.melhor_dia2) {
+      observacoesComDias += `\n2º Melhor dia/horário: ${formData.melhor_dia2}`;
+    }
+    const formDataToSend = {
+      ...formData,
+      observacoes: observacoesComDias
+    };
+
     try {
-      const response = await fetch(`${config.API_URL}/leads/cadastro`, {
+      const response = await fetch(`${config.API_BASE_URL}/leads/cadastro`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(formDataToSend)
       });
       
       const data = await response.json();
@@ -213,6 +228,30 @@ const CapturaLead = () => {
                   maxLength="14"
                 />
                 {errors.cpf && <span className="field-error">{errors.cpf}</span>}
+                <span className="cpf-info">Seu CPF está sujeito a uma análise</span>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">1º Melhor dia/horário para agendamento</label>
+                <input
+                  type="datetime-local"
+                  name="melhor_dia1"
+                  className="form-input"
+                  value={formData.melhor_dia1}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">2º Melhor dia/horário para agendamento</label>
+                <input
+                  type="datetime-local"
+                  name="melhor_dia2"
+                  className="form-input"
+                  value={formData.melhor_dia2}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                />
               </div>
 
               <div className="form-group">
@@ -584,6 +623,14 @@ const CapturaLead = () => {
         .footer-text {
           font-size: 0.9rem;
           opacity: 0.8;
+        }
+
+        .cpf-info {
+          display: block;
+          color: #6b7280;
+          font-size: 0.85rem;
+          margin-top: 4px;
+          margin-left: 2px;
         }
 
         @media (max-width: 768px) {

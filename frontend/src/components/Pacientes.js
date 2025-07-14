@@ -279,6 +279,8 @@ const Pacientes = () => {
   };
 
   const pacientesFiltrados = pacientes.filter(p => {
+    // Mostrar apenas pacientes que já têm consultor atribuído (número válido)
+    if (!p.consultor_id || p.consultor_id === '' || p.consultor_id === null || p.consultor_id === undefined || Number(p.consultor_id) === 0) return false;
     const matchNome = !filtroNome || p.nome.toLowerCase().includes(filtroNome.toLowerCase());
     const matchTelefone = !filtroTelefone || (p.telefone || '').includes(filtroTelefone);
     const matchCPF = !filtroCPF || (p.cpf || '').includes(filtroCPF);

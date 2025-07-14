@@ -53,6 +53,11 @@ ALTER TABLE fechamentos ADD COLUMN IF NOT EXISTS contrato_tamanho INTEGER;
 ALTER TABLE fechamentos ADD COLUMN IF NOT EXISTS contrato_upload_data TIMESTAMP DEFAULT NOW();
 ```
 
+### **Migração 014: Aprovação de Fechamentos**
+```sql
+ALTER TABLE fechamentos ADD COLUMN IF NOT EXISTS aprovado TEXT DEFAULT 'pendente';
+```
+
 ## 🔍 **Como Verificar se Funcionou**
 
 Após executar, rode no Supabase:
