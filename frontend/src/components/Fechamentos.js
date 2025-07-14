@@ -27,6 +27,7 @@ const Fechamentos = () => {
     observacoes: ''
   });
   const [contratoSelecionado, setContratoSelecionado] = useState(null);
+  const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
     carregarDados();
@@ -175,6 +176,7 @@ const Fechamentos = () => {
   };
 
   const salvarFechamento = async () => {
+    setSalvando(true);
     try {
       const token = localStorage.getItem('token');
       if (!token || token === 'null' || token.trim() === '') {
@@ -260,6 +262,8 @@ const Fechamentos = () => {
     } catch (error) {
       console.error('Erro ao salvar fechamento:', error);
       alert('Erro ao salvar: ' + error.message);
+    } finally {
+      setSalvando(false);
     }
   };
 
@@ -767,8 +771,12 @@ const Fechamentos = () => {
                 <button 
                   type="submit"
                   className="btn btn-primary"
+                  disabled={salvando}
                 >
-                  {fechamentoEditando ? 'Atualizar' : 'Salvar'}
+                  {salvando ? (
+                    <span className="loading-spinner" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: 8 }}></span>
+                  ) : null}
+                  {fechamentoEditando ? (salvando ? 'Atualizando...' : 'Atualizar') : (salvando ? 'Salvando...' : 'Salvar')}
                 </button>
               </div>
             </form>

@@ -10,6 +10,7 @@ const Clinicas = () => {
   const [message, setMessage] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroCity, setFiltroCity] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState('');
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewingClinica, setViewingClinica] = useState(null);
   const [formData, setFormData] = useState({
@@ -20,7 +21,8 @@ const Clinicas = () => {
     estado: '',
     nicho: '',
     telefone: '',
-    email: ''
+    email: '',
+    status: 'ativo'
   });
 
   // Verificar se usuário é consultor
@@ -141,7 +143,8 @@ const Clinicas = () => {
           estado: '',
           nicho: '',
           telefone: '',
-          email: ''
+          email: '',
+          status: 'ativo'
         });
         fetchClinicas();
         setTimeout(() => setMessage(''), 3000);
@@ -164,7 +167,8 @@ const Clinicas = () => {
       estado: clinica.estado || '',
       nicho: clinica.nicho || '',
       telefone: clinica.telefone || '',
-      email: clinica.email || ''
+      email: clinica.email || '',
+      status: clinica.status || 'ativo'
     });
     setShowModal(true);
   };
@@ -201,7 +205,8 @@ const Clinicas = () => {
       estado: '',
       nicho: '',
       telefone: '',
-      email: ''
+      email: '',
+      status: 'ativo'
     });
     setEditingClinica(null);
     setShowModal(false);
@@ -224,11 +229,49 @@ const Clinicas = () => {
     }
   };
 
+  const toggleStatus = async (clinica) => {
+    const novaStatus = clinica.status === 'ativo' ? 'bloqueado' : 'ativo';
+    const acao = novaStatus === 'ativo' ? 'desbloquear' : 'bloquear';
+    
+    if (!window.confirm(`Deseja ${acao} a clínica "${clinica.nome}"?`)) {
+      return;
+    }
+
+    // Buscar a clínica completa para garantir todos os campos
+    const clinicaCompleta = clinicas.find(c => c.id === clinica.id);
+    if (!clinicaCompleta) {
+      setMessage('Erro: clínica não encontrada.');
+      return;
+    }
+    const clinicaParaAtualizar = { ...clinicaCompleta, status: novaStatus };
+
+    try {
+      const response = await makeRequest(`/clinicas/${clinica.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(clinicaParaAtualizar)
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        setMessage(`Clínica ${acao}da com sucesso!`);
+        fetchClinicas();
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        setMessage('Erro ao alterar status: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao alterar status:', error);
+      setMessage('Erro ao alterar status da clínica');
+    }
+  };
+
   // Filtrar clínicas
   const clinicasFiltradas = clinicas.filter(clinica => {
     const matchEstado = !filtroEstado || clinica.estado === filtroEstado;
     const matchCidade = !filtroCity || clinica.cidade?.toLowerCase().includes(filtroCity.toLowerCase());
-    return matchEstado && matchCidade;
+    const matchStatus = !filtroStatus || clinica.status === filtroStatus;
+    return matchEstado && matchCidade && matchStatus;
   });
 
   // Obter listas únicas para filtros
@@ -297,11 +340,12 @@ const Clinicas = () => {
             }}>
               Filtros de Busca
             </h3>
-            {(filtroEstado || filtroCity) && (
+            {(filtroEstado || filtroCity || filtroStatus) && (
               <button 
                 onClick={() => {
                   setFiltroEstado('');
                   setFiltroCity('');
+                  setFiltroStatus('');
                 }}
                 className="btn btn-secondary"
                 style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
@@ -311,7 +355,7 @@ const Clinicas = () => {
             )}
           </div>
           
-          <div className="grid grid-2">
+          <div className="grid grid-3">
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Estado</label>
               <select
@@ -348,9 +392,22 @@ const Clinicas = () => {
                 ))}
               </select>
             </div>
+
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Status</label>
+              <select
+                value={filtroStatus}
+                onChange={(e) => setFiltroStatus(e.target.value)}
+                className="form-select"
+              >
+                <option value="">Todas as clínicas</option>
+                <option value="ativo">Desbloqueadas</option>
+                <option value="bloqueado">Bloqueadas</option>
+              </select>
+            </div>
           </div>
 
-          {(filtroEstado || filtroCity) && (
+          {(filtroEstado || filtroCity || filtroStatus) && (
             <div style={{ 
               marginTop: '1rem', 
               padding: '0.75rem', 
@@ -370,7 +427,7 @@ const Clinicas = () => {
           </div>
         ) : clinicasFiltradas.length === 0 ? (
           <p style={{ textAlign: 'center', color: '#6b7280', padding: '2rem' }}>
-            {filtroEstado || filtroCity
+            {filtroEstado || filtroCity || filtroStatus
               ? 'Nenhuma clínica encontrada com os filtros aplicados.'
               : 'Nenhuma clínica cadastrada ainda.'
             }
@@ -386,12 +443,13 @@ const Clinicas = () => {
                   <th>Cidade/Estado</th>
                   <th>Nicho</th>
                   <th>Contato</th>
+                  <th>Status</th>
                   <th>Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {clinicasFiltradas.map(clinica => (
-                  <tr key={clinica.id}>
+                  <tr key={clinica.id} className={clinica.status === 'bloqueado' ? 'clinica-bloqueada' : ''}>
                     <td>
                       <strong>{clinica.nome}</strong>
                     </td>
@@ -418,7 +476,12 @@ const Clinicas = () => {
                       )}
                       {!clinica.telefone && !clinica.email && '-'}
                     </td>
-                                        <td>
+                    <td>
+                      <span className={`badge ${clinica.status === 'ativo' ? 'badge-success' : 'badge-danger'}`}>
+                        {clinica.status === 'ativo' ? 'Desbloqueada' : 'Bloqueada'}
+                      </span>
+                    </td>
+                    <td>
                       {isConsultor ? (
                         <button
                           onClick={() => handleView(clinica)}
@@ -441,6 +504,26 @@ const Clinicas = () => {
                               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                             </svg>
+                          </button>
+                          <button
+                            onClick={() => toggleStatus(clinica)}
+                            className="btn-action"
+                            title={clinica.status === 'ativo' ? 'Bloquear clínica' : 'Desbloquear clínica'}
+                            style={{ marginLeft: '0.5rem' }}
+                          >
+                            {clinica.status === 'ativo' ? (
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                <circle cx="12" cy="16" r="1"></circle>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                              </svg>
+                            ) : (
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                <circle cx="12" cy="16" r="1"></circle>
+                                <path d="M7 11V7a5 5 0 0 1 9.9 0"></path>
+                              </svg>
+                            )}
                           </button>
                           <button
                             onClick={() => handleView(clinica)}
@@ -610,6 +693,19 @@ const Clinicas = () => {
                 </div>
               </div>
 
+              <div className="form-group">
+                <label className="form-label">Status da Clínica</label>
+                <select
+                  name="status"
+                  className="form-select"
+                  value={formData.status}
+                  onChange={handleInputChange}
+                >
+                  <option value="ativo">Desbloqueada (padrão)</option>
+                  <option value="bloqueado">Bloqueada</option>
+                </select>
+              </div>
+
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
                 <button 
                   type="button"
@@ -697,6 +793,17 @@ const Clinicas = () => {
                    <div>
                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>E-mail</label>
                      <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.email}</p>
+                   </div>
+                 )}
+                 
+                 {viewingClinica.status && (
+                   <div>
+                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Status</label>
+                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                       <span className={`badge ${viewingClinica.status === 'ativo' ? 'badge-success' : 'badge-danger'}`}>
+                         {viewingClinica.status === 'ativo' ? 'Desbloqueada' : 'Bloqueada'}
+                       </span>
+                     </p>
                    </div>
                  )}
                  

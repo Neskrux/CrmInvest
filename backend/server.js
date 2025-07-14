@@ -485,11 +485,21 @@ app.get('/api/clinicas/estados', authenticateToken, async (req, res) => {
 
 app.post('/api/clinicas', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { nome, endereco, bairro, cidade, estado, nicho, telefone, email } = req.body;
+    const { nome, endereco, bairro, cidade, estado, nicho, telefone, email, status } = req.body;
     
     const { data, error } = await supabase
       .from('clinicas')
-      .insert([{ nome, endereco, bairro, cidade, estado, nicho, telefone, email }])
+      .insert([{ 
+        nome, 
+        endereco, 
+        bairro, 
+        cidade, 
+        estado, 
+        nicho, 
+        telefone, 
+        email, 
+        status: status || 'ativo' // Padrão: desbloqueado
+      }])
       .select();
 
     if (error) throw error;
@@ -502,17 +512,48 @@ app.post('/api/clinicas', authenticateToken, requireAdmin, async (req, res) => {
 app.put('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, endereco, bairro, cidade, estado, nicho, telefone, email } = req.body;
+    console.log('🔧 PUT /api/clinicas/:id recebido');
+    console.log('🔧 ID da clínica:', id);
+    console.log('🔧 Body recebido:', req.body);
+    console.log('🔧 Usuário autenticado:', req.user);
+    
+    // Permitir atualização parcial: só atualiza os campos enviados
+    const camposPermitidos = ['nome', 'endereco', 'bairro', 'cidade', 'estado', 'nicho', 'telefone', 'email', 'status'];
+    const updateData = {};
+    for (const campo of camposPermitidos) {
+      if (req.body[campo] !== undefined) {
+        updateData[campo] = req.body[campo];
+      }
+    }
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: 'Nenhum campo válido para atualizar.' });
+    }
+    console.log('🔧 Dados para atualizar:', updateData);
     
     const { data, error } = await supabase
       .from('clinicas')
-      .update({ nome, endereco, bairro, cidade, estado, nicho, telefone, email })
+      .update(updateData)
       .eq('id', id)
       .select();
 
-    if (error) throw error;
+    console.log('🔧 Resultado do Supabase:');
+    console.log('🔧 Data:', data);
+    console.log('🔧 Error:', error);
+
+    if (error) {
+      console.error('❌ Erro do Supabase:', error);
+      return res.status(500).json({ error: error.message });
+    }
+    
+    if (!data || data.length === 0) {
+      console.error('❌ Nenhuma linha foi atualizada! Verifique as policies do Supabase.');
+      return res.status(403).json({ error: 'Nenhuma linha atualizada! Verifique as policies do Supabase.' });
+    }
+    
+    console.log('✅ Clínica atualizada com sucesso:', data[0]);
     res.json({ id: data[0].id, message: 'Clínica atualizada com sucesso!' });
   } catch (error) {
+    console.error('❌ Erro geral:', error);
     res.status(500).json({ error: error.message });
   }
 });

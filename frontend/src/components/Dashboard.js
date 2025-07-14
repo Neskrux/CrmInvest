@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const Dashboard = () => {
   const { makeRequest, user } = useAuth();
@@ -27,7 +28,9 @@ const Dashboard = () => {
     valorPeriodo: 0,
     novosLeadsPeriodo: 0,
     // Estatísticas por dia da semana
-    estatisticasPorDia: {}
+    estatisticasPorDia: {},
+    // Estatísticas de pacientes, agendamentos e fechamentos por cidade
+    agendamentosPorCidade: []
   });
   const [loading, setLoading] = useState(true);
 
@@ -194,6 +197,104 @@ const Dashboard = () => {
         }
       }
 
+      // Calcular pacientes, agendamentos e fechamentos por cidade
+      const dadosPorCidade = {};
+      
+      // Buscar todas as clínicas se não houver filtro de região
+      let todasClinicas = clinicasFiltradas;
+      if (!filtroRegiao.cidade && !filtroRegiao.estado) {
+        // Se não há filtro de região, buscar todas as clínicas do banco
+        try {
+          const todasClinicasRes = await makeRequest('/clinicas');
+          if (todasClinicasRes.ok) {
+            todasClinicas = await todasClinicasRes.json();
+          }
+        } catch (error) {
+          console.error('Erro ao buscar todas as clínicas:', error);
+        }
+      }
+
+      // Criar mapa de clínicas por ID para facilitar a busca
+      const clinicasMap = {};
+      todasClinicas.forEach(clinica => {
+        clinicasMap[clinica.id] = clinica;
+      });
+      
+      // Agrupar pacientes por cidade (usando a clínica do agendamento mais recente ou primeira clínica)
+      pacientes.forEach(paciente => {
+        // Buscar agendamento mais recente do paciente para determinar a cidade
+        const agendamentoPaciente = agendamentos.find(a => a.paciente_id === paciente.id);
+        let cidade = null;
+        
+        if (agendamentoPaciente && agendamentoPaciente.clinica_id) {
+          const clinica = clinicasMap[agendamentoPaciente.clinica_id];
+          if (clinica) {
+            cidade = clinica.cidade;
+          }
+        }
+        
+        if (cidade) {
+          if (!dadosPorCidade[cidade]) {
+            dadosPorCidade[cidade] = {
+              cidade: cidade,
+              pacientes: 0,
+              agendamentos: 0,
+              fechamentos: 0
+            };
+          }
+          dadosPorCidade[cidade].pacientes++;
+        }
+      });
+      
+      // Agrupar agendamentos por cidade das clínicas
+      agendamentos.forEach(agendamento => {
+        if (agendamento.clinica_id) {
+          const clinica = clinicasMap[agendamento.clinica_id];
+          if (clinica && clinica.cidade) {
+            const cidade = clinica.cidade;
+            if (!dadosPorCidade[cidade]) {
+              dadosPorCidade[cidade] = {
+                cidade: cidade,
+                pacientes: 0,
+                agendamentos: 0,
+                fechamentos: 0
+              };
+            }
+            dadosPorCidade[cidade].agendamentos++;
+          }
+        }
+      });
+
+      // Agrupar fechamentos por cidade das clínicas
+      fechamentos.forEach(fechamento => {
+        if (fechamento.clinica_id) {
+          const clinica = clinicasMap[fechamento.clinica_id];
+          if (clinica && clinica.cidade) {
+            const cidade = clinica.cidade;
+            if (!dadosPorCidade[cidade]) {
+              dadosPorCidade[cidade] = {
+                cidade: cidade,
+                pacientes: 0,
+                agendamentos: 0,
+                fechamentos: 0
+              };
+            }
+            dadosPorCidade[cidade].fechamentos++;
+          }
+        }
+      });
+
+      // Converter para array e ordenar por total (pacientes + agendamentos + fechamentos)
+      const agendamentosPorCidadeArray = Object.values(dadosPorCidade)
+        .map(item => ({
+          ...item,
+          total: item.pacientes + item.agendamentos + item.fechamentos,
+          conversaoAgendamento: item.pacientes > 0 ? ((item.agendamentos / item.pacientes) * 100).toFixed(1) : 0,
+          conversaoFechamento: item.agendamentos > 0 ? ((item.fechamentos / item.agendamentos) * 100).toFixed(1) : 0
+        }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 10); // Mostrar apenas top 10 cidades
+
       // Calcular comissões
       const mesAtual = new Date().getMonth();
       const anoAtual = new Date().getFullYear();
@@ -265,7 +366,8 @@ const Dashboard = () => {
         fechamentosPeriodo: fechamentosPeriodo.length,
         valorPeriodo,
         novosLeadsPeriodo,
-        estatisticasPorDia
+        estatisticasPorDia,
+        agendamentosPorCidade: agendamentosPorCidadeArray
       });
       setLoading(false);
     } catch (error) {
@@ -775,6 +877,108 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Gráfico de Pacientes, Agendamentos e Fechamentos por Cidade */}
+      {stats.agendamentosPorCidade.length > 0 && (
+        <div className="card" style={{ marginTop: '2rem' }}>
+          <div className="card-header">
+            <h2 className="card-title">Pacientes, Agendamentos e Fechamentos por Cidade</h2>
+            <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+              Top 10 cidades com mais movimentação no funil de vendas
+            </p>
+          </div>
+          <div className="card-body">
+            <ResponsiveContainer width="100%" height={400}>
+              <BarChart
+                data={stats.agendamentosPorCidade}
+                margin={{
+                  top: 20,
+                  right: 30,
+                  left: 20,
+                  bottom: 5,
+                }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="cidade" 
+                  angle={-45}
+                  textAnchor="end"
+                  height={100}
+                  interval={0}
+                />
+                <YAxis />
+                <Tooltip 
+                  labelFormatter={(value) => `Cidade: ${value}`}
+                  formatter={(value, name, props) => {
+                    const labels = {
+                      pacientes: 'Pacientes',
+                      agendamentos: 'Agendamentos',
+                      fechamentos: 'Fechamentos',
+                      total: 'Total'
+                    };
+                    return [value, labels[name] || name];
+                  }}
+                  labelStyle={{ fontWeight: 'bold' }}
+                  contentStyle={{ 
+                    backgroundColor: '#f9fafb', 
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '6px'
+                  }}
+                />
+                <Legend />
+                <Bar dataKey="pacientes" fill="#f59e0b" name="Pacientes" />
+                <Bar dataKey="agendamentos" fill="#3b82f6" name="Agendamentos" />
+                <Bar dataKey="fechamentos" fill="#059669" name="Fechamentos" />
+              </BarChart>
+            </ResponsiveContainer>
+            
+            {/* Tabela de Conversão por Cidade */}
+            <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+              <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1f2937', marginBottom: '1rem' }}>
+                Taxa de Conversão por Cidade
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                {stats.agendamentosPorCidade.map((cidade, index) => (
+                  <div key={index} style={{ 
+                    padding: '0.75rem',
+                    backgroundColor: 'white',
+                    borderRadius: '6px',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+                  }}>
+                    <div style={{ fontWeight: '600', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
+                      {cidade.cidade}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Pacientes → Agendamentos:</span>
+                        <span style={{ 
+                          fontSize: '0.75rem', 
+                          fontWeight: '600',
+                          color: parseFloat(cidade.conversaoAgendamento) > 50 ? '#059669' : 
+                                 parseFloat(cidade.conversaoAgendamento) > 20 ? '#f59e0b' : '#ef4444'
+                        }}>
+                          {cidade.conversaoAgendamento}%
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Agendamentos → Fechamentos:</span>
+                        <span style={{ 
+                          fontSize: '0.75rem', 
+                          fontWeight: '600',
+                          color: parseFloat(cidade.conversaoFechamento) > 50 ? '#059669' : 
+                                 parseFloat(cidade.conversaoFechamento) > 20 ? '#f59e0b' : '#ef4444'
+                        }}>
+                          {cidade.conversaoFechamento}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-2" style={{ gap: '2rem' }}>
         {/* Pipeline de Vendas */}
         <div className="card" style={{ minWidth: 0 }}>
@@ -817,48 +1021,271 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Performance dos Consultores */}
+        {/* Ranking dos Consultores */}
         <div className="card" style={{ minWidth: 0 }}>
           <div className="card-header">
-            <h2 className="card-title">Performance dos Consultores</h2>
+            <h2 className="card-title">🏆 Ranking dos Consultores</h2>
+            <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+              Classificação por valor fechado
+            </p>
           </div>
-          <div className="card-body" style={{ padding: '0' }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Consultor</th>
-                  <th className="text-center">Pac.</th>
-                  <th className="text-center">Agend.</th>
-                  <th className="text-center">Fech.</th>
-                  <th className="text-right">Valor</th>
-                  <th className="text-right">Comissão</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.consultoresStats.length > 0 ? (
-                  stats.consultoresStats.map((consultor, index) => (
-                    <tr key={index}>
-                      <td className="font-medium">{consultor.nome}</td>
-                      <td className="text-center">{consultor.totalPacientes}</td>
-                      <td className="text-center">{consultor.totalAgendamentos}</td>
-                      <td className="text-center">{consultor.totalFechamentos}</td>
-                      <td className="text-right font-semibold">
-                        {formatCurrencyCompact(consultor.valorFechado)}
-                      </td>
-                      <td className="text-right font-semibold" style={{ color: '#059669' }}>
-                        {formatCurrencyCompact(consultor.comissaoTotal)}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="6" className="text-center" style={{ color: '#9ca3af' }}>
-                      Nenhum dado disponível
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <div className="card-body">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {(() => {
+                // Ordenar consultores e calcular posições
+                const consultoresOrdenados = [...stats.consultoresStats]
+                  .sort((a, b) => b.valorFechado - a.valorFechado);
+                
+                let posicaoAtual = 0;
+                const consultoresComPosicao = consultoresOrdenados.map((consultor) => {
+                  const temAtividade = consultor.valorFechado > 0 || 
+                                      consultor.totalAgendamentos > 0 || 
+                                      consultor.totalPacientes > 0;
+                  if (temAtividade) {
+                    posicaoAtual++;
+                    return { ...consultor, posicao: posicaoAtual, temAtividade };
+                  }
+                  return { ...consultor, posicao: null, temAtividade };
+                });
+
+                // Separar ativos e inativos
+                const consultoresAtivos = consultoresComPosicao.filter(c => c.temAtividade);
+                const consultoresInativos = consultoresComPosicao.filter(c => !c.temAtividade);
+
+                return (
+                  <>
+                    {/* Top 3 em destaque */}
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                      gap: '1rem',
+                      marginBottom: '2rem'
+                    }}>
+                      {consultoresAtivos.slice(0, 3).map((consultor, idx) => (
+                        <div 
+                          key={idx}
+                          style={{
+                            padding: '1.5rem',
+                            borderRadius: '16px',
+                            background: idx === 0 ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' :
+                                       idx === 1 ? 'linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%)' :
+                                                  'linear-gradient(135deg, #fed7aa 0%, #fdba74 100%)',
+                            border: '2px solid',
+                            borderColor: idx === 0 ? '#fbbf24' :
+                                        idx === 1 ? '#9ca3af' : '#fb923c',
+                            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+                            textAlign: 'center',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          {/* Medalha */}
+                          <div style={{ 
+                            fontSize: '3rem', 
+                            marginBottom: '0.5rem' 
+                          }}>
+                            {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
+                          </div>
+                          
+                          {/* Nome */}
+                          <h3 style={{ 
+                            fontSize: '1.25rem', 
+                            fontWeight: '700',
+                            marginBottom: '0.5rem',
+                            color: '#1e293b'
+                          }}>
+                            {consultor.nome}
+                          </h3>
+                          
+                          {/* Posição */}
+                          <div style={{ 
+                            fontSize: '0.875rem', 
+                            color: '#64748b',
+                            marginBottom: '1rem'
+                          }}>
+                            {idx === 0 ? '👑 Líder do Ranking' :
+                             idx === 1 ? '⭐ Vice-líder' : 
+                                        '🌟 3º Lugar'}
+                          </div>
+
+                          {/* Estatísticas */}
+                          <div style={{ 
+                            display: 'grid', 
+                            gridTemplateColumns: 'repeat(3, 1fr)',
+                            gap: '0.5rem',
+                            marginBottom: '1rem'
+                          }}>
+                            <div>
+                              <div style={{ fontSize: '1.25rem', fontWeight: '700' }}>
+                                {consultor.totalPacientes}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                Pacientes
+                              </div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#3b82f6' }}>
+                                {consultor.totalAgendamentos}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                Agendamentos
+                              </div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#10b981' }}>
+                                {consultor.totalFechamentos}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                Fechamentos
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Valores */}
+                          <div style={{ 
+                            padding: '1rem', 
+                            background: 'rgba(255, 255, 255, 0.8)',
+                            borderRadius: '12px',
+                            marginTop: '1rem'
+                          }}>
+                            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#059669' }}>
+                              {formatCurrency(consultor.valorFechado)}
+                            </div>
+                            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                              Comissão: {formatCurrency(consultor.comissaoTotal)}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Restante dos consultores */}
+                    {consultoresAtivos.length > 3 && (
+                      <div style={{ marginBottom: '2rem' }}>
+                        <h4 style={{ 
+                          fontSize: '1rem', 
+                          fontWeight: '600', 
+                          color: '#1e293b',
+                          marginBottom: '1rem'
+                        }}>
+                          Demais Posições
+                        </h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          {consultoresAtivos.slice(3).map((consultor, idx) => (
+                            <div 
+                              key={idx}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '1rem',
+                                background: '#ffffff',
+                                borderRadius: '12px',
+                                border: '1px solid #e5e7eb',
+                                gap: '1rem'
+                              }}
+                            >
+                              <div style={{ 
+                                fontSize: '1.25rem', 
+                                fontWeight: '600',
+                                color: '#6b7280',
+                                minWidth: '50px'
+                              }}>
+                                {consultor.posicao}º
+                              </div>
+                              
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: '600' }}>{consultor.nome}</div>
+                                <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                  {consultor.posicao}ª posição
+                                </div>
+                              </div>
+
+                              <div style={{ 
+                                display: 'flex', 
+                                gap: '2rem',
+                                fontSize: '0.875rem'
+                              }}>
+                                <div style={{ textAlign: 'center' }}>
+                                  <div style={{ fontWeight: '600' }}>{consultor.totalPacientes}</div>
+                                  <div style={{ color: '#6b7280', fontSize: '0.75rem' }}>pacientes</div>
+                                </div>
+                                <div style={{ textAlign: 'center' }}>
+                                  <div style={{ fontWeight: '600', color: '#3b82f6' }}>{consultor.totalAgendamentos}</div>
+                                  <div style={{ color: '#6b7280', fontSize: '0.75rem' }}>agendamentos</div>
+                                </div>
+                                <div style={{ textAlign: 'center' }}>
+                                  <div style={{ fontWeight: '600', color: '#10b981' }}>{consultor.totalFechamentos}</div>
+                                  <div style={{ color: '#6b7280', fontSize: '0.75rem' }}>fechamentos</div>
+                                </div>
+                              </div>
+
+                              <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontWeight: '700', color: '#059669' }}>
+                                  {formatCurrency(consultor.valorFechado)}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                                  Comissão: {formatCurrency(consultor.comissaoTotal)}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Consultores inativos */}
+                    {consultoresInativos.length > 0 && (
+                      <div>
+                        <h4 style={{ 
+                          fontSize: '1rem', 
+                          fontWeight: '600', 
+                          color: '#6b7280',
+                          marginBottom: '1rem'
+                        }}>
+                          💤 Aguardando Primeira Venda
+                        </h4>
+                        <div style={{ 
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                          gap: '0.75rem'
+                        }}>
+                          {consultoresInativos.map((consultor, idx) => (
+                            <div 
+                              key={idx}
+                              style={{
+                                padding: '1rem',
+                                background: '#f8fafc',
+                                borderRadius: '8px',
+                                border: '1px solid #e2e8f0',
+                                textAlign: 'center',
+                                opacity: 0.7
+                              }}
+                            >
+                              <div style={{ 
+                                fontSize: '1.5rem', 
+                                marginBottom: '0.5rem' 
+                              }}>
+                                ⭕
+          </div>
+                              <div style={{ fontWeight: '600', color: '#64748b' }}>
+                                {consultor.nome}
+                              </div>
+                              <div style={{ 
+                                fontSize: '0.75rem', 
+                                color: '#94a3b8',
+                                marginTop: '0.25rem'
+                              }}>
+                                Sem vendas
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
           </div>
         </div>
       </div>
