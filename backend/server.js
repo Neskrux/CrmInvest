@@ -196,6 +196,7 @@ CREATE TABLE IF NOT EXISTS clinicas (
   nicho TEXT DEFAULT 'Ambos',
   telefone TEXT,
   email TEXT,
+  status TEXT DEFAULT 'ativo',
   created_at TIMESTAMP DEFAULT NOW()
 );
 
