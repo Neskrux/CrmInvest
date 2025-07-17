@@ -494,6 +494,13 @@ body {
   font-weight: 500;
 }
 
+.stat-sublabel {
+  font-size: 0.75rem;
+  color: var(--gray-400);
+  font-weight: 400;
+  margin-top: 0.25rem;
+}
+
 .stat-change {
   font-size: 0.75rem;
   margin-top: 0.5rem;

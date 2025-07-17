@@ -18,6 +18,8 @@ const Pacientes = () => {
   const [filtroTipo, setFiltroTipo] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
   const [filtroConsultor, setFiltroConsultor] = useState('');
+  const [filtroDataInicio, setFiltroDataInicio] = useState('');
+  const [filtroDataFim, setFiltroDataFim] = useState('');
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
@@ -281,13 +283,41 @@ const Pacientes = () => {
   const pacientesFiltrados = pacientes.filter(p => {
     // Mostrar apenas pacientes que já têm consultor atribuído (número válido)
     if (!p.consultor_id || p.consultor_id === '' || p.consultor_id === null || p.consultor_id === undefined || Number(p.consultor_id) === 0) return false;
+    
     const matchNome = !filtroNome || p.nome.toLowerCase().includes(filtroNome.toLowerCase());
     const matchTelefone = !filtroTelefone || (p.telefone || '').includes(filtroTelefone);
     const matchCPF = !filtroCPF || (p.cpf || '').includes(filtroCPF);
     const matchTipo = !filtroTipo || p.tipo_tratamento === filtroTipo;
     const matchStatus = !filtroStatus || p.status === filtroStatus;
     const matchConsultor = !filtroConsultor || String(p.consultor_id) === filtroConsultor;
-    return matchNome && matchTelefone && matchCPF && matchTipo && matchStatus && matchConsultor;
+    
+    // Filtro por data de cadastro
+    let matchData = true;
+    if (filtroDataInicio || filtroDataFim) {
+      const dataCadastro = p.created_at ? new Date(p.created_at) : null;
+      if (dataCadastro) {
+        // Normalizar a data de cadastro para comparação (apenas a data, sem hora)
+        const dataCadastroNormalizada = new Date(dataCadastro.getFullYear(), dataCadastro.getMonth(), dataCadastro.getDate());
+        
+
+        
+        if (filtroDataInicio) {
+          const dataInicio = new Date(filtroDataInicio);
+          const dataInicioNormalizada = new Date(dataInicio.getFullYear(), dataInicio.getMonth(), dataInicio.getDate());
+          matchData = matchData && dataCadastroNormalizada >= dataInicioNormalizada;
+        }
+        if (filtroDataFim) {
+          const dataFim = new Date(filtroDataFim);
+          const dataFimNormalizada = new Date(dataFim.getFullYear(), dataFim.getMonth(), dataFim.getDate());
+          matchData = matchData && dataCadastroNormalizada <= dataFimNormalizada;
+        }
+      } else {
+        // Se não tem data de cadastro mas não há filtro restritivo, mostrar
+        matchData = !filtroDataInicio && !filtroDataFim;
+      }
+    }
+    
+    return matchNome && matchTelefone && matchCPF && matchTipo && matchStatus && matchConsultor && matchData;
   });
 
   return (
@@ -330,29 +360,30 @@ const Pacientes = () => {
           <div className="stats-grid" style={{ marginBottom: '2rem' }}>
             <div className="stat-card">
               <div className="stat-label">Leads</div>
-              <div className="stat-value">{pacientes.filter(p => p.status === 'lead').length}</div>
+              <div className="stat-value">{pacientesFiltrados.filter(p => p.status === 'lead').length}</div>
             </div>
             
             <div className="stat-card">
               <div className="stat-label">Agendados</div>
-              <div className="stat-value">{pacientes.filter(p => p.status === 'agendado').length}</div>
+              <div className="stat-value">{pacientesFiltrados.filter(p => p.status === 'agendado').length}</div>
             </div>
             
             <div className="stat-card">
               <div className="stat-label">Fechados</div>
-              <div className="stat-value">{pacientes.filter(p => p.status === 'fechado').length}</div>
+              <div className="stat-value">{pacientesFiltrados.filter(p => p.status === 'fechado').length}</div>
             </div>
             
             <div className="stat-card">
-              <div className="stat-label">Total</div>
-              <div className="stat-value">{pacientes.length}</div>
+              <div className="stat-label">Exibindo</div>
+              <div className="stat-value">{pacientesFiltrados.length}</div>
+              <div className="stat-sublabel">de {pacientes.filter(p => p.consultor_id && p.consultor_id !== '' && p.consultor_id !== null && p.consultor_id !== undefined && Number(p.consultor_id) !== 0).length}</div>
             </div>
             
             <div className="stat-card">
               <div className="stat-label">Taxa Conversão</div>
               <div className="stat-value">
-                {pacientes.length > 0 
-                  ? Math.round((pacientes.filter(p => p.status === 'fechado').length / pacientes.length) * 100)
+                {pacientesFiltrados.length > 0 
+                  ? Math.round((pacientesFiltrados.filter(p => p.status === 'fechado').length / pacientesFiltrados.length) * 100)
                   : 0}%
               </div>
             </div>
@@ -409,8 +440,35 @@ const Pacientes = () => {
                     </select>
                   </div>
                 </div>
+                <div className="grid grid-2" style={{ gap: '1rem', marginTop: '1rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Data de Cadastro - Início</label>
+                    <input 
+                      type="date" 
+                      className="form-input" 
+                      value={filtroDataInicio} 
+                      onChange={e => setFiltroDataInicio(e.target.value)} 
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Data de Cadastro - Fim</label>
+                    <input 
+                      type="date" 
+                      className="form-input" 
+                      value={filtroDataFim} 
+                      onChange={e => setFiltroDataFim(e.target.value)} 
+                    />
+                  </div>
+                </div>
                 <button className="btn btn-sm btn-secondary" style={{ marginTop: '1rem' }} onClick={() => {
-                  setFiltroNome(''); setFiltroTelefone(''); setFiltroCPF(''); setFiltroTipo(''); setFiltroStatus(''); setFiltroConsultor('');
+                  setFiltroNome(''); 
+                  setFiltroTelefone(''); 
+                  setFiltroCPF(''); 
+                  setFiltroTipo(''); 
+                  setFiltroStatus(''); 
+                  setFiltroConsultor('');
+                  setFiltroDataInicio('');
+                  setFiltroDataFim('');
                 }}>Limpar Filtros</button>
               </div>
             )}

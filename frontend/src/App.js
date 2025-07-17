@@ -14,6 +14,7 @@ import Consultores from './components/Consultores';
 import Clinicas from './components/Clinicas';
 import Agendamentos from './components/Agendamentos';
 import Fechamentos from './components/Fechamentos';
+import MetaAds from './components/MetaAds';
 import logoBrasao from './images/logobrasao.png';
 import logoHorizontal from './images/logohorizontal.png';
 import logoHorizontalPreto from './images/logohorizontalpreto.png';
@@ -49,6 +50,7 @@ function AppContent() {
     if (path.includes('/clinicas')) return 'clinicas';
     if (path.includes('/agendamentos')) return 'agendamentos';
     if (path.includes('/fechamentos')) return 'fechamentos';
+    if (path.includes('/meta-ads')) return 'meta-ads';
     return 'dashboard';
   };
   
@@ -85,6 +87,7 @@ function AppContent() {
         <Route path="/clinicas" element={<Clinicas />} />
         <Route path="/agendamentos" element={<Agendamentos />} />
         <Route path="/fechamentos" element={<Fechamentos />} />
+        <Route path="/meta-ads" element={<MetaAds />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
@@ -201,6 +204,20 @@ function AppContent() {
                   <circle cx="12" cy="7" r="4" />
                 </svg>
                 Consultores
+              </Link>
+            </div>
+          )}
+
+          {user.tipo === 'admin' && (
+            <div className="nav-item">
+              <Link
+                to="/meta-ads"
+                className={`nav-link ${activeTab === 'meta-ads' ? 'active' : ''}`}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                </svg>
+                Meta Ads
               </Link>
             </div>
           )}

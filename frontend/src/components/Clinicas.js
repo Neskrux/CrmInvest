@@ -24,6 +24,7 @@ const Clinicas = () => {
     email: '',
     status: 'ativo'
   });
+  const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
 
   // Verificar se usuário é consultor
   const isConsultor = user?.tipo === 'consultor';
@@ -159,17 +160,23 @@ const Clinicas = () => {
 
   const handleEdit = (clinica) => {
     setEditingClinica(clinica);
+    const estadoClinica = clinica.estado || '';
+    const cidadeClinica = clinica.cidade || '';
+    const cidadesDoEstado = estadoClinica ? (cidadesPorEstado[estadoClinica] || []) : [];
+    const cidadeEhCustomizada = cidadesDoEstado.length > 0 && !cidadesDoEstado.includes(cidadeClinica) && cidadeClinica !== '';
+    
     setFormData({
       nome: clinica.nome || '',
       endereco: clinica.endereco || '',
       bairro: clinica.bairro || '',
-      cidade: clinica.cidade || '',
-      estado: clinica.estado || '',
+      cidade: cidadeClinica,
+      estado: estadoClinica,
       nicho: clinica.nicho || '',
       telefone: clinica.telefone || '',
       email: clinica.email || '',
       status: clinica.status || 'ativo'
     });
+    setCidadeCustomizada(cidadeEhCustomizada);
     setShowModal(true);
   };
 
@@ -208,17 +215,14 @@ const Clinicas = () => {
       email: '',
       status: 'ativo'
     });
+    setCidadeCustomizada(false);
     setEditingClinica(null);
     setShowModal(false);
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value
-    });
-
+    
     // Limpar cidade se estado mudar
     if (name === 'estado') {
       setFormData(prev => ({
@@ -226,6 +230,12 @@ const Clinicas = () => {
         estado: value,
         cidade: '' // Limpar cidade quando estado muda
       }));
+      setCidadeCustomizada(false); // Resetar cidade customizada
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value
+      });
     }
   };
 
@@ -610,12 +620,19 @@ const Clinicas = () => {
 
                 <div className="form-group">
                   <label className="form-label">Cidade *</label>
-                  {cidadesSugeridas.length > 0 && formData.cidade !== 'OUTRA' ? (
+                  {cidadesSugeridas.length > 0 && !cidadeCustomizada ? (
                     <select
                       name="cidade"
                       className="form-select"
                       value={formData.cidade}
-                      onChange={handleInputChange}
+                      onChange={(e) => {
+                        if (e.target.value === 'OUTRA') {
+                          setCidadeCustomizada(true);
+                          setFormData(prev => ({ ...prev, cidade: '' }));
+                        } else {
+                          handleInputChange(e);
+                        }
+                      }}
                       required
                     >
                       <option value="">Selecione a cidade</option>
@@ -625,16 +642,31 @@ const Clinicas = () => {
                       <option value="OUTRA">Outra cidade</option>
                     </select>
                   ) : (
-                    <input
-                      type="text"
-                      name="cidade"
-                      className="form-input"
-                      value={formData.cidade === 'OUTRA' ? '' : formData.cidade}
-                      onChange={handleInputChange}
-                      placeholder="Digite o nome da cidade"
-                      disabled={!formData.estado}
-                      required
-                    />
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        name="cidade"
+                        className="form-input"
+                        value={formData.cidade}
+                        onChange={handleInputChange}
+                        placeholder="Digite o nome da cidade"
+                        disabled={!formData.estado}
+                        required
+                      />
+                      {cidadesSugeridas.length > 0 && cidadeCustomizada && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ whiteSpace: 'nowrap', fontSize: '0.875rem', padding: '0.5rem' }}
+                          onClick={() => {
+                            setCidadeCustomizada(false);
+                            setFormData(prev => ({ ...prev, cidade: '' }));
+                          }}
+                        >
+                          Voltar
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
 
