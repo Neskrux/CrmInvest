@@ -8,9 +8,10 @@ const CapturaLead = () => {
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
-    tipo_tratamento: '',
+    tipo_servico: '',
     cpf: '',
     observacoes: '',
+    imobiliaria_preferida: '',
     melhor_dia1: '',
     melhor_dia2: ''
   });
@@ -84,8 +85,11 @@ const CapturaLead = () => {
     
     setLoading(true);
     
-    // Concatenar os melhores dias/horários à observação
+    // Concatenar os melhores dias/horários e imobiliária à observação
     let observacoesComDias = formData.observacoes || '';
+    if (formData.imobiliaria_preferida) {
+      observacoesComDias += `\nImobiliária de preferência: ${formData.imobiliaria_preferida}`;
+    }
     if (formData.melhor_dia1) {
       observacoesComDias += `\n1º Melhor dia/horário: ${formData.melhor_dia1}`;
     }
@@ -134,26 +138,26 @@ const CapturaLead = () => {
           <div className="captura-header">
             <img src={logoBrasao} alt="Logo" className="captura-logo" />
             <h1 className="captura-title">
-              Transforme seu <span className="highlight">Sorriso</span>
+              Encontre seu <span className="highlight">Imóvel dos Sonhos</span>
             </h1>
             <p className="captura-subtitle">
-              Agende sua consulta gratuita e descubra como podemos te ajudar a conquistar o sorriso dos seus sonhos
+              Cadastre-se gratuitamente e receba as melhores ofertas de imóveis diretamente no seu WhatsApp
             </p>
           </div>
 
           {/* Benefícios */}
           <div className="captura-benefits">
             <div className="benefit-item">
-              <div className="benefit-icon">✨</div>
-              <span>Consulta Gratuita</span>
+              <div className="benefit-icon">🏠</div>
+              <span>Cadastro Gratuito</span>
             </div>
             <div className="benefit-item">
-              <div className="benefit-icon">🏆</div>
-              <span>Profissionais Qualificados</span>
+              <div className="benefit-icon">🎯</div>
+              <span>Ofertas Personalizadas</span>
             </div>
             <div className="benefit-item">
-              <div className="benefit-icon">💎</div>
-              <span>Tecnologia Avançada</span>
+              <div className="benefit-icon">💼</div>
+              <span>Corretores Especializados</span>
             </div>
           </div>
 
@@ -161,7 +165,7 @@ const CapturaLead = () => {
           <div className="captura-form-container">
             <h2 className="form-title">Preencha seus dados</h2>
             <p className="form-subtitle">
-              Entraremos em contato em até 2 horas para agendar sua consulta
+              Entraremos em contato em até 2 horas com as melhores ofertas para você
             </p>
 
             {errors.general && (
@@ -200,18 +204,19 @@ const CapturaLead = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Tipo de Tratamento</label>
+                <label className="form-label">Tipo de Interesse</label>
                 <select
-                  name="tipo_tratamento"
+                  name="tipo_servico"
                   className="form-select"
-                  value={formData.tipo_tratamento}
+                  value={formData.tipo_servico}
                   onChange={handleInputChange}
                   disabled={loading}
                 >
                   <option value="">Selecione (opcional)</option>
-                  <option value="Estético">Tratamento Estético</option>
-                  <option value="Odontológico">Tratamento Odontológico</option>
-                  <option value="Ambos">Ambos os Tratamentos</option>
+                  <option value="Compra">Comprar Imóvel</option>
+                  <option value="Venda">Vender Imóvel</option>
+                  <option value="Locacao">Alugar Imóvel</option>
+                  <option value="Avaliacao">Avaliar Imóvel</option>
                 </select>
               </div>
 
@@ -228,11 +233,25 @@ const CapturaLead = () => {
                   maxLength="14"
                 />
                 {errors.cpf && <span className="field-error">{errors.cpf}</span>}
-                <span className="cpf-info">Seu CPF está sujeito a uma análise</span>
+                <span className="cpf-info">Seu CPF está sujeito a uma análise de crédito</span>
               </div>
 
               <div className="form-group">
-                <label className="form-label">1º Melhor dia/horário para agendamento</label>
+                <label className="form-label">Imobiliária de Preferência</label>
+                <input
+                  type="text"
+                  name="imobiliaria_preferida"
+                  className="form-input"
+                  value={formData.imobiliaria_preferida}
+                  onChange={handleInputChange}
+                  placeholder="Nome da imobiliária (opcional)"
+                  disabled={loading}
+                />
+                <span className="cpf-info">Se você foi indicado por alguma imobiliária específica</span>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">1º Melhor dia/horário para contato</label>
                 <input
                   type="datetime-local"
                   name="melhor_dia1"
@@ -243,7 +262,7 @@ const CapturaLead = () => {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">2º Melhor dia/horário para agendamento</label>
+                <label className="form-label">2º Melhor dia/horário para contato</label>
                 <input
                   type="datetime-local"
                   name="melhor_dia2"
@@ -255,13 +274,13 @@ const CapturaLead = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Como podemos te ajudar?</label>
+                <label className="form-label">Qual tipo de imóvel você procura?</label>
                 <textarea
                   name="observacoes"
                   className="form-textarea"
                   value={formData.observacoes}
                   onChange={handleInputChange}
-                  placeholder="Conte-nos sobre seus objetivos e expectativas..."
+                  placeholder="Ex: Apartamento 2 quartos, casa com quintal, comercial para investimento..."
                   rows="3"
                   disabled={loading}
                 />
@@ -276,8 +295,8 @@ const CapturaLead = () => {
                   <span className="loading-spinner">Enviando...</span>
                 ) : (
                   <>
-                    <span>Agendar Consulta Gratuita</span>
-                    <div className="btn-icon">🚀</div>
+                    <span>Receber Ofertas Gratuitamente</span>
+                    <div className="btn-icon">🏠</div>
                   </>
                 )}
               </button>
@@ -286,21 +305,21 @@ const CapturaLead = () => {
 
           {/* Depoimentos */}
           <div className="captura-testimonials">
-            <h3 className="testimonials-title">O que nossos pacientes dizem</h3>
+            <h3 className="testimonials-title">O que nossos clientes dizem</h3>
             <div className="testimonials-grid">
               <div className="testimonial-card">
                 <div className="testimonial-stars">⭐⭐⭐⭐⭐</div>
                 <p className="testimonial-text">
-                  "Profissionais incríveis! Mudaram completamente meu sorriso e minha autoestima."
+                  "Encontrei meu apartamento dos sonhos em apenas 2 semanas! Atendimento excelente."
                 </p>
-                <div className="testimonial-author">- Maria Silva</div>
+                <div className="testimonial-author">- Ana Costa</div>
               </div>
               <div className="testimonial-card">
                 <div className="testimonial-stars">⭐⭐⭐⭐⭐</div>
                 <p className="testimonial-text">
-                  "Atendimento excepcional e resultados que superaram minhas expectativas."
+                  "Vendi minha casa pelo melhor preço do mercado. Recomendo a todos!"
                 </p>
-                <div className="testimonial-author">- João Santos</div>
+                <div className="testimonial-author">- Carlos Mendes</div>
               </div>
             </div>
           </div>

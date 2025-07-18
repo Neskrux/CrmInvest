@@ -9,14 +9,14 @@ import CapturaLead from './components/CapturaLead';
 import CapturaSucesso from './components/CapturaSucesso';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
-import Pacientes from './components/Pacientes';
+import Indicacoes from './components/Indicacoes';
 import Consultores from './components/Consultores';
-import Clinicas from './components/Clinicas';
+import Imobiliarias from './components/Imobiliarias';
 import Agendamentos from './components/Agendamentos';
 import Fechamentos from './components/Fechamentos';
 import logoBrasao from './images/logobrasao.png';
 import logoHorizontal from './images/logohorizontal.png';
-import logoHorizontalPreto from './images/logohorizontalpreto.png';
+import logoHorizontalAzul from './images/logohorinzontalazul.png';
 
 // Componente para proteger rotas
 const ProtectedRoute = ({ children }) => {
@@ -44,9 +44,9 @@ function AppContent() {
   // Determinar aba ativa baseada na rota atual
   const getActiveTab = () => {
     const path = location.pathname;
-    if (path.includes('/pacientes')) return 'pacientes';
+    if (path.includes('/indicacoes')) return 'indicacoes';
     if (path.includes('/consultores')) return 'consultores';
-    if (path.includes('/clinicas')) return 'clinicas';
+    if (path.includes('/imobiliarias')) return 'imobiliarias';
     if (path.includes('/agendamentos')) return 'agendamentos';
     if (path.includes('/fechamentos')) return 'fechamentos';
     return 'dashboard';
@@ -80,9 +80,9 @@ function AppContent() {
     return (
       <Routes>
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/pacientes" element={<Pacientes />} />
+        <Route path="/indicacoes" element={<Indicacoes />} />
         <Route path="/consultores" element={<Consultores />} />
-        <Route path="/clinicas" element={<Clinicas />} />
+        <Route path="/imobiliarias" element={<Imobiliarias />} />
         <Route path="/agendamentos" element={<Agendamentos />} />
         <Route path="/fechamentos" element={<Fechamentos />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -136,16 +136,13 @@ function AppContent() {
 
           <div className="nav-item">
             <Link
-              to="/pacientes"
-              className={`nav-link ${activeTab === 'pacientes' ? 'active' : ''}`}
+              to="/indicacoes"
+              className={`nav-link ${activeTab === 'indicacoes' ? 'active' : ''}`}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
               </svg>
-              Pacientes
+              Indicações
             </Link>
           </div>
 
@@ -160,7 +157,7 @@ function AppContent() {
                 <line x1="8" y1="2" x2="8" y2="6" />
                 <line x1="3" y1="10" x2="21" y2="10" />
               </svg>
-              Agendamentos
+              Visitas
             </Link>
           </div>
 
@@ -179,14 +176,14 @@ function AppContent() {
 
           <div className="nav-item">
             <Link
-              to="/clinicas"
-              className={`nav-link ${activeTab === 'clinicas' ? 'active' : ''}`}
+              to="/imobiliarias"
+              className={`nav-link ${activeTab === 'imobiliarias' ? 'active' : ''}`}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                 <polyline points="9 22 9 12 15 12 15 22" />
               </svg>
-              Clínicas
+              Empreendimentos
             </Link>
           </div>
 
@@ -200,7 +197,7 @@ function AppContent() {
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                   <circle cx="12" cy="7" r="4" />
                 </svg>
-                Consultores
+                Corretores
               </Link>
             </div>
           )}
@@ -211,9 +208,9 @@ function AppContent() {
             <div className="user-avatar">
               {getUserInitials()}
             </div>
-            <div className="user-details">
+                          <div className="user-details">
               <h3>{user.nome}</h3>
-              <p>{user.tipo === 'admin' ? 'Administrador' : 'Consultor'}</p>
+              <p>{user.tipo === 'admin' ? 'Administrador' : 'Corretor'}</p>
             </div>
           </div>
           <button
@@ -235,7 +232,7 @@ function AppContent() {
         <header className="main-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
             <img 
-              src={logoHorizontalPreto} 
+              src={logoHorizontalAzul} 
               alt="CRM System" 
               style={{ 
                 height: '32px', 
@@ -280,7 +277,7 @@ function AppContent() {
                   {user.nome}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                  {user.tipo === 'admin' ? 'Administrador' : 'Consultor'}
+                  {user.tipo === 'admin' ? 'Administrador' : 'Corretor'}
                 </div>
               </div>
             </div>

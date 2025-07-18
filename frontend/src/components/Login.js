@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import logoBrasaoPreto from '../images/logobrasaopreto.png';
+import logoBrasaoAzul from '../images/logobrasaoazul.png';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -45,7 +45,7 @@ const Login = () => {
       }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <img 
-            src={logoBrasaoPreto} 
+            src={logoBrasaoAzul} 
             alt="CRM System" 
             style={{ 
               width: '80px', 

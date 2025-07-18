@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import logoBrasaoPreto from '../images/logobrasaopreto.png';
+import logoBrasaoAzul from '../images/logobrasaoazul.png';
 
 const CadastroSucesso = () => {
   const navigate = useNavigate();
@@ -24,7 +24,7 @@ const CadastroSucesso = () => {
         textAlign: 'center'
       }}>
         <img 
-          src={logoBrasaoPreto} 
+                      src={logoBrasaoAzul} 
           alt="CRM System" 
           style={{ 
             width: '80px', 

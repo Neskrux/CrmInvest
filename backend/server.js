@@ -185,15 +185,14 @@ const initializeTables = async () => {
   console.log('✅ Para configurar o banco, execute as migrações em backend/migrations/');
   console.log('📁 Use o arquivo: backend/migrations/run_migrations.sql');
   console.log(`
--- Tabela de clínicas (atualizada)
-CREATE TABLE IF NOT EXISTS clinicas (
+-- Tabela de imobiliárias (atualizada)
+CREATE TABLE IF NOT EXISTS imobiliarias (
   id SERIAL PRIMARY KEY,
   nome TEXT NOT NULL,
   endereco TEXT,
   bairro TEXT,
   cidade TEXT,
   estado VARCHAR(2),
-  nicho TEXT DEFAULT 'Ambos',
   telefone TEXT,
   email TEXT,
   status TEXT DEFAULT 'ativo',
@@ -208,13 +207,13 @@ CREATE TABLE IF NOT EXISTS consultores (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Tabela de pacientes/leads
-CREATE TABLE IF NOT EXISTS pacientes (
+-- Tabela de clientes/leads
+CREATE TABLE IF NOT EXISTS clientes (
   id SERIAL PRIMARY KEY,
   nome TEXT NOT NULL,
   telefone TEXT,
   cpf TEXT,
-  tipo_tratamento TEXT,
+  tipo_servico TEXT,
   status TEXT DEFAULT 'lead',
   observacoes TEXT,
   created_at TIMESTAMP DEFAULT NOW()
@@ -223,9 +222,9 @@ CREATE TABLE IF NOT EXISTS pacientes (
 -- Tabela de agendamentos
 CREATE TABLE IF NOT EXISTS agendamentos (
   id SERIAL PRIMARY KEY,
-  paciente_id INTEGER REFERENCES pacientes(id),
+  cliente_id INTEGER REFERENCES clientes(id),
   consultor_id INTEGER REFERENCES consultores(id),
-  clinica_id INTEGER REFERENCES clinicas(id),
+  imobiliaria_id INTEGER REFERENCES imobiliarias(id),
   data_agendamento DATE,
   horario TIME,
   status TEXT DEFAULT 'agendado',
@@ -237,13 +236,13 @@ CREATE TABLE IF NOT EXISTS agendamentos (
 -- Tabela de fechamentos
 CREATE TABLE IF NOT EXISTS fechamentos (
   id SERIAL PRIMARY KEY,
-  paciente_id INTEGER REFERENCES pacientes(id) ON DELETE CASCADE,
+  cliente_id INTEGER REFERENCES clientes(id) ON DELETE CASCADE,
   consultor_id INTEGER REFERENCES consultores(id) ON DELETE SET NULL,
-  clinica_id INTEGER REFERENCES clinicas(id) ON DELETE SET NULL,
+  imobiliaria_id INTEGER REFERENCES imobiliarias(id) ON DELETE SET NULL,
   agendamento_id INTEGER REFERENCES agendamentos(id) ON DELETE SET NULL,
   valor_fechado DECIMAL(10,2) NOT NULL,
   data_fechamento DATE NOT NULL DEFAULT CURRENT_DATE,
-  tipo_tratamento TEXT,
+  tipo_servico TEXT,
   forma_pagamento TEXT,
   observacoes TEXT,
   created_at TIMESTAMP DEFAULT NOW()
@@ -410,13 +409,13 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
 
 // ROTAS DA API
 
-// === CLÍNICAS === (Apenas Admin)
-app.get('/api/clinicas', authenticateToken, async (req, res) => {
+// === IMOBILIÁRIAS === (Apenas Admin)
+app.get('/api/imobiliarias', authenticateToken, async (req, res) => {
   try {
     const { cidade, estado } = req.query;
     
     let query = supabase
-      .from('clinicas')
+      .from('imobiliarias')
       .select('*')
       .order('nome');
 
@@ -439,12 +438,12 @@ app.get('/api/clinicas', authenticateToken, async (req, res) => {
   }
 });
 
-app.get('/api/clinicas/cidades', authenticateToken, async (req, res) => {
+app.get('/api/imobiliarias/cidades', authenticateToken, async (req, res) => {
   try {
     const { estado } = req.query;
     
     let query = supabase
-      .from('clinicas')
+      .from('imobiliarias')
       .select('cidade')
       .not('cidade', 'is', null)
       .not('cidade', 'eq', '');
@@ -466,10 +465,10 @@ app.get('/api/clinicas/cidades', authenticateToken, async (req, res) => {
   }
 });
 
-app.get('/api/clinicas/estados', authenticateToken, async (req, res) => {
+app.get('/api/imobiliarias/estados', authenticateToken, async (req, res) => {
   try {
     const { data, error } = await supabase
-      .from('clinicas')
+      .from('imobiliarias')
       .select('estado')
       .not('estado', 'is', null)
       .not('estado', 'eq', '');
@@ -484,19 +483,18 @@ app.get('/api/clinicas/estados', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/clinicas', authenticateToken, requireAdmin, async (req, res) => {
+app.post('/api/imobiliarias', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { nome, endereco, bairro, cidade, estado, nicho, telefone, email, status } = req.body;
+    const { nome, endereco, bairro, cidade, estado, telefone, email, status } = req.body;
     
     const { data, error } = await supabase
-      .from('clinicas')
+      .from('imobiliarias')
       .insert([{ 
         nome, 
         endereco, 
         bairro, 
         cidade, 
         estado, 
-        nicho, 
         telefone, 
         email, 
         status: status || 'ativo' // Padrão: desbloqueado
@@ -504,22 +502,22 @@ app.post('/api/clinicas', authenticateToken, requireAdmin, async (req, res) => {
       .select();
 
     if (error) throw error;
-    res.json({ id: data[0].id, message: 'Clínica cadastrada com sucesso!' });
+    res.json({ id: data[0].id, message: 'Imobiliária cadastrada com sucesso!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.put('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.put('/api/imobiliarias/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    console.log('🔧 PUT /api/clinicas/:id recebido');
-    console.log('🔧 ID da clínica:', id);
+    console.log('🔧 PUT /api/imobiliarias/:id recebido');
+    console.log('🔧 ID da imobiliária:', id);
     console.log('🔧 Body recebido:', req.body);
     console.log('🔧 Usuário autenticado:', req.user);
     
     // Permitir atualização parcial: só atualiza os campos enviados
-    const camposPermitidos = ['nome', 'endereco', 'bairro', 'cidade', 'estado', 'nicho', 'telefone', 'email', 'status'];
+    const camposPermitidos = ['nome', 'endereco', 'bairro', 'cidade', 'estado', 'telefone', 'email', 'status'];
     const updateData = {};
     for (const campo of camposPermitidos) {
       if (req.body[campo] !== undefined) {
@@ -532,7 +530,7 @@ app.put('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) =
     console.log('🔧 Dados para atualizar:', updateData);
     
     const { data, error } = await supabase
-      .from('clinicas')
+      .from('imobiliarias')
       .update(updateData)
       .eq('id', id)
       .select();
@@ -551,8 +549,8 @@ app.put('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) =
       return res.status(403).json({ error: 'Nenhuma linha atualizada! Verifique as policies do Supabase.' });
     }
     
-    console.log('✅ Clínica atualizada com sucesso:', data[0]);
-    res.json({ id: data[0].id, message: 'Clínica atualizada com sucesso!' });
+    console.log('✅ Imobiliária atualizada com sucesso:', data[0]);
+    res.json({ id: data[0].id, message: 'Imobiliária atualizada com sucesso!' });
   } catch (error) {
     console.error('❌ Erro geral:', error);
     res.status(500).json({ error: error.message });
@@ -700,10 +698,10 @@ app.post('/api/consultores/cadastro', async (req, res) => {
   }
 });
 
-// === CADASTRO PÚBLICO DE PACIENTES/LEADS === (Sem autenticação)
+// === CADASTRO PÚBLICO DE CLIENTES/LEADS === (Sem autenticação)
 app.post('/api/leads/cadastro', async (req, res) => {
   try {
-    const { nome, telefone, tipo_tratamento, cpf, observacoes } = req.body;
+    const { nome, telefone, tipo_servico, cpf, observacoes } = req.body;
     
     // Validar campos obrigatórios
     if (!nome || !telefone || !cpf) {
@@ -727,14 +725,14 @@ app.post('/api/leads/cadastro', async (req, res) => {
       return res.status(400).json({ error: 'CPF deve ter 11 dígitos!' });
     }
     
-    // Inserir lead/paciente
+    // Inserir lead/cliente
     const { data, error } = await supabase
-      .from('pacientes')
+      .from('clientes')
       .insert([{ 
         nome: nome.trim(), 
         telefone: telefone.trim(), 
         cpf: cpfNumeros,
-        tipo_tratamento: tipo_tratamento || null,
+        tipo_servico: tipo_servico || null,
         status: 'lead', 
         observacoes: observacoes || null,
         consultor_id: null // Lead público não tem consultor inicial
@@ -826,34 +824,34 @@ app.get('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res
   }
 });
 
-// === PACIENTES === (Admin vê todos, Consultor vê apenas os seus)
-app.get('/api/pacientes', authenticateToken, async (req, res) => {
+// === CLIENTES === (Admin vê todos, Consultor vê apenas os seus)
+app.get('/api/clientes', authenticateToken, async (req, res) => {
   try {
     let query = supabase
-      .from('pacientes')
+      .from('clientes')
       .select(`
         *,
         consultores(nome)
       `)
       .order('created_at', { ascending: false });
 
-    // Se for consultor, filtrar pacientes atribuídos a ele OU vinculados através de agendamentos
+    // Se for consultor, filtrar clientes atribuídos a ele OU vinculados através de agendamentos
     if (req.user.tipo === 'consultor') {
-      // Buscar pacientes com agendamentos deste consultor
+      // Buscar clientes com agendamentos deste consultor
       const { data: agendamentos, error: agendError } = await supabase
         .from('agendamentos')
-        .select('paciente_id')
+        .select('cliente_id')
         .eq('consultor_id', req.user.consultor_id);
 
       if (agendError) throw agendError;
 
-      const pacienteIds = agendamentos.map(a => a.paciente_id);
+      const clienteIds = agendamentos.map(a => a.cliente_id);
       
-      // Combinar: pacientes atribuídos diretamente OU com agendamentos
+      // Combinar: clientes atribuídos diretamente OU com agendamentos
       const conditions = [`consultor_id.eq.${req.user.consultor_id}`];
       
-      if (pacienteIds.length > 0) {
-        conditions.push(`id.in.(${pacienteIds.join(',')})`);
+      if (clienteIds.length > 0) {
+        conditions.push(`id.in.(${clienteIds.join(',')})`);
       }
       
       // Aplicar filtro OR
@@ -865,9 +863,9 @@ app.get('/api/pacientes', authenticateToken, async (req, res) => {
     if (error) throw error;
     
     // Reformatar dados para compatibilidade com frontend
-    const formattedData = data.map(paciente => ({
-      ...paciente,
-      consultor_nome: paciente.consultores?.nome
+    const formattedData = data.map(cliente => ({
+      ...cliente,
+      consultor_nome: cliente.consultores?.nome
     }));
 
     res.json(formattedData);
@@ -876,20 +874,20 @@ app.get('/api/pacientes', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/pacientes', authenticateToken, async (req, res) => {
+app.post('/api/clientes', authenticateToken, async (req, res) => {
   try {
-    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id } = req.body;
+    const { nome, telefone, cpf, tipo_servico, status, observacoes, consultor_id } = req.body;
     
     // Converter consultor_id para null se não fornecido
     const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
     
     const { data, error } = await supabase
-      .from('pacientes')
+      .from('clientes')
       .insert([{ 
         nome, 
         telefone, 
         cpf, 
-        tipo_tratamento, 
+        tipo_servico, 
         status: status || 'lead', 
         observacoes,
         consultor_id: consultorId
@@ -897,27 +895,27 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
       .select();
 
     if (error) throw error;
-    res.json({ id: data[0].id, message: 'Paciente cadastrado com sucesso!' });
+    res.json({ id: data[0].id, message: 'Cliente cadastrado com sucesso!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
+app.put('/api/clientes/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id } = req.body;
+    const { nome, telefone, cpf, tipo_servico, status, observacoes, consultor_id } = req.body;
     
     // Converter consultor_id para null se não fornecido
     const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
     
     const { data, error } = await supabase
-      .from('pacientes')
+      .from('clientes')
       .update({ 
         nome, 
         telefone, 
         cpf, 
-        tipo_tratamento, 
+        tipo_servico, 
         status, 
         observacoes,
         consultor_id: consultorId
@@ -926,19 +924,19 @@ app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
       .select();
 
     if (error) throw error;
-    res.json({ id: data[0].id, message: 'Paciente atualizado com sucesso!' });
+    res.json({ id: data[0].id, message: 'Cliente atualizado com sucesso!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.put('/api/pacientes/:id/status', authenticateToken, async (req, res) => {
+app.put('/api/clientes/:id/status', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
     
     const { error } = await supabase
-      .from('pacientes')
+      .from('clientes')
       .update({ status })
       .eq('id', id);
 
@@ -953,7 +951,7 @@ app.put('/api/pacientes/:id/status', authenticateToken, async (req, res) => {
 app.get('/api/novos-leads', authenticateToken, async (req, res) => {
   try {
     const { data, error } = await supabase
-      .from('pacientes')
+      .from('clientes')
       .select('*')
       .is('consultor_id', null)
       .order('created_at', { ascending: false });
@@ -970,21 +968,21 @@ app.put('/api/novos-leads/:id/pegar', authenticateToken, async (req, res) => {
     const { id } = req.params;
     
     // Verificar se o lead ainda está disponível
-    const { data: pacienteAtual, error: checkError } = await supabase
-      .from('pacientes')
+    const { data: clienteAtual, error: checkError } = await supabase
+      .from('clientes')
       .select('consultor_id')
       .eq('id', id)
       .single();
 
     if (checkError) throw checkError;
 
-    if (pacienteAtual.consultor_id !== null) {
+    if (clienteAtual.consultor_id !== null) {
       return res.status(400).json({ error: 'Este lead já foi atribuído a outro consultor!' });
     }
 
     // Atribuir o lead ao consultor atual
     const { error } = await supabase
-      .from('pacientes')
+      .from('clientes')
       .update({ consultor_id: req.user.consultor_id })
       .eq('id', id);
 
@@ -1002,9 +1000,9 @@ app.get('/api/agendamentos', authenticateToken, async (req, res) => {
       .from('agendamentos')
       .select(`
         *,
-        pacientes(nome, telefone),
+        clientes(nome, telefone),
         consultores(nome),
-        clinicas(nome)
+        imobiliarias(nome)
       `)
       .order('data_agendamento', { ascending: false })
       .order('horario');
@@ -1021,10 +1019,10 @@ app.get('/api/agendamentos', authenticateToken, async (req, res) => {
     // Reformatar dados para compatibilidade com frontend
     const formattedData = data.map(agendamento => ({
       ...agendamento,
-      paciente_nome: agendamento.pacientes?.nome,
-      paciente_telefone: agendamento.pacientes?.telefone,
+      cliente_nome: agendamento.clientes?.nome,
+      cliente_telefone: agendamento.clientes?.telefone,
       consultor_nome: agendamento.consultores?.nome,
-      clinica_nome: agendamento.clinicas?.nome
+      imobiliaria_nome: agendamento.imobiliarias?.nome
     }));
 
     res.json(formattedData);
@@ -1035,21 +1033,21 @@ app.get('/api/agendamentos', authenticateToken, async (req, res) => {
 
 app.post('/api/agendamentos', authenticateToken, async (req, res) => {
   try {
-    const { paciente_id, consultor_id, clinica_id, data_agendamento, horario, observacoes } = req.body;
+    const { cliente_id, consultor_id, imobiliaria_id, data_agendamento, horario, observacoes } = req.body;
     
     const { data, error } = await supabase
       .from('agendamentos')
-      .insert([{ paciente_id, consultor_id, clinica_id, data_agendamento, horario, observacoes }])
+      .insert([{ cliente_id, consultor_id, imobiliaria_id, data_agendamento, horario, observacoes }])
       .select();
 
     if (error) throw error;
 
-    // Atualizar status do paciente para "agendado"
-    if (paciente_id) {
+    // Atualizar status do cliente para "agendado"
+    if (cliente_id) {
       await supabase
-        .from('pacientes')
+        .from('clientes')
         .update({ status: 'agendado' })
-        .eq('id', paciente_id);
+        .eq('id', cliente_id);
     }
 
     res.json({ id: data[0].id, message: 'Agendamento criado com sucesso!' });
@@ -1061,22 +1059,22 @@ app.post('/api/agendamentos', authenticateToken, async (req, res) => {
 app.put('/api/agendamentos/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { paciente_id, consultor_id, clinica_id, data_agendamento, horario, status, observacoes } = req.body;
+    const { cliente_id, consultor_id, imobiliaria_id, data_agendamento, horario, status, observacoes } = req.body;
     
     const { data, error } = await supabase
       .from('agendamentos')
-      .update({ paciente_id, consultor_id, clinica_id, data_agendamento, horario, status, observacoes })
+      .update({ cliente_id, consultor_id, imobiliaria_id, data_agendamento, horario, status, observacoes })
       .eq('id', id)
       .select();
 
     if (error) throw error;
 
-    // Se mudou o paciente do agendamento, atualizar status do novo paciente
-    if (paciente_id) {
+    // Se mudou o cliente do agendamento, atualizar status do novo cliente
+    if (cliente_id) {
       await supabase
-        .from('pacientes')
+        .from('clientes')
         .update({ status: 'agendado' })
-        .eq('id', paciente_id);
+        .eq('id', cliente_id);
     }
 
     res.json({ id: data[0].id, message: 'Agendamento atualizado com sucesso!' });
@@ -1112,7 +1110,7 @@ app.put('/api/agendamentos/:id/lembrado', authenticateToken, async (req, res) =>
       .eq('id', id);
 
     if (error) throw error;
-    res.json({ message: 'Paciente marcado como lembrado!' });
+    res.json({ message: 'Cliente marcado como lembrado!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1142,9 +1140,9 @@ app.get('/api/fechamentos', authenticateToken, async (req, res) => {
       .from('fechamentos')
       .select(`
         *,
-        pacientes(nome, telefone, cpf),
+        clientes(nome, telefone, cpf),
         consultores(nome),
-        clinicas(nome)
+        imobiliarias(nome)
       `)
       .order('data_fechamento', { ascending: false })
       .order('created_at', { ascending: false });
@@ -1161,11 +1159,11 @@ app.get('/api/fechamentos', authenticateToken, async (req, res) => {
     // Reformatar dados para compatibilidade com frontend
     const formattedData = data.map(fechamento => ({
       ...fechamento,
-      paciente_nome: fechamento.pacientes?.nome,
-      paciente_telefone: fechamento.pacientes?.telefone,
-      paciente_cpf: fechamento.pacientes?.cpf,
+      cliente_nome: fechamento.clientes?.nome,
+      cliente_telefone: fechamento.clientes?.telefone,
+      cliente_cpf: fechamento.clientes?.cpf,
       consultor_nome: fechamento.consultores?.nome,
-      clinica_nome: fechamento.clinicas?.nome
+      imobiliaria_nome: fechamento.imobiliarias?.nome
     }));
 
     res.json(formattedData);
@@ -1177,12 +1175,12 @@ app.get('/api/fechamentos', authenticateToken, async (req, res) => {
 app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), async (req, res) => {
   try {
     const { 
-      paciente_id, 
+      cliente_id, 
       consultor_id, 
-      clinica_id, 
+      imobiliaria_id, 
       valor_fechado, 
       data_fechamento, 
-      tipo_tratamento,
+      tipo_servico,
       observacoes 
     } = req.body;
 
@@ -1193,7 +1191,7 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
 
     // Converter campos opcionais para null se não enviados ou vazios
     const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
-    const clinicaId = clinica_id && String(clinica_id).trim() !== '' ? parseInt(clinica_id) : null;
+    const imobiliariaId = imobiliaria_id && String(imobiliaria_id).trim() !== '' ? parseInt(imobiliaria_id) : null;
 
     // Dados do contrato (se houver arquivo)
     let contratoArquivo = null;
@@ -1219,12 +1217,12 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
     const { data, error } = await supabase
       .from('fechamentos')
       .insert([{ 
-        paciente_id: parseInt(paciente_id), 
+        cliente_id: parseInt(cliente_id), 
         consultor_id: consultorId, 
-        clinica_id: clinicaId, 
+        imobiliaria_id: imobiliariaId, 
         valor_fechado: parseFloat(valor_fechado), 
         data_fechamento, 
-        tipo_tratamento: tipo_tratamento || null,
+        tipo_servico: tipo_servico || null,
         observacoes: observacoes || null,
         contrato_arquivo: contratoArquivo,
         contrato_nome_original: contratoNomeOriginal,
@@ -1243,12 +1241,12 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
       throw error;
     }
 
-    // Atualizar status do paciente para "fechado"
-    if (paciente_id) {
+    // Atualizar status do cliente para "fechado"
+    if (cliente_id) {
       await supabase
-        .from('pacientes')
+        .from('clientes')
         .update({ status: 'fechado' })
-        .eq('id', paciente_id);
+        .eq('id', cliente_id);
     }
 
 
@@ -1268,28 +1266,28 @@ app.put('/api/fechamentos/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { 
-      paciente_id, 
+      cliente_id, 
       consultor_id, 
-      clinica_id, 
+      imobiliaria_id, 
       valor_fechado, 
       data_fechamento, 
-      tipo_tratamento,
+      tipo_servico,
       observacoes 
     } = req.body;
 
     // Converter campos opcionais para null se não enviados ou vazios
     const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
-    const clinicaId = clinica_id && String(clinica_id).trim() !== '' ? parseInt(clinica_id) : null;
+    const imobiliariaId = imobiliaria_id && String(imobiliaria_id).trim() !== '' ? parseInt(imobiliaria_id) : null;
     
     const { data, error } = await supabase
       .from('fechamentos')
       .update({ 
-        paciente_id: parseInt(paciente_id), 
+        cliente_id: parseInt(cliente_id), 
         consultor_id: consultorId, 
-        clinica_id: clinicaId, 
+        imobiliaria_id: imobiliariaId, 
         valor_fechado: parseFloat(valor_fechado), 
         data_fechamento, 
-        tipo_tratamento: tipo_tratamento || null,
+        tipo_servico: tipo_servico || null,
         observacoes: observacoes || null 
       })
       .eq('id', id)
@@ -1491,30 +1489,30 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
     const { data: lembradosHoje, error: error2 } = await lembradosQuery;
     if (error2) throw error2;
 
-    // Buscar total de pacientes
-    let pacientesQuery = supabase
-      .from('pacientes')
+    // Buscar total de clientes
+    let clientesQuery = supabase
+      .from('clientes')
       .select('*', { count: 'exact', head: true });
 
-    // Para consultor, contar apenas pacientes com agendamentos dele
+    // Para consultor, contar apenas clientes com agendamentos dele
     if (isConsultor) {
       const { data: agendamentos, error: agendError } = await supabase
         .from('agendamentos')
-        .select('paciente_id')
+        .select('cliente_id')
         .eq('consultor_id', consultorId);
 
       if (agendError) throw agendError;
 
-      const pacienteIds = [...new Set(agendamentos.map(a => a.paciente_id))];
+      const clienteIds = [...new Set(agendamentos.map(a => a.cliente_id))];
       
-      if (pacienteIds.length > 0) {
-        pacientesQuery = pacientesQuery.in('id', pacienteIds);
+      if (clienteIds.length > 0) {
+        clientesQuery = clientesQuery.in('id', clienteIds);
       } else {
-        pacientesQuery = pacientesQuery.eq('id', 0); // Força resultado vazio
+        clientesQuery = clientesQuery.eq('id', 0); // Força resultado vazio
       }
     }
 
-    const { count: totalPacientes, error: error3 } = await pacientesQuery;
+    const { count: totalClientes, error: error3 } = await clientesQuery;
     if (error3) throw error3;
 
     // Buscar fechamentos
@@ -1615,7 +1613,7 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
     res.json({
       agendamentosHoje: agendamentosHoje.length,
       lembradosHoje: lembradosHoje.length,
-      totalPacientes,
+      totalClientes,
       fechamentosHoje,
       fechamentosMes: fechamentosMes.length,
       valorTotalMes,
@@ -1636,7 +1634,7 @@ app.listen(PORT, async () => {
   
   // Verificar conexão com Supabase
   try {
-    const { data, error } = await supabase.from('clinicas').select('count').limit(1);
+    const { data, error } = await supabase.from('imobiliarias').select('count').limit(1);
     if (error) {
       console.log('⚠️  Configure as variáveis SUPABASE_URL e SUPABASE_SERVICE_KEY no arquivo .env');
       console.log('📖 Consulte o README.md para instruções detalhadas');

@@ -4,9 +4,9 @@ import { useAuth } from '../contexts/AuthContext';
 const Fechamentos = () => {
   const { makeRequest, isAdmin } = useAuth();
   const [fechamentos, setFechamentos] = useState([]);
-  const [pacientes, setPacientes] = useState([]);
+  const [clientes, setClientes] = useState([]);
   const [consultores, setConsultores] = useState([]);
-  const [clinicas, setClinicas] = useState([]);
+  const [imobiliarias, setClinicas] = useState([]);
   const [agendamentos, setAgendamentos] = useState([]);
   const [erro, setErro] = useState(null);
   const [carregando, setCarregando] = useState(true);
@@ -16,14 +16,15 @@ const Fechamentos = () => {
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
   const [fechamentoEditando, setFechamentoEditando] = useState(null);
+  const [ordenacao, setOrdenacao] = useState('data-desc'); // Novo estado para ordenação
   const [novoFechamento, setNovoFechamento] = useState({
-    paciente_id: '',
+    cliente_id: '',
     consultor_id: '',
-    clinica_id: '',
+    imobiliaria_id: '',
     valor_fechado: '',
     valor_formatado: '',
     data_fechamento: new Date().toISOString().split('T')[0],
-    tipo_tratamento: '',
+    tipo_servico: '',
     observacoes: ''
   });
   const [contratoSelecionado, setContratoSelecionado] = useState(null);
@@ -38,11 +39,11 @@ const Fechamentos = () => {
       setCarregando(true);
       setErro(null);
       
-      const [fechamentosRes, pacientesRes, consultoresRes, clinicasRes, agendamentosRes] = await Promise.all([
+      const [fechamentosRes, clientesRes, consultoresRes, imobiliariasRes, agendamentosRes] = await Promise.all([
         makeRequest('/fechamentos'),
-        makeRequest('/pacientes'),
+        makeRequest('/clientes'),
         makeRequest('/consultores'),
-        makeRequest('/clinicas'),
+        makeRequest('/imobiliarias'),
         makeRequest('/agendamentos')
       ]);
 
@@ -51,15 +52,15 @@ const Fechamentos = () => {
       }
 
       const fechamentosData = await fechamentosRes.json();
-      const pacientesData = await pacientesRes.json();
+      const clientesData = await clientesRes.json();
       const consultoresData = await consultoresRes.json();
-      const clinicasData = await clinicasRes.json();
+      const imobiliariasData = await imobiliariasRes.json();
       const agendamentosData = await agendamentosRes.json();
 
       setFechamentos(Array.isArray(fechamentosData) ? fechamentosData : []);
-      setPacientes(Array.isArray(pacientesData) ? pacientesData : []);
+      setClientes(Array.isArray(clientesData) ? clientesData : []);
       setConsultores(Array.isArray(consultoresData) ? consultoresData : []);
-      setClinicas(Array.isArray(clinicasData) ? clinicasData : []);
+      setClinicas(Array.isArray(imobiliariasData) ? imobiliariasData : []);
       setAgendamentos(Array.isArray(agendamentosData) ? agendamentosData : []);
       
       setCarregando(false);
@@ -69,7 +70,7 @@ const Fechamentos = () => {
       setCarregando(false);
       
       setFechamentos([]);
-      setPacientes([]);
+      setClientes([]);
       setConsultores([]);
       setClinicas([]);
       setAgendamentos([]);
@@ -82,7 +83,7 @@ const Fechamentos = () => {
     }
     return fechamentos.filter(fechamento => {
       const consultorMatch = !filtroConsultor || fechamento.consultor_id === parseInt(filtroConsultor);
-      const clinicaMatch = !filtroClinica || fechamento.clinica_id === parseInt(filtroClinica);
+      const imobiliariaMatch = !filtroClinica || fechamento.imobiliaria_id === parseInt(filtroClinica);
       
       let mesMatch = true;
       if (filtroMes) {
@@ -92,8 +93,31 @@ const Fechamentos = () => {
                    dataFechamento.getMonth() === parseInt(mes) - 1;
       }
 
-      return consultorMatch && clinicaMatch && mesMatch;
+      return consultorMatch && imobiliariaMatch && mesMatch;
     });
+  };
+
+  const ordenarFechamentos = (fechamentosFiltrados) => {
+    const fechamentosOrdenados = [...fechamentosFiltrados];
+    
+    switch (ordenacao) {
+      case 'credito-desc':
+        return fechamentosOrdenados.sort((a, b) => parseFloat(b.valor_fechado || 0) - parseFloat(a.valor_fechado || 0));
+      case 'credito-asc':
+        return fechamentosOrdenados.sort((a, b) => parseFloat(a.valor_fechado || 0) - parseFloat(b.valor_fechado || 0));
+      case 'data-desc':
+        return fechamentosOrdenados.sort((a, b) => new Date(b.data_fechamento) - new Date(a.data_fechamento));
+      case 'data-asc':
+        return fechamentosOrdenados.sort((a, b) => new Date(a.data_fechamento) - new Date(b.data_fechamento));
+      case 'cliente':
+        return fechamentosOrdenados.sort((a, b) => {
+          const clienteA = clientes.find(c => c.id === a.cliente_id)?.nome || '';
+          const clienteB = clientes.find(c => c.id === b.cliente_id)?.nome || '';
+          return clienteA.localeCompare(clienteB);
+        });
+      default:
+        return fechamentosOrdenados;
+    }
   };
 
   const calcularEstatisticas = () => {
@@ -149,13 +173,13 @@ const Fechamentos = () => {
     } else {
       setFechamentoEditando(null);
       setNovoFechamento({
-        paciente_id: '',
+        cliente_id: '',
         consultor_id: '',
-        clinica_id: '',
+        imobiliaria_id: '',
         valor_fechado: '',
         valor_formatado: '',
         data_fechamento: new Date().toISOString().split('T')[0],
-        tipo_tratamento: '',
+        tipo_servico: '',
         observacoes: ''
       });
     }
@@ -167,13 +191,13 @@ const Fechamentos = () => {
     setFechamentoEditando(null);
     setContratoSelecionado(null);
     setNovoFechamento({
-      paciente_id: '',
+      cliente_id: '',
       consultor_id: '',
-      clinica_id: '',
+      imobiliaria_id: '',
       valor_fechado: '',
       valor_formatado: '',
       data_fechamento: new Date().toISOString().split('T')[0],
-      tipo_tratamento: '',
+      tipo_servico: '',
       observacoes: ''
     });
   };
@@ -188,8 +212,8 @@ const Fechamentos = () => {
         return;
       }
 
-      if (!novoFechamento.paciente_id) {
-        alert('Por favor, selecione um paciente!');
+      if (!novoFechamento.cliente_id) {
+        alert('Por favor, selecione um cliente!');
         return;
       }
       
@@ -215,19 +239,19 @@ const Fechamentos = () => {
 
       const formData = new FormData();
       
-      formData.append('paciente_id', parseInt(novoFechamento.paciente_id));
+      formData.append('cliente_id', parseInt(novoFechamento.cliente_id));
       
       if (novoFechamento.consultor_id && novoFechamento.consultor_id.trim() !== '') {
         formData.append('consultor_id', parseInt(novoFechamento.consultor_id));
       }
       
-      if (novoFechamento.clinica_id && novoFechamento.clinica_id.trim() !== '') {
-        formData.append('clinica_id', parseInt(novoFechamento.clinica_id));
+      if (novoFechamento.imobiliaria_id && novoFechamento.imobiliaria_id.trim() !== '') {
+        formData.append('imobiliaria_id', parseInt(novoFechamento.imobiliaria_id));
       }
       
       formData.append('valor_fechado', parseFloat(novoFechamento.valor_fechado));
       formData.append('data_fechamento', novoFechamento.data_fechamento);
-      formData.append('tipo_tratamento', novoFechamento.tipo_tratamento || '');
+      formData.append('tipo_servico', novoFechamento.tipo_servico || '');
       formData.append('observacoes', novoFechamento.observacoes || '');
       
       if (contratoSelecionado) {
@@ -357,31 +381,20 @@ const Fechamentos = () => {
     });
   };
 
-  const handlePacienteChange = async (pacienteId) => {
-    setNovoFechamento({...novoFechamento, paciente_id: pacienteId});
+  const handleClienteChange = async (clienteId) => {
+    setNovoFechamento({...novoFechamento, cliente_id: clienteId});
     
-    if (pacienteId) {
-      // Buscar o paciente selecionado
-      const paciente = pacientes.find(p => p.id === parseInt(pacienteId));
-      
-      if (paciente && paciente.consultor_id) {
-        // Se o paciente tem consultor, selecionar automaticamente
-        setNovoFechamento(prev => ({
-          ...prev,
-          paciente_id: pacienteId,
-          consultor_id: paciente.consultor_id.toString()
-        }));
-      }
-      
-      // Buscar último agendamento do paciente para pegar a clínica
+    if (clienteId) {
+      // Buscar última visita do cliente para pegar a imobiliária
       const ultimoAgendamento = agendamentos
-        .filter(a => a.paciente_id === parseInt(pacienteId))
+        .filter(a => a.cliente_id === parseInt(clienteId))
         .sort((a, b) => new Date(b.data_agendamento) - new Date(a.data_agendamento))[0];
       
-      if (ultimoAgendamento && ultimoAgendamento.clinica_id) {
+      if (ultimoAgendamento && ultimoAgendamento.imobiliaria_id) {
         setNovoFechamento(prev => ({
           ...prev,
-          clinica_id: ultimoAgendamento.clinica_id.toString()
+          cliente_id: clienteId,
+          imobiliaria_id: ultimoAgendamento.imobiliaria_id.toString()
         }));
       }
     }
@@ -447,7 +460,7 @@ const Fechamentos = () => {
     );
   }
 
-  const fechamentosFiltrados = filtrarFechamentos();
+  const fechamentosFiltrados = ordenarFechamentos(filtrarFechamentos());
   const stats = calcularEstatisticas();
   const filtrosAtivos = contarFiltrosAtivos();
 
@@ -461,12 +474,12 @@ const Fechamentos = () => {
       {/* KPIs */}
       <div className="stats-grid" style={{ marginBottom: '2rem' }}>
         <div className="stat-card">
-          <div className="stat-label">Total de Fechamentos</div>
+          <div className="stat-label">Total de Indicações</div>
           <div className="stat-value">{stats.total}</div>
         </div>
         
         <div className="stat-card">
-          <div className="stat-label">Valor Total</div>
+          <div className="stat-label">Crédito Acumulado</div>
           <div className="stat-value">{formatarMoeda(stats.valorTotal)}</div>
         </div>
         
@@ -476,12 +489,12 @@ const Fechamentos = () => {
         </div>
         
         <div className="stat-card">
-          <div className="stat-label">Fechamentos Hoje</div>
+          <div className="stat-label">Indicações Hoje</div>
           <div className="stat-value">{stats.fechamentosHoje}</div>
         </div>
         
         <div className="stat-card">
-          <div className="stat-label">Fechamentos no Mês</div>
+          <div className="stat-label">Indicações no Mês</div>
           <div className="stat-value">{stats.fechamentosMes}</div>
         </div>
       </div>
@@ -489,7 +502,18 @@ const Fechamentos = () => {
       {/* Filtros e Ações */}
       <div className="card">
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 className="card-title">Lista de Fechamentos</h2>
+          <div>
+            <h2 className="card-title">Lista de Fechamentos</h2>
+            <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+              Classificado por: {
+                ordenacao === 'data-desc' ? 'Data (Mais recente)' :
+                ordenacao === 'data-asc' ? 'Data (Mais antigo)' :
+                ordenacao === 'credito-desc' ? 'Crédito Acumulado (Maior)' :
+                ordenacao === 'credito-asc' ? 'Crédito Acumulado (Menor)' :
+                ordenacao === 'cliente' ? 'Cliente (A-Z)' : 'Padrão'
+              }
+            </div>
+          </div>
           <div style={{ display: 'flex', gap: '1rem' }}>
             <button 
               className="btn btn-secondary"
@@ -517,9 +541,9 @@ const Fechamentos = () => {
             backgroundColor: '#f9fafb',
             borderBottom: '1px solid #e5e7eb'
           }}>
-            <div className="grid grid-3" style={{ gap: '1rem', marginBottom: '1rem' }}>
+            <div className="grid grid-4" style={{ gap: '1rem', marginBottom: '1rem' }}>
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Consultor</label>
+                <label className="form-label">Corretor</label>
                 <select 
                   className="form-select"
                   value={filtroConsultor} 
@@ -533,14 +557,14 @@ const Fechamentos = () => {
               </div>
 
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Clínica</label>
+                <label className="form-label">Imobiliária</label>
                 <select 
                   className="form-select"
                   value={filtroClinica} 
                   onChange={(e) => setFiltroClinica(e.target.value)}
                 >
                   <option value="">Todas</option>
-                  {clinicas.map(c => (
+                  {imobiliarias.map(c => (
                     <option key={c.id} value={c.id}>{c.nome}</option>
                   ))}
                 </select>
@@ -554,6 +578,21 @@ const Fechamentos = () => {
                   value={filtroMes} 
                   onChange={(e) => setFiltroMes(e.target.value)}
                 />
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Classificar por</label>
+                <select 
+                  className="form-select"
+                  value={ordenacao} 
+                  onChange={(e) => setOrdenacao(e.target.value)}
+                >
+                  <option value="data-desc">Data (Mais recente)</option>
+                  <option value="data-asc">Data (Mais antigo)</option>
+                  <option value="credito-desc">Crédito Acumulado (Maior)</option>
+                  <option value="credito-asc">Crédito Acumulado (Menor)</option>
+                  <option value="cliente">Cliente (A-Z)</option>
+                </select>
               </div>
             </div>
             
@@ -579,9 +618,9 @@ const Fechamentos = () => {
                 <thead>
                   <tr>
                     <th>Data</th>
-                    <th>Paciente</th>
-                    <th>Consultor</th>
-                    <th>Clínica</th>
+                    <th>Cliente</th>
+                    <th>Corretor</th>
+                    <th>Imobiliária</th>
                     <th>Tipo</th>
                     <th style={{ textAlign: 'right' }}>Valor</th>
                     <th>Status</th>
@@ -590,16 +629,16 @@ const Fechamentos = () => {
                 </thead>
                 <tbody>
                   {fechamentosFiltrados.map(fechamento => {
-                    const paciente = pacientes.find(p => p.id === fechamento.paciente_id);
+                    const cliente = clientes.find(p => p.id === fechamento.cliente_id);
                     const consultor = consultores.find(c => c.id === fechamento.consultor_id);
-                    const clinica = clinicas.find(c => c.id === fechamento.clinica_id);
+                    const imobiliaria = imobiliarias.find(c => c.id === fechamento.imobiliaria_id);
 
                     return (
                       <tr key={fechamento.id}>
                         <td>{formatarData(fechamento.data_fechamento)}</td>
                         <td>
                           <div>
-                            <div style={{ fontWeight: '500' }}>{paciente?.nome || 'N/A'}</div>
+                            <div style={{ fontWeight: '500' }}>{cliente?.nome || 'N/A'}</div>
                             {fechamento.observacoes && (
                               <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
                                 {fechamento.observacoes}
@@ -608,11 +647,11 @@ const Fechamentos = () => {
                           </div>
                         </td>
                         <td>{consultor?.nome || 'N/A'}</td>
-                        <td>{clinica?.nome || 'N/A'}</td>
+                        <td>{imobiliaria?.nome || 'N/A'}</td>
                         <td>
-                          {fechamento.tipo_tratamento && (
+                          {fechamento.tipo_servico && (
                             <span className="badge badge-info">
-                              {fechamento.tipo_tratamento}
+                              {fechamento.tipo_servico}
                             </span>
                           )}
                         </td>
@@ -708,15 +747,15 @@ const Fechamentos = () => {
 
             <form onSubmit={(e) => { e.preventDefault(); salvarFechamento(); }}>
               <div className="form-group">
-                <label className="form-label">Paciente *</label>
+                <label className="form-label">Cliente *</label>
                 <select 
                   className="form-select"
-                  value={novoFechamento.paciente_id}
-                  onChange={(e) => handlePacienteChange(e.target.value)}
+                  value={novoFechamento.cliente_id}
+                  onChange={(e) => handleClienteChange(e.target.value)}
                   required
                 >
-                  <option value="">Selecione um paciente</option>
-                  {pacientes.map(p => (
+                  <option value="">Selecione um cliente</option>
+                  {clientes.map(p => (
                     <option key={p.id} value={p.id}>
                       {p.nome} {p.telefone && `- ${p.telefone}`}
                     </option>
@@ -724,43 +763,27 @@ const Fechamentos = () => {
                 </select>
               </div>
 
-              <div className="grid grid-2">
-                <div className="form-group">
-                  <label className="form-label">Valor (R$) *</label>
-                  <input 
-                    type="text"
-                    className="form-input"
-                    value={novoFechamento.valor_formatado}
-                    onChange={handleValorChange}
-                    placeholder="0,00"
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Consultor</label>
-                  <select 
-                    className="form-select"
-                    value={novoFechamento.consultor_id}
-                    onChange={(e) => setNovoFechamento({...novoFechamento, consultor_id: e.target.value})}
-                  >
-                    <option value="">Selecione um consultor</option>
-                    {consultores.map(c => (
-                      <option key={c.id} value={c.id}>{c.nome}</option>
-                    ))}
-                  </select>
-                </div>
+              <div className="form-group">
+                <label className="form-label">Valor (R$) *</label>
+                <input 
+                  type="text"
+                  className="form-input"
+                  value={novoFechamento.valor_formatado}
+                  onChange={handleValorChange}
+                  placeholder="0,00"
+                  required
+                />
               </div>
 
               <div className="form-group">
-                <label className="form-label">Clínica</label>
+                <label className="form-label">Imobiliária</label>
                 <select 
                   className="form-select"
-                  value={novoFechamento.clinica_id}
-                  onChange={(e) => setNovoFechamento({...novoFechamento, clinica_id: e.target.value})}
+                  value={novoFechamento.imobiliaria_id}
+                  onChange={(e) => setNovoFechamento({...novoFechamento, imobiliaria_id: e.target.value})}
                 >
                   <option value="">Selecione uma clínica</option>
-                  {clinicas.map(c => (
+                  {imobiliarias.map(c => (
                     <option key={c.id} value={c.id}>{c.nome}</option>
                   ))}
                 </select>
@@ -778,15 +801,15 @@ const Fechamentos = () => {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Tipo de Tratamento</label>
+                  <label className="form-label">Tipo de Serviço</label>
                   <select 
                     className="form-select"
-                    value={novoFechamento.tipo_tratamento}
-                    onChange={(e) => setNovoFechamento({...novoFechamento, tipo_tratamento: e.target.value})}
+                    value={novoFechamento.tipo_servico}
+                    onChange={(e) => setNovoFechamento({...novoFechamento, tipo_servico: e.target.value})}
                   >
                     <option value="">Selecione</option>
-                    <option value="Estético">Estético</option>
-                    <option value="Odontológico">Odontológico</option>
+                    <option value="Compra">Compra</option>
+                    <option value="Venda">Venda</option>
                   </select>
                 </div>
               </div>

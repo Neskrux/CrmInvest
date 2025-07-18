@@ -8,8 +8,8 @@ const CapturaSucesso = () => {
   const { nome, message } = location.state || {};
 
   const handleWhatsApp = () => {
-    const phoneNumber = '5541997233138'; // Número do WhatsApp da clínica
-    const text = `Olá! Acabei de me cadastrar no site para agendar uma consulta. Meu nome é ${nome || 'Não informado'}.`;
+    const phoneNumber = '5541997233138'; // Número do WhatsApp da imobiliária
+    const text = `Olá! Acabei de me cadastrar no site para receber ofertas de imóveis. Meu nome é ${nome || 'Não informado'}.`;
     const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
@@ -37,7 +37,7 @@ const CapturaSucesso = () => {
           </h2>
           <p className="card-text">
             Sua solicitação foi enviada com sucesso. Nossa equipe entrará em contato 
-            em até <strong>2 horas</strong> para agendar sua consulta gratuita.
+            em até <strong>2 horas</strong> com as melhores ofertas de imóveis para você.
           </p>
           
           <div className="next-steps">
@@ -53,15 +53,15 @@ const CapturaSucesso = () => {
               <div className="step-item">
                 <div className="step-number">2</div>
                 <div className="step-content">
-                  <strong>Agende sua consulta</strong>
-                  <p>Escolha o melhor horário para você</p>
+                  <strong>Receba ofertas personalizadas</strong>
+                  <p>Imóveis selecionados conforme seu perfil</p>
                 </div>
               </div>
               <div className="step-item">
                 <div className="step-number">3</div>
                 <div className="step-content">
-                  <strong>Realize sua consulta</strong>
-                  <p>Avaliação gratuita com nossos especialistas</p>
+                  <strong>Agende suas visitas</strong>
+                  <p>Visite os imóveis que mais interessam</p>
                 </div>
               </div>
             </div>
@@ -93,30 +93,30 @@ const CapturaSucesso = () => {
             </div>
             <div className="info-card">
               <div className="info-icon">🆓</div>
-              <h4>Consulta Gratuita</h4>
-              <p>Primeira consulta sem custo</p>
+              <h4>Serviço Gratuito</h4>
+              <p>Sem taxa de cadastro</p>
             </div>
             <div className="info-card">
               <div className="info-icon">⭐</div>
-              <h4>Atendimento Premium</h4>
-              <p>Profissionais qualificados</p>
+              <h4>Corretores Qualificados</h4>
+              <p>Especialistas no mercado</p>
             </div>
           </div>
         </div>
 
         <div className="social-proof">
-          <h3 className="social-title">Junte-se a milhares de pacientes satisfeitos</h3>
+          <h3 className="social-title">Junte-se a milhares de clientes satisfeitos</h3>
           <div className="social-stats">
             <div className="stat-item">
-              <div className="stat-number">1000+</div>
-              <div className="stat-label">Sorrisos Transformados</div>
+              <div className="stat-number">500+</div>
+              <div className="stat-label">Imóveis Vendidos</div>
             </div>
             <div className="stat-item">
               <div className="stat-number">5⭐</div>
               <div className="stat-label">Avaliação Média</div>
             </div>
             <div className="stat-item">
-              <div className="stat-number">98%</div>
+              <div className="stat-number">95%</div>
               <div className="stat-label">Satisfação</div>
             </div>
           </div>

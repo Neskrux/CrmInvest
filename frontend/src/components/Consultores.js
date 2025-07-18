@@ -28,11 +28,11 @@ const Consultores = () => {
       if (response.ok) {
         setConsultores(data);
       } else {
-        console.error('Erro ao carregar consultores:', data.error);
-        setMessage('Erro ao carregar consultores: ' + data.error);
+        console.error('Erro ao carregar corretores:', data.error);
+        setMessage('Erro ao carregar corretores: ' + data.error);
       }
     } catch (error) {
-      console.error('Erro ao carregar consultores:', error);
+      console.error('Erro ao carregar corretores:', error);
       setMessage('Erro ao conectar com o servidor');
     } finally {
       setLoading(false);
@@ -62,7 +62,7 @@ const Consultores = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setMessage(editingConsultor ? 'Consultor atualizado com sucesso!' : 'Consultor cadastrado com sucesso!');
+        setMessage(editingConsultor ? 'Corretor atualizado com sucesso!' : 'Corretor cadastrado com sucesso!');
         setShowModal(false);
         setEditingConsultor(null);
         setFormData({
@@ -75,11 +75,11 @@ const Consultores = () => {
         fetchConsultores();
         setTimeout(() => setMessage(''), 3000);
       } else {
-        setMessage('Erro ao salvar consultor: ' + data.error);
+        setMessage('Erro ao salvar corretor: ' + data.error);
       }
     } catch (error) {
-      console.error('Erro ao salvar consultor:', error);
-      setMessage('Erro ao salvar consultor');
+      console.error('Erro ao salvar corretor:', error);
+      setMessage('Erro ao salvar corretor');
     }
   };
 
@@ -170,10 +170,10 @@ const Consultores = () => {
         });
         setShowSenhaModal(true);
       } else {
-        setMessage('Erro ao carregar dados do consultor: ' + data.error);
+        setMessage('Erro ao carregar dados do corretor: ' + data.error);
       }
     } catch (error) {
-      console.error('Erro ao carregar consultor:', error);
+      console.error('Erro ao carregar corretor:', error);
       setMessage('Erro ao conectar com o servidor');
     }
   };
@@ -239,8 +239,8 @@ const Consultores = () => {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Gerenciar Consultores</h1>
-        <p className="page-subtitle">Gerencie a equipe de consultores</p>
+        <h1 className="page-title">Gerenciar Corretores</h1>
+        <p className="page-subtitle">Gerencie a equipe de corretores</p>
       </div>
 
       {message && (
@@ -251,7 +251,7 @@ const Consultores = () => {
 
       <div className="card">
         <div className="card-header">
-          <h2 className="card-title">Equipe de Consultores</h2>
+          <h2 className="card-title">Equipe de Corretores</h2>
           <button 
             className="btn btn-primary"
             onClick={() => setShowModal(true)}
@@ -259,7 +259,7 @@ const Consultores = () => {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 5v14M5 12h14" />
             </svg>
-            Novo Consultor
+            Novo Corretor
           </button>
         </div>
 
@@ -269,7 +269,7 @@ const Consultores = () => {
           </div>
         ) : consultores.length === 0 ? (
           <p style={{ textAlign: 'center', color: '#6b7280', padding: '2rem' }}>
-            Nenhum consultor cadastrado ainda.
+            Nenhum corretor cadastrado ainda.
           </p>
         ) : (
           <div className="table-container">
@@ -382,7 +382,7 @@ const Consultores = () => {
           <div className="modal">
             <div className="modal-header">
               <h2 className="modal-title">
-                {editingConsultor ? 'Editar Consultor' : 'Novo Consultor'}
+                {editingConsultor ? 'Editar Corretor' : 'Novo Corretor'}
               </h2>
               <button 
                 className="close-btn"
@@ -401,7 +401,7 @@ const Consultores = () => {
                   className="form-input"
                   value={formData.nome}
                   onChange={handleInputChange}
-                  placeholder="Digite o nome do consultor"
+                  placeholder="Digite o nome do corretor"
                   required
                   autoComplete="off"
                 />
@@ -428,7 +428,7 @@ const Consultores = () => {
                   className="form-input"
                   value={formData.email}
                   onChange={handleInputChange}
-                  placeholder="consultor@email.com"
+                  placeholder="corretor@email.com"
                   required
                   autoComplete="off"
                 />
@@ -445,7 +445,7 @@ const Consultores = () => {
                   className="form-input"
                   value={formData.senha}
                   onChange={handleInputChange}
-                  placeholder="Digite a senha do consultor"
+                  placeholder="Digite a senha do corretor"
                   autoComplete="new-password"
                 />
                 <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
@@ -481,7 +481,7 @@ const Consultores = () => {
                   type="submit"
                   className="btn btn-primary"
                 >
-                  {editingConsultor ? 'Atualizar Consultor' : 'Cadastrar Consultor'}
+                  {editingConsultor ? 'Atualizar Corretor' : 'Cadastrar Corretor'}
                 </button>
               </div>
             </form>
@@ -518,8 +518,8 @@ const Consultores = () => {
                 </div>
                 <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
                   {consultorSenha.temSenha 
-                    ? 'Este consultor pode fazer login no sistema' 
-                    : 'Este consultor não pode fazer login'
+                    ? 'Este corretor pode fazer login no sistema' 
+                    : 'Este corretor não pode fazer login'
                   }
                 </div>
               </div>

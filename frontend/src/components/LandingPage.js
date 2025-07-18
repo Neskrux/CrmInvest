@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import logoHorizontalPreto from '../images/logohorizontalpreto.png';
+import logoHorizontalAzul from '../images/logohorinzontalazul.png';
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -26,7 +26,7 @@ const LandingPage = () => {
         {/* Logo e Título */}
         <div style={{ marginBottom: '3rem' }}>
           <img 
-            src={logoHorizontalPreto} 
+            src={logoHorizontalAzul} 
             alt="CRM System" 
             style={{ 
               width: '250px',
@@ -41,7 +41,7 @@ const LandingPage = () => {
             color: '#4b5563',
             lineHeight: '1.5'
           }}>
-            Sistema profissional de gestão de consultores e vendas
+            Sistema profissional de indicação de vendas
           </p>
         </div>
 
@@ -54,7 +54,7 @@ const LandingPage = () => {
           <button
             onClick={() => navigate('/captura-lead')}
             style={{
-              background: '#1a1d23',
+              background: '#000064',
               color: 'white',
               border: 'none',
               padding: '1rem 2rem',
@@ -65,21 +65,21 @@ const LandingPage = () => {
               transition: 'all 0.15s ease'
             }}
             onMouseOver={(e) => {
-              e.target.style.background = '#0f1114';
+              e.target.style.background = '#000050';
               e.target.style.transform = 'translateY(-1px)';
             }}
             onMouseOut={(e) => {
-              e.target.style.background = '#1a1d23';
+              e.target.style.background = '#000064';
               e.target.style.transform = 'translateY(0)';
             }}
           >
-            Cadastrar Paciente
+            Link de Indicação
           </button>
 
           <button
             onClick={() => navigate('/cadastro')}
             style={{
-              background: '#1a1d23',
+              background: '#000064',
               color: 'white',
               border: 'none',
               padding: '1rem 2rem',
@@ -90,22 +90,22 @@ const LandingPage = () => {
               transition: 'all 0.15s ease'
             }}
             onMouseOver={(e) => {
-              e.target.style.background = '#0f1114';
+              e.target.style.background = '#000050';
               e.target.style.transform = 'translateY(-1px)';
             }}
             onMouseOut={(e) => {
-              e.target.style.background = '#1a1d23';
+              e.target.style.background = '#000064';
               e.target.style.transform = 'translateY(0)';
             }}
           >
-            Cadastrar como Consultor
+            Cadastrar como Indicador
           </button>
 
           <button
             onClick={() => navigate('/login')}
             style={{
               background: 'white',
-              color: '#1a1d23',
+              color: '#000064',
               border: '1px solid #d1d5db',
               padding: '1rem 2rem',
               borderRadius: '6px',
@@ -146,7 +146,7 @@ const LandingPage = () => {
                 color: '#1a1d23',
                 marginBottom: '0.25rem'
               }}>
-                R$ 5
+                R$ 5000
               </div>
               <div style={{
                 fontSize: '0.75rem',
@@ -154,7 +154,7 @@ const LandingPage = () => {
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em'
               }}>
-                Por mil
+                Por fechamento
               </div>
             </div>
             <div>

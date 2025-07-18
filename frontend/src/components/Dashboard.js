@@ -12,7 +12,7 @@ const Dashboard = () => {
   const [cidadesDisponiveis, setCidadesDisponiveis] = useState([]);
   const [estadosDisponiveis, setEstadosDisponiveis] = useState([]);
   const [stats, setStats] = useState({
-    totalPacientes: 0,
+    totalIndicacoes: 0,
     totalAgendamentos: 0,
     totalFechamentos: 0,
     valorTotalFechamentos: 0,
@@ -29,7 +29,7 @@ const Dashboard = () => {
     novosLeadsPeriodo: 0,
     // Estatísticas por dia da semana
     estatisticasPorDia: {},
-    // Estatísticas de pacientes, agendamentos e fechamentos por cidade
+    // Estatísticas de indicações, agendamentos e fechamentos por cidade
     agendamentosPorCidade: []
   });
   const [loading, setLoading] = useState(true);
@@ -44,13 +44,13 @@ const Dashboard = () => {
     const fetchCidades = async () => {
       try {
         if (filtroRegiao.estado) {
-          const cidadesRes = await makeRequest(`/clinicas/cidades?estado=${filtroRegiao.estado}`);
+          const cidadesRes = await makeRequest(`/imobiliarias/cidades?estado=${filtroRegiao.estado}`);
           if (cidadesRes.ok) {
             const cidades = await cidadesRes.json();
             setCidadesDisponiveis(cidades);
           }
         } else {
-          const cidadesRes = await makeRequest('/clinicas/cidades');
+          const cidadesRes = await makeRequest('/imobiliarias/cidades');
           if (cidadesRes.ok) {
             const cidades = await cidadesRes.json();
             setCidadesDisponiveis(cidades);
@@ -71,38 +71,38 @@ const Dashboard = () => {
   const fetchStats = async () => {
     try {
       // Construir parâmetros de busca para clínicas
-      const clinicasParams = new URLSearchParams();
-      if (filtroRegiao.estado) clinicasParams.append('estado', filtroRegiao.estado);
-      if (filtroRegiao.cidade) clinicasParams.append('cidade', filtroRegiao.cidade);
+      const imobiliariasParams = new URLSearchParams();
+      if (filtroRegiao.estado) imobiliariasParams.append('estado', filtroRegiao.estado);
+      if (filtroRegiao.cidade) imobiliariasParams.append('cidade', filtroRegiao.cidade);
       
-      const [pacientesRes, agendamentosRes, fechamentosRes, consultoresRes, clinicasRes] = await Promise.all([
-        makeRequest('/pacientes'),
+      const [indicacoesRes, agendamentosRes, fechamentosRes, consultoresRes, imobiliariasRes] = await Promise.all([
+        makeRequest('/clientes'),
         makeRequest('/agendamentos'),
         makeRequest('/fechamentos'),
         makeRequest('/consultores'),
-        makeRequest(`/clinicas?${clinicasParams.toString()}`)
+        makeRequest(`/imobiliarias?${imobiliariasParams.toString()}`)
       ]);
 
-      const pacientes = await pacientesRes.json();
+      const indicacoes = await indicacoesRes.json();
       let agendamentos = await agendamentosRes.json();
       let fechamentos = await fechamentosRes.json();
       const consultores = await consultoresRes.json();
-      const clinicasFiltradas = await clinicasRes.json();
+      const imobiliariasFiltradas = await imobiliariasRes.json();
 
       // Aplicar filtros por região se especificados
       if (filtroRegiao.cidade || filtroRegiao.estado) {
-        const clinicasIds = clinicasFiltradas.map(c => c.id);
+        const imobiliariasIds = imobiliariasFiltradas.map(c => c.id);
         
-        // Filtrar agendamentos por região (via clínicas)
+        // Filtrar visitas por região (via clínicas)
         agendamentos = agendamentos.filter(agendamento => {
-          if (!agendamento.clinica_id) return false; // excluir agendamentos sem clínica quando há filtro
-          return clinicasIds.includes(agendamento.clinica_id);
+          if (!agendamento.imobiliaria_id) return false; // excluir agendamentos sem clínica quando há filtro
+          return imobiliariasIds.includes(agendamento.imobiliaria_id);
         });
 
         // Filtrar fechamentos por região (via clínicas)
         fechamentos = fechamentos.filter(fechamento => {
-          if (!fechamento.clinica_id) return false; // excluir fechamentos sem clínica quando há filtro
-          return clinicasIds.includes(fechamento.clinica_id);
+          if (!fechamento.imobiliaria_id) return false; // excluir fechamentos sem clínica quando há filtro
+          return imobiliariasIds.includes(fechamento.imobiliaria_id);
         });
       }
 
@@ -110,7 +110,7 @@ const Dashboard = () => {
       const hojeStr = hoje.toISOString().split('T')[0];
       const agendamentosHoje = agendamentos.filter(a => a.data_agendamento === hojeStr).length;
 
-      const leadsPorStatus = pacientes.reduce((acc, p) => {
+      const leadsPorStatus = indicacoes.reduce((acc, p) => {
         acc[p.status] = (acc[p.status] || 0) + 1;
         return acc;
       }, {});
@@ -171,10 +171,10 @@ const Dashboard = () => {
         sum + parseFloat(f.valor_fechado || 0), 0
       );
 
-      const novosLeadsPeriodo = dataInicio ? pacientes.filter(p => {
+      const novosLeadsPeriodo = dataInicio ? indicacoes.filter(p => {
         const data = new Date(p.created_at);
         return data >= dataInicio && data <= dataFim;
-      }).length : pacientes.length;
+      }).length : indicacoes.length;
 
       // Calcular estatísticas por dia da semana (apenas para visualização semanal)
       let estatisticasPorDia = {};
@@ -197,15 +197,15 @@ const Dashboard = () => {
         }
       }
 
-      // Calcular pacientes, agendamentos e fechamentos por cidade
+              // Calcular indicações, visitas e fechamentos por cidade
       const dadosPorCidade = {};
       
       // Buscar todas as clínicas se não houver filtro de região
-      let todasClinicas = clinicasFiltradas;
+      let todasClinicas = imobiliariasFiltradas;
       if (!filtroRegiao.cidade && !filtroRegiao.estado) {
         // Se não há filtro de região, buscar todas as clínicas do banco
         try {
-          const todasClinicasRes = await makeRequest('/clinicas');
+          const todasClinicasRes = await makeRequest('/imobiliarias');
           if (todasClinicasRes.ok) {
             todasClinicas = await todasClinicasRes.json();
           }
@@ -215,21 +215,21 @@ const Dashboard = () => {
       }
 
       // Criar mapa de clínicas por ID para facilitar a busca
-      const clinicasMap = {};
-      todasClinicas.forEach(clinica => {
-        clinicasMap[clinica.id] = clinica;
+      const imobiliariasMap = {};
+      todasClinicas.forEach(imobiliaria => {
+        imobiliariasMap[imobiliaria.id] = imobiliaria;
       });
       
-      // Agrupar pacientes por cidade (usando a clínica do agendamento mais recente ou primeira clínica)
-      pacientes.forEach(paciente => {
-        // Buscar agendamento mais recente do paciente para determinar a cidade
-        const agendamentoPaciente = agendamentos.find(a => a.paciente_id === paciente.id);
+      // Agrupar indicações por cidade (usando a imobiliária do agendamento mais recente ou primeira imobiliária)
+      indicacoes.forEach(cliente => {
+        // Buscar agendamento mais recente do cliente para determinar a cidade
+        const agendamentoCliente = agendamentos.find(a => a.cliente_id === cliente.id);
         let cidade = null;
         
-        if (agendamentoPaciente && agendamentoPaciente.clinica_id) {
-          const clinica = clinicasMap[agendamentoPaciente.clinica_id];
-          if (clinica) {
-            cidade = clinica.cidade;
+        if (agendamentoCliente && agendamentoCliente.imobiliaria_id) {
+          const imobiliaria = imobiliariasMap[agendamentoCliente.imobiliaria_id];
+          if (imobiliaria) {
+            cidade = imobiliaria.cidade;
           }
         }
         
@@ -237,25 +237,25 @@ const Dashboard = () => {
           if (!dadosPorCidade[cidade]) {
             dadosPorCidade[cidade] = {
               cidade: cidade,
-              pacientes: 0,
+              indicacoes: 0,
               agendamentos: 0,
               fechamentos: 0
             };
           }
-          dadosPorCidade[cidade].pacientes++;
+          dadosPorCidade[cidade].indicacoes++;
         }
       });
       
-      // Agrupar agendamentos por cidade das clínicas
+              // Agrupar visitas por cidade das clínicas
       agendamentos.forEach(agendamento => {
-        if (agendamento.clinica_id) {
-          const clinica = clinicasMap[agendamento.clinica_id];
-          if (clinica && clinica.cidade) {
-            const cidade = clinica.cidade;
+        if (agendamento.imobiliaria_id) {
+          const imobiliaria = imobiliariasMap[agendamento.imobiliaria_id];
+          if (imobiliaria && imobiliaria.cidade) {
+            const cidade = imobiliaria.cidade;
             if (!dadosPorCidade[cidade]) {
               dadosPorCidade[cidade] = {
                 cidade: cidade,
-                pacientes: 0,
+                indicacoes: 0,
                 agendamentos: 0,
                 fechamentos: 0
               };
@@ -267,14 +267,14 @@ const Dashboard = () => {
 
       // Agrupar fechamentos por cidade das clínicas
       fechamentos.forEach(fechamento => {
-        if (fechamento.clinica_id) {
-          const clinica = clinicasMap[fechamento.clinica_id];
-          if (clinica && clinica.cidade) {
-            const cidade = clinica.cidade;
+        if (fechamento.imobiliaria_id) {
+          const imobiliaria = imobiliariasMap[fechamento.imobiliaria_id];
+          if (imobiliaria && imobiliaria.cidade) {
+            const cidade = imobiliaria.cidade;
             if (!dadosPorCidade[cidade]) {
               dadosPorCidade[cidade] = {
                 cidade: cidade,
-                pacientes: 0,
+                indicacoes: 0,
                 agendamentos: 0,
                 fechamentos: 0
               };
@@ -284,12 +284,12 @@ const Dashboard = () => {
         }
       });
 
-      // Converter para array e ordenar por total (pacientes + agendamentos + fechamentos)
+      // Converter para array e ordenar por total (indicações + agendamentos + fechamentos)
       const agendamentosPorCidadeArray = Object.values(dadosPorCidade)
-        .map(item => ({
-          ...item,
-          total: item.pacientes + item.agendamentos + item.fechamentos,
-          conversaoAgendamento: item.pacientes > 0 ? ((item.agendamentos / item.pacientes) * 100).toFixed(1) : 0,
+                  .map(item => ({
+            ...item,
+            total: item.indicacoes + item.agendamentos + item.fechamentos,
+            conversaoAgendamento: item.indicacoes > 0 ? ((item.agendamentos / item.indicacoes) * 100).toFixed(1) : 0,
           conversaoFechamento: item.agendamentos > 0 ? ((item.fechamentos / item.agendamentos) * 100).toFixed(1) : 0
         }))
         .sort((a, b) => b.total - a.total)
@@ -307,7 +307,7 @@ const Dashboard = () => {
       consultores.forEach(c => {
         consultoresMap[c.nome] = {
           nome: c.nome,
-          totalPacientes: 0,
+          totalIndicacoes: 0,
           totalAgendamentos: 0,
           totalFechamentos: 0,
           valorFechado: 0,
@@ -318,9 +318,9 @@ const Dashboard = () => {
       });
 
       // Atualizar estatísticas dos consultores
-      pacientes.forEach(p => {
+      indicacoes.forEach(p => {
         if (p.consultor_nome && consultoresMap[p.consultor_nome]) {
-          consultoresMap[p.consultor_nome].totalPacientes++;
+          consultoresMap[p.consultor_nome].totalIndicacoes++;
         }
       });
 
@@ -353,7 +353,7 @@ const Dashboard = () => {
       const consultoresStats = Object.values(consultoresMap);
 
       setStats({
-        totalPacientes: pacientes.length,
+        totalIndicacoes: indicacoes.length,
         totalAgendamentos: agendamentos.length,
         totalFechamentos: fechamentos.length,
         valorTotalFechamentos: valorTotal,
@@ -378,7 +378,7 @@ const Dashboard = () => {
 
   const fetchRegioesDisponiveis = async () => {
     try {
-      const estadosRes = await makeRequest('/clinicas/estados');
+      const estadosRes = await makeRequest('/imobiliarias/estados');
       if (estadosRes.ok) {
         const estados = await estadosRes.json();
         setEstadosDisponiveis(estados);
@@ -446,16 +446,16 @@ const Dashboard = () => {
 
   const getStatusColor = (status) => {
     const colors = {
-      lead: '#f59e0b',
+      lead: '#0ea5e9',
       agendado: '#3b82f6',
-      compareceu: '#10b981',
-      fechado: '#059669',
-      nao_fechou: '#ef4444',
-      nao_compareceu: '#f87171',
-      reagendado: '#8b5cf6',
-      nao_passou_cpf: '#6366f1'
+      compareceu: '#0891b2',
+      fechado: '#000064',
+      nao_fechou: '#6366f1',
+      nao_compareceu: '#8b5cf6',
+      reagendado: '#1e40af',
+      nao_passou_cpf: '#4f46e5'
     };
-    return colors[status] || '#6b7280';
+    return colors[status] || '#64748b';
   };
 
   if (loading) {
@@ -741,7 +741,7 @@ const Dashboard = () => {
                   fontSize: '0.75rem'
                 }}>
                   <div style={{ color: '#2563eb' }}>
-                    <strong>{dados.agendamentos}</strong> agend.
+                    <strong>{dados.agendamentos}</strong> visit.
                   </div>
                   <div style={{ color: '#10b981' }}>
                     <strong>{dados.fechamentos}</strong> fech.
@@ -759,38 +759,38 @@ const Dashboard = () => {
       {/* KPIs do Período - Apenas quando não é Total */}
       {periodo !== 'total' && (
         <div style={{ marginBottom: '2rem' }}>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1a1d23', marginBottom: '1rem' }}>
-            Resumo do Período - {obterPeriodoTexto()}
-          </h3>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#000064', marginBottom: '1rem' }}>
+          Resumo do Período - {obterPeriodoTexto()}
+        </h3>
           <div className="stats-grid">
-            <div className="stat-card">
+            <div className="stat-card" style={{ backgroundColor: '#f0f9ff', border: '1px solid #0ea5e9' }}>
               <div className="stat-label">Novos Leads</div>
-              <div className="stat-value">{stats.novosLeadsPeriodo}</div>
-              <div className="stat-subtitle" style={{ color: '#6b7280' }}>
+              <div className="stat-value" style={{ color: '#0ea5e9' }}>{stats.novosLeadsPeriodo}</div>
+              <div className="stat-subtitle" style={{ color: '#0284c7' }}>
                 No período selecionado
               </div>
             </div>
 
-            <div className="stat-card">
-              <div className="stat-label">Agendamentos</div>
-              <div className="stat-value">{stats.agendamentosPeriodo}</div>
-              <div className="stat-subtitle" style={{ color: '#6b7280' }}>
+            <div className="stat-card" style={{ backgroundColor: '#dbeafe', border: '1px solid #3b82f6' }}>
+              <div className="stat-label">Visitas</div>
+              <div className="stat-value" style={{ color: '#3b82f6' }}>{stats.agendamentosPeriodo}</div>
+              <div className="stat-subtitle" style={{ color: '#1d4ed8' }}>
                 No período selecionado
               </div>
             </div>
 
-            <div className="stat-card">
+            <div className="stat-card" style={{ backgroundColor: '#e0e7ff', border: '1px solid #6366f1' }}>
               <div className="stat-label">Fechamentos</div>
-              <div className="stat-value">{stats.fechamentosPeriodo}</div>
-              <div className="stat-subtitle" style={{ color: '#6b7280' }}>
+              <div className="stat-value" style={{ color: '#6366f1' }}>{stats.fechamentosPeriodo}</div>
+              <div className="stat-subtitle" style={{ color: '#4f46e5' }}>
                 No período selecionado
               </div>
             </div>
 
-            <div className="stat-card">
+            <div className="stat-card" style={{ backgroundColor: '#f8fafc', border: '1px solid #000064' }}>
               <div className="stat-label">Valor Fechado</div>
-              <div className="stat-value">{formatCurrency(stats.valorPeriodo)}</div>
-              <div className="stat-subtitle" style={{ color: '#6b7280' }}>
+              <div className="stat-value" style={{ color: '#000064' }}>{formatCurrency(stats.valorPeriodo)}</div>
+              <div className="stat-subtitle" style={{ color: '#1e40af' }}>
                 No período selecionado
               </div>
             </div>
@@ -800,14 +800,14 @@ const Dashboard = () => {
 
       {/* KPIs Principais */}
       <div style={{ marginBottom: '2rem' }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1a1d23', marginBottom: '1rem' }}>
+        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#000064', marginBottom: '1rem' }}>
           Totais Gerais
         </h3>
         <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-label">Total de Pacientes</div>
-            <div className="stat-value">{stats.totalPacientes}</div>
-            <div className="stat-change positive">
+          <div className="stat-card" style={{ backgroundColor: '#e0f2fe', border: '1px solid #0891b2' }}>
+            <div className="stat-label">Total de Indicações</div>
+            <div className="stat-value" style={{ color: '#0891b2' }}>{stats.totalIndicacoes}</div>
+            <div className="stat-change positive" style={{ color: '#0891b2' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
                 <polyline points="17 6 23 6 23 12"></polyline>
@@ -816,10 +816,10 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="stat-card">
-            <div className="stat-label">Agendamentos</div>
-            <div className="stat-value">{stats.totalAgendamentos}</div>
-            <div className="stat-change positive">
+          <div className="stat-card" style={{ backgroundColor: '#dbeafe', border: '1px solid #3b82f6' }}>
+            <div className="stat-label">Visitas</div>
+            <div className="stat-value" style={{ color: '#3b82f6' }}>{stats.totalAgendamentos}</div>
+            <div className="stat-change positive" style={{ color: '#3b82f6' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
                 <polyline points="17 6 23 6 23 12"></polyline>
@@ -828,10 +828,10 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="stat-card">
+          <div className="stat-card" style={{ backgroundColor: '#e0e7ff', border: '1px solid #6366f1' }}>
             <div className="stat-label">Fechamentos</div>
-            <div className="stat-value">{stats.totalFechamentos}</div>
-            <div className="stat-change positive">
+            <div className="stat-value" style={{ color: '#6366f1' }}>{stats.totalFechamentos}</div>
+            <div className="stat-change positive" style={{ color: '#6366f1' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
                 <polyline points="17 6 23 6 23 12"></polyline>
@@ -840,10 +840,10 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="stat-card">
+          <div className="stat-card" style={{ backgroundColor: '#f0f9ff', border: '1px solid #000064' }}>
             <div className="stat-label">Valor Total</div>
-            <div className="stat-value">{formatCurrency(stats.valorTotalFechamentos)}</div>
-            <div className="stat-change positive">
+            <div className="stat-value" style={{ color: '#000064' }}>{formatCurrency(stats.valorTotalFechamentos)}</div>
+            <div className="stat-change positive" style={{ color: '#000064' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
                 <polyline points="17 6 23 6 23 12"></polyline>
@@ -854,34 +854,24 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Cards de Comissão */}
-      <div className="stats-grid" style={{ marginTop: '2rem', gridTemplateColumns: 'repeat(2, 1fr)' }}>
-        <div className="stat-card" style={{ backgroundColor: '#fef3c7' }}>
-          <div className="stat-label">Comissão do Mês</div>
-          <div className="stat-value" style={{ color: '#f59e0b' }}>
-            {formatCurrency(stats.comissaoTotalMes)}
-          </div>
-          <div className="stat-subtitle" style={{ color: '#92400e' }}>
-            Total de comissões este mês
-          </div>
-        </div>
-
-        <div className="stat-card" style={{ backgroundColor: '#ede9fe' }}>
-          <div className="stat-label">Comissão Total Geral</div>
-          <div className="stat-value" style={{ color: '#8b5cf6' }}>
+      {/* Card de Crédito */}
+      <div className="stats-grid" style={{ marginTop: '2rem', gridTemplateColumns: '1fr' }}>
+        <div className="stat-card" style={{ backgroundColor: '#dbeafe', border: '1px solid #3b82f6' }}>
+          <div className="stat-label">Crédito Total</div>
+          <div className="stat-value" style={{ color: '#000064' }}>
             {formatCurrency(stats.comissaoTotalGeral)}
           </div>
-          <div className="stat-subtitle" style={{ color: '#5b21b6' }}>
-            Comissões acumuladas
+          <div className="stat-subtitle" style={{ color: '#1e40af' }}>
+            Créditos acumulados
           </div>
         </div>
       </div>
 
-      {/* Gráfico de Pacientes, Agendamentos e Fechamentos por Cidade */}
+            {/* Gráfico de Clientes, Visitas e Fechamentos por Cidade */}
       {stats.agendamentosPorCidade.length > 0 && (
         <div className="card" style={{ marginTop: '2rem' }}>
           <div className="card-header">
-            <h2 className="card-title">Pacientes, Agendamentos e Fechamentos por Cidade</h2>
+            <h2 className="card-title">Indicações, Visitas e Fechamentos por Cidade</h2>
             <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
               Top 10 cidades com mais movimentação no funil de vendas
             </p>
@@ -910,8 +900,8 @@ const Dashboard = () => {
                   labelFormatter={(value) => `Cidade: ${value}`}
                   formatter={(value, name, props) => {
                     const labels = {
-                      pacientes: 'Pacientes',
-                      agendamentos: 'Agendamentos',
+                      indicacoes: 'Indicações',
+                      agendamentos: 'Visitas',
                       fechamentos: 'Fechamentos',
                       total: 'Total'
                     };
@@ -925,9 +915,9 @@ const Dashboard = () => {
                   }}
                 />
                 <Legend />
-                <Bar dataKey="pacientes" fill="#f59e0b" name="Pacientes" />
-                <Bar dataKey="agendamentos" fill="#3b82f6" name="Agendamentos" />
-                <Bar dataKey="fechamentos" fill="#059669" name="Fechamentos" />
+                                  <Bar dataKey="indicacoes" fill="#0891b2" name="Indicações" />
+                <Bar dataKey="agendamentos" fill="#3b82f6" name="Visitas" />
+                <Bar dataKey="fechamentos" fill="#000064" name="Fechamentos" />
               </BarChart>
             </ResponsiveContainer>
             
@@ -949,23 +939,23 @@ const Dashboard = () => {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Pacientes → Agendamentos:</span>
+                        <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Indicações → Visitas:</span>
                         <span style={{ 
                           fontSize: '0.75rem', 
                           fontWeight: '600',
-                          color: parseFloat(cidade.conversaoAgendamento) > 50 ? '#059669' : 
-                                 parseFloat(cidade.conversaoAgendamento) > 20 ? '#f59e0b' : '#ef4444'
+                          color: parseFloat(cidade.conversaoAgendamento) > 50 ? '#000064' : 
+                                 parseFloat(cidade.conversaoAgendamento) > 20 ? '#3b82f6' : '#6366f1'
                         }}>
                           {cidade.conversaoAgendamento}%
                         </span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Agendamentos → Fechamentos:</span>
+                        <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Visitas → Fechamentos:</span>
                         <span style={{ 
                           fontSize: '0.75rem', 
                           fontWeight: '600',
-                          color: parseFloat(cidade.conversaoFechamento) > 50 ? '#059669' : 
-                                 parseFloat(cidade.conversaoFechamento) > 20 ? '#f59e0b' : '#ef4444'
+                          color: parseFloat(cidade.conversaoFechamento) > 50 ? '#000064' : 
+                                 parseFloat(cidade.conversaoFechamento) > 20 ? '#3b82f6' : '#6366f1'
                         }}>
                           {cidade.conversaoFechamento}%
                         </span>
@@ -988,7 +978,7 @@ const Dashboard = () => {
           <div className="card-body">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {Object.entries(stats.leadsPorStatus).map(([status, count]) => {
-                const total = stats.totalPacientes || 1;
+                const total = stats.totalIndicacoes || 1;
                 const percentage = (count / total) * 100;
                 return (
                   <div key={status}>
@@ -1021,10 +1011,10 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Ranking dos Consultores */}
+        {/* Ranking dos Corretores */}
         <div className="card" style={{ minWidth: 0 }}>
           <div className="card-header">
-            <h2 className="card-title">🏆 Ranking dos Consultores</h2>
+            <h2 className="card-title">🏆 Ranking dos Corretores</h2>
             <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
               Classificação por valor fechado
             </p>
@@ -1040,7 +1030,7 @@ const Dashboard = () => {
                 const consultoresComPosicao = consultoresOrdenados.map((consultor) => {
                   const temAtividade = consultor.valorFechado > 0 || 
                                       consultor.totalAgendamentos > 0 || 
-                                      consultor.totalPacientes > 0;
+                                      consultor.totalIndicacoes > 0;
                   if (temAtividade) {
                     posicaoAtual++;
                     return { ...consultor, posicao: posicaoAtual, temAtividade };
@@ -1117,10 +1107,10 @@ const Dashboard = () => {
                           }}>
                             <div>
                               <div style={{ fontSize: '1.25rem', fontWeight: '700' }}>
-                                {consultor.totalPacientes}
+                                {consultor.totalIndicacoes}
                               </div>
                               <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                                Pacientes
+                                Indicações
                               </div>
                             </div>
                             <div>
@@ -1128,7 +1118,7 @@ const Dashboard = () => {
                                 {consultor.totalAgendamentos}
                               </div>
                               <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                                Agendamentos
+                                Visitas
                               </div>
                             </div>
                             <div>
@@ -1152,15 +1142,15 @@ const Dashboard = () => {
                               {formatCurrency(consultor.valorFechado)}
                             </div>
                             <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                              Comissão: {formatCurrency(consultor.comissaoTotal)}
+                              Crédito: {formatCurrency(consultor.comissaoTotal)}
                             </div>
                           </div>
                         </div>
                       ))}
                     </div>
 
-                    {/* Restante dos consultores */}
-                    {consultoresAtivos.length > 3 && (
+                                {/* Restante dos corretores */}
+            {consultoresAtivos.length > 3 && (
                       <div style={{ marginBottom: '2rem' }}>
                         <h4 style={{ 
                           fontSize: '1rem', 
@@ -1206,12 +1196,12 @@ const Dashboard = () => {
                                 fontSize: '0.875rem'
                               }}>
                                 <div style={{ textAlign: 'center' }}>
-                                  <div style={{ fontWeight: '600' }}>{consultor.totalPacientes}</div>
-                                  <div style={{ color: '#6b7280', fontSize: '0.75rem' }}>pacientes</div>
+                                                  <div style={{ fontWeight: '600' }}>{consultor.totalIndicacoes}</div>
+                <div style={{ color: '#6b7280', fontSize: '0.75rem' }}>indicações</div>
                                 </div>
                                 <div style={{ textAlign: 'center' }}>
                                   <div style={{ fontWeight: '600', color: '#3b82f6' }}>{consultor.totalAgendamentos}</div>
-                                  <div style={{ color: '#6b7280', fontSize: '0.75rem' }}>agendamentos</div>
+                                  <div style={{ color: '#6b7280', fontSize: '0.75rem' }}>visitas</div>
                                 </div>
                                 <div style={{ textAlign: 'center' }}>
                                   <div style={{ fontWeight: '600', color: '#10b981' }}>{consultor.totalFechamentos}</div>
@@ -1224,7 +1214,7 @@ const Dashboard = () => {
                                   {formatCurrency(consultor.valorFechado)}
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                                  Comissão: {formatCurrency(consultor.comissaoTotal)}
+                                  Crédito: {formatCurrency(consultor.comissaoTotal)}
                                 </div>
                               </div>
                             </div>
@@ -1233,8 +1223,8 @@ const Dashboard = () => {
                       </div>
                     )}
 
-                    {/* Consultores inativos */}
-                    {consultoresInativos.length > 0 && (
+                                {/* Corretores inativos */}
+            {consultoresInativos.length > 0 && (
                       <div>
                         <h4 style={{ 
                           fontSize: '1rem', 
@@ -1298,49 +1288,49 @@ const Dashboard = () => {
         <div className="card-body">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '2rem' }}>
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', fontWeight: '700', color: '#1a1d23' }}>
-                {stats.totalPacientes}
+              <div style={{ fontSize: '2rem', fontWeight: '700', color: '#0ea5e9' }}>
+                {stats.totalIndicacoes}
               </div>
-              <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+              <div style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '0.25rem' }}>
                 Leads Totais
               </div>
             </div>
 
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="2">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2">
               <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
 
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', fontWeight: '700', color: '#1a1d23' }}>
+              <div style={{ fontSize: '2rem', fontWeight: '700', color: '#3b82f6' }}>
                 {stats.leadsPorStatus.agendado || 0}
               </div>
-              <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+              <div style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '0.25rem' }}>
                 Agendados
               </div>
             </div>
 
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="2">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2">
               <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
 
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', fontWeight: '700', color: '#1a1d23' }}>
+              <div style={{ fontSize: '2rem', fontWeight: '700', color: '#0891b2' }}>
                 {stats.leadsPorStatus.compareceu || 0}
               </div>
-              <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+              <div style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '0.25rem' }}>
                 Compareceram
               </div>
             </div>
 
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="2">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2">
               <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
 
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', fontWeight: '700', color: '#059669' }}>
+              <div style={{ fontSize: '2rem', fontWeight: '700', color: '#000064' }}>
                 {stats.leadsPorStatus.fechado || 0}
               </div>
-              <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+              <div style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '0.25rem' }}>
                 Fechados
               </div>
             </div>
@@ -1353,12 +1343,12 @@ const Dashboard = () => {
             borderRadius: '8px',
             textAlign: 'center' 
           }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#059669' }}>
-              {stats.totalPacientes > 0 
-                ? ((stats.leadsPorStatus.fechado || 0) / stats.totalPacientes * 100).toFixed(1)
+                        <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#000064' }}>
+              {stats.totalIndicacoes > 0
+                ? ((stats.leadsPorStatus.fechado || 0) / stats.totalIndicacoes * 100).toFixed(1)
                 : 0}%
             </div>
-            <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+            <div style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '0.25rem' }}>
               Taxa de Conversão Total
             </div>
           </div>
