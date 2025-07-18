@@ -40,6 +40,7 @@ const ProtectedRoute = ({ children }) => {
 function AppContent() {
   const { user, logout, loading } = useAuth();
   const location = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   // Determinar aba ativa baseada na rota atual
   const getActiveTab = () => {
@@ -104,7 +105,13 @@ function AppContent() {
 
   return (
     <div className="App">
-      <aside className="sidebar">
+      {/* Overlay para mobile */}
+      <div 
+        className={`sidebar-overlay ${mobileMenuOpen ? 'active' : ''}`}
+        onClick={() => setMobileMenuOpen(false)}
+      />
+      
+      <aside className={`sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-header">
           <img 
             src={logoBrasao} 
@@ -123,6 +130,7 @@ function AppContent() {
             <Link
               to="/dashboard"
               className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="3" y="3" width="7" height="7" />
@@ -138,6 +146,7 @@ function AppContent() {
             <Link
               to="/indicacoes"
               className={`nav-link ${activeTab === 'indicacoes' ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
@@ -150,6 +159,7 @@ function AppContent() {
             <Link
               to="/agendamentos"
               className={`nav-link ${activeTab === 'agendamentos' ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -165,6 +175,7 @@ function AppContent() {
             <Link
               to="/fechamentos"
               className={`nav-link ${activeTab === 'fechamentos' ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="12" y1="1" x2="12" y2="23" />
@@ -178,6 +189,7 @@ function AppContent() {
             <Link
               to="/imobiliarias"
               className={`nav-link ${activeTab === 'imobiliarias' ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -192,6 +204,7 @@ function AppContent() {
               <Link
                 to="/consultores"
                 className={`nav-link ${activeTab === 'consultores' ? 'active' : ''}`}
+                onClick={() => setMobileMenuOpen(false)}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -231,6 +244,17 @@ function AppContent() {
       <main className="main-content">
         <header className="main-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+            <button 
+              className="mobile-menu-btn"
+              onClick={() => setMobileMenuOpen(true)}
+              style={{ display: 'none' }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
             <img 
               src={logoHorizontalAzul} 
               alt="CRM System" 
