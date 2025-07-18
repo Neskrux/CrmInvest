@@ -17,6 +17,7 @@ const Pacientes = () => {
   const [filtroCPF, setFiltroCPF] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
+  const [filtroCpfAprovado, setFiltroCpfAprovado] = useState('');
   const [filtroConsultor, setFiltroConsultor] = useState('');
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
   const [filtroDataFim, setFiltroDataFim] = useState('');
@@ -27,7 +28,8 @@ const Pacientes = () => {
     tipo_tratamento: '',
     status: 'lead',
     observacoes: '',
-    consultor_id: ''
+    consultor_id: '',
+    cpf_aprovado: false
   });
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewPaciente, setViewPaciente] = useState(null);
@@ -181,7 +183,8 @@ const Pacientes = () => {
       tipo_tratamento: paciente.tipo_tratamento || '',
       status: paciente.status || 'lead',
       observacoes: paciente.observacoes || '',
-      consultor_id: paciente.consultor_id || ''
+      consultor_id: paciente.consultor_id || '',
+      cpf_aprovado: paciente.cpf_aprovado || false
     });
     setShowModal(true);
   };
@@ -209,9 +212,16 @@ const Pacientes = () => {
   }
 
   const handleInputChange = (e) => {
-    let { name, value } = e.target;
-    if (name === 'telefone') value = maskTelefone(value);
-    if (name === 'cpf') value = maskCPF(value);
+    let { name, value, type, checked } = e.target;
+    
+    // Para checkbox, usar checked em vez de value
+    if (type === 'checkbox') {
+      value = checked;
+    } else {
+      if (name === 'telefone') value = maskTelefone(value);
+      if (name === 'cpf') value = maskCPF(value);
+    }
+    
     setFormData({
       ...formData,
       [name]: value
@@ -274,7 +284,8 @@ const Pacientes = () => {
       tipo_tratamento: '',
       status: 'lead',
       observacoes: '',
-      consultor_id: ''
+      consultor_id: '',
+      cpf_aprovado: false
     });
     setEditingPaciente(null);
     setShowModal(false);
@@ -289,6 +300,7 @@ const Pacientes = () => {
     const matchCPF = !filtroCPF || (p.cpf || '').includes(filtroCPF);
     const matchTipo = !filtroTipo || p.tipo_tratamento === filtroTipo;
     const matchStatus = !filtroStatus || p.status === filtroStatus;
+    const matchCpfAprovado = !filtroCpfAprovado || (filtroCpfAprovado === 'true' ? p.cpf_aprovado === true : p.cpf_aprovado === false);
     const matchConsultor = !filtroConsultor || String(p.consultor_id) === filtroConsultor;
     
     // Filtro por data de cadastro
@@ -317,7 +329,7 @@ const Pacientes = () => {
       }
     }
     
-    return matchNome && matchTelefone && matchCPF && matchTipo && matchStatus && matchConsultor && matchData;
+    return matchNome && matchTelefone && matchCPF && matchTipo && matchStatus && matchCpfAprovado && matchConsultor && matchData;
   });
 
   return (
@@ -412,7 +424,7 @@ const Pacientes = () => {
                     <input type="text" className="form-input" value={filtroCPF} onChange={e => setFiltroCPF(e.target.value)} placeholder="Buscar por CPF" />
                   </div>
                 </div>
-                <div className="grid grid-3" style={{ gap: '1rem' }}>
+                <div className="grid grid-4" style={{ gap: '1rem' }}>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label">Tipo de Tratamento</label>
                     <select className="form-select" value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}>
@@ -428,6 +440,14 @@ const Pacientes = () => {
                       {statusOptions.map(option => (
                         <option key={option.value} value={option.value}>{option.label}</option>
                       ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">CPF Aprovado</label>
+                    <select className="form-select" value={filtroCpfAprovado} onChange={e => setFiltroCpfAprovado(e.target.value)}>
+                      <option value="">Todos</option>
+                      <option value="true">Sim</option>
+                      <option value="false">Não</option>
                     </select>
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
@@ -466,6 +486,7 @@ const Pacientes = () => {
                   setFiltroCPF(''); 
                   setFiltroTipo(''); 
                   setFiltroStatus(''); 
+                  setFiltroCpfAprovado('');
                   setFiltroConsultor('');
                   setFiltroDataInicio('');
                   setFiltroDataFim('');
@@ -503,6 +524,7 @@ const Pacientes = () => {
                       <th>Consultor</th>
                       <th>Telefone</th>
                       <th>CPF</th>
+                      <th>CPF Aprovado</th>
                       <th>Tipo</th>
                       <th>Status</th>
                       <th>Cadastrado</th>
@@ -533,6 +555,11 @@ const Pacientes = () => {
                           </td>
                           <td>{formatarTelefone(paciente.telefone)}</td>
                           <td>{formatarCPF(paciente.cpf)}</td>
+                          <td>
+                            <span className={`badge ${paciente.cpf_aprovado ? 'badge-success' : 'badge-danger'}`}>
+                              {paciente.cpf_aprovado ? 'Sim' : 'Não'}
+                            </span>
+                          </td>
                           <td>
                             {paciente.tipo_tratamento && (
                               <span className={`badge badge-${paciente.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
@@ -629,6 +656,7 @@ const Pacientes = () => {
                       <th>Nome</th>
                       <th>Telefone</th>
                       <th>CPF</th>
+                      <th>CPF Aprovado</th>
                       <th>Tipo</th>
                       <th>Status</th>
                       <th>Cadastrado</th>
@@ -652,6 +680,11 @@ const Pacientes = () => {
                           </td>
                           <td>{formatarTelefone(lead.telefone)}</td>
                           <td>{formatarCPF(lead.cpf)}</td>
+                          <td>
+                            <span className={`badge ${lead.cpf_aprovado ? 'badge-success' : 'badge-danger'}`}>
+                              {lead.cpf_aprovado ? 'Sim' : 'Não'}
+                            </span>
+                          </td>
                           <td>
                             {lead.tipo_tratamento && (
                               <span className={`badge badge-${lead.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
@@ -735,6 +768,19 @@ const Pacientes = () => {
                     placeholder="000.000.000-00"
                   />
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    name="cpf_aprovado"
+                    checked={formData.cpf_aprovado}
+                    onChange={handleInputChange}
+                    style={{ margin: 0 }}
+                  />
+                  CPF Aprovado
+                </label>
               </div>
 
               <div className="grid grid-2">
@@ -825,6 +871,10 @@ const Pacientes = () => {
                   <label className="form-label">CPF</label>
                   <input type="text" className="form-input" value={viewPaciente.cpf || '-'} readOnly />
                 </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">CPF Aprovado</label>
+                <input type="text" className="form-input" value={viewPaciente.cpf_aprovado ? 'Sim' : 'Não'} readOnly />
               </div>
               <div className="grid grid-2">
                 <div className="form-group">
