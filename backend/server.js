@@ -7,6 +7,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
+const MetaAdsAPI = require('./meta-ads-api');
 require('dotenv').config();
 
 const app = express();
@@ -878,7 +879,7 @@ app.get('/api/pacientes', authenticateToken, async (req, res) => {
 
 app.post('/api/pacientes', authenticateToken, async (req, res) => {
   try {
-    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id } = req.body;
+    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cpf_aprovado } = req.body;
     
     // Converter consultor_id para null se não fornecido
     const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
@@ -892,7 +893,8 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
         tipo_tratamento, 
         status: status || 'lead', 
         observacoes,
-        consultor_id: consultorId
+        consultor_id: consultorId,
+        cpf_aprovado: cpf_aprovado || false
       }])
       .select();
 
@@ -906,7 +908,7 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
 app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id } = req.body;
+    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cpf_aprovado } = req.body;
     
     // Converter consultor_id para null se não fornecido
     const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
@@ -920,7 +922,8 @@ app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
         tipo_tratamento, 
         status, 
         observacoes,
-        consultor_id: consultorId
+        consultor_id: consultorId,
+        cpf_aprovado: cpf_aprovado !== undefined ? cpf_aprovado : false
       })
       .eq('id', id)
       .select();
@@ -1448,6 +1451,267 @@ app.put('/api/fechamentos/:id/reprovar', authenticateToken, requireAdmin, async 
   } catch (error) {
     console.error('Erro ao reprovar fechamento:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// === META ADS PRICING === (Apenas Admin)
+app.get('/api/meta-ads/pricing', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { cidade, estado, status } = req.query;
+    
+    let query = supabase
+      .from('meta_ads_pricing')
+      .select('*')
+      .order('cidade');
+
+    if (cidade) {
+      query = query.ilike('cidade', `%${cidade}%`);
+    }
+
+    if (estado) {
+      query = query.eq('estado', estado);
+    }
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/meta-ads/pricing', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { cidade, estado, preco_por_lead, campanha_id, campanha_nome, periodo_inicio, periodo_fim, observacoes } = req.body;
+    
+    const { data, error } = await supabase
+      .from('meta_ads_pricing')
+      .insert([{ 
+        cidade, 
+        estado, 
+        preco_por_lead, 
+        campanha_id, 
+        campanha_nome, 
+        periodo_inicio, 
+        periodo_fim, 
+        observacoes 
+      }])
+      .select();
+
+    if (error) throw error;
+    res.json({ id: data[0].id, message: 'Preço por lead cadastrado com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/meta-ads/pricing/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+    
+    const { data, error } = await supabase
+      .from('meta_ads_pricing')
+      .update(updateData)
+      .eq('id', id)
+      .select();
+
+    if (error) throw error;
+    res.json({ id: data[0].id, message: 'Preço por lead atualizado com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === META ADS LEADS === (Admin vê todos, Consultor vê apenas seus)
+app.get('/api/meta-ads/leads', authenticateToken, async (req, res) => {
+  try {
+    let query = supabase
+      .from('meta_ads_leads')
+      .select(`
+        *,
+        pacientes(nome, telefone, cpf)
+      `)
+      .order('created_at', { ascending: false });
+
+    // Se for consultor, filtrar apenas leads de pacientes atribuídos a ele
+    if (req.user.tipo === 'consultor') {
+      const { data: pacientesConsultor, error: pacientesError } = await supabase
+        .from('pacientes')
+        .select('id')
+        .eq('consultor_id', req.user.consultor_id);
+
+      if (pacientesError) throw pacientesError;
+
+      const pacienteIds = pacientesConsultor.map(p => p.id);
+      
+      if (pacienteIds.length > 0) {
+        query = query.in('paciente_id', pacienteIds);
+      } else {
+        // Se não tem pacientes, retornar array vazio
+        return res.json([]);
+      }
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/meta-ads/leads', authenticateToken, async (req, res) => {
+  try {
+    const { 
+      paciente_id, 
+      campanha_id, 
+      campanha_nome, 
+      adset_id, 
+      adset_nome, 
+      ad_id, 
+      ad_nome, 
+      custo_lead, 
+      data_lead, 
+      cidade_lead, 
+      estado_lead 
+    } = req.body;
+    
+    const { data, error } = await supabase
+      .from('meta_ads_leads')
+      .insert([{ 
+        paciente_id, 
+        campanha_id, 
+        campanha_nome, 
+        adset_id, 
+        adset_nome, 
+        ad_id, 
+        ad_nome, 
+        custo_lead, 
+        data_lead, 
+        cidade_lead, 
+        estado_lead 
+      }])
+      .select();
+
+    if (error) throw error;
+    res.json({ id: data[0].id, message: 'Lead do Meta Ads registrado com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === META ADS API INTEGRATION === (Apenas Admin)
+app.get('/api/meta-ads/test-connection', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const metaAPI = new MetaAdsAPI();
+    const result = await metaAPI.testConnection();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erro ao testar conexão com Meta Ads API',
+      error: error.message || 'Erro desconhecido'
+    });
+  }
+});
+
+app.get('/api/meta-ads/campaigns', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const metaAPI = new MetaAdsAPI();
+    const campaigns = await metaAPI.getCampaigns();
+    res.json(campaigns);
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erro ao buscar campanhas',
+      error: error.message || 'Erro desconhecido'
+    });
+  }
+});
+
+app.get('/api/meta-ads/campaign/:id/insights', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { dateRange = 'last_30d' } = req.query;
+    
+    const metaAPI = new MetaAdsAPI();
+    const insights = await metaAPI.getCostPerLeadByRegion(id, dateRange);
+    res.json(insights);
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erro ao buscar insights da campanha',
+      error: error.message || 'Erro desconhecido'
+    });
+  }
+});
+
+app.post('/api/meta-ads/sync-campaigns', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const metaAPI = new MetaAdsAPI();
+    const campaignData = await metaAPI.syncCampaignData();
+    
+    // Salvar dados no banco
+    const { data, error } = await supabase
+      .from('meta_ads_pricing')
+      .upsert(
+        campaignData.flatMap(campaign => 
+          campaign.insights.map(insight => ({
+            cidade: insight.city,
+            estado: insight.region,
+            preco_por_lead: insight.costPerLead,
+            campanha_id: campaign.campaign_id,
+            campanha_nome: campaign.campaign_name,
+            periodo_inicio: new Date().toISOString().split('T')[0],
+            periodo_fim: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            status: 'ativo',
+            observacoes: `Sincronizado automaticamente - ${campaign.campaign_name}`
+          }))
+        ),
+        { onConflict: 'cidade,estado,campanha_id' }
+      );
+
+    if (error) throw error;
+    
+    res.json({ 
+      success: true, 
+      message: 'Campanhas sincronizadas com sucesso!',
+      campaignsCount: campaignData.length,
+      pricingCount: data?.length || 0
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erro ao sincronizar campanhas',
+      error: error.message || 'Erro desconhecido'
+    });
+  }
+});
+
+app.get('/api/meta-ads/regional-insights', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { campaignId, dateRange = 'last_30d' } = req.query;
+    
+    if (!campaignId) {
+      return res.status(400).json({ error: 'ID da campanha é obrigatório' });
+    }
+    
+    const metaAPI = new MetaAdsAPI();
+    const insights = await metaAPI.getRegionalInsights(campaignId, dateRange);
+    res.json(insights);
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erro ao buscar insights regionais',
+      error: error.message || 'Erro desconhecido'
+    });
   }
 });
 

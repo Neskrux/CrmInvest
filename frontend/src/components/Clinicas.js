@@ -147,6 +147,7 @@ const Clinicas = () => {
           email: '',
           status: 'ativo'
         });
+        setCidadeCustomizada(false);
         fetchClinicas();
         setTimeout(() => setMessage(''), 3000);
       } else {
