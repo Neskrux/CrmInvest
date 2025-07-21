@@ -17,7 +17,7 @@ const Pacientes = () => {
   const [filtroCPF, setFiltroCPF] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
-  const [filtroCpfAprovado, setFiltroCpfAprovado] = useState('');
+
   const [filtroConsultor, setFiltroConsultor] = useState('');
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
   const [filtroDataFim, setFiltroDataFim] = useState('');
@@ -28,8 +28,7 @@ const Pacientes = () => {
     tipo_tratamento: '',
     status: 'lead',
     observacoes: '',
-    consultor_id: '',
-    cpf_aprovado: false
+    consultor_id: ''
   });
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewPaciente, setViewPaciente] = useState(null);
@@ -45,6 +44,7 @@ const Pacientes = () => {
     { value: 'reagendado', label: 'Reagendado', color: '#8b5cf6' },
     { value: 'nao_passou_cpf', label: 'Não passou CPF', color: '#6366f1' },
     { value: 'sem_cedente', label: 'Sem cedente (CPF Aprovado)', color: '#fbbf24' },
+    { value: 'cpf_aprovado', label: 'CPF Aprovado', color: '#10b981' },
     { value: 'nao_tem_interesse', label: 'Não tem interesse', color: '#9ca3af' },
     { value: 'em_conversa', label: 'Em conversa', color: '#0ea5e9' },
     { value: 'cpf_reprovado', label: 'CPF Reprovado', color: '#ef4444' },
@@ -183,8 +183,7 @@ const Pacientes = () => {
       tipo_tratamento: paciente.tipo_tratamento || '',
       status: paciente.status || 'lead',
       observacoes: paciente.observacoes || '',
-      consultor_id: paciente.consultor_id || '',
-      cpf_aprovado: paciente.cpf_aprovado || false
+      consultor_id: paciente.consultor_id || ''
     });
     setShowModal(true);
   };
@@ -284,8 +283,7 @@ const Pacientes = () => {
       tipo_tratamento: '',
       status: 'lead',
       observacoes: '',
-      consultor_id: '',
-      cpf_aprovado: false
+      consultor_id: ''
     });
     setEditingPaciente(null);
     setShowModal(false);
@@ -300,7 +298,7 @@ const Pacientes = () => {
     const matchCPF = !filtroCPF || (p.cpf || '').includes(filtroCPF);
     const matchTipo = !filtroTipo || p.tipo_tratamento === filtroTipo;
     const matchStatus = !filtroStatus || p.status === filtroStatus;
-    const matchCpfAprovado = !filtroCpfAprovado || (filtroCpfAprovado === 'true' ? p.cpf_aprovado === true : p.cpf_aprovado === false);
+
     const matchConsultor = !filtroConsultor || String(p.consultor_id) === filtroConsultor;
     
     // Filtro por data de cadastro
@@ -329,7 +327,7 @@ const Pacientes = () => {
       }
     }
     
-    return matchNome && matchTelefone && matchCPF && matchTipo && matchStatus && matchCpfAprovado && matchConsultor && matchData;
+    return matchNome && matchTelefone && matchCPF && matchTipo && matchStatus && matchConsultor && matchData;
   });
 
   return (
@@ -442,14 +440,7 @@ const Pacientes = () => {
                       ))}
                     </select>
                   </div>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">CPF Aprovado</label>
-                    <select className="form-select" value={filtroCpfAprovado} onChange={e => setFiltroCpfAprovado(e.target.value)}>
-                      <option value="">Todos</option>
-                      <option value="true">Sim</option>
-                      <option value="false">Não</option>
-                    </select>
-                  </div>
+
                   <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label">Consultor</label>
                     <select className="form-select" value={filtroConsultor} onChange={e => setFiltroConsultor(e.target.value)}>
@@ -486,7 +477,6 @@ const Pacientes = () => {
                   setFiltroCPF(''); 
                   setFiltroTipo(''); 
                   setFiltroStatus(''); 
-                  setFiltroCpfAprovado('');
                   setFiltroConsultor('');
                   setFiltroDataInicio('');
                   setFiltroDataFim('');
@@ -524,7 +514,6 @@ const Pacientes = () => {
                       <th>Consultor</th>
                       <th>Telefone</th>
                       <th>CPF</th>
-                      <th>CPF Aprovado</th>
                       <th>Tipo</th>
                       <th>Status</th>
                       <th>Cadastrado</th>
@@ -555,11 +544,6 @@ const Pacientes = () => {
                           </td>
                           <td>{formatarTelefone(paciente.telefone)}</td>
                           <td>{formatarCPF(paciente.cpf)}</td>
-                          <td>
-                            <span className={`badge ${paciente.cpf_aprovado ? 'badge-success' : 'badge-danger'}`}>
-                              {paciente.cpf_aprovado ? 'Sim' : 'Não'}
-                            </span>
-                          </td>
                           <td>
                             {paciente.tipo_tratamento && (
                               <span className={`badge badge-${paciente.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
@@ -656,7 +640,6 @@ const Pacientes = () => {
                       <th>Nome</th>
                       <th>Telefone</th>
                       <th>CPF</th>
-                      <th>CPF Aprovado</th>
                       <th>Tipo</th>
                       <th>Status</th>
                       <th>Cadastrado</th>
@@ -680,11 +663,6 @@ const Pacientes = () => {
                           </td>
                           <td>{formatarTelefone(lead.telefone)}</td>
                           <td>{formatarCPF(lead.cpf)}</td>
-                          <td>
-                            <span className={`badge ${lead.cpf_aprovado ? 'badge-success' : 'badge-danger'}`}>
-                              {lead.cpf_aprovado ? 'Sim' : 'Não'}
-                            </span>
-                          </td>
                           <td>
                             {lead.tipo_tratamento && (
                               <span className={`badge badge-${lead.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
@@ -770,18 +748,7 @@ const Pacientes = () => {
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <input
-                    type="checkbox"
-                    name="cpf_aprovado"
-                    checked={formData.cpf_aprovado}
-                    onChange={handleInputChange}
-                    style={{ margin: 0 }}
-                  />
-                  CPF Aprovado
-                </label>
-              </div>
+
 
               <div className="grid grid-2">
                 <div className="form-group">
@@ -872,10 +839,7 @@ const Pacientes = () => {
                   <input type="text" className="form-input" value={viewPaciente.cpf || '-'} readOnly />
                 </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">CPF Aprovado</label>
-                <input type="text" className="form-input" value={viewPaciente.cpf_aprovado ? 'Sim' : 'Não'} readOnly />
-              </div>
+
               <div className="grid grid-2">
                 <div className="form-group">
                   <label className="form-label">Tipo de Tratamento</label>
