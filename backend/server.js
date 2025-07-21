@@ -879,7 +879,7 @@ app.get('/api/pacientes', authenticateToken, async (req, res) => {
 
 app.post('/api/pacientes', authenticateToken, async (req, res) => {
   try {
-    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cpf_aprovado } = req.body;
+    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id } = req.body;
     
     // Converter consultor_id para null se não fornecido
     const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
@@ -894,7 +894,7 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
         status: status || 'lead', 
         observacoes,
         consultor_id: consultorId,
-        cpf_aprovado: cpf_aprovado || false
+
       }])
       .select();
 
@@ -908,7 +908,7 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
 app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cpf_aprovado } = req.body;
+    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id } = req.body;
     
     // Converter consultor_id para null se não fornecido
     const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
@@ -923,7 +923,7 @@ app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
         status, 
         observacoes,
         consultor_id: consultorId,
-        cpf_aprovado: cpf_aprovado !== undefined ? cpf_aprovado : false
+
       })
       .eq('id', id)
       .select();
