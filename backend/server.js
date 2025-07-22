@@ -1705,24 +1705,26 @@ app.post('/api/meta-ads/sync-campaigns', authenticateToken, requireAdmin, async 
     const campaignData = await metaAPI.syncCampaignData();
     
     // Salvar dados no banco
+    const pricingData = campaignData.flatMap(campaign => 
+      campaign.insights.map(insight => ({
+        region: insight.region || 'N/A',
+        country: insight.country || 'BR',
+        cost_per_lead: insight.costPerLead || 0,
+        spend: insight.spend || 0,
+        impressions: insight.impressions || 0,
+        clicks: insight.clicks || 0,
+        leads: insight.leads || 0,
+        date_range: 'last_30d',
+        updated_at: new Date().toISOString()
+      }))
+    );
+
     const { data, error } = await supabase
       .from('meta_ads_pricing')
-      .upsert(
-        campaignData.flatMap(campaign => 
-          campaign.insights.map(insight => ({
-            cidade: insight.city,
-            estado: insight.region,
-            preco_por_lead: insight.costPerLead,
-            campanha_id: campaign.campaign_id,
-            campanha_nome: campaign.campaign_name,
-            periodo_inicio: new Date().toISOString().split('T')[0],
-            periodo_fim: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            status: 'ativo',
-            observacoes: `Sincronizado automaticamente - ${campaign.campaign_name}`
-          }))
-        ),
-        { onConflict: 'cidade,estado,campanha_id' }
-      );
+      .upsert(pricingData, { 
+        onConflict: 'region,country,date_range',
+        ignoreDuplicates: false 
+      });
 
     if (error) throw error;
     
