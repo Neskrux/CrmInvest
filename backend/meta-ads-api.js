@@ -182,7 +182,7 @@ class MetaAdsAPI {
     const params = {
       fields: 'spend,impressions,clicks,actions,action_values,cost_per_action_type',
       time_range: `{'since':'${this.getDateRange(dateRange).since}','until':'${this.getDateRange(dateRange).until}'}`,
-      breakdowns: 'country,region,city'
+      breakdowns: 'country,region' // Removido 'city' - não suportado pela API v23.0+
     };
 
     return await this.makeRequest(endpoint, params);
@@ -194,9 +194,8 @@ class MetaAdsAPI {
       const insights = await this.getRegionalInsights(campaignId, dateRange);
       
       return insights.data.map(insight => {
-        const region = insight.breakdowns?.region || 'N/A';
-        const city = insight.breakdowns?.city || 'N/A';
-        const country = insight.breakdowns?.country || 'BR';
+        const region = insight.region || 'N/A';
+        const country = insight.country || 'BR';
         
         // Calcular custo por lead
         const spend = parseFloat(insight.spend) || 0;
@@ -205,7 +204,6 @@ class MetaAdsAPI {
 
         return {
           region,
-          city,
           country,
           spend,
           leads,
