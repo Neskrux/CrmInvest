@@ -25,6 +25,7 @@ const Pacientes = () => {
     nome: '',
     telefone: '',
     cpf: '',
+    cidade: '',
     tipo_tratamento: '',
     status: 'lead',
     observacoes: '',
@@ -180,6 +181,7 @@ const Pacientes = () => {
       nome: paciente.nome || '',
       telefone: paciente.telefone || '',
       cpf: paciente.cpf || '',
+      cidade: paciente.cidade || '',
       tipo_tratamento: paciente.tipo_tratamento || '',
       status: paciente.status || 'lead',
       observacoes: paciente.observacoes || '',
@@ -210,6 +212,34 @@ const Pacientes = () => {
       .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
   }
 
+  // Função para formatar cidade no padrão: Cidade/ESTADO
+  function formatarCidade(value) {
+    if (!value) return '';
+    
+    // Remove caracteres especiais exceto barra e espaços
+    const cleanValue = value.replace(/[^a-zA-ZÀ-ÿ\s\/]/g, '');
+    
+    // Se contém barra, formatar cidade/estado
+    if (cleanValue.includes('/')) {
+      const parts = cleanValue.split('/');
+      if (parts.length >= 2) {
+        const cidade = parts[0].trim();
+        const estado = parts[1].trim().toUpperCase();
+        
+        // Primeira letra maiúscula na cidade
+        const cidadeFormatada = cidade.charAt(0).toUpperCase() + cidade.slice(1).toLowerCase();
+        
+        // Limitar estado a 2 caracteres
+        const estadoFormatado = estado.substring(0, 2);
+        
+        return `${cidadeFormatada}/${estadoFormatado}`;
+      }
+    }
+    
+    // Se não tem barra, apenas primeira maiúscula
+    return cleanValue.charAt(0).toUpperCase() + cleanValue.slice(1).toLowerCase();
+  }
+
   const handleInputChange = (e) => {
     let { name, value, type, checked } = e.target;
     
@@ -219,6 +249,7 @@ const Pacientes = () => {
     } else {
       if (name === 'telefone') value = maskTelefone(value);
       if (name === 'cpf') value = maskCPF(value);
+      if (name === 'cidade') value = formatarCidade(value);
     }
     
     setFormData({
@@ -280,6 +311,7 @@ const Pacientes = () => {
       nome: '',
       telefone: '',
       cpf: '',
+      cidade: '',
       tipo_tratamento: '',
       status: 'lead',
       observacoes: '',
@@ -514,6 +546,7 @@ const Pacientes = () => {
                       <th>Consultor</th>
                       <th>Telefone</th>
                       <th>CPF</th>
+                      <th>Cidade</th>
                       <th>Tipo</th>
                       <th>Status</th>
                       <th>Cadastrado</th>
@@ -544,6 +577,7 @@ const Pacientes = () => {
                           </td>
                           <td>{formatarTelefone(paciente.telefone)}</td>
                           <td>{formatarCPF(paciente.cpf)}</td>
+                          <td>{paciente.cidade || '-'}</td>
                           <td>
                             {paciente.tipo_tratamento && (
                               <span className={`badge badge-${paciente.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
@@ -640,6 +674,7 @@ const Pacientes = () => {
                       <th>Nome</th>
                       <th>Telefone</th>
                       <th>CPF</th>
+                      <th>Cidade</th>
                       <th>Tipo</th>
                       <th>Status</th>
                       <th>Cadastrado</th>
@@ -663,6 +698,7 @@ const Pacientes = () => {
                           </td>
                           <td>{formatarTelefone(lead.telefone)}</td>
                           <td>{formatarCPF(lead.cpf)}</td>
+                          <td>{lead.cidade || '-'}</td>
                           <td>
                             {lead.tipo_tratamento && (
                               <span className={`badge badge-${lead.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
@@ -746,6 +782,21 @@ const Pacientes = () => {
                     placeholder="000.000.000-00"
                   />
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Cidade</label>
+                <input
+                  type="text"
+                  name="cidade"
+                  className="form-input"
+                  value={formData.cidade}
+                  onChange={handleInputChange}
+                  placeholder="São Paulo/SP"
+                />
+                <small style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                  Formato: Cidade/ESTADO (ex: São Paulo/SP)
+                </small>
               </div>
 
 
@@ -838,6 +889,11 @@ const Pacientes = () => {
                   <label className="form-label">CPF</label>
                   <input type="text" className="form-input" value={viewPaciente.cpf || '-'} readOnly />
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Cidade</label>
+                <input type="text" className="form-input" value={viewPaciente.cidade || '-'} readOnly />
               </div>
 
               <div className="grid grid-2">
