@@ -1614,11 +1614,55 @@ app.get('/api/meta-ads/test-connection', authenticateToken, requireAdmin, async 
   try {
     const metaAPI = new MetaAdsAPI();
     const result = await metaAPI.testConnection();
-    res.json(result);
+    
+    // Verificar expiração do token
+    const tokenStatus = await metaAPI.checkTokenExpiration();
+    
+    res.json({
+      ...result,
+      tokenStatus
+    });
   } catch (error) {
     res.status(500).json({ 
       success: false, 
       message: 'Erro ao testar conexão com Meta Ads API',
+      error: error.message || 'Erro desconhecido'
+    });
+  }
+});
+
+// Verificar status do token
+app.get('/api/meta-ads/token-status', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const metaAPI = new MetaAdsAPI();
+    const tokenStatus = await metaAPI.checkTokenExpiration();
+    res.json(tokenStatus);
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erro ao verificar token',
+      error: error.message || 'Erro desconhecido'
+    });
+  }
+});
+
+// Renovar token
+app.post('/api/meta-ads/extend-token', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const metaAPI = new MetaAdsAPI();
+    const newToken = await metaAPI.extendToken();
+    
+    res.json({
+      success: true,
+      message: 'Token renovado com sucesso! Atualize o META_ACCESS_TOKEN no arquivo .env',
+      newToken: newToken.access_token,
+      expiresIn: newToken.expires_in,
+      expiresAt: newToken.expires_at
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erro ao renovar token',
       error: error.message || 'Erro desconhecido'
     });
   }

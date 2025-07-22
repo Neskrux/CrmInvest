@@ -17,6 +17,7 @@ const MetaAds = () => {
   const [selectedCampaign, setSelectedCampaign] = useState('');
   const [dateRange, setDateRange] = useState('last_30d');
   const [apiStatus, setApiStatus] = useState(null);
+  const [tokenStatus, setTokenStatus] = useState(null);
   const [formData, setFormData] = useState({
     cidade: '',
     estado: '',
@@ -110,12 +111,44 @@ const MetaAds = () => {
       const response = await makeRequest('/meta-ads/test-connection');
       const data = await response.json();
       setApiStatus(data);
+      setTokenStatus(data.tokenStatus);
     } catch (error) {
       setApiStatus({ 
         success: false, 
         message: 'Erro ao testar conexão',
         error: error.message || 'Erro desconhecido'
       });
+    }
+  };
+
+  const checkTokenStatus = async () => {
+    try {
+      const response = await makeRequest('/meta-ads/token-status');
+      const data = await response.json();
+      setTokenStatus(data);
+    } catch (error) {
+      console.error('Erro ao verificar status do token:', error);
+    }
+  };
+
+  const extendToken = async () => {
+    try {
+      setLoading(true);
+      const response = await makeRequest('/meta-ads/extend-token', {
+        method: 'POST'
+      });
+      const data = await response.json();
+      
+      if (response.ok) {
+        setMessage(`✅ ${data.message}\n\n🔑 Novo token: ${data.newToken}\n\n⚠️ Copie e atualize seu .env!`);
+        checkTokenStatus();
+      } else {
+        setMessage('❌ Erro ao renovar token: ' + (data.error || 'Erro desconhecido'));
+      }
+    } catch (error) {
+      setMessage('❌ Erro ao renovar token: ' + (error.message || 'Erro desconhecido'));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -408,7 +441,7 @@ const MetaAds = () => {
       )}
 
       {activeTab === 'api' && (
-        <div className="api-integration">
+                  <div className="api-integration">
           <div className="api-status">
             <h3>🔗 Status da API</h3>
             {apiStatus && (
@@ -428,6 +461,35 @@ const MetaAds = () => {
                         : JSON.stringify(apiStatus.error, null, 2)
                       }
                     </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {tokenStatus && (
+              <div className="token-status">
+                <h4>🔑 Status do Token</h4>
+                <div className={`token-card ${tokenStatus.needsRenewal ? 'warning' : 'success'}`}>
+                  <div className="token-info">
+                    <p><strong>Válido:</strong> {tokenStatus.isValid ? '✅ Sim' : '❌ Não'}</p>
+                    {tokenStatus.expires && tokenStatus.expires !== 'never' && (
+                      <p><strong>Expira em:</strong> {tokenStatus.expires} ({tokenStatus.daysLeft} dias)</p>
+                    )}
+                    {tokenStatus.expires === 'never' && (
+                      <p><strong>Expiração:</strong> ♾️ Nunca expira</p>
+                    )}
+                    {tokenStatus.needsRenewal && (
+                      <p className="warning-text">⚠️ Token precisa ser renovado!</p>
+                    )}
+                  </div>
+                  {tokenStatus.needsRenewal && (
+                    <button 
+                      className="btn btn-warning"
+                      onClick={extendToken}
+                      disabled={loading}
+                    >
+                      🔄 Renovar Token (60 dias)
+                    </button>
                   )}
                 </div>
               </div>
@@ -1014,6 +1076,48 @@ const MetaAds = () => {
           margin: 5px 0;
           font-size: 14px;
           color: #6b7280;
+        }
+
+        .token-status {
+          margin-top: 20px;
+        }
+
+        .token-card {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 15px;
+          border-radius: 8px;
+          margin-top: 10px;
+        }
+
+        .token-card.success {
+          background: #d1fae5;
+          border: 1px solid #a7f3d0;
+        }
+
+        .token-card.warning {
+          background: #fef3c7;
+          border: 1px solid #fde68a;
+        }
+
+        .token-info p {
+          margin: 5px 0;
+          font-size: 14px;
+        }
+
+        .warning-text {
+          color: #d97706 !important;
+          font-weight: 600;
+        }
+
+        .btn-warning {
+          background: #f59e0b;
+          color: white;
+        }
+
+        .btn-warning:hover {
+          background: #d97706;
         }
 
         @media (max-width: 768px) {

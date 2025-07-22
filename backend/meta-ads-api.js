@@ -5,6 +5,8 @@ class MetaAdsAPI {
   constructor() {
     this.accessToken = process.env.META_ACCESS_TOKEN;
     this.adAccountId = process.env.META_AD_ACCOUNT_ID;
+    this.appId = process.env.META_APP_ID;
+    this.appSecret = process.env.META_APP_SECRET;
     this.apiVersion = 'v19.0'; // Versão mais recente
     this.baseURL = `https://graph.facebook.com/${this.apiVersion}`;
   }
@@ -12,6 +14,92 @@ class MetaAdsAPI {
   // Verificar se as credenciais estão configuradas
   isConfigured() {
     return this.accessToken && this.adAccountId;
+  }
+
+  // Verificar informações do token atual
+  async getTokenInfo() {
+    try {
+      const url = `${this.baseURL}/debug_token`;
+      const response = await axios.get(url, {
+        params: {
+          input_token: this.accessToken,
+          access_token: this.accessToken
+        }
+      });
+      
+      return response.data.data;
+    } catch (error) {
+      console.error('Erro ao verificar token:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  // Renovar token para longa duração (60 dias)
+  async extendToken() {
+    try {
+      if (!this.appId || !this.appSecret) {
+        throw new Error('APP_ID e APP_SECRET são necessários para renovar o token. Configure META_APP_ID e META_APP_SECRET no .env');
+      }
+
+      const url = `${this.baseURL}/oauth/access_token`;
+      const response = await axios.get(url, {
+        params: {
+          grant_type: 'fb_exchange_token',
+          client_id: this.appId,
+          client_secret: this.appSecret,
+          fb_exchange_token: this.accessToken
+        }
+      });
+
+      const newToken = response.data.access_token;
+      
+      // Verificar se o novo token é válido
+      const tokenInfo = await this.getTokenInfo();
+      
+      return {
+        access_token: newToken,
+        expires_in: response.data.expires_in,
+        token_type: response.data.token_type,
+        expires_at: tokenInfo.expires_at
+      };
+    } catch (error) {
+      console.error('Erro ao renovar token:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  // Verificar se o token está próximo do vencimento (menos de 7 dias)
+  async checkTokenExpiration() {
+    try {
+      const tokenInfo = await this.getTokenInfo();
+      
+      if (!tokenInfo.expires_at) {
+        return {
+          isValid: true,
+          expires: 'never',
+          daysLeft: Infinity,
+          needsRenewal: false
+        };
+      }
+
+      const expiresAt = new Date(tokenInfo.expires_at * 1000);
+      const now = new Date();
+      const daysLeft = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));
+      
+      return {
+        isValid: tokenInfo.is_valid,
+        expires: expiresAt.toLocaleDateString('pt-BR'),
+        daysLeft: daysLeft,
+        needsRenewal: daysLeft <= 7,
+        expiresAt: tokenInfo.expires_at
+      };
+    } catch (error) {
+      return {
+        isValid: false,
+        error: error.message,
+        needsRenewal: true
+      };
+    }
   }
 
   // Fazer requisição para a API do Meta
