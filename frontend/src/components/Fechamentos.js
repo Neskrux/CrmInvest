@@ -234,7 +234,7 @@ const Fechamentos = () => {
         formData.append('contrato', contratoSelecionado);
       }
 
-      // Corrigir base da URL para evitar /api/api/fechamentos
+      // Base da URL da API
       const API_BASE_URL = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000/api';
       
       const url = fechamentoEditando 
@@ -243,14 +243,16 @@ const Fechamentos = () => {
       
       console.log('🔐 Enviando requisição com token:', token ? 'presente' : 'ausente');
       
-      const response = await fetch(url, {
-        method: fechamentoEditando ? 'PUT' : 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-          // NÃO incluir 'Content-Type' ao usar FormData
-        },
-        body: formData
-      });
+             const response = await fetch(url, {
+         method: fechamentoEditando ? 'PUT' : 'POST',
+         headers: {
+           'Authorization': `Bearer ${token}`
+           // NÃO incluir 'Content-Type' ao usar FormData
+         },
+         body: formData,
+         // Timeout de 2 minutos para uploads grandes
+         signal: AbortSignal.timeout(120000)
+       });
 
       const result = await response.json();
 
@@ -262,12 +264,23 @@ const Fechamentos = () => {
         console.error('Erro na resposta:', result);
         alert('Erro: ' + (result.error || 'Erro desconhecido'));
       }
-    } catch (error) {
-      console.error('Erro ao salvar fechamento:', error);
-      alert('Erro ao salvar: ' + error.message);
-    } finally {
-      setSalvando(false);
-    }
+         } catch (error) {
+       console.error('Erro ao salvar fechamento:', error);
+       
+       let mensagemErro = 'Erro ao salvar fechamento';
+       
+       if (error.message.includes('timeout') || error.message.includes('AbortError')) {
+         mensagemErro = 'Timeout no upload - arquivo muito grande ou conexão lenta. Tente novamente.';
+       } else if (error.message.includes('fetch failed')) {
+         mensagemErro = 'Erro de conexão durante o upload. Tente novamente.';
+       } else {
+         mensagemErro += ': ' + error.message;
+       }
+       
+       alert(mensagemErro);
+     } finally {
+       setSalvando(false);
+     }
   };
 
   const excluirFechamento = async (id) => {
@@ -389,7 +402,7 @@ const Fechamentos = () => {
 
   const downloadContrato = async (fechamento) => {
     try {
-      const API_BASE_URL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5000/api';
+      const API_BASE_URL = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000/api';
       
       const token = localStorage.getItem('token');
       if (!token || token === 'null' || token.trim() === '') {
@@ -398,7 +411,7 @@ const Fechamentos = () => {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/fechamentos/${fechamento.id}/contrato`, {
+      const response = await fetch(`${API_BASE_URL}/fechamentos/${fechamento.id}/contrato`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -830,10 +843,13 @@ const Fechamentos = () => {
                   className="btn btn-primary"
                   disabled={salvando}
                 >
-                  {salvando ? (
-                    <span className="loading-spinner" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: 8 }}></span>
-                  ) : null}
-                  {fechamentoEditando ? (salvando ? 'Atualizando...' : 'Atualizar') : (salvando ? 'Salvando...' : 'Salvar')}
+                                     {salvando ? (
+                     <span className="loading-spinner" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: 8 }}></span>
+                   ) : null}
+                   {fechamentoEditando ? 
+                     (salvando ? 'Atualizando...' : 'Atualizar') : 
+                     (salvando ? (contratoSelecionado ? 'Enviando contrato...' : 'Salvando...') : 'Salvar')
+                   }
                 </button>
               </div>
             </form>
