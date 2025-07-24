@@ -227,21 +227,42 @@ const Agendamentos = () => {
   };
 
   const formatarData = (data) => {
-    return new Date(data).toLocaleDateString('pt-BR');
+    // Corrige problema de fuso horário ao interpretar data
+    const [ano, mes, dia] = data.split('-');
+    const dataLocal = new Date(ano, mes - 1, dia);
+    return dataLocal.toLocaleDateString('pt-BR');
   };
 
   const formatarHorario = (horario) => {
     return horario.substring(0, 5); // Remove os segundos
   };
 
+  const obterDataLocal = () => {
+    const hoje = new Date();
+    // Force para timezone local
+    const dataStr = hoje.getFullYear() + '-' + 
+                   String(hoje.getMonth() + 1).padStart(2, '0') + '-' + 
+                   String(hoje.getDate()).padStart(2, '0');
+    return dataStr;
+  };
+
   const ehHoje = (data) => {
-    const hoje = new Date().toISOString().split('T')[0];
-    return data === hoje;
+    // Comparação mais robusta usando objetos Date locais
+    const [anoData, mesData, diaData] = data.split('-').map(Number);
+    const [anoHoje, mesHoje, diaHoje] = obterDataLocal().split('-').map(Number);
+    
+    return anoData === anoHoje && mesData === mesHoje && diaData === diaHoje;
   };
 
   const ehPassado = (data) => {
-    const hoje = new Date().toISOString().split('T')[0];
-    return data < hoje;
+    const [anoData, mesData, diaData] = data.split('-').map(Number);
+    const [anoHoje, mesHoje, diaHoje] = obterDataLocal().split('-').map(Number);
+    
+    if (anoData < anoHoje) return true;
+    if (anoData > anoHoje) return false;
+    if (mesData < mesHoje) return true;
+    if (mesData > mesHoje) return false;
+    return diaData < diaHoje;
   };
 
   const resetForm = () => {
@@ -292,7 +313,7 @@ const Agendamentos = () => {
   });
 
   // Obter data atual para o input
-  const hoje = new Date().toISOString().split('T')[0];
+  const hojeStr = obterDataLocal();
 
   // Verificar se há filtros ativos
   const temFiltrosAtivos = filtroConsultor || filtroClinica || filtroDataInicio || filtroDataFim || filtroStatus;
