@@ -66,16 +66,21 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey); // Cliente 
 // Configurar Supabase Storage
 const STORAGE_BUCKET = 'contratos';
 
-// Função para fazer upload para Supabase Storage
-const uploadToSupabase = async (file) => {
+// Função para fazer upload para Supabase Storage com retry
+const uploadToSupabase = async (file, retryCount = 0) => {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 1000; // 1 segundo
+  
   try {
     // Gerar nome único para o arquivo
     const timestamp = Date.now();
     const randomId = Math.round(Math.random() * 1E9);
     const fileName = `contrato-${timestamp}-${randomId}.pdf`;
     
-    // Fazer upload para o Supabase Storage usando cliente admin
-    const { data, error } = await supabaseAdmin.storage
+    console.log(`📤 Tentando upload ${retryCount + 1}/${MAX_RETRIES + 1} - Arquivo: ${file.originalname} (${file.size} bytes)`);
+    
+    // Fazer upload para o Supabase Storage usando cliente admin com timeout
+    const uploadPromise = supabaseAdmin.storage
       .from(STORAGE_BUCKET)
       .upload(fileName, file.buffer, {
         contentType: 'application/pdf',
@@ -83,7 +88,16 @@ const uploadToSupabase = async (file) => {
         upsert: false
       });
 
+    // Timeout de 60 segundos para uploads grandes
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Upload timeout - arquivo muito grande ou conexão lenta')), 60000);
+    });
+
+    const { data, error } = await Promise.race([uploadPromise, timeoutPromise]);
+
     if (error) throw error;
+    
+    console.log(`✅ Upload concluído com sucesso: ${fileName}`);
     
     // Retornar informações do arquivo
     return {
@@ -93,9 +107,33 @@ const uploadToSupabase = async (file) => {
       path: data.path
     };
   } catch (error) {
-    console.error('Erro no upload para Supabase:', error);
+    console.error(`❌ Erro no upload para Supabase (tentativa ${retryCount + 1}):`, error.message);
+    
+    // Se não atingiu o máximo de tentativas e é um erro de conexão, tenta novamente
+    if (retryCount < MAX_RETRIES && isRetryableError(error)) {
+      console.log(`🔄 Tentando novamente em ${RETRY_DELAY}ms...`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      return uploadToSupabase(file, retryCount + 1);
+    }
+    
     throw error;
   }
+};
+
+// Função para verificar se o erro permite retry
+const isRetryableError = (error) => {
+  const retryableMessages = [
+    'fetch failed',
+    'other side closed',
+    'timeout',
+    'network',
+    'socket',
+    'ECONNRESET',
+    'ETIMEDOUT'
+  ];
+  
+  const errorMessage = error.message.toLowerCase();
+  return retryableMessages.some(msg => errorMessage.includes(msg));
 };
 
 // JWT Secret
