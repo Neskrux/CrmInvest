@@ -709,7 +709,6 @@ const Agendamentos = () => {
                     className="form-input"
                     value={formData.data_agendamento}
                     onChange={handleInputChange}
-                    min={hoje}
                     required
                     autoComplete="off"
                   />

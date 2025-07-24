@@ -247,8 +247,8 @@ const Pacientes = () => {
     if (type === 'checkbox') {
       value = checked;
     } else {
-      if (name === 'telefone') value = maskTelefone(value);
-      if (name === 'cpf') value = maskCPF(value);
+    if (name === 'telefone') value = maskTelefone(value);
+    if (name === 'cpf') value = maskCPF(value);
       if (name === 'cidade') value = formatarCidade(value);
     }
     

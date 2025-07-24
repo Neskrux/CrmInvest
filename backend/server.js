@@ -1464,14 +1464,14 @@ app.get('/api/meta-ads/pricing', authenticateToken, requireAdmin, async (req, re
     let query = supabase
       .from('meta_ads_pricing')
       .select('*')
-      .order('cidade');
+      .order('region');
 
     if (cidade) {
-      query = query.ilike('cidade', `%${cidade}%`);
+      query = query.ilike('region', `%${cidade}%`);
     }
 
     if (estado) {
-      query = query.eq('estado', estado);
+      query = query.ilike('region', `%${estado}%`);
     }
 
     if (status) {
@@ -1489,19 +1489,20 @@ app.get('/api/meta-ads/pricing', authenticateToken, requireAdmin, async (req, re
 
 app.post('/api/meta-ads/pricing', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { cidade, estado, preco_por_lead, campanha_id, campanha_nome, periodo_inicio, periodo_fim, observacoes } = req.body;
+    const { city, state, cost_per_lead, spend, leads } = req.body;
     
+    // Adaptar para a estrutura da tabela meta_ads_pricing
     const { data, error } = await supabase
       .from('meta_ads_pricing')
       .insert([{ 
-        cidade, 
-        estado, 
-        preco_por_lead, 
-        campanha_id, 
-        campanha_nome, 
-        periodo_inicio, 
-        periodo_fim, 
-        observacoes 
+        region: `${city || 'N/A'} - ${state || 'BR'}`,
+        city: city,
+        state: state,
+        country: 'BR',
+        cost_per_lead: cost_per_lead || 0,
+        spend: spend || 0,
+        leads: leads || 0,
+        date_range: 'manual' // indicar que foi inserido manualmente
       }])
       .select();
 
@@ -1515,7 +1516,18 @@ app.post('/api/meta-ads/pricing', authenticateToken, requireAdmin, async (req, r
 app.put('/api/meta-ads/pricing/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const { city, state, cost_per_lead, spend, leads } = req.body;
+    
+    // Adaptar dados para a estrutura da tabela
+    const updateData = {};
+    if (city || state) {
+      updateData.region = `${city || 'N/A'} - ${state || 'BR'}`;
+      updateData.city = city;
+      updateData.state = state;
+    }
+    if (cost_per_lead !== undefined) updateData.cost_per_lead = cost_per_lead;
+    if (spend !== undefined) updateData.spend = spend;
+    if (leads !== undefined) updateData.leads = leads;
     
     const { data, error } = await supabase
       .from('meta_ads_pricing')
@@ -1682,6 +1694,30 @@ app.get('/api/meta-ads/campaigns', authenticateToken, requireAdmin, async (req, 
   }
 });
 
+// Nova rota para buscar Ad Sets de uma campanha
+app.get('/api/meta-ads/campaign/:id/adsets', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`🔍 [AdSets] Buscando Ad Sets para campanha: ${id}`);
+    console.log(`👤 [AdSets] Usuário: ${req.user?.nome || 'Unknown'}`);
+    
+    const metaAPI = new MetaAdsAPI();
+    console.log(`📡 [AdSets] Chamando metaAPI.getAdSets(${id})`);
+    
+    const adsets = await metaAPI.getAdSets(id);
+    console.log(`✅ [AdSets] Dados recebidos:`, JSON.stringify(adsets, null, 2));
+    
+    res.json(adsets);
+  } catch (error) {
+    console.error(`❌ [AdSets] Erro ao buscar Ad Sets para campanha ${req.params.id}:`, error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erro ao buscar conjuntos de anúncios',
+      error: error.message || 'Erro desconhecido'
+    });
+  }
+});
+
 app.get('/api/meta-ads/campaign/:id/insights', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -1701,30 +1737,63 @@ app.get('/api/meta-ads/campaign/:id/insights', authenticateToken, requireAdmin, 
 
 app.post('/api/meta-ads/sync-campaigns', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    const { status = 'ACTIVE' } = req.body;
     const metaAPI = new MetaAdsAPI();
-    const campaignData = await metaAPI.syncCampaignData();
+    const campaignData = await metaAPI.syncCampaignData(status);
     
-    // Salvar dados no banco
-    const pricingData = campaignData.flatMap(campaign => 
+    // Salvar dados reais do Meta Ads - agora com cidade + estado
+    const rawData = campaignData.flatMap(campaign => 
       campaign.insights.map(insight => ({
-        region: insight.region || 'N/A',
+        region: `${insight.city || insight.region || 'N/A'} - ${insight.region || 'BR'}`,
         country: insight.country || 'BR',
         cost_per_lead: insight.costPerLead || 0,
         spend: insight.spend || 0,
-        impressions: insight.impressions || 0,
-        clicks: insight.clicks || 0,
         leads: insight.leads || 0,
         date_range: 'last_30d',
-        updated_at: new Date().toISOString()
+        // Campos extras para filtros
+        city: insight.city || insight.region || 'N/A',
+        state: insight.region || 'BR'
       }))
     );
 
+    // Consolidar dados por região (somar valores duplicados)
+    const consolidated = {};
+    rawData.forEach(item => {
+      const key = `${item.region}-${item.country}-${item.date_range}`;
+      if (consolidated[key]) {
+        consolidated[key].spend += item.spend;
+        consolidated[key].leads += item.leads;
+        // Recalcular cost_per_lead
+        consolidated[key].cost_per_lead = consolidated[key].leads > 0 ? 
+          consolidated[key].spend / consolidated[key].leads : 0;
+      } else {
+        consolidated[key] = { ...item };
+      }
+    });
+
+    const pricingData = Object.values(consolidated);
+    
+    console.log('=== DADOS CONSOLIDADOS DO META ADS ===');
+    console.log('Total de itens únicos para sincronizar:', pricingData.length);
+    console.log('Dados:', JSON.stringify(pricingData, null, 2));
+
+    console.log('Total items:', pricingData.length);
+    
+    console.log('Tentando inserir dados:', JSON.stringify(pricingData, null, 2));
+    
     const { data, error } = await supabase
       .from('meta_ads_pricing')
-      .upsert(pricingData, { 
+      .upsert(pricingData, {
         onConflict: 'region,country,date_range',
-        ignoreDuplicates: false 
+        ignoreDuplicates: false
       });
+      
+    if (error) {
+      console.log('Erro detalhado:', error);
+      console.log('Código do erro:', error.code);
+      console.log('Mensagem do erro:', error.message);
+      console.log('Detalhes do erro:', error.details);
+    }
 
     if (error) throw error;
     
@@ -1960,4 +2029,348 @@ app.listen(PORT, async () => {
   }
   
   await initializeTables();
+}); 
+
+// === META ADS REAL-TIME INSIGHTS === (Apenas Admin)
+app.get('/api/meta-ads/real-time-insights', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { dateRange = 'last_30d', status = 'ACTIVE' } = req.query;
+    
+    console.log(`🔄 Buscando insights em tempo real para período: ${dateRange}, status: ${status}`);
+    
+    const metaAPI = new MetaAdsAPI();
+    const campaigns = await metaAPI.getCampaigns(status);
+    
+    if (!campaigns.data || campaigns.data.length === 0) {
+      return res.json([]);
+    }
+    
+    const realTimeData = [];
+    
+    // Buscar insights por Ad Set para cada campanha ativa
+    for (const campaign of campaigns.data) {
+      try {
+        console.log(`📊 Processando campanha: ${campaign.name}`);
+        
+        // Buscar Ad Sets da campanha
+        const adSetsResponse = await metaAPI.getAdSets(campaign.id);
+        
+        if (adSetsResponse.data && adSetsResponse.data.length > 0) {
+          // Processar cada Ad Set
+          for (const adSet of adSetsResponse.data) {
+            // Apenas Ad Sets ativos
+            if (adSet.status !== 'ACTIVE') continue;
+            
+            // Extrair cidade do nome do Ad Set
+            const locationInfo = metaAPI.extractCityFromAdSetName(adSet.name);
+            const city = locationInfo.city;
+            const state = locationInfo.state;
+            
+            // Buscar insights do Ad Set
+            const adSetInsightsEndpoint = `/${adSet.id}/insights`;
+            const adSetInsightsParams = {
+              fields: 'spend,impressions,clicks,reach,actions,cost_per_action_type,cpm,cpc,ctr',
+              time_range: `{'since':'${metaAPI.getDateRange(dateRange).since}','until':'${metaAPI.getDateRange(dateRange).until}'}`
+            };
+            
+            try {
+              const adSetInsights = await metaAPI.makeRequest(adSetInsightsEndpoint, adSetInsightsParams);
+              
+              if (adSetInsights.data && adSetInsights.data.length > 0) {
+                const insight = adSetInsights.data[0];
+                const spend = parseFloat(insight.spend) || 0;
+                const leads = metaAPI.countLeads(insight.actions);
+                const impressions = parseInt(insight.impressions) || 0;
+                const clicks = parseInt(insight.clicks) || 0;
+                const reach = parseInt(insight.reach) || 0;
+                
+                // Calcular métricas
+                const costPerLead = leads > 0 ? spend / leads : 0;
+                const cpm = impressions > 0 ? (spend / impressions) * 1000 : 0;
+                const cpc = clicks > 0 ? spend / clicks : 0;
+                const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+                
+                realTimeData.push({
+                  campaign_id: campaign.id,
+                  name: campaign.name,
+                  adset_name: adSet.name,
+                  status: campaign.status || 'ACTIVE',
+                  objective: campaign.objective || 'OUTCOME_ENGAGEMENT',
+                  city: city,
+                  state: state,
+                  region: `${city} - ${state}`,
+                  cost_per_lead: parseFloat(costPerLead.toFixed(2)),
+                  spend: spend,
+                  leads: leads,
+                  impressions: impressions,
+                  reach: reach,
+                  clicks: clicks,
+                  cpm: parseFloat(cpm.toFixed(2)),
+                  cpc: parseFloat(cpc.toFixed(2)),
+                  ctr: parseFloat(ctr.toFixed(2)),
+                  updated_time: campaign.updated_time || campaign.created_time,
+                  date_range: dateRange
+                });
+              } else {
+                console.log(`⚠️ Sem insights para Ad Set: ${adSet.name}`);
+              }
+            } catch (adSetError) {
+              console.warn(`⚠️ Erro ao buscar insights do Ad Set ${adSet.name}:`, adSetError.message);
+            }
+          }
+        } else {
+          console.log(`⚠️ Nenhum Ad Set ativo encontrado para campanha: ${campaign.name}`);
+        }
+        
+        // Delay pequeno para evitar rate limit
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+      } catch (campaignError) {
+        console.warn(`⚠️ Erro ao processar campanha ${campaign.name}:`, campaignError.message);
+        
+        // Adicionar campanha com erro/dados básicos
+        realTimeData.push({
+          campaign_id: campaign.id,
+          name: campaign.name,
+          status: campaign.status || 'ACTIVE',
+          objective: campaign.objective || 'UNKNOWN',
+          city: 'N/A',
+          state: 'BR',
+          region: 'Erro ao carregar',
+          cost_per_lead: 0,
+          spend: 0,
+          leads: 0,
+          impressions: 0,
+          reach: 0,
+          clicks: 0,
+          cpm: 0,
+          cpc: 0,
+          ctr: 0,
+          updated_time: campaign.updated_time || campaign.created_time,
+          date_range: dateRange,
+          error: campaignError.message
+        });
+      }
+    }
+    
+    console.log(`✅ Total de campanhas processadas: ${realTimeData.length}`);
+    
+    // Ordenar por gasto (maior primeiro)
+    realTimeData.sort((a, b) => (b.spend || 0) - (a.spend || 0));
+    
+    res.json(realTimeData);
+    
+  } catch (error) {
+    console.error('❌ Erro ao buscar insights em tempo real:', error);
+    res.status(500).json({ 
+      error: 'Erro ao buscar insights em tempo real',
+      details: error.message,
+      success: false 
+    });
+  }
+});
+
+// === META ADS MÉTRICAS AVANÇADAS === (Apenas Admin)
+app.get('/api/meta-ads/advanced-metrics', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { dateRange = 'last_30d' } = req.query;
+    
+    console.log(`🔄 Buscando métricas avançadas APENAS campanhas ATIVAS para período: ${dateRange}`);
+    
+    const metaAPI = new MetaAdsAPI();
+    const campaigns = await metaAPI.getCampaigns('ACTIVE'); // SEMPRE buscar apenas ATIVAS
+    
+    if (!campaigns.data || campaigns.data.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        summary: {
+          total_fechamentos: 0,
+          valor_total_fechamentos: 0,
+          periodo: dateRange,
+          cidades_com_fechamentos: 0,
+          mensagem: 'Nenhuma campanha ativa encontrada'
+        }
+      });
+    }
+    
+    // Filtrar APENAS campanhas ATIVAS (dupla verificação)
+    const activeCampaigns = campaigns.data.filter(c => c.status === 'ACTIVE');
+    console.log(`✅ ${activeCampaigns.length} campanhas ATIVAS encontradas`);
+    
+    if (activeCampaigns.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        summary: {
+          total_fechamentos: 0,
+          valor_total_fechamentos: 0,
+          periodo: dateRange,
+          cidades_com_fechamentos: 0,
+          mensagem: 'Nenhuma campanha ativa encontrada após filtro'
+        }
+      });
+    }
+
+    // Buscar fechamentos do período para calcular CPA real
+    const { since, until } = metaAPI.getDateRange(dateRange);
+    const { data: fechamentos, error: fechError } = await supabase
+      .from('fechamentos')
+      .select(`
+        valor_fechado, 
+        data_fechamento,
+        pacientes(cidade, nome, telefone)
+      `)
+      .gte('data_fechamento', since)
+      .lte('data_fechamento', until);
+
+    if (fechError) {
+      console.warn('⚠️ Erro ao buscar fechamentos:', fechError.message);
+    }
+
+    const fechamentosPorCidade = {};
+    const totalFechamentos = fechamentos?.length || 0;
+    const valorTotalFechamentos = fechamentos?.reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0) || 0;
+
+    // Agrupar fechamentos por cidade para calcular CPA real por região
+    if (fechamentos && fechamentos.length > 0) {
+      fechamentos.forEach(fechamento => {
+        const cidade = fechamento.pacientes?.cidade || 'N/A';
+        if (!fechamentosPorCidade[cidade]) {
+          fechamentosPorCidade[cidade] = {
+            count: 0,
+            valor_total: 0
+          };
+        }
+        fechamentosPorCidade[cidade].count++;
+        fechamentosPorCidade[cidade].valor_total += parseFloat(fechamento.valor_fechado || 0);
+      });
+    }
+    
+    const advancedMetrics = [];
+    
+    // Buscar insights detalhados por Ad Set para cada campanha ATIVA
+    for (const campaign of activeCampaigns) {
+      try {
+        console.log(`📊 Processando métricas avançadas para campanha: ${campaign.name}`);
+        
+        // Buscar Ad Sets da campanha
+        const adSetsResponse = await metaAPI.getAdSets(campaign.id);
+        
+        if (adSetsResponse.data && adSetsResponse.data.length > 0) {
+          // Processar cada Ad Set
+          for (const adSet of adSetsResponse.data) {
+            // Apenas Ad Sets ativos
+            if (adSet.status !== 'ACTIVE') continue;
+            
+            // Extrair cidade do nome do Ad Set
+            const locationInfo = metaAPI.extractCityFromAdSetName(adSet.name);
+            const city = locationInfo.city;
+            const state = locationInfo.state;
+            
+            // Buscar insights do Ad Set
+            const adSetInsightsEndpoint = `/${adSet.id}/insights`;
+            const adSetInsightsParams = {
+              fields: 'spend,impressions,clicks,reach,actions,cost_per_action_type,cpm,cpc,ctr',
+              time_range: `{'since':'${metaAPI.getDateRange(dateRange).since}','until':'${metaAPI.getDateRange(dateRange).until}'}`
+            };
+            
+            try {
+              const adSetInsights = await metaAPI.makeRequest(adSetInsightsEndpoint, adSetInsightsParams);
+              
+              if (adSetInsights.data && adSetInsights.data.length > 0) {
+                const insight = adSetInsights.data[0];
+                const spend = parseFloat(insight.spend) || 0;
+                const leads = metaAPI.countLeads(insight.actions);
+                const impressions = parseInt(insight.impressions) || 0;
+                const clicks = parseInt(insight.clicks) || 0;
+                const reach = parseInt(insight.reach) || 0;
+                
+                // Calcular métricas
+                const cpm = impressions > 0 ? (spend / impressions) * 1000 : 0; // Cost per Mille
+                const cpc = clicks > 0 ? spend / clicks : 0; // Cost per Click
+                const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0; // Click Through Rate
+                const costPerLead = leads > 0 ? spend / leads : 0; // Custo por Lead do Meta
+                
+                // CPA Real baseado em fechamentos do sistema
+                const fechamentosCity = fechamentosPorCidade[city] || { count: 0, valor_total: 0 };
+                const cpaReal = fechamentosCity.count > 0 ? spend / fechamentosCity.count : 0;
+                const roasReal = spend > 0 ? fechamentosCity.valor_total / spend : 0;
+                
+                advancedMetrics.push({
+                  campaign_id: campaign.id,
+                  name: campaign.name,
+                  adset_name: adSet.name,
+                  status: campaign.status || 'ACTIVE',
+                  objective: campaign.objective || 'OUTCOME_ENGAGEMENT',
+                  city: city,
+                  state: state,
+                  region: `${city} - ${state}`,
+              
+              // Métricas básicas
+              spend: spend,
+              leads: leads,
+              impressions: impressions,
+              clicks: clicks,
+              reach: reach,
+              
+              // Métricas calculadas
+              cpm: parseFloat(cpm.toFixed(2)),
+              cpc: parseFloat(cpc.toFixed(2)),
+              ctr: parseFloat(ctr.toFixed(2)),
+              cost_per_lead: parseFloat(costPerLead.toFixed(2)),
+              
+              // Métricas baseadas em fechamentos reais
+              cpa_real: parseFloat(cpaReal.toFixed(2)),
+              fechamentos_reais: fechamentosCity.count,
+              valor_total_fechamentos: fechamentosCity.valor_total,
+              roas_real: parseFloat(roasReal.toFixed(2)),
+              
+                  updated_time: campaign.updated_time || campaign.created_time,
+                  date_range: dateRange
+                });
+              } else {
+                console.log(`⚠️ Sem insights para Ad Set: ${adSet.name}`);
+              }
+            } catch (adSetError) {
+              console.warn(`⚠️ Erro ao buscar insights do Ad Set ${adSet.name}:`, adSetError.message);
+            }
+          }
+        } else {
+          console.log(`⚠️ Nenhum Ad Set ativo encontrado para campanha: ${campaign.name}`);
+        }
+        
+        // Delay pequeno para evitar rate limit
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+      } catch (campaignError) {
+        console.warn(`⚠️ Erro ao processar métricas da campanha ${campaign.name}:`, campaignError.message);
+      }
+    }
+    
+    console.log(`✅ Total de métricas avançadas processadas: ${advancedMetrics.length}`);
+    console.log(`📊 Resumo dos fechamentos: ${totalFechamentos} fechamentos, R$ ${valorTotalFechamentos.toFixed(2)} em valor total`);
+    
+    // Ordenar por gasto (maior primeiro)
+    advancedMetrics.sort((a, b) => (b.spend || 0) - (a.spend || 0));
+    
+    res.json({
+      success: true,
+      data: advancedMetrics,
+      summary: {
+        total_fechamentos: totalFechamentos,
+        valor_total_fechamentos: valorTotalFechamentos,
+        periodo: dateRange,
+        cidades_com_fechamentos: Object.keys(fechamentosPorCidade).length
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Erro ao buscar métricas avançadas:', error);
+    res.status(500).json({ 
+      error: 'Erro ao buscar métricas avançadas',
+      details: error.message,
+      success: false 
+    });
+  }
 }); 
