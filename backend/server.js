@@ -665,6 +665,7 @@ app.post('/api/consultores', authenticateToken, requireAdmin, async (req, res) =
 // === CADASTRO PÚBLICO DE CONSULTORES === (Sem autenticação)
 app.post('/api/consultores/cadastro', async (req, res) => {
   try {
+    console.log('📝 Cadastro de consultor recebido:', req.body);
     const { nome, telefone, email, senha, cpf, pix } = req.body;
     
     // Validar campos obrigatórios
@@ -712,6 +713,7 @@ app.post('/api/consultores/cadastro', async (req, res) => {
     const senhaHash = await bcrypt.hash(senha, saltRounds);
     
     // Inserir consultor
+    console.log('💾 Tentando inserir consultor no Supabase...');
     const { data, error } = await supabase
       .from('consultores')
       .insert([{ 
@@ -726,7 +728,12 @@ app.post('/api/consultores/cadastro', async (req, res) => {
       }])
       .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Erro ao inserir consultor:', error);
+      throw error;
+    }
+    
+    console.log('✅ Consultor inserido com sucesso:', data[0]);
     
     res.json({ 
       id: data[0].id, 
@@ -742,7 +749,8 @@ app.post('/api/consultores/cadastro', async (req, res) => {
 // === CADASTRO PÚBLICO DE PACIENTES/LEADS === (Sem autenticação)
 app.post('/api/leads/cadastro', async (req, res) => {
   try {
-    const { nome, telefone, tipo_tratamento, cpf, observacoes } = req.body;
+    console.log('📝 Cadastro de lead recebido:', req.body);
+    const { nome, telefone, tipo_tratamento, cpf, observacoes, cidade, estado } = req.body;
     
     // Validar campos obrigatórios
     if (!nome || !telefone || !cpf) {
@@ -766,21 +774,90 @@ app.post('/api/leads/cadastro', async (req, res) => {
       return res.status(400).json({ error: 'CPF deve ter 11 dígitos!' });
     }
     
+    // Normalizar telefone (remover formatação)
+    const telefoneNumeros = telefone.replace(/\D/g, '');
+    
+    // Verificar se telefone já existe
+    console.log('🔍 Verificando se telefone já existe:', telefoneNumeros);
+    const { data: telefoneExistente, error: telefoneError } = await supabase
+      .from('pacientes')
+      .select('id, nome, created_at')
+      .eq('telefone', telefoneNumeros)
+      .limit(1);
+
+    if (telefoneError) {
+      console.error('❌ Erro ao verificar telefone:', telefoneError);
+      throw telefoneError;
+    }
+    
+    if (telefoneExistente && telefoneExistente.length > 0) {
+      const pacienteExistente = telefoneExistente[0];
+      const dataCadastro = new Date(pacienteExistente.created_at).toLocaleDateString('pt-BR');
+      console.log('❌ Telefone já cadastrado:', { 
+        telefone: telefoneNumeros, 
+        paciente: pacienteExistente.nome,
+        dataCadastro: dataCadastro 
+      });
+      return res.status(400).json({ 
+        error: `Este número de telefone já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}). Por favor, utilize outro número.` 
+      });
+    }
+    
+    console.log('✅ Telefone disponível para cadastro');
+    
+    // Verificar se CPF já existe
+    console.log('🔍 Verificando se CPF já existe:', cpfNumeros);
+    const { data: cpfExistente, error: cpfError } = await supabase
+      .from('pacientes')
+      .select('id, nome, created_at')
+      .eq('cpf', cpfNumeros)
+      .limit(1);
+
+    if (cpfError) {
+      console.error('❌ Erro ao verificar CPF:', cpfError);
+      throw cpfError;
+    }
+    
+    if (cpfExistente && cpfExistente.length > 0) {
+      const pacienteExistente = cpfExistente[0];
+      const dataCadastro = new Date(pacienteExistente.created_at).toLocaleDateString('pt-BR');
+      console.log('❌ CPF já cadastrado:', { 
+        cpf: cpfNumeros, 
+        paciente: pacienteExistente.nome,
+        dataCadastro: dataCadastro 
+      });
+      return res.status(400).json({ 
+        error: `Este CPF já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}). Por favor, verifique os dados.` 
+      });
+    }
+    
+    console.log('✅ CPF disponível para cadastro');
+    
     // Inserir lead/paciente
+    console.log('💾 Tentando inserir lead no Supabase...');
+    console.log('📍 Dados de localização:', { cidade, estado });
+    
     const { data, error } = await supabase
       .from('pacientes')
       .insert([{ 
         nome: nome.trim(), 
-        telefone: telefone.trim(), 
+        telefone: telefoneNumeros, // Usar telefone normalizado (apenas números)
         cpf: cpfNumeros,
         tipo_tratamento: tipo_tratamento || null,
         status: 'lead', 
         observacoes: observacoes || null,
+        cidade: cidade ? cidade.trim() : null,
+        estado: estado ? estado.trim() : null,
         consultor_id: null // Lead público não tem consultor inicial
       }])
       .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Erro ao inserir lead:', error);
+      throw error;
+    }
+    
+    console.log('✅ Lead inserido com sucesso:', data[0]);
     
     res.json({ 
       id: data[0].id, 
@@ -917,7 +994,49 @@ app.get('/api/pacientes', authenticateToken, async (req, res) => {
 
 app.post('/api/pacientes', authenticateToken, async (req, res) => {
   try {
-    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade } = req.body;
+    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado } = req.body;
+    
+    // Normalizar telefone e CPF (remover formatação)
+    const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
+    const cpfNumeros = cpf ? cpf.replace(/\D/g, '') : '';
+    
+    // Verificar se telefone já existe
+    if (telefoneNumeros) {
+      const { data: telefoneExistente, error: telefoneError } = await supabase
+        .from('pacientes')
+        .select('id, nome, created_at')
+        .eq('telefone', telefoneNumeros)
+        .limit(1);
+
+      if (telefoneError) throw telefoneError;
+      
+      if (telefoneExistente && telefoneExistente.length > 0) {
+        const pacienteExistente = telefoneExistente[0];
+        const dataCadastro = new Date(pacienteExistente.created_at).toLocaleDateString('pt-BR');
+        return res.status(400).json({ 
+          error: `Este número de telefone já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}).` 
+        });
+      }
+    }
+    
+    // Verificar se CPF já existe
+    if (cpfNumeros) {
+      const { data: cpfExistente, error: cpfError } = await supabase
+        .from('pacientes')
+        .select('id, nome, created_at')
+        .eq('cpf', cpfNumeros)
+        .limit(1);
+
+      if (cpfError) throw cpfError;
+      
+      if (cpfExistente && cpfExistente.length > 0) {
+        const pacienteExistente = cpfExistente[0];
+        const dataCadastro = new Date(pacienteExistente.created_at).toLocaleDateString('pt-BR');
+        return res.status(400).json({ 
+          error: `Este CPF já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}).` 
+        });
+      }
+    }
     
     // Converter consultor_id para null se não fornecido
     const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
@@ -926,14 +1045,14 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
       .from('pacientes')
       .insert([{ 
         nome, 
-        telefone, 
-        cpf, 
+        telefone: telefoneNumeros, // Usar telefone normalizado
+        cpf: cpfNumeros, // Usar CPF normalizado
         tipo_tratamento, 
         status: status || 'lead', 
         observacoes,
         consultor_id: consultorId,
-        cidade
-
+        cidade,
+        estado
       }])
       .select();
 
@@ -949,6 +1068,50 @@ app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade } = req.body;
     
+    // Normalizar telefone e CPF (remover formatação)
+    const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
+    const cpfNumeros = cpf ? cpf.replace(/\D/g, '') : '';
+    
+    // Verificar se telefone já existe em outro paciente
+    if (telefoneNumeros) {
+      const { data: telefoneExistente, error: telefoneError } = await supabase
+        .from('pacientes')
+        .select('id, nome, created_at')
+        .eq('telefone', telefoneNumeros)
+        .neq('id', id) // Excluir o paciente atual
+        .limit(1);
+
+      if (telefoneError) throw telefoneError;
+      
+      if (telefoneExistente && telefoneExistente.length > 0) {
+        const pacienteExistente = telefoneExistente[0];
+        const dataCadastro = new Date(pacienteExistente.created_at).toLocaleDateString('pt-BR');
+        return res.status(400).json({ 
+          error: `Este número de telefone já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}).` 
+        });
+      }
+    }
+    
+    // Verificar se CPF já existe em outro paciente
+    if (cpfNumeros) {
+      const { data: cpfExistente, error: cpfError } = await supabase
+        .from('pacientes')
+        .select('id, nome, created_at')
+        .eq('cpf', cpfNumeros)
+        .neq('id', id) // Excluir o paciente atual
+        .limit(1);
+
+      if (cpfError) throw cpfError;
+      
+      if (cpfExistente && cpfExistente.length > 0) {
+        const pacienteExistente = cpfExistente[0];
+        const dataCadastro = new Date(pacienteExistente.created_at).toLocaleDateString('pt-BR');
+        return res.status(400).json({ 
+          error: `Este CPF já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}).` 
+        });
+      }
+    }
+    
     // Converter consultor_id para null se não fornecido
     const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
     
@@ -956,14 +1119,13 @@ app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
       .from('pacientes')
       .update({ 
         nome, 
-        telefone, 
-        cpf, 
+        telefone: telefoneNumeros, // Usar telefone normalizado
+        cpf: cpfNumeros, // Usar CPF normalizado
         tipo_tratamento, 
         status, 
         observacoes,
         consultor_id: consultorId,
         cidade
-
       })
       .eq('id', id)
       .select();
