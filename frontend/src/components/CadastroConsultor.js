@@ -158,7 +158,7 @@ const CadastroConsultor = () => {
     setLoading(true);
     
     try {
-      const response = await fetch('http://localhost:5000/api/consultores/cadastro', {
+      const response = await fetch('/api/consultores/cadastro', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

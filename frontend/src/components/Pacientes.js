@@ -26,6 +26,7 @@ const Pacientes = () => {
     telefone: '',
     cpf: '',
     cidade: '',
+    estado: '',
     tipo_tratamento: '',
     status: 'lead',
     observacoes: '',
@@ -182,6 +183,7 @@ const Pacientes = () => {
       telefone: paciente.telefone || '',
       cpf: paciente.cpf || '',
       cidade: paciente.cidade || '',
+      estado: paciente.estado || '',
       tipo_tratamento: paciente.tipo_tratamento || '',
       status: paciente.status || 'lead',
       observacoes: paciente.observacoes || '',
@@ -312,6 +314,7 @@ const Pacientes = () => {
       telefone: '',
       cpf: '',
       cidade: '',
+      estado: '',
       tipo_tratamento: '',
       status: 'lead',
       observacoes: '',
@@ -577,7 +580,14 @@ const Pacientes = () => {
                           </td>
                           <td>{formatarTelefone(paciente.telefone)}</td>
                           <td>{formatarCPF(paciente.cpf)}</td>
-                          <td>{paciente.cidade || '-'}</td>
+                          <td>
+                            {paciente.cidade || paciente.estado ? (
+                              <>
+                                {paciente.cidade && <div>{paciente.cidade}</div>}
+                                {paciente.estado && <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{paciente.estado}</div>}
+                              </>
+                            ) : '-'}
+                          </td>
                           <td>
                             {paciente.tipo_tratamento && (
                               <span className={`badge badge-${paciente.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
@@ -698,7 +708,14 @@ const Pacientes = () => {
                           </td>
                           <td>{formatarTelefone(lead.telefone)}</td>
                           <td>{formatarCPF(lead.cpf)}</td>
-                          <td>{lead.cidade || '-'}</td>
+                          <td>
+                            {lead.cidade || lead.estado ? (
+                              <>
+                                {lead.cidade && <div>{lead.cidade}</div>}
+                                {lead.estado && <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{lead.estado}</div>}
+                              </>
+                            ) : '-'}
+                          </td>
                           <td>
                             {lead.tipo_tratamento && (
                               <span className={`badge badge-${lead.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
@@ -784,19 +801,57 @@ const Pacientes = () => {
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Cidade</label>
-                <input
-                  type="text"
-                  name="cidade"
-                  className="form-input"
-                  value={formData.cidade}
-                  onChange={handleInputChange}
-                  placeholder="São Paulo/SP"
-                />
-                <small style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                  Formato: Cidade/ESTADO (ex: São Paulo/SP)
-                </small>
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">Cidade</label>
+                  <input
+                    type="text"
+                    name="cidade"
+                    className="form-input"
+                    value={formData.cidade}
+                    onChange={handleInputChange}
+                    placeholder="Digite a cidade"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Estado</label>
+                  <select
+                    name="estado"
+                    className="form-select"
+                    value={formData.estado}
+                    onChange={handleInputChange}
+                  >
+                    <option value="">Selecione o estado</option>
+                    <option value="AC">Acre</option>
+                    <option value="AL">Alagoas</option>
+                    <option value="AP">Amapá</option>
+                    <option value="AM">Amazonas</option>
+                    <option value="BA">Bahia</option>
+                    <option value="CE">Ceará</option>
+                    <option value="DF">Distrito Federal</option>
+                    <option value="ES">Espírito Santo</option>
+                    <option value="GO">Goiás</option>
+                    <option value="MA">Maranhão</option>
+                    <option value="MT">Mato Grosso</option>
+                    <option value="MS">Mato Grosso do Sul</option>
+                    <option value="MG">Minas Gerais</option>
+                    <option value="PA">Pará</option>
+                    <option value="PB">Paraíba</option>
+                    <option value="PR">Paraná</option>
+                    <option value="PE">Pernambuco</option>
+                    <option value="PI">Piauí</option>
+                    <option value="RJ">Rio de Janeiro</option>
+                    <option value="RN">Rio Grande do Norte</option>
+                    <option value="RS">Rio Grande do Sul</option>
+                    <option value="RO">Rondônia</option>
+                    <option value="RR">Roraima</option>
+                    <option value="SC">Santa Catarina</option>
+                    <option value="SP">São Paulo</option>
+                    <option value="SE">Sergipe</option>
+                    <option value="TO">Tocantins</option>
+                  </select>
+                </div>
               </div>
 
 
