@@ -38,19 +38,20 @@ const Pacientes = () => {
   // Status disponíveis para o pipeline
   const statusOptions = [
     { value: 'lead', label: 'Lead', color: '#f59e0b' },
+    { value: 'em_conversa', label: 'Em conversa', color: '#0ea5e9' },
+    { value: 'cpf_aprovado', label: 'CPF Aprovado', color: '#10b981' },
+    { value: 'cpf_reprovado', label: 'CPF Reprovado', color: '#ef4444' },
+    { value: 'nao_passou_cpf', label: 'Não passou CPF', color: '#6366f1' },
+    { value: 'nao_tem_outro_cpf', label: 'Não tem outro CPF', color: '#a3a3a3' },
+    { value: 'nao_tem_interesse', label: 'Não tem interesse', color: '#9ca3af' },
+    { value: 'sem_cedente', label: 'Sem cedente (CPF Aprovado)', color: '#fbbf24' },
+    // Demais status no final
     { value: 'agendado', label: 'Agendado', color: '#3b82f6' },
     { value: 'compareceu', label: 'Compareceu', color: '#10b981' },
     { value: 'fechado', label: 'Fechado', color: '#059669' },
     { value: 'nao_fechou', label: 'Não Fechou', color: '#dc2626' },
     { value: 'nao_compareceu', label: 'Não Compareceu', color: '#ef4444' },
-    { value: 'reagendado', label: 'Reagendado', color: '#8b5cf6' },
-    { value: 'nao_passou_cpf', label: 'Não passou CPF', color: '#6366f1' },
-    { value: 'sem_cedente', label: 'Sem cedente (CPF Aprovado)', color: '#fbbf24' },
-    { value: 'cpf_aprovado', label: 'CPF Aprovado', color: '#10b981' },
-    { value: 'nao_tem_interesse', label: 'Não tem interesse', color: '#9ca3af' },
-    { value: 'em_conversa', label: 'Em conversa', color: '#0ea5e9' },
-    { value: 'cpf_reprovado', label: 'CPF Reprovado', color: '#ef4444' },
-    { value: 'nao_tem_outro_cpf', label: 'Não tem outro CPF', color: '#a3a3a3' }
+    { value: 'reagendado', label: 'Reagendado', color: '#8b5cf6' }
   ];
 
   useEffect(() => {
