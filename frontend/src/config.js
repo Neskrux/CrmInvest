@@ -3,7 +3,7 @@ const config = {
   // URL base da API
   API_BASE_URL: process.env.REACT_APP_API_URL || 
     (process.env.NODE_ENV === 'production' 
-      ? '/api' 
+      ? 'https://crm-invest.vercel.app/api'
       : 'http://localhost:5000/api'),
   
   // Configurações do Supabase (se necessário no frontend)

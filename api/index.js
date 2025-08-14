@@ -55,9 +55,9 @@ const upload = multer({
 });
 
 // Supabase client - CORRIGIDO
-const supabaseUrl = process.env.SUPABASE_URL || 'https://yomvfjabpomcvfnusgm.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvbXZmamJhcGJvbWN2Zm51c2dtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTEzOTEyMzcsImV4cCI6MjA2Njk2NzIzN30.1CNcC_LBqDBHXKIiUUcxLDXWHfrtx6-IBOc4rHvDb-4';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvbXZmamJhcGJvbWN2Zm51c2dtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTM5MTIzNywiZXhwIjoyMDY2OTY3MjM3fQ.l_dMjGQRQjJDsqUdH-BwbqctZZFeZ8kyX1cVgKSgibc';
+const supabaseUrl = process.env.SUPABASE_URL || 'https://idicuetpukxjqripbpwa.supabase.co';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaWN1ZXRwdWt4anFyaXBicHdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYyNzA5MTQsImV4cCI6MjA1MTg0NjkxNH0.j1u6gpLmC9Kont3WW9nqLmJJ6icQAcLt5TuPVtJCqGc';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaWN1ZXRwdWt4anFyaXBicHdhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTIwMDczMSwiZXhwIjoyMDcwNzc2NzMxfQ.71IeNihVLi3Uj4Tx9b9-xB2XVqUqBZXimHspudv4Ex4';
 
 // Cliente Supabase para operações normais
 const supabase = createClient(supabaseUrl, supabaseAnonKey);

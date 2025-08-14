@@ -235,7 +235,7 @@ const Fechamentos = () => {
       }
 
       // Base da URL da API
-      const API_BASE_URL = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000/api';
+      const API_BASE_URL = process.env.NODE_ENV === 'production' ? 'https://crm-invest.vercel.app/api' : 'http://localhost:5000/api';
       
       const url = fechamentoEditando 
         ? `${API_BASE_URL}/fechamentos/${fechamentoEditando.id}`
@@ -402,7 +402,7 @@ const Fechamentos = () => {
 
   const downloadContrato = async (fechamento) => {
     try {
-      const API_BASE_URL = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000/api';
+      const API_BASE_URL = process.env.NODE_ENV === 'production' ? 'https://crm-invest.vercel.app/api' : 'http://localhost:5000/api';
       
       const token = localStorage.getItem('token');
       if (!token || token === 'null' || token.trim() === '') {
