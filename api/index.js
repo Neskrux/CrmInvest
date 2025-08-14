@@ -1350,14 +1350,62 @@ app.get('/api/fechamentos/:id/contrato', authenticateToken, async (req, res) => 
       return res.status(500).json({ error: 'Erro ao baixar arquivo' });
     }
 
-    // Configurar headers para download
+    // Usar URL assinada do Supabase (expira em 60s) para garantir download correto
+    const nomeDownload = (fechamento.contrato_nome_original || 'contrato.pdf').replace(/"/g, '');
+    const { data: signed, error: signedError } = await supabaseAdmin.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrl(fechamento.contrato_arquivo, 60, { download: nomeDownload });
+
+    if (!signedError && signed?.signedUrl) {
+      return res.redirect(signed.signedUrl);
+    }
+
+    // Fallback manual
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${fechamento.contrato_nome_original || 'contrato.pdf'}"`);
-    
-    // Enviar o arquivo
-    res.send(data);
+    res.setHeader('Content-Disposition', `attachment; filename="${nomeDownload}"`);
+    if (data && typeof data.arrayBuffer === 'function') {
+      const buffer = Buffer.from(await data.arrayBuffer());
+      res.setHeader('Content-Length', buffer.length);
+      return res.end(buffer);
+    }
+    if (data && typeof data.pipe === 'function') {
+      return data.pipe(res);
+    }
+    return res.status(500).json({ error: 'Não foi possível processar o arquivo do contrato' });
   } catch (error) {
     console.error('Erro ao baixar contrato:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Endpoint alternativo: retorna URL assinada para download
+app.get('/api/fechamentos/:id/contrato/url', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { data: fechamento, error } = await supabase
+      .from('fechamentos')
+      .select('contrato_arquivo, contrato_nome_original')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    if (!fechamento?.contrato_arquivo) {
+      return res.status(404).json({ error: 'Contrato não encontrado!' });
+    }
+
+    const nomeDownload = (fechamento.contrato_nome_original || 'contrato.pdf').replace(/"/g, '');
+    const { data: signed, error: signedError } = await supabaseAdmin.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrl(fechamento.contrato_arquivo, 60, { download: nomeDownload });
+
+    if (signedError || !signed?.signedUrl) {
+      return res.status(500).json({ error: 'Não foi possível gerar URL assinada' });
+    }
+
+    res.json({ url: signed.signedUrl, nome: nomeDownload });
+  } catch (error) {
+    console.error('Erro ao gerar URL do contrato:', error);
     res.status(500).json({ error: error.message });
   }
 });

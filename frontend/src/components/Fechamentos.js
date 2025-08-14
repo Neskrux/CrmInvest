@@ -411,26 +411,46 @@ const Fechamentos = () => {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/fechamentos/${fechamento.id}/contrato`, {
+      // Primeiro, tentar URL assinada (baixa direto do Storage)
+      const urlRes = await fetch(`${API_BASE_URL}/fechamentos/${fechamento.id}/contrato/url`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
+      if (urlRes.ok) {
+        const { url, nome, error } = await urlRes.json();
+        if (error || !url) {
+          throw new Error(error || 'URL assinada indisponível');
+        }
+        // Abrir a URL assinada (o Storage já entrega o PDF corretamente)
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = nome || fechamento.contrato_nome_original || 'contrato.pdf';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        return;
+      }
+
+      // Fallback: chamar o endpoint de download direto
+      const response = await fetch(`${API_BASE_URL}/fechamentos/${fechamento.id}/contrato`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (!response.ok) {
         const data = await response.json();
         alert('Erro ao baixar contrato: ' + (data.error || 'Erro desconhecido'));
         return;
       }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      const arrayBuffer = await response.arrayBuffer();
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const objectUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
+      a.href = objectUrl;
       a.download = fechamento.contrato_nome_original || 'contrato.pdf';
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(objectUrl);
       document.body.removeChild(a);
     } catch (error) {
       console.error('Erro ao baixar contrato:', error);
