@@ -567,8 +567,9 @@ const Pacientes = () => {
                 Nenhum paciente cadastrado ainda.
               </div>
             ) : (
-              <div className="table-container">
-                <table className="table">
+              <>
+                <div className="table-container">
+                  <table className="table">
                   <thead>
                     <tr>
                       <th>Nome</th>
@@ -670,31 +671,31 @@ const Pacientes = () => {
                       );
                     })}
                   </tbody>
-                </table>
-              </div>
-              {/* Controles de paginação */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
-                <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
-                  Página {currentPage} de {totalPages} — exibindo {pacientesPaginados.length} de {pacientesFiltrados.length}
+                  </table>
                 </div>
-                <div>
-                  <button
-                    className="btn"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    style={{ marginRight: '8px' }}
-                  >
-                    Anterior
-                  </button>
-                  <button
-                    className="btn"
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  >
-                    Próxima
-                  </button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
+                  <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                    Página {currentPage} de {totalPages} — exibindo {pacientesPaginados.length} de {pacientesFiltrados.length}
+                  </div>
+                  <div>
+                    <button
+                      className="btn"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      style={{ marginRight: '8px' }}
+                    >
+                      Anterior
+                    </button>
+                    <button
+                      className="btn"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    >
+                      Próxima
+                    </button>
+                  </div>
                 </div>
-              </div>
+              </>
             )}
           </div>
         </>
