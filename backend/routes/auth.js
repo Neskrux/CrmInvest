@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { supabase } = require('../config/database');
+const { supabase, supabaseAdmin } = require('../config/database');
 const { JWT_SECRET } = require('../config/constants');
 const { normalizarEmail, authenticateToken } = require('../middleware/auth');
 
@@ -19,7 +19,7 @@ router.post('/login', async (req, res) => {
     let tipoLogin = null;
 
     if (email.includes('@')) {
-      const { data: usuarios, error } = await supabase
+      const { data: usuarios, error } = await supabaseAdmin
         .from('usuarios')
         .select(`
           *,
@@ -40,7 +40,7 @@ router.post('/login', async (req, res) => {
     if (!usuario && email.includes('@')) {
       const emailNormalizado = normalizarEmail(email);
     
-      const { data: consultores, error } = await supabase
+      const { data: consultores, error } = await supabaseAdmin
         .from('consultores')
         .select('*')
         .eq('email', emailNormalizado)
@@ -66,7 +66,7 @@ router.post('/login', async (req, res) => {
     }
 
     if (tipoLogin === 'admin') {
-      await supabase
+      await supabaseAdmin
         .from('usuarios')
         .update({ ultimo_login: new Date().toISOString() })
         .eq('id', usuario.id);
@@ -121,7 +121,7 @@ router.post('/logout', authenticateToken, (req, res) => {
 
 router.get('/verify-token', authenticateToken, async (req, res) => {
   try {
-    const { data: usuario, error } = await supabase
+    const { data: usuario, error } = await supabaseAdmin
       .from('usuarios')
       .select(`
         *,

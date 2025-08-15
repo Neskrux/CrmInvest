@@ -1,42 +1,46 @@
-api/login:1   Failed to load resource: the server responded with a status of 500 ()
+AuthContext.js:81   POST https://crm-invest.vercel.app/api/login 500 (Internal Server Error)
+login @ AuthContext.js:81
+onSubmit @ Login.js:18
+ze @ react-dom.production.min.js:54
+$e @ react-dom.production.min.js:54
+(anônimo) @ react-dom.production.min.js:55
+Rr @ react-dom.production.min.js:105
+Lr @ react-dom.production.min.js:106
+(anônimo) @ react-dom.production.min.js:117
+cc @ react-dom.production.min.js:273
+Ae @ react-dom.production.min.js:52
+Hr @ react-dom.production.min.js:109
+qt @ react-dom.production.min.js:74
+Vt @ react-dom.production.min.js:73
 AuthContext.js:94  ❌ Erro na resposta: {"error":"Erro interno do servidor"}
 login @ AuthContext.js:94
+await in login
+onSubmit @ Login.js:18
+ze @ react-dom.production.min.js:54
+$e @ react-dom.production.min.js:54
+(anônimo) @ react-dom.production.min.js:55
+Rr @ react-dom.production.min.js:105
+Lr @ react-dom.production.min.js:106
+(anônimo) @ react-dom.production.min.js:117
+cc @ react-dom.production.min.js:273
+Ae @ react-dom.production.min.js:52
+Hr @ react-dom.production.min.js:109
+qt @ react-dom.production.min.js:74
+Vt @ react-dom.production.min.js:73
 AuthContext.js:120  ❌ Erro no login: Error: Erro 500: {"error":"Erro interno do servidor"}
     at login (AuthContext.js:95:15)
     at async onSubmit (Login.js:18:11)
 login @ AuthContext.js:120
-api/login:1   Failed to load resource: the server responded with a status of 500 ()
-AuthContext.js:94  ❌ Erro na resposta: {"error":"Erro interno do servidor"}
-login @ AuthContext.js:94
-AuthContext.js:120  ❌ Erro no login: Error: Erro 500: {"error":"Erro interno do servidor"}
-    at login (AuthContext.js:95:15)
-    at async onSubmit (Login.js:18:11)
-login @ AuthContext.js:120
-api/login:1   Failed to load resource: the server responded with a status of 500 ()
-AuthContext.js:94  ❌ Erro na resposta: {"error":"Erro interno do servidor"}
-login @ AuthContext.js:94
-AuthContext.js:120  ❌ Erro no login: Error: Erro 500: {"error":"Erro interno do servidor"}
-    at login (AuthContext.js:95:15)
-    at async onSubmit (Login.js:18:11)
-login @ AuthContext.js:120
-api/login:1   Failed to load resource: the server responded with a status of 500 ()
-AuthContext.js:94  ❌ Erro na resposta: {"error":"Erro interno do servidor"}
-login @ AuthContext.js:94
-AuthContext.js:120  ❌ Erro no login: Error: Erro 500: {"error":"Erro interno do servidor"}
-    at login (AuthContext.js:95:15)
-    at async onSubmit (Login.js:18:11)
-login @ AuthContext.js:120
-api/login:1   Failed to load resource: the server responded with a status of 500 ()
-AuthContext.js:94  ❌ Erro na resposta: {"error":"Erro interno do servidor"}
-login @ AuthContext.js:94
-AuthContext.js:120  ❌ Erro no login: Error: Erro 500: {"error":"Erro interno do servidor"}
-    at login (AuthContext.js:95:15)
-    at async onSubmit (Login.js:18:11)
-login @ AuthContext.js:120
-api/login:1   Failed to load resource: the server responded with a status of 500 ()
-AuthContext.js:94  ❌ Erro na resposta: {"error":"Erro interno do servidor"}
-login @ AuthContext.js:94
-AuthContext.js:120  ❌ Erro no login: Error: Erro 500: {"error":"Erro interno do servidor"}
-    at login (AuthContext.js:95:15)
-    at async onSubmit (Login.js:18:11)
-login @ AuthContext.js:120
+await in login
+onSubmit @ Login.js:18
+ze @ react-dom.production.min.js:54
+$e @ react-dom.production.min.js:54
+(anônimo) @ react-dom.production.min.js:55
+Rr @ react-dom.production.min.js:105
+Lr @ react-dom.production.min.js:106
+(anônimo) @ react-dom.production.min.js:117
+cc @ react-dom.production.min.js:273
+Ae @ react-dom.production.min.js:52
+Hr @ react-dom.production.min.js:109
+qt @ react-dom.production.min.js:74
+Vt @ react-dom.production.min.js:73
