@@ -42,4 +42,5 @@ app.listen(PORT, async () => {
   }
   
   await initializeTables();
-});
+}); 
+
