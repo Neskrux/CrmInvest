@@ -3,8 +3,8 @@ require('dotenv').config();
 
 class MetaAdsAPI {
   constructor() {
-    this.accessToken = process.env.META_ACCESS_TOKEN;
-    this.adAccountId = process.env.META_AD_ACCOUNT_ID;
+    this.accessToken = process.env.META_ACCESS_TOKEN || '';
+    this.adAccountId = process.env.META_AD_ACCOUNT_ID || '';
     this.baseURL = 'https://graph.facebook.com/v19.0';
     this.cache = new Map(); // Cache para evitar muitas chamadas
     this.lastRequest = 0; // Timestamp da última requisição

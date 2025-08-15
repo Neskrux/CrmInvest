@@ -1,4 +1,6 @@
-const JWT_SECRET = 'nKDiWQtS50GAaJUf3u2YKPxrJn+Y2DRdV5pRwkUg0iBkb/tvH0UQVAnOT8kWQA7pp27mXaTCaoV2NpoOPVZ8IA==';
+require('dotenv').config();
+
+const JWT_SECRET = process.env.JWT_SECRET || 'nKDiWQtS50GAaJUf3u2YKPxrJn+Y2DRdV5pRwkUg0iBkb/tvH0UQVAnOT8kWQA7pp27mXaTCaoV2NpoOPVZ8IA==';
 
 const corsOptions = {
   origin: [
