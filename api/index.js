@@ -59,6 +59,11 @@ const supabaseUrl = 'https://idicuetpukxjqripbpwa.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaWN1ZXRwdWt4anFyaXBicHdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYyNzA5MTQsImV4cCI6MjA1MTg0NjkxNH0.j1u6gpLmC9Kont3WW9nqLmJJ6icQAcLt5TuPVtJCqGc';
 const supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaWN1ZXRwdWt4anFyaXBicHdhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTIwMDczMSwiZXhwIjoyMDcwNzc2NzMxfQ.71IeNihVLi3Uj4Tx9b9-xB2XVqUqBZXimHspudv4Ex4';
 
+console.log('🔍 DEBUG - Credenciais Supabase:');
+console.log('URL:', supabaseUrl);
+console.log('ANON KEY:', supabaseAnonKey ? 'Presente' : 'Ausente');
+console.log('SERVICE KEY:', supabaseServiceKey ? 'Presente' : 'Ausente');
+
 // Cliente Supabase para operações normais
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -1602,4 +1607,29 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
 })();
 
 // Exportar para Vercel
+// Endpoint de debug para verificar configuração
+app.get('/debug-env', (req, res) => {
+  res.json({
+    timestamp: new Date().toISOString(),
+    supabase: {
+      url: supabaseUrl,
+      hasAnonKey: !!supabaseAnonKey,
+      hasServiceKey: !!supabaseServiceKey
+    },
+    jwt: {
+      hasSecret: !!JWT_SECRET
+    },
+    environment: process.env.NODE_ENV || 'undefined'
+  });
+});
+
+// Endpoint raiz
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'CRM API Online', 
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
+  });
+});
+
 module.exports = app; 
