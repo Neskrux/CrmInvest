@@ -1,11 +1,14 @@
 {
-  "buildCommand": "cd frontend && npm install --force && CI=false DISABLE_ESLINT_PLUGIN=true npm run build-vercel",
+  "buildCommand": "cd frontend && npm install --force && CI=false DISABLE_ESLINT_PLUGIN=true npm run build",
   "outputDirectory": "frontend/build",
   "framework": null,
   "env": {
     "CI": "false",
     "DISABLE_ESLINT_PLUGIN": "true",
-    "NODE_ENV": "production"
+    "NODE_ENV": "production",
+    "SUPABASE_URL": "https://idicuetpukxjqripbpwa.supabase.co",
+    "SUPABASE_SERVICE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaWN1ZXRwdWt4anFyaXBicHdhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTIwMDczMSwiZXhwIjoyMDcwNzc2NzMxfQ.71IeNihVLi3Uj4Tx9b9-xB2XVqUqBZXimHspudv4Ex4",
+    "JWT_SECRET": "nKDiWQtS50GAaJUf3u2YKPxrJn+Y2DRdV5pRwkUg0iBkb/tvH0UQVAnOT8kWQA7pp27mXaTCaoV2NpoOPVZ8IA=="
   },
   "build": {
     "env": {
