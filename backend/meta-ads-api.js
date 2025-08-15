@@ -9,6 +9,12 @@ class MetaAdsAPI {
     this.cache = new Map(); // Cache para evitar muitas chamadas
     this.lastRequest = 0; // Timestamp da última requisição
     this.minDelay = 1000; // Delay mínimo entre requisições (1 segundo)
+    
+    // Verificar se as variáveis de ambiente estão configuradas
+    if (!this.accessToken || !this.adAccountId) {
+      console.error('❌ Variáveis de ambiente do Meta Ads não configuradas!');
+      console.error('Configure META_ACCESS_TOKEN e META_AD_ACCOUNT_ID no arquivo .env');
+    }
   }
 
   // Adicionar delay entre requisições
