@@ -54,10 +54,10 @@ const upload = multer({
   }
 });
 
-// Supabase client - CORRIGIDO
-const supabaseUrl = process.env.SUPABASE_URL || 'https://idicuetpukxjqripbpwa.supabase.co';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaWN1ZXRwdWt4anFyaXBicHdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYyNzA5MTQsImV4cCI6MjA1MTg0NjkxNH0.j1u6gpLmC9Kont3WW9nqLmJJ6icQAcLt5TuPVtJCqGc';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaWN1ZXRwdWt4anFyaXBicHdhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTIwMDczMSwiZXhwIjoyMDcwNzc2NzMxfQ.71IeNihVLi3Uj4Tx9b9-xB2XVqUqBZXimHspudv4Ex4';
+// Supabase client - CREDENCIAIS FIXAS PARA VERCEL
+const supabaseUrl = 'https://idicuetpukxjqripbpwa.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaWN1ZXRwdWt4anFyaXBicHdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYyNzA5MTQsImV4cCI6MjA1MTg0NjkxNH0.j1u6gpLmC9Kont3WW9nqLmJJ6icQAcLt5TuPVtJCqGc';
+const supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaWN1ZXRwdWt4anFyaXBicHdhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTIwMDczMSwiZXhwIjoyMDcwNzc2NzMxfQ.71IeNihVLi3Uj4Tx9b9-xB2XVqUqBZXimHspudv4Ex4';
 
 // Cliente Supabase para operações normais
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -68,8 +68,8 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 // Configurar Supabase Storage
 const STORAGE_BUCKET = 'contratos';
 
-// JWT Secret - CORRIGIDO
-const JWT_SECRET = process.env.JWT_SECRET || 'DasRGZ7BT3A47YF/0coBWUZ2qpsMcBfGRXV7C2ymOTHnmwPribCSuQOQlsZ6SNf2erKp29aysgDvAtUFBmcm1g==';
+// JWT Secret - FIXO PARA VERCEL
+const JWT_SECRET = 'nKDiWQtS50GAaJUf3u2YKPxrJn+Y2DRdV5pRwkUg0iBkb/tvH0UQVAnOT8kWQA7pp27mXaTCaoV2NpoOPVZ8IA==';
 
 // Função para normalizar emails (converter para minúsculas e limpar espaços)
 const normalizarEmail = (email) => {
