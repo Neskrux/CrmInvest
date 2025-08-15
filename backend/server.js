@@ -1081,7 +1081,7 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
 app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade } = req.body;
+    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado } = req.body;
     
     // Normalizar telefone e CPF (remover formatação)
     const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
@@ -1140,7 +1140,8 @@ app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
         status, 
         observacoes,
         consultor_id: consultorId,
-        cidade
+        cidade,
+        estado
       })
       .eq('id', id)
       .select();

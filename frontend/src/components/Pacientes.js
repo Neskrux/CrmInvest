@@ -161,6 +161,8 @@ const Pacientes = () => {
           nome: '',
           telefone: '',
           cpf: '',
+          cidade: '',
+          estado: '',
           tipo_tratamento: '',
           status: 'lead',
           observacoes: '',
