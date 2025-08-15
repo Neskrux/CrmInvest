@@ -12,6 +12,18 @@ const STORAGE_BUCKET = 'contratos';
 
 const initializeTables = async () => {
   console.log(`
+-- Tabela de usuários (admin)
+CREATE TABLE IF NOT EXISTS usuarios (
+  id SERIAL PRIMARY KEY,
+  nome TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  senha TEXT NOT NULL,
+  consultor_id INTEGER REFERENCES consultores(id),
+  ativo BOOLEAN DEFAULT true,
+  ultimo_login TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Tabela de clínicas (atualizada)
 CREATE TABLE IF NOT EXISTS clinicas (
   id SERIAL PRIMARY KEY,

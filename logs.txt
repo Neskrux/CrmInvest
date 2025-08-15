@@ -1,0 +1,42 @@
+api/login:1   Failed to load resource: the server responded with a status of 500 ()
+AuthContext.js:94  ❌ Erro na resposta: {"error":"Erro interno do servidor"}
+login @ AuthContext.js:94
+AuthContext.js:120  ❌ Erro no login: Error: Erro 500: {"error":"Erro interno do servidor"}
+    at login (AuthContext.js:95:15)
+    at async onSubmit (Login.js:18:11)
+login @ AuthContext.js:120
+api/login:1   Failed to load resource: the server responded with a status of 500 ()
+AuthContext.js:94  ❌ Erro na resposta: {"error":"Erro interno do servidor"}
+login @ AuthContext.js:94
+AuthContext.js:120  ❌ Erro no login: Error: Erro 500: {"error":"Erro interno do servidor"}
+    at login (AuthContext.js:95:15)
+    at async onSubmit (Login.js:18:11)
+login @ AuthContext.js:120
+api/login:1   Failed to load resource: the server responded with a status of 500 ()
+AuthContext.js:94  ❌ Erro na resposta: {"error":"Erro interno do servidor"}
+login @ AuthContext.js:94
+AuthContext.js:120  ❌ Erro no login: Error: Erro 500: {"error":"Erro interno do servidor"}
+    at login (AuthContext.js:95:15)
+    at async onSubmit (Login.js:18:11)
+login @ AuthContext.js:120
+api/login:1   Failed to load resource: the server responded with a status of 500 ()
+AuthContext.js:94  ❌ Erro na resposta: {"error":"Erro interno do servidor"}
+login @ AuthContext.js:94
+AuthContext.js:120  ❌ Erro no login: Error: Erro 500: {"error":"Erro interno do servidor"}
+    at login (AuthContext.js:95:15)
+    at async onSubmit (Login.js:18:11)
+login @ AuthContext.js:120
+api/login:1   Failed to load resource: the server responded with a status of 500 ()
+AuthContext.js:94  ❌ Erro na resposta: {"error":"Erro interno do servidor"}
+login @ AuthContext.js:94
+AuthContext.js:120  ❌ Erro no login: Error: Erro 500: {"error":"Erro interno do servidor"}
+    at login (AuthContext.js:95:15)
+    at async onSubmit (Login.js:18:11)
+login @ AuthContext.js:120
+api/login:1   Failed to load resource: the server responded with a status of 500 ()
+AuthContext.js:94  ❌ Erro na resposta: {"error":"Erro interno do servidor"}
+login @ AuthContext.js:94
+AuthContext.js:120  ❌ Erro no login: Error: Erro 500: {"error":"Erro interno do servidor"}
+    at login (AuthContext.js:95:15)
+    at async onSubmit (Login.js:18:11)
+login @ AuthContext.js:120
