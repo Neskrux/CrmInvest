@@ -56,10 +56,18 @@ const upload = multer({
   }
 });
 
-// Supabase client
-const supabaseUrl = process.env.SUPABASE_URL || 'https://your-project-id.supabase.co';
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY || 'your-anon-key-here';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || supabaseKey; // Service role key para Storage
+// Supabase client - usando apenas variáveis de ambiente
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+
+// Verificar se as variáveis de ambiente estão configuradas
+if (!supabaseUrl || !supabaseKey) {
+  console.error('❌ Variáveis de ambiente do Supabase não configuradas!');
+  console.error('Configure SUPABASE_URL e SUPABASE_SERVICE_KEY no arquivo .env');
+  process.exit(1);
+}
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey); // Cliente admin para Storage
 
@@ -136,8 +144,15 @@ const isRetryableError = (error) => {
   return retryableMessages.some(msg => errorMessage.includes(msg));
 };
 
-// JWT Secret
-const JWT_SECRET = process.env.JWT_SECRET || 'crm-secret-key-2024';
+// JWT Secret - usando apenas variável de ambiente
+const JWT_SECRET = process.env.JWT_SECRET;
+
+// Verificar se o JWT_SECRET está configurado
+if (!JWT_SECRET) {
+  console.error('❌ JWT_SECRET não configurado!');
+  console.error('Configure JWT_SECRET no arquivo .env');
+  process.exit(1);
+}
 
 // Função para normalizar emails (converter para minúsculas e limpar espaços)
 const normalizarEmail = (email) => {

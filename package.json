@@ -1,13 +1,13 @@
 {
-  "name": "crm-system",
+  "name": "crm-invest",
   "version": "1.0.0",
-  "description": "CRM System with Frontend and Backend",
+  "description": "CRM para Investimentos",
   "scripts": {
-    "build": "cd frontend && npm install --force && chmod +x node_modules/.bin/react-scripts && CI=false DISABLE_ESLINT_PLUGIN=true npm run build",
-    "install": "cd frontend && npm install --force && cd ../backend && npm install",
-    "start": "cd backend && node server.js"
+    "build": "cd frontend && npm install && npm run build",
+    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm start\"",
+    "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install"
   },
-  "engines": {
-    "node": ">=14.x"
+  "devDependencies": {
+    "concurrently": "^8.2.2"
   }
 } 

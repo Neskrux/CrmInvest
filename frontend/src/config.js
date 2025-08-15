@@ -1,6 +1,6 @@
 // Configuração da API
 const config = {
-  // URL base da API
+  // URL base da API - usando variável de ambiente ou fallback seguro
   API_BASE_URL: process.env.REACT_APP_API_URL || 
     (process.env.NODE_ENV === 'production' 
       ? '/api' 
