@@ -14,9 +14,15 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(() => {
-    const savedToken = localStorage.getItem('token');
-    // Verificar se o token é válido (não vazio e não 'null' string)
-    return savedToken && savedToken !== 'null' && savedToken.trim() !== '' ? savedToken : null;
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const savedToken = localStorage.getItem('token');
+        return savedToken && savedToken !== 'null' && savedToken.trim() !== '' ? savedToken : null;
+      }
+    } catch (error) {
+      console.error('Erro ao acessar localStorage:', error);
+    }
+    return null;
   });
 
   // Configurar URL base da API
@@ -29,8 +35,11 @@ export const AuthProvider = ({ children }) => {
     console.log('Limpando todos os dados de autenticação');
     setUser(null);
     setToken(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    }
   };
 
   const makeRequest = async (url, options = {}) => {
@@ -62,8 +71,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (email, senha) => {
+    console.log('🔐 Tentando login para:', email);
+    console.log('🌐 API URL:', API_BASE_URL);
+    
     try {
-      const response = await fetch(`${API_BASE_URL}/login`, {
+      const loginUrl = `${API_BASE_URL}/login`;
+      console.log('📡 URL completa:', loginUrl);
+      
+      const response = await fetch(loginUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -71,17 +86,30 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify({ email, senha })
       });
 
-      const data = await response.json();
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erro no login');
+        const errorText = await response.text();
+        console.error('❌ Erro na resposta:', errorText);
+        throw new Error(`Erro ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Dados recebidos:', { hasToken: !!data.token, hasUsuario: !!data.usuario });
+
+      if (!data.token || !data.usuario) {
+        throw new Error('Resposta inválida do servidor');
       }
 
       const { token: newToken, usuario } = data;
       
       // Salvar token no localStorage e no state
-      localStorage.setItem('token', newToken);
-      localStorage.setItem('user', JSON.stringify(usuario));
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('token', newToken);
+        localStorage.setItem('user', JSON.stringify(usuario));
+      }
+      
       setToken(newToken);
       setUser(usuario);
 
@@ -89,7 +117,7 @@ export const AuthProvider = ({ children }) => {
 
       return { success: true, user: usuario };
     } catch (error) {
-      console.error('Erro no login:', error);
+      console.error('❌ Erro no login:', error);
       return { success: false, error: error.message };
     }
   };
@@ -99,7 +127,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   const verifyToken = async () => {
-    const currentToken = localStorage.getItem('token');
+    let currentToken = null;
+    
+    if (typeof window !== 'undefined' && window.localStorage) {
+      currentToken = localStorage.getItem('token');
+    }
     
     if (!currentToken || currentToken === 'null' || currentToken.trim() === '') {
       console.log('Nenhum token válido encontrado - redirecionando para login');
@@ -117,7 +149,10 @@ export const AuthProvider = ({ children }) => {
         console.log('Token válido - usuário autenticado:', data.usuario.nome || data.usuario.email);
         setUser(data.usuario);
         setToken(currentToken);
-        localStorage.setItem('user', JSON.stringify(data.usuario));
+        
+        if (typeof window !== 'undefined' && window.localStorage) {
+          localStorage.setItem('user', JSON.stringify(data.usuario));
+        }
       } else {
         console.log('Token inválido - fazendo logout');
         clearAllData();
