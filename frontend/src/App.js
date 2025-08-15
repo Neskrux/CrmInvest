@@ -19,7 +19,6 @@ import logoBrasao from './images/logobrasao.png';
 import logoHorizontal from './images/logohorizontal.png';
 import logoHorizontalPreto from './images/logohorizontalpreto.png';
 
-// Componente para proteger rotas
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
   
@@ -42,7 +41,6 @@ function AppContent() {
   const { user, logout, loading } = useAuth();
   const location = useLocation();
   
-  // Determinar aba ativa baseada na rota atual
   const getActiveTab = () => {
     const path = location.pathname;
     if (path.includes('/pacientes')) return 'pacientes';
@@ -64,7 +62,6 @@ function AppContent() {
     );
   }
 
-  // Se o usuário não está autenticado, mostrar as páginas de entrada
   if (!user) {
     return (
       <Routes>
@@ -77,7 +74,6 @@ function AppContent() {
     );
   }
 
-  // Se o usuário está autenticado, mostrar a aplicação principal
   const renderContent = () => {
     return (
       <Routes>
@@ -317,11 +313,9 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
-          {/* Rotas públicas - Captura de leads */}
           <Route path="/captura-lead" element={<CapturaLead />} />
           <Route path="/captura-sucesso" element={<CapturaSucesso />} />
           
-          {/* Rotas da aplicação principal */}
           <Route path="/*" element={<AppContent />} />
         </Routes>
       </Router>

@@ -68,7 +68,7 @@ console.log('SERVICE KEY:', supabaseServiceKey ? 'Presente' : 'Ausente');
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Cliente Supabase Admin para operações privilegiadas (Storage, etc.)
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+const supabaseAdmin = createClient(supabaseUrl, supabaseAnonKey); // Usar anon key para todas as operações temporariamente
 
 // Configurar Supabase Storage
 const STORAGE_BUCKET = 'contratos';

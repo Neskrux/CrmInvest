@@ -13,7 +13,6 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Configuração CORS para Vercel
 const corsOptions = {
   origin: [
     'http://localhost:3000',
@@ -26,21 +25,15 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 
-// Middleware
 app.use(cors(corsOptions));
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
-// Servir arquivos estáticos da pasta uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Configuração do Multer para upload de arquivos
-// Usar memoryStorage para funcionar no Vercel
 const storage = multer.memoryStorage();
 
-// Filtros para upload
 const fileFilter = (req, file, cb) => {
-  // Permitir apenas arquivos PDF
   if (file.mimetype === 'application/pdf') {
     cb(null, true);
   } else {
@@ -52,18 +45,17 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024 // Limite de 10MB
+    fileSize: 10 * 1024 * 1024
   }
 });
 
-// Supabase client
-const supabaseUrl = process.env.SUPABASE_URL || 'https://your-project-id.supabase.co';
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY || 'your-anon-key-here';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || supabaseKey; // Service role key para Storage
-const supabase = createClient(supabaseUrl, supabaseKey);
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey); // Cliente admin para Storage
+const supabaseUrl = 'https://idicuetpukxjqripbpwa.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaWN1ZXRwdWt4anFyaXBicHdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYyNzA5MTQsImV4cCI6MjA1MTg0NjkxNH0.j1u6gpLmC9Kont3WW9nqLmJJ6icQAcLt5TuPVtJCqGc';
+const supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaWN1ZXRwdWt4anFyaXBicHdhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTIwMDczMSwiZXhwIjoyMDcwNzc2NzMxfQ.71IeNihVLi3Uj4Tx9b9-xB2XVqUqBZXimHspudv4Ex4';
 
-// Configurar Supabase Storage
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabaseAdmin = createClient(supabaseUrl, supabaseAnonKey);
+
 const STORAGE_BUCKET = 'contratos';
 
 // Função para fazer upload para Supabase Storage com retry
@@ -72,14 +64,10 @@ const uploadToSupabase = async (file, retryCount = 0) => {
   const RETRY_DELAY = 1000; // 1 segundo
   
   try {
-    // Gerar nome único para o arquivo
     const timestamp = Date.now();
     const randomId = Math.round(Math.random() * 1E9);
     const fileName = `contrato-${timestamp}-${randomId}.pdf`;
     
-    console.log(`📤 Tentando upload ${retryCount + 1}/${MAX_RETRIES + 1} - Arquivo: ${file.originalname} (${file.size} bytes)`);
-    
-    // Fazer upload para o Supabase Storage usando cliente admin com timeout
     const uploadPromise = supabaseAdmin.storage
       .from(STORAGE_BUCKET)
       .upload(fileName, file.buffer, {
@@ -88,7 +76,6 @@ const uploadToSupabase = async (file, retryCount = 0) => {
         upsert: false
       });
 
-    // Timeout de 60 segundos para uploads grandes
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('Upload timeout - arquivo muito grande ou conexão lenta')), 60000);
     });
@@ -97,9 +84,6 @@ const uploadToSupabase = async (file, retryCount = 0) => {
 
     if (error) throw error;
     
-    console.log(`✅ Upload concluído com sucesso: ${fileName}`);
-    
-    // Retornar informações do arquivo
     return {
       fileName: fileName,
       originalName: file.originalname,
@@ -107,11 +91,7 @@ const uploadToSupabase = async (file, retryCount = 0) => {
       path: data.path
     };
   } catch (error) {
-    console.error(`❌ Erro no upload para Supabase (tentativa ${retryCount + 1}):`, error.message);
-    
-    // Se não atingiu o máximo de tentativas e é um erro de conexão, tenta novamente
     if (retryCount < MAX_RETRIES && isRetryableError(error)) {
-      console.log(`🔄 Tentando novamente em ${RETRY_DELAY}ms...`);
       await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
       return uploadToSupabase(file, retryCount + 1);
     }
@@ -136,8 +116,8 @@ const isRetryableError = (error) => {
   return retryableMessages.some(msg => errorMessage.includes(msg));
 };
 
-// JWT Secret
-const JWT_SECRET = process.env.JWT_SECRET || 'crm-secret-key-2024';
+// JWT Secret - FIXO PARA DESENVOLVIMENTO
+const JWT_SECRET = 'nKDiWQtS50GAaJUf3u2YKPxrJn+Y2DRdV5pRwkUg0iBkb/tvH0UQVAnOT8kWQA7pp27mXaTCaoV2NpoOPVZ8IA==';
 
 // Função para normalizar emails (converter para minúsculas e limpar espaços)
 const normalizarEmail = (email) => {
@@ -151,17 +131,12 @@ const authenticateUpload = (req, res, next) => {
   const authHeader = req.headers['authorization'] || req.headers['Authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
-  console.log('📤 Upload - Todos os headers:', req.headers);
-  console.log('📤 Upload - Authorization:', authHeader);
-  console.log('📤 Upload - Token:', token ? 'presente' : 'ausente');
-
   if (!token) {
     return res.status(401).json({ error: 'Token de acesso requerido' });
   }
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
-      console.log('📤 Erro ao verificar token no upload:', err.message);
       return res.status(403).json({ error: 'Token inválido' });
     }
     req.user = user;
@@ -174,18 +149,12 @@ const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
-  // Log para debug
-  console.log('🔐 Autenticação - Headers recebidos:', Object.keys(req.headers));
-  console.log('🔐 Authorization header:', authHeader);
-  console.log('🔐 Token extraído:', token ? 'presente' : 'ausente');
-
   if (!token) {
     return res.status(401).json({ error: 'Token de acesso requerido' });
   }
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
-      console.log('🔐 Erro ao verificar token:', err.message);
       return res.status(403).json({ error: 'Token inválido' });
     }
     req.user = user;
@@ -216,13 +185,7 @@ const requireOwnerOrAdmin = (req, res, next) => {
   return res.status(403).json({ error: 'Acesso negado' });
 };
 
-// Helper function para inicializar tabelas no Supabase
 const initializeTables = async () => {
-  console.log('🔄 Verificando estrutura das tabelas no Supabase...');
-  
-  // As tabelas serão criadas via SQL no painel do Supabase
-  console.log('✅ Para configurar o banco, execute as migrações em backend/migrations/');
-  console.log('📁 Use o arquivo: backend/migrations/run_migrations.sql');
   console.log(`
 -- Tabela de clínicas (atualizada)
 CREATE TABLE IF NOT EXISTS clinicas (
@@ -324,27 +287,21 @@ app.post('/api/login', async (req, res) => {
 
     // Se não encontrou admin, tentar login como consultor (apenas por email)
     if (!usuario && email.includes('@')) {
-      // Normalizar email para busca
-      const emailNormalizado = normalizarEmail(email);
-      console.log('🔍 Buscando consultor por email:', emailNormalizado);
-      
-      const { data: consultores, error } = await supabase
-        .from('consultores')
-        .select('*')
-        .eq('email', emailNormalizado)
-        .limit(1);
+          // Normalizar email para busca
+    const emailNormalizado = normalizarEmail(email);
+    
+    const { data: consultores, error } = await supabase
+      .from('consultores')
+      .select('*')
+      .eq('email', emailNormalizado)
+      .limit(1);
 
-      console.log('📊 Resultado da busca:', { consultores, error });
+    if (error) throw error;
 
-      if (error) throw error;
-
-      if (consultores && consultores.length > 0) {
-        usuario = consultores[0];
-        tipoLogin = 'consultor';
-        console.log('✅ Consultor encontrado:', usuario.nome);
-      } else {
-        console.log('❌ Nenhum consultor encontrado com email:', emailNormalizado);
-      }
+    if (consultores && consultores.length > 0) {
+      usuario = consultores[0];
+      tipoLogin = 'consultor';
+    }
     }
 
     if (!usuario) {
@@ -352,18 +309,12 @@ app.post('/api/login', async (req, res) => {
     }
 
     // Verificar senha
-    console.log('🔐 Verificando senha para usuário:', usuario.nome || usuario.email);
-    console.log('🔐 Senha digitada:', senha);
-    console.log('🔐 Hash no banco:', usuario.senha);
-    
     const senhaValida = await bcrypt.compare(senha, usuario.senha);
-    console.log('🔐 Senha válida?', senhaValida);
     
     // TEMPORÁRIO: Aceitar senha admin123 para admin
     const senhaTemporaria = senha === 'admin123' && usuario.email === 'admin@crm.com';
     
     if (!senhaValida && !senhaTemporaria) {
-      console.log('❌ Login falhou: senha inválida');
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
@@ -552,10 +503,6 @@ app.post('/api/clinicas', authenticateToken, requireAdmin, async (req, res) => {
 app.put('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    console.log('🔧 PUT /api/clinicas/:id recebido');
-    console.log('🔧 ID da clínica:', id);
-    console.log('🔧 Body recebido:', req.body);
-    console.log('🔧 Usuário autenticado:', req.user);
     
     // Permitir atualização parcial: só atualiza os campos enviados
     const camposPermitidos = ['nome', 'endereco', 'bairro', 'cidade', 'estado', 'nicho', 'telefone', 'email', 'status'];
@@ -568,7 +515,6 @@ app.put('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) =
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ error: 'Nenhum campo válido para atualizar.' });
     }
-    console.log('🔧 Dados para atualizar:', updateData);
     
     const { data, error } = await supabase
       .from('clinicas')
@@ -576,24 +522,16 @@ app.put('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) =
       .eq('id', id)
       .select();
 
-    console.log('🔧 Resultado do Supabase:');
-    console.log('🔧 Data:', data);
-    console.log('🔧 Error:', error);
-
     if (error) {
-      console.error('❌ Erro do Supabase:', error);
       return res.status(500).json({ error: error.message });
     }
     
     if (!data || data.length === 0) {
-      console.error('❌ Nenhuma linha foi atualizada! Verifique as policies do Supabase.');
       return res.status(403).json({ error: 'Nenhuma linha atualizada! Verifique as policies do Supabase.' });
     }
     
-    console.log('✅ Clínica atualizada com sucesso:', data[0]);
     res.json({ id: data[0].id, message: 'Clínica atualizada com sucesso!' });
   } catch (error) {
-    console.error('❌ Erro geral:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -665,7 +603,6 @@ app.post('/api/consultores', authenticateToken, requireAdmin, async (req, res) =
 // === CADASTRO PÚBLICO DE CONSULTORES === (Sem autenticação)
 app.post('/api/consultores/cadastro', async (req, res) => {
   try {
-    console.log('📝 Cadastro de consultor recebido:', req.body);
     const { nome, telefone, email, senha, cpf, pix } = req.body;
     
     // Validar campos obrigatórios
@@ -713,7 +650,6 @@ app.post('/api/consultores/cadastro', async (req, res) => {
     const senhaHash = await bcrypt.hash(senha, saltRounds);
     
     // Inserir consultor
-    console.log('💾 Tentando inserir consultor no Supabase...');
     const { data, error } = await supabase
       .from('consultores')
       .insert([{ 
@@ -729,11 +665,8 @@ app.post('/api/consultores/cadastro', async (req, res) => {
       .select();
 
     if (error) {
-      console.error('❌ Erro ao inserir consultor:', error);
       throw error;
     }
-    
-    console.log('✅ Consultor inserido com sucesso:', data[0]);
     
     res.json({ 
       id: data[0].id, 
@@ -749,7 +682,6 @@ app.post('/api/consultores/cadastro', async (req, res) => {
 // === CADASTRO PÚBLICO DE PACIENTES/LEADS === (Sem autenticação)
 app.post('/api/leads/cadastro', async (req, res) => {
   try {
-    console.log('📝 Cadastro de lead recebido:', req.body);
     const { nome, telefone, tipo_tratamento, cpf, observacoes, cidade, estado } = req.body;
     
     // Validar campos obrigatórios
@@ -778,7 +710,6 @@ app.post('/api/leads/cadastro', async (req, res) => {
     const telefoneNumeros = telefone.replace(/\D/g, '');
     
     // Verificar se telefone já existe
-    console.log('🔍 Verificando se telefone já existe:', telefoneNumeros);
     const { data: telefoneExistente, error: telefoneError } = await supabase
       .from('pacientes')
       .select('id, nome, created_at')
@@ -786,24 +717,16 @@ app.post('/api/leads/cadastro', async (req, res) => {
       .limit(1);
 
     if (telefoneError) {
-      console.error('❌ Erro ao verificar telefone:', telefoneError);
       throw telefoneError;
     }
     
     if (telefoneExistente && telefoneExistente.length > 0) {
       const pacienteExistente = telefoneExistente[0];
       const dataCadastro = new Date(pacienteExistente.created_at).toLocaleDateString('pt-BR');
-      console.log('❌ Telefone já cadastrado:', { 
-        telefone: telefoneNumeros, 
-        paciente: pacienteExistente.nome,
-        dataCadastro: dataCadastro 
-      });
       return res.status(400).json({ 
         error: `Este número de telefone já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}). Por favor, utilize outro número.` 
       });
     }
-    
-    console.log('✅ Telefone disponível para cadastro');
     
     // Verificar se CPF já existe
     console.log('🔍 Verificando se CPF já existe:', cpfNumeros);
