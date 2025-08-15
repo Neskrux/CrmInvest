@@ -50,8 +50,10 @@ const upload = multer({
 });
 
 const supabaseUrl = 'https://idicuetpukxjqripbpwa.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaWN1ZXRwdWt4anFyaXBicHdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYyNzA5MTQsImV4cCI6MjA1MTg0NjkxNH0.j1u6gpLmC9Kont3WW9nqLmJJ6icQAcLt5TuPVtJCqGc';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaWN1ZXRwdWt4anFyaXBicHdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyMDA3MzEsImV4cCI6MjA3MDc3NjczMX0.ON3SSbGxWMu8J2ZEyW3wSt-SjKs0jt1XrpFOxUcpKZ0';
 const supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaWN1ZXRwdWt4anFyaXBicHdhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTIwMDczMSwiZXhwIjoyMDcwNzc2NzMxfQ.71IeNihVLi3Uj4Tx9b9-xB2XVqUqBZXimHspudv4Ex4';
+
+
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const supabaseAdmin = createClient(supabaseUrl, supabaseAnonKey);
@@ -729,7 +731,6 @@ app.post('/api/leads/cadastro', async (req, res) => {
     }
     
     // Verificar se CPF já existe
-    console.log('🔍 Verificando se CPF já existe:', cpfNumeros);
     const { data: cpfExistente, error: cpfError } = await supabase
       .from('pacientes')
       .select('id, nome, created_at')
@@ -737,28 +738,18 @@ app.post('/api/leads/cadastro', async (req, res) => {
       .limit(1);
 
     if (cpfError) {
-      console.error('❌ Erro ao verificar CPF:', cpfError);
       throw cpfError;
     }
     
     if (cpfExistente && cpfExistente.length > 0) {
       const pacienteExistente = cpfExistente[0];
       const dataCadastro = new Date(pacienteExistente.created_at).toLocaleDateString('pt-BR');
-      console.log('❌ CPF já cadastrado:', { 
-        cpf: cpfNumeros, 
-        paciente: pacienteExistente.nome,
-        dataCadastro: dataCadastro 
-      });
       return res.status(400).json({ 
         error: `Este CPF já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}). Por favor, verifique os dados.` 
       });
     }
     
-    console.log('✅ CPF disponível para cadastro');
-    
     // Inserir lead/paciente
-    console.log('💾 Tentando inserir lead no Supabase...');
-    console.log('📍 Dados de localização:', { cidade, estado });
     
     const { data, error } = await supabase
       .from('pacientes')
@@ -776,11 +767,8 @@ app.post('/api/leads/cadastro', async (req, res) => {
       .select();
 
     if (error) {
-      console.error('❌ Erro ao inserir lead:', error);
       throw error;
     }
-    
-    console.log('✅ Lead inserido com sucesso:', data[0]);
     
     res.json({ 
       id: data[0].id, 
@@ -1582,7 +1570,6 @@ app.put('/api/fechamentos/:id/aprovar', authenticateToken, requireAdmin, async (
     
     if (error) {
       // Se der erro (campo não existe), criar uma resposta de sucesso mesmo assim
-      console.log('Campo aprovado não existe na tabela, mas continuando...');
       return res.json({ message: 'Fechamento aprovado com sucesso!' });
     }
     
@@ -1617,7 +1604,6 @@ app.put('/api/fechamentos/:id/reprovar', authenticateToken, requireAdmin, async 
     
     if (error) {
       // Se der erro (campo não existe), criar uma resposta de sucesso mesmo assim
-      console.log('Campo aprovado não existe na tabela, mas continuando...');
       return res.json({ message: 'Fechamento reprovado com sucesso!' });
     }
     
@@ -1870,18 +1856,13 @@ app.get('/api/meta-ads/campaigns', authenticateToken, requireAdmin, async (req, 
 app.get('/api/meta-ads/campaign/:id/adsets', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    console.log(`🔍 [AdSets] Buscando Ad Sets para campanha: ${id}`);
-    console.log(`👤 [AdSets] Usuário: ${req.user?.nome || 'Unknown'}`);
     
     const metaAPI = new MetaAdsAPI();
-    console.log(`📡 [AdSets] Chamando metaAPI.getAdSets(${id})`);
     
     const adsets = await metaAPI.getAdSets(id);
-    console.log(`✅ [AdSets] Dados recebidos:`, JSON.stringify(adsets, null, 2));
     
     res.json(adsets);
   } catch (error) {
-    console.error(`❌ [AdSets] Erro ao buscar Ad Sets para campanha ${req.params.id}:`, error);
     res.status(500).json({ 
       success: false, 
       message: 'Erro ao buscar conjuntos de anúncios',
@@ -1945,27 +1926,12 @@ app.post('/api/meta-ads/sync-campaigns', authenticateToken, requireAdmin, async 
 
     const pricingData = Object.values(consolidated);
     
-    console.log('=== DADOS CONSOLIDADOS DO META ADS ===');
-    console.log('Total de itens únicos para sincronizar:', pricingData.length);
-    console.log('Dados:', JSON.stringify(pricingData, null, 2));
-
-    console.log('Total items:', pricingData.length);
-    
-    console.log('Tentando inserir dados:', JSON.stringify(pricingData, null, 2));
-    
     const { data, error } = await supabase
       .from('meta_ads_pricing')
       .upsert(pricingData, {
         onConflict: 'region,country,date_range',
         ignoreDuplicates: false
       });
-      
-    if (error) {
-      console.log('Erro detalhado:', error);
-      console.log('Código do erro:', error.code);
-      console.log('Mensagem do erro:', error.message);
-      console.log('Detalhes do erro:', error.details);
-    }
 
     if (error) throw error;
     
@@ -2183,21 +2149,11 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
 
 // Inicializar servidor
 app.listen(PORT, async () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT}`);
-  console.log(`🌐 Acesse: http://localhost:${PORT}`);
-  console.log(`🗄️ Usando Supabase como banco de dados`);
-  
   // Verificar conexão com Supabase
   try {
     const { data, error } = await supabase.from('clinicas').select('count').limit(1);
-    if (error) {
-      console.log('⚠️  Configure as variáveis SUPABASE_URL e SUPABASE_SERVICE_KEY no arquivo .env');
-      console.log('📖 Consulte o README.md para instruções detalhadas');
-    } else {
-      console.log('✅ Conexão com Supabase estabelecida com sucesso!');
-    }
   } catch (error) {
-    console.log('⚠️  Erro ao conectar com Supabase:', error.message);
+    // Erro silencioso
   }
   
   await initializeTables();
@@ -2207,8 +2163,6 @@ app.listen(PORT, async () => {
 app.get('/api/meta-ads/real-time-insights', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { dateRange = 'last_30d', status = 'ACTIVE' } = req.query;
-    
-    console.log(`🔄 Buscando insights em tempo real para período: ${dateRange}, status: ${status}`);
     
     const metaAPI = new MetaAdsAPI();
     const campaigns = await metaAPI.getCampaigns(status);
@@ -2222,7 +2176,6 @@ app.get('/api/meta-ads/real-time-insights', authenticateToken, requireAdmin, asy
     // Buscar insights por Ad Set para cada campanha ativa
     for (const campaign of campaigns.data) {
       try {
-        console.log(`📊 Processando campanha: ${campaign.name}`);
         
         // Buscar Ad Sets da campanha
         const adSetsResponse = await metaAPI.getAdSets(campaign.id);
@@ -2283,22 +2236,18 @@ app.get('/api/meta-ads/real-time-insights', authenticateToken, requireAdmin, asy
                   updated_time: campaign.updated_time || campaign.created_time,
                   date_range: dateRange
                 });
-              } else {
-                console.log(`⚠️ Sem insights para Ad Set: ${adSet.name}`);
               }
             } catch (adSetError) {
-              console.warn(`⚠️ Erro ao buscar insights do Ad Set ${adSet.name}:`, adSetError.message);
+              // Erro silencioso
             }
           }
-        } else {
-          console.log(`⚠️ Nenhum Ad Set ativo encontrado para campanha: ${campaign.name}`);
         }
         
         // Delay pequeno para evitar rate limit
         await new Promise(resolve => setTimeout(resolve, 100));
         
       } catch (campaignError) {
-        console.warn(`⚠️ Erro ao processar campanha ${campaign.name}:`, campaignError.message);
+        // Erro silencioso
         
         // Adicionar campanha com erro/dados básicos
         realTimeData.push({
@@ -2325,15 +2274,12 @@ app.get('/api/meta-ads/real-time-insights', authenticateToken, requireAdmin, asy
       }
     }
     
-    console.log(`✅ Total de campanhas processadas: ${realTimeData.length}`);
-    
     // Ordenar por gasto (maior primeiro)
     realTimeData.sort((a, b) => (b.spend || 0) - (a.spend || 0));
     
     res.json(realTimeData);
     
   } catch (error) {
-    console.error('❌ Erro ao buscar insights em tempo real:', error);
     res.status(500).json({ 
       error: 'Erro ao buscar insights em tempo real',
       details: error.message,
@@ -2346,8 +2292,6 @@ app.get('/api/meta-ads/real-time-insights', authenticateToken, requireAdmin, asy
 app.get('/api/meta-ads/advanced-metrics', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { dateRange = 'last_30d' } = req.query;
-    
-    console.log(`🔄 Buscando métricas avançadas APENAS campanhas ATIVAS para período: ${dateRange}`);
     
     const metaAPI = new MetaAdsAPI();
     const campaigns = await metaAPI.getCampaigns('ACTIVE'); // SEMPRE buscar apenas ATIVAS
@@ -2368,7 +2312,6 @@ app.get('/api/meta-ads/advanced-metrics', authenticateToken, requireAdmin, async
     
     // Filtrar APENAS campanhas ATIVAS (dupla verificação)
     const activeCampaigns = campaigns.data.filter(c => c.status === 'ACTIVE');
-    console.log(`✅ ${activeCampaigns.length} campanhas ATIVAS encontradas`);
     
     if (activeCampaigns.length === 0) {
       return res.json({
@@ -2424,8 +2367,6 @@ app.get('/api/meta-ads/advanced-metrics', authenticateToken, requireAdmin, async
     // Buscar insights detalhados por Ad Set para cada campanha ATIVA
     for (const campaign of activeCampaigns) {
       try {
-        console.log(`📊 Processando métricas avançadas para campanha: ${campaign.name}`);
-        
         // Buscar Ad Sets da campanha
         const adSetsResponse = await metaAPI.getAdSets(campaign.id);
         
@@ -2501,27 +2442,20 @@ app.get('/api/meta-ads/advanced-metrics', authenticateToken, requireAdmin, async
                   updated_time: campaign.updated_time || campaign.created_time,
                   date_range: dateRange
                 });
-              } else {
-                console.log(`⚠️ Sem insights para Ad Set: ${adSet.name}`);
               }
             } catch (adSetError) {
-              console.warn(`⚠️ Erro ao buscar insights do Ad Set ${adSet.name}:`, adSetError.message);
+              // Erro silencioso
             }
           }
-        } else {
-          console.log(`⚠️ Nenhum Ad Set ativo encontrado para campanha: ${campaign.name}`);
         }
         
         // Delay pequeno para evitar rate limit
         await new Promise(resolve => setTimeout(resolve, 100));
         
       } catch (campaignError) {
-        console.warn(`⚠️ Erro ao processar métricas da campanha ${campaign.name}:`, campaignError.message);
+        // Erro silencioso
       }
     }
-    
-    console.log(`✅ Total de métricas avançadas processadas: ${advancedMetrics.length}`);
-    console.log(`📊 Resumo dos fechamentos: ${totalFechamentos} fechamentos, R$ ${valorTotalFechamentos.toFixed(2)} em valor total`);
     
     // Ordenar por gasto (maior primeiro)
     advancedMetrics.sort((a, b) => (b.spend || 0) - (a.spend || 0));
@@ -2538,7 +2472,6 @@ app.get('/api/meta-ads/advanced-metrics', authenticateToken, requireAdmin, async
     });
     
   } catch (error) {
-    console.error('❌ Erro ao buscar métricas avançadas:', error);
     res.status(500).json({ 
       error: 'Erro ao buscar métricas avançadas',
       details: error.message,
