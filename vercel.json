@@ -23,15 +23,10 @@
       "dest": "/frontend/$1"
     }
   ],
-  "build": {
-    "env": {
-      "CI": "false",
-      "DISABLE_ESLINT_PLUGIN": "true",
-      "REACT_APP_API_URL": "/api"
-    }
-  },
   "env": {
-    "NODE_ENV": "production"
+    "NODE_ENV": "production",
+    "DISABLE_ESLINT_PLUGIN": "true",
+    "CI": "false"
   },
   "regions": ["gru1"]
 } 
