@@ -49,14 +49,12 @@ const upload = multer({
   }
 });
 
-const supabaseUrl = 'https://idicuetpukxjqripbpwa.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaWN1ZXRwdWt4anFyaXBicHdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyMDA3MzEsImV4cCI6MjA3MDc3NjczMX0.ON3SSbGxWMu8J2ZEyW3wSt-SjKs0jt1XrpFOxUcpKZ0';
-const supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaWN1ZXRwdWt4anFyaXBicHdhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTIwMDczMSwiZXhwIjoyMDcwNzc2NzMxfQ.71IeNihVLi3Uj4Tx9b9-xB2XVqUqBZXimHspudv4Ex4';
-
-
+const supabaseUrl = process.env.SUPABASE_URL || 'https://idicuetpukxjqripbpwa.supabase.co';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaWN1ZXRwdWt4anFyaXBicHdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyMDA3MzEsImV4cCI6MjA3MDc3NjczMX0.ON3SSbGxWMu8J2ZEyW3wSt-SjKs0jt1XrpFOxUcpKZ0';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaWN1ZXRwdWt4anFyaXBicHdhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTIwMDczMSwiZXhwIjoyMDcwNzc2NzMxfQ.71IeNihVLi3Uj4Tx9b9-xB2XVqUqBZXimHspudv4Ex4';
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
-const supabaseAdmin = createClient(supabaseUrl, supabaseAnonKey);
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 const STORAGE_BUCKET = 'contratos';
 
