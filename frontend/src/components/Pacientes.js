@@ -17,6 +17,8 @@ const Pacientes = () => {
   const [filtroCPF, setFiltroCPF] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const [filtroConsultor, setFiltroConsultor] = useState('');
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
@@ -61,6 +63,21 @@ const Pacientes = () => {
       fetchNovosLeads();
     }
   }, [activeTab]);
+
+  // Sempre que filtros ou a lista mudarem, voltar para a primeira página
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    pacientes,
+    filtroNome,
+    filtroTelefone,
+    filtroCPF,
+    filtroTipo,
+    filtroStatus,
+    filtroConsultor,
+    filtroDataInicio,
+    filtroDataFim
+  ]);
 
   const fetchPacientes = async () => {
     try {
@@ -368,6 +385,12 @@ const Pacientes = () => {
     return matchNome && matchTelefone && matchCPF && matchTipo && matchStatus && matchConsultor && matchData;
   });
 
+  // Paginação em memória
+  const totalPages = Math.max(1, Math.ceil(pacientesFiltrados.length / PAGE_SIZE));
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const endIndex = startIndex + PAGE_SIZE;
+  const pacientesPaginados = pacientesFiltrados.slice(startIndex, endIndex);
+
   return (
     <div>
       <div className="page-header">
@@ -560,7 +583,7 @@ const Pacientes = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {pacientesFiltrados.map(paciente => {
+                    {pacientesPaginados.map(paciente => {
                       const statusInfo = getStatusInfo(paciente.status);
                       return (
                         <tr key={paciente.id}>
@@ -648,6 +671,29 @@ const Pacientes = () => {
                     })}
                   </tbody>
                 </table>
+              </div>
+              {/* Controles de paginação */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
+                <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                  Página {currentPage} de {totalPages} — exibindo {pacientesPaginados.length} de {pacientesFiltrados.length}
+                </div>
+                <div>
+                  <button
+                    className="btn"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    style={{ marginRight: '8px' }}
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    className="btn"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  >
+                    Próxima
+                  </button>
+                </div>
               </div>
             )}
           </div>
