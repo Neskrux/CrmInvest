@@ -8,9 +8,13 @@ const path = require('path');
 const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
 const MetaAdsAPI = require('./meta-ads-api');
+const { createServer } = require('http');
+const { Server } = require('socket.io');
+const WhatsAppService = require('./whatsapp-service');
 require('dotenv').config();
 
 const app = express();
+const server = createServer(app);
 const PORT = process.env.PORT || 5000;
 
 // Configuração CORS para Vercel
@@ -300,6 +304,18 @@ CREATE TABLE IF NOT EXISTS fechamentos (
   tipo_tratamento TEXT,
   forma_pagamento TEXT,
   observacoes TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Tabela de novas clínicas (missões diárias)
+CREATE TABLE IF NOT EXISTS novas_clinicas (
+  id SERIAL PRIMARY KEY,
+  nome TEXT NOT NULL,
+  telefone TEXT,
+  endereco TEXT,
+  status TEXT DEFAULT 'tem_interesse',
+  observacoes TEXT,
+  consultor_id INTEGER REFERENCES consultores(id),
   created_at TIMESTAMP DEFAULT NOW()
 );
   `);
@@ -1211,6 +1227,96 @@ app.put('/api/novos-leads/:id/pegar', authenticateToken, async (req, res) => {
 
     if (error) throw error;
     res.json({ message: 'Lead atribuído com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === NOVAS CLÍNICAS === (Funcionalidade para pegar clínicas encontradas nas missões)
+app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('novas_clinicas')
+      .select('*')
+      .is('consultor_id', null)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/novas-clinicas', authenticateToken, async (req, res) => {
+  try {
+    const { nome, telefone, endereco, status, observacoes } = req.body;
+    
+    // Normalizar telefone (remover formatação)
+    const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
+    
+    // Verificar se telefone já existe
+    if (telefoneNumeros) {
+      const { data: telefoneExistente, error: telefoneError } = await supabase
+        .from('novas_clinicas')
+        .select('id, nome, created_at')
+        .eq('telefone', telefoneNumeros)
+        .limit(1);
+
+      if (telefoneError) throw telefoneError;
+      
+      if (telefoneExistente && telefoneExistente.length > 0) {
+        const clinicaExistente = telefoneExistente[0];
+        const dataCadastro = new Date(clinicaExistente.created_at).toLocaleDateString('pt-BR');
+        return res.status(400).json({ 
+          error: `Este número de telefone já está cadastrado para ${clinicaExistente.nome} (cadastrado em ${dataCadastro}).` 
+        });
+      }
+    }
+    
+    const { data, error } = await supabase
+      .from('novas_clinicas')
+      .insert([{ 
+        nome, 
+        telefone: telefoneNumeros, 
+        endereco,
+        status: status || 'tem_interesse',
+        observacoes
+      }])
+      .select();
+
+    if (error) throw error;
+    res.json({ id: data[0].id, message: 'Nova clínica cadastrada com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/novas-clinicas/:id/pegar', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Verificar se a clínica ainda está disponível
+    const { data: clinicaAtual, error: checkError } = await supabase
+      .from('novas_clinicas')
+      .select('consultor_id')
+      .eq('id', id)
+      .single();
+
+    if (checkError) throw checkError;
+
+    if (clinicaAtual.consultor_id !== null) {
+      return res.status(400).json({ error: 'Esta clínica já foi atribuída a outro consultor!' });
+    }
+
+    // Atribuir a clínica ao consultor atual
+    const { error } = await supabase
+      .from('novas_clinicas')
+      .update({ consultor_id: req.user.consultor_id })
+      .eq('id', id);
+
+    if (error) throw error;
+    res.json({ message: 'Clínica atribuída com sucesso!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -2225,11 +2331,110 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
   }
 });
 
+// Configurar Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin: [
+      'http://localhost:3000',
+      'https://localhost:3000',
+      process.env.FRONTEND_URL,
+      /\.vercel\.app$/
+    ],
+    methods: ['GET', 'POST']
+  }
+});
+
+// Inicializar WhatsApp Service
+let whatsappService = null;
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('🔌 Cliente conectado:', socket.id);
+  
+  // Enviar status atual do WhatsApp
+  if (whatsappService) {
+    socket.emit('whatsapp:status', whatsappService.getStatus());
+  }
+  
+  socket.on('disconnect', () => {
+    console.log('🔌 Cliente desconectado:', socket.id);
+  });
+});
+
+// === ROTAS DO WHATSAPP ===
+app.get('/api/whatsapp/status', authenticateToken, (req, res) => {
+  if (!whatsappService) {
+    return res.json({ status: 'not_initialized', isConnected: false });
+  }
+  res.json(whatsappService.getStatus());
+});
+
+app.post('/api/whatsapp/connect', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    if (!whatsappService) {
+      whatsappService = new WhatsAppService(io, supabase);
+    }
+    
+    await whatsappService.initialize();
+    res.json({ message: 'Iniciando conexão com WhatsApp...' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/whatsapp/disconnect', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    if (whatsappService) {
+      await whatsappService.disconnect();
+    }
+    res.json({ message: 'WhatsApp desconectado com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/whatsapp/send-message', authenticateToken, async (req, res) => {
+  try {
+    const { jid, message } = req.body;
+    
+    if (!whatsappService || !whatsappService.isConnected) {
+      return res.status(400).json({ error: 'WhatsApp não está conectado' });
+    }
+    
+    const result = await whatsappService.sendMessage(jid, message);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/whatsapp/messages/:jid', authenticateToken, async (req, res) => {
+  try {
+    const { jid } = req.params;
+    const { limit = 50 } = req.query;
+    
+    console.log('🔍 Buscando mensagens para JID:', jid);
+    
+    if (!whatsappService) {
+      console.log('❌ WhatsApp Service não inicializado');
+      return res.json([]);
+    }
+    
+    const messages = await whatsappService.getMessages(jid, parseInt(limit));
+    console.log('📨 Mensagens encontradas:', messages.length);
+    res.json(messages);
+  } catch (error) {
+    console.error('❌ Erro ao buscar mensagens:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Inicializar servidor
-app.listen(PORT, async () => {
+server.listen(PORT, async () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
   console.log(`🌐 Acesse: http://localhost:${PORT}`);
   console.log(`🗄️ Usando Supabase como banco de dados`);
+  console.log(`📱 WhatsApp Service inicializado`);
   
   // Verificar conexão com Supabase
   try {

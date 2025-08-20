@@ -4,10 +4,13 @@ import { useAuth } from '../contexts/AuthContext';
 const Clinicas = () => {
   const { makeRequest, user } = useAuth();
   const [clinicas, setClinicas] = useState([]);
+  const [novasClinicas, setNovasClinicas] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [showNovaClinicaModal, setShowNovaClinicaModal] = useState(false);
   const [editingClinica, setEditingClinica] = useState(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [activeTab, setActiveTab] = useState('clinicas');
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroCity, setFiltroCity] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
@@ -25,6 +28,19 @@ const Clinicas = () => {
     status: 'ativo'
   });
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
+  const [novaClinicaFormData, setNovaClinicaFormData] = useState({
+    nome: '',
+    telefone: '',
+    endereco: '',
+    status: 'tem_interesse',
+    observacoes: ''
+  });
+
+  // Status disponíveis para novas clínicas
+  const statusNovaClinicaOptions = [
+    { value: 'tem_interesse', label: 'Tem Interesse', color: '#10b981' },
+    { value: 'nao_tem_interesse', label: 'Não tem Interesse', color: '#ef4444' }
+  ];
 
   // Verificar se usuário é consultor
   const isConsultor = user?.tipo === 'consultor';
@@ -93,7 +109,10 @@ const Clinicas = () => {
 
   useEffect(() => {
     fetchClinicas();
-  }, []);
+    if (activeTab === 'novas-clinicas') {
+      fetchNovasClinicas();
+    }
+  }, [activeTab]);
 
   const fetchClinicas = async () => {
     try {
@@ -111,6 +130,75 @@ const Clinicas = () => {
       setMessage('Erro ao conectar com o servidor');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchNovasClinicas = async () => {
+    try {
+      const response = await makeRequest('/novas-clinicas');
+      const data = await response.json();
+      
+      if (response.ok) {
+        setNovasClinicas(data);
+      } else {
+        console.error('Erro ao carregar novas clínicas:', data.error);
+        setMessage('Erro ao carregar novas clínicas: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar novas clínicas:', error);
+      setMessage('Erro ao conectar com o servidor');
+    }
+  };
+
+  const pegarClinica = async (clinicaId) => {
+    try {
+      const response = await makeRequest(`/novas-clinicas/${clinicaId}/pegar`, {
+        method: 'PUT'
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        setMessage('Clínica atribuída com sucesso!');
+        fetchNovasClinicas();
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        setMessage('Erro ao pegar clínica: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao pegar clínica:', error);
+      setMessage('Erro ao pegar clínica');
+    }
+  };
+
+  const handleNovaClinicaSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await makeRequest('/novas-clinicas', {
+        method: 'POST',
+        body: JSON.stringify(novaClinicaFormData)
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        setMessage('Nova clínica cadastrada com sucesso!');
+        setShowNovaClinicaModal(false);
+        setNovaClinicaFormData({
+          nome: '',
+          telefone: '',
+          endereco: '',
+          status: 'tem_interesse',
+          observacoes: ''
+        });
+        fetchNovasClinicas();
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        setMessage('Erro ao cadastrar nova clínica: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao cadastrar nova clínica:', error);
+      setMessage('Erro ao cadastrar nova clínica');
     }
   };
 
@@ -240,6 +328,28 @@ const Clinicas = () => {
     }
   };
 
+  const getStatusNovaClinicaInfo = (status) => {
+    return statusNovaClinicaOptions.find(option => option.value === status) || statusNovaClinicaOptions[0];
+  };
+
+  const handleNovaClinicaInputChange = (e) => {
+    let { name, value } = e.target;
+    
+    // Aplicar máscara de telefone se necessário
+    if (name === 'telefone') {
+      value = value
+        .replace(/\D/g, '')
+        .replace(/(\d{2})(\d)/, '($1) $2')
+        .replace(/(\d{5})(\d)/, '$1-$2')
+        .replace(/(-\d{4})\d+?$/, '$1');
+    }
+    
+    setNovaClinicaFormData({
+      ...novaClinicaFormData,
+      [name]: value
+    });
+  };
+
   const toggleStatus = async (clinica) => {
     const novaStatus = clinica.status === 'ativo' ? 'bloqueado' : 'ativo';
     const acao = novaStatus === 'ativo' ? 'desbloquear' : 'bloquear';
@@ -307,27 +417,49 @@ const Clinicas = () => {
         <p className="page-subtitle">{isConsultor ? 'Visualize as clínicas parceiras' : 'Gerencie as clínicas parceiras'}</p>
       </div>
 
+      {/* Navegação por abas */}
+      <div className="tabs">
+        <button
+          className={`tab ${activeTab === 'clinicas' ? 'active' : ''}`}
+          onClick={() => setActiveTab('clinicas')}
+        >
+          Clínicas
+        </button>
+        <button
+          className={`tab ${activeTab === 'novas-clinicas' ? 'active' : ''}`}
+          onClick={() => setActiveTab('novas-clinicas')}
+          style={{ position: 'relative' }}
+        >
+          Novas Clínicas
+          {novasClinicas.length > 0 && (
+            <span className="tab-badge">{novasClinicas.length}</span>
+          )}
+        </button>
+      </div>
+
       {message && (
         <div className={`alert ${message.includes('sucesso') ? 'alert-success' : 'alert-error'}`}>
           {message}
         </div>
       )}
 
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">Lista de Clínicas</h2>
-          {!isConsultor && (
-            <button 
-              className="btn btn-primary"
-              onClick={() => setShowModal(true)}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              Nova Clínica
-            </button>
-          )}
-        </div>
+      {/* Conteúdo da aba Clínicas */}
+      {activeTab === 'clinicas' && (
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Lista de Clínicas</h2>
+            {!isConsultor && (
+              <button 
+                className="btn btn-primary"
+                onClick={() => setShowModal(true)}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Nova Clínica
+              </button>
+            )}
+          </div>
 
         {/* Seção de Filtros */}
         <div style={{ 
@@ -556,7 +688,98 @@ const Clinicas = () => {
             </table>
           </div>
         )}
-      </div>
+        </div>
+      )}
+
+      {/* Conteúdo da aba Novas Clínicas */}
+      {activeTab === 'novas-clinicas' && (
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Novas Clínicas Encontradas</h2>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                {novasClinicas.length} clínica(s) disponível(eis)
+              </div>
+              <button 
+                className="btn btn-primary"
+                onClick={() => setShowNovaClinicaModal(true)}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Cadastrar Nova Clínica
+              </button>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="loading">
+              <div className="spinner"></div>
+            </div>
+          ) : novasClinicas.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#6b7280', padding: '3rem' }}>
+              Nenhuma nova clínica encontrada no momento.
+            </div>
+          ) : (
+            <div className="table-container">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>Telefone</th>
+                    <th>Endereço</th>
+                    <th>Status</th>
+                    <th>Cadastrado</th>
+                    <th style={{ width: '120px' }}>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {novasClinicas.map(clinica => {
+                    const statusInfo = getStatusNovaClinicaInfo(clinica.status);
+                    return (
+                      <tr key={clinica.id}>
+                        <td>
+                          <div>
+                            <strong>{clinica.nome}</strong>
+                            {clinica.observacoes && (
+                              <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+                                {clinica.observacoes}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td>{formatarTelefone(clinica.telefone)}</td>
+                        <td>{clinica.endereco || '-'}</td>
+                        <td>
+                          <span 
+                            className="badge"
+                            style={{
+                              backgroundColor: statusInfo.color + '20',
+                              color: statusInfo.color,
+                              border: `1px solid ${statusInfo.color}`
+                            }}
+                          >
+                            {statusInfo.label}
+                          </span>
+                        </td>
+                        <td>{formatarData(clinica.created_at)}</td>
+                        <td>
+                          <button
+                            onClick={() => pegarClinica(clinica.id)}
+                            className="btn btn-primary"
+                          >
+                            Pegar Clínica
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Modal de Cadastro/Edição */}
       {showModal && (
@@ -861,6 +1084,125 @@ const Clinicas = () => {
            </div>
          </div>
        )}
+
+      {/* Modal de Cadastro de Nova Clínica */}
+      {showNovaClinicaModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Cadastrar Nova Clínica</h2>
+              <button 
+                className="close-btn"
+                onClick={() => {
+                  setShowNovaClinicaModal(false);
+                  setNovaClinicaFormData({ 
+                    nome: '', 
+                    telefone: '', 
+                    endereco: '', 
+                    status: 'tem_interesse',
+                    observacoes: '' 
+                  });
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleNovaClinicaSubmit} style={{ padding: '1.5rem' }}>
+              <div className="form-group">
+                <label className="form-label">Nome da Clínica *</label>
+                <input
+                  type="text"
+                  name="nome"
+                  className="form-input"
+                  value={novaClinicaFormData.nome}
+                  onChange={handleNovaClinicaInputChange}
+                  placeholder="Digite o nome da clínica"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Telefone</label>
+                <input
+                  type="tel"
+                  name="telefone"
+                  className="form-input"
+                  value={novaClinicaFormData.telefone}
+                  onChange={handleNovaClinicaInputChange}
+                  placeholder="(11) 99999-9999"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Endereço</label>
+                <input
+                  type="text"
+                  name="endereco"
+                  className="form-input"
+                  value={novaClinicaFormData.endereco}
+                  onChange={handleNovaClinicaInputChange}
+                  placeholder="Ex: Rua das Flores, 123 - Centro"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Status da Clínica *</label>
+                <select
+                  name="status"
+                  className="form-select"
+                  value={novaClinicaFormData.status}
+                  onChange={handleNovaClinicaInputChange}
+                  required
+                >
+                  {statusNovaClinicaOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Observações</label>
+                <textarea
+                  name="observacoes"
+                  className="form-textarea"
+                  value={novaClinicaFormData.observacoes}
+                  onChange={handleNovaClinicaInputChange}
+                  placeholder="Informações adicionais sobre a clínica..."
+                  rows="3"
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
+                <button 
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowNovaClinicaModal(false);
+                    setNovaClinicaFormData({ 
+                      nome: '', 
+                      telefone: '', 
+                      endereco: '', 
+                      status: 'tem_interesse',
+                      observacoes: '' 
+                    });
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  className="btn btn-primary"
+                >
+                  Cadastrar Clínica
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

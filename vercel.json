@@ -3,7 +3,10 @@
   "builds": [
     {
       "src": "backend/server.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
     },
     {
       "src": "frontend/package.json",
@@ -19,14 +22,32 @@
       "dest": "/backend/server.js"
     },
     {
-      "src": "/(.*)",
+      "src": "/captura-lead",
+      "dest": "/frontend/index.html"
+    },
+    {
+      "src": "/captura-sucesso", 
+      "dest": "/frontend/index.html"
+    },
+    {
+      "src": "/(.*\\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot))",
       "dest": "/frontend/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/frontend/index.html"
     }
   ],
   "env": {
     "NODE_ENV": "production",
     "DISABLE_ESLINT_PLUGIN": "true",
     "CI": "false"
+  },
+  "functions": {
+    "backend/server.js": {
+      "maxDuration": 30,
+      "memory": 1024
+    }
   },
   "regions": ["gru1"]
 } 
