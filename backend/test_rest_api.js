@@ -92,3 +92,4 @@ const testTables = () => {
 // Executar os testes
 testRestAPI();
 setTimeout(testTables, 2000);
+

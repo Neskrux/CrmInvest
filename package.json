@@ -9,5 +9,10 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "leaflet": "^1.9.4",
+    "react-leaflet": "^5.0.0"
   }
-} 
+}

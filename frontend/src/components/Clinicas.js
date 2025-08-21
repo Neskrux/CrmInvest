@@ -1,5 +1,8 @@
   import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+// Mapa (Leaflet)
+import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const Clinicas = () => {
   const { makeRequest, user } = useAuth();
@@ -16,6 +19,10 @@ const Clinicas = () => {
   const [filtroStatus, setFiltroStatus] = useState('');
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewingClinica, setViewingClinica] = useState(null);
+  // Estados para o mapa
+  const [clinicasGeo, setClinicasGeo] = useState([]);
+  const [novasClinicasGeo, setNovasClinicasGeo] = useState([]);
+  const [geocoding, setGeocoding] = useState(false);
   const [formData, setFormData] = useState({
     nome: '',
     endereco: '',
@@ -109,10 +116,18 @@ const Clinicas = () => {
 
   useEffect(() => {
     fetchClinicas();
-    if (activeTab === 'novas-clinicas') {
+    if (activeTab === 'novas-clinicas' || activeTab === 'mapa') {
       fetchNovasClinicas();
     }
   }, [activeTab]);
+
+  // Regeocodificar quando filtros/dados mudarem e a aba for mapa
+  useEffect(() => {
+    if (activeTab === 'mapa') {
+      geocodeDataForMap();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, filtroEstado, filtroCity, filtroStatus, clinicas, novasClinicas]);
 
   const fetchClinicas = async () => {
     try {
@@ -131,6 +146,76 @@ const Clinicas = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // ===== Geocodificação e Mapa =====
+  const getGeocodeCache = () => {
+    try {
+      const raw = localStorage.getItem('geocodeCache');
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const setGeocodeCache = (cache) => {
+    try {
+      localStorage.setItem('geocodeCache', JSON.stringify(cache));
+    } catch {}
+  };
+
+  const normalizeAddress = (endereco, cidade, estado) => {
+    const parts = [];
+    if (endereco && endereco.trim() !== '') parts.push(endereco.trim());
+    if (cidade && cidade.trim() !== '') parts.push(cidade.trim());
+    if (estado && estado.trim() !== '') parts.push(estado.trim());
+    parts.push('Brasil');
+    return parts.join(', ');
+  };
+
+  const geocodeAddress = async (address, cache) => {
+    if (!address || address.trim() === '') return null;
+    const key = address.toLowerCase();
+    if (cache[key]) return cache[key];
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&addressdetails=0`;
+    try {
+      const res = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } });
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const point = { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+        cache[key] = point;
+        setGeocodeCache(cache);
+        await new Promise(r => setTimeout(r, 1100));
+        return point;
+      }
+    } catch {}
+    return null;
+  };
+
+  const geocodeDataForMap = async () => {
+    if (activeTab !== 'mapa') return;
+    setGeocoding(true);
+    const cache = getGeocodeCache();
+
+    const clinicasToGeo = clinicasFiltradas.slice(0, 200);
+    const clinicasPoints = [];
+    for (const c of clinicasToGeo) {
+      const address = normalizeAddress(c.endereco, c.cidade, c.estado);
+      const pt = await geocodeAddress(address, cache);
+      if (pt) clinicasPoints.push({ ...pt, item: c });
+    }
+
+    const novasToGeo = novasClinicas.slice(0, 200);
+    const novasPoints = [];
+    for (const c of novasToGeo) {
+      const address = normalizeAddress(c.endereco || c.nome, null, null);
+      const pt = await geocodeAddress(address, cache);
+      if (pt) novasPoints.push({ ...pt, item: c });
+    }
+
+    setClinicasGeo(clinicasPoints);
+    setNovasClinicasGeo(novasPoints);
+    setGeocoding(false);
   };
 
   const fetchNovasClinicas = async () => {
@@ -435,6 +520,12 @@ const Clinicas = () => {
             <span className="tab-badge">{novasClinicas.length}</span>
           )}
         </button>
+        <button
+          className={`tab ${activeTab === 'mapa' ? 'active' : ''}`}
+          onClick={() => setActiveTab('mapa')}
+        >
+          Mapa
+        </button>
       </div>
 
       {message && (
@@ -443,6 +534,69 @@ const Clinicas = () => {
         </div>
       )}
 
+      {/* Conteúdo da aba Mapa */}
+      {activeTab === 'mapa' && (
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Mapa de Clínicas</h2>
+            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+              {geocoding ? 'Localizando endereços…' : `${clinicasGeo.length} clínicas e ${novasClinicasGeo.length} novas clínicas no mapa`}
+            </div>
+          </div>
+
+          <div style={{ padding: '0 1.5rem 1rem 1.5rem' }}>
+            <span className="badge" style={{ backgroundColor: '#10b981', color: 'white', marginRight: '0.5rem' }}>Clínicas</span>
+            <span className="badge" style={{ backgroundColor: '#f59e0b', color: 'white' }}>Novas Clínicas</span>
+          </div>
+
+          <div style={{ height: '520px', width: '100%', borderTop: '1px solid #e5e7eb' }}>
+            <MapContainer
+              center={clinicasGeo[0] ? [clinicasGeo[0].lat, clinicasGeo[0].lon] : [-25.4284, -49.2733]}
+              zoom={11}
+              style={{ height: '100%', width: '100%' }}
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+
+              {clinicasGeo.map(({ lat, lon, item }) => (
+                <CircleMarker key={`c-${item.id}`} center={[lat, lon]} radius={8} pathOptions={{ color: '#10b981', fillColor: '#10b981', fillOpacity: 0.8 }}>
+                  <Popup>
+                    <div style={{ minWidth: '180px' }}>
+                      <strong>{item.nome}</strong>
+                      <div style={{ color: '#6b7280', marginTop: '0.25rem' }}>
+                        {(item.endereco || '')}
+                        {item.cidade || item.estado ? <div>{item.cidade}{item.estado ? `/${item.estado}` : ''}</div> : null}
+                      </div>
+                      {item.telefone && <div style={{ marginTop: '0.25rem' }}>{formatarTelefone(item.telefone)}</div>}
+                      {item.nicho && <div style={{ marginTop: '0.25rem' }}>Nicho: {item.nicho}</div>}
+                    </div>
+                  </Popup>
+                </CircleMarker>
+              ))}
+
+              {novasClinicasGeo.map(({ lat, lon, item }) => (
+                <CircleMarker key={`n-${item.id}`} center={[lat, lon]} radius={8} pathOptions={{ color: '#f59e0b', fillColor: '#f59e0b', fillOpacity: 0.8 }}>
+                  <Popup>
+                    <div style={{ minWidth: '180px' }}>
+                      <strong>{item.nome}</strong>
+                      {item.endereco && (
+                        <div style={{ color: '#6b7280', marginTop: '0.25rem' }}>{item.endereco}</div>
+                      )}
+                      {item.status && (
+                        <div style={{ marginTop: '0.25rem' }}>Status: {getStatusNovaClinicaInfo(item.status)?.label || item.status}</div>
+                      )}
+                      {item.telefone && <div style={{ marginTop: '0.25rem' }}>{formatarTelefone(item.telefone)}</div>}
+                      <div style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: '#9ca3af' }}>Nova clínica</div>
+                    </div>
+                  </Popup>
+                </CircleMarker>
+              ))}
+            </MapContainer>
+          </div>
+        </div>
+      )}
       {/* Conteúdo da aba Clínicas */}
       {activeTab === 'clinicas' && (
         <div className="card">
