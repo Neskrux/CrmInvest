@@ -37,11 +37,17 @@ const Clinicas = () => {
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
   const [novaClinicaFormData, setNovaClinicaFormData] = useState({
     nome: '',
-    telefone: '',
     endereco: '',
+    bairro: '',
+    cidade: '',
+    estado: '',
+    nicho: '',
+    telefone: '',
+    email: '',
     status: 'tem_interesse',
     observacoes: ''
   });
+  const [cidadeCustomizadaNova, setCidadeCustomizadaNova] = useState(false);
 
   // Status disponíveis para novas clínicas
   const statusNovaClinicaOptions = [
@@ -271,11 +277,17 @@ const Clinicas = () => {
         setShowNovaClinicaModal(false);
         setNovaClinicaFormData({
           nome: '',
-          telefone: '',
           endereco: '',
+          bairro: '',
+          cidade: '',
+          estado: '',
+          nicho: '',
+          telefone: '',
+          email: '',
           status: 'tem_interesse',
           observacoes: ''
         });
+        setCidadeCustomizadaNova(false);
         fetchNovasClinicas();
         setTimeout(() => setMessage(''), 3000);
       } else {
@@ -429,10 +441,20 @@ const Clinicas = () => {
         .replace(/(-\d{4})\d+?$/, '$1');
     }
     
-    setNovaClinicaFormData({
-      ...novaClinicaFormData,
-      [name]: value
-    });
+    // Limpar cidade se estado mudar
+    if (name === 'estado') {
+      setNovaClinicaFormData(prev => ({
+        ...prev,
+        estado: value,
+        cidade: '' // Limpar cidade quando estado muda
+      }));
+      setCidadeCustomizadaNova(false); // Resetar cidade customizada
+    } else {
+      setNovaClinicaFormData({
+        ...novaClinicaFormData,
+        [name]: value
+      });
+    }
   };
 
   const toggleStatus = async (clinica) => {
@@ -880,8 +902,10 @@ const Clinicas = () => {
                 <thead>
                   <tr>
                     <th>Nome</th>
+                    <th>Localização</th>
+                    <th>Nicho</th>
                     <th>Telefone</th>
-                    <th>Endereço</th>
+                    <th>Email</th>
                     <th>Status</th>
                     <th>Cadastrado</th>
                     <th style={{ width: '120px' }}>Ações</th>
@@ -902,8 +926,26 @@ const Clinicas = () => {
                             )}
                           </div>
                         </td>
-                        <td>{formatarTelefone(clinica.telefone)}</td>
-                        <td>{clinica.endereco || '-'}</td>
+                        <td>
+                          <div style={{ fontSize: '0.875rem' }}>
+                            {clinica.cidade && clinica.estado ? 
+                              `${clinica.cidade}/${clinica.estado}` : 
+                              clinica.cidade || clinica.estado || '-'}
+                            {clinica.bairro && (
+                              <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{clinica.bairro}</div>
+                            )}
+                            {clinica.endereco && (
+                              <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{clinica.endereco}</div>
+                            )}
+                          </div>
+                        </td>
+                        <td>{clinica.nicho || '-'}</td>
+                        <td>{formatarTelefone(clinica.telefone) || '-'}</td>
+                        <td>
+                          {clinica.email ? (
+                            <span style={{ fontSize: '0.875rem' }}>{clinica.email}</span>
+                          ) : '-'}
+                        </td>
                         <td>
                           <span 
                             className="badge"
@@ -1242,7 +1284,7 @@ const Clinicas = () => {
       {/* Modal de Cadastro de Nova Clínica */}
       {showNovaClinicaModal && (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: '500px' }}>
+          <div className="modal" style={{ maxWidth: '700px' }}>
             <div className="modal-header">
               <h2 className="modal-title">Cadastrar Nova Clínica</h2>
               <button 
@@ -1250,12 +1292,18 @@ const Clinicas = () => {
                 onClick={() => {
                   setShowNovaClinicaModal(false);
                   setNovaClinicaFormData({ 
-                    nome: '', 
-                    telefone: '', 
-                    endereco: '', 
+                    nome: '',
+                    endereco: '',
+                    bairro: '',
+                    cidade: '',
+                    estado: '',
+                    nicho: '',
+                    telefone: '',
+                    email: '',
                     status: 'tem_interesse',
-                    observacoes: '' 
+                    observacoes: ''
                   });
+                  setCidadeCustomizadaNova(false);
                 }}
               >
                 ×
@@ -1277,26 +1325,136 @@ const Clinicas = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Telefone</label>
-                <input
-                  type="tel"
-                  name="telefone"
-                  className="form-input"
-                  value={novaClinicaFormData.telefone}
-                  onChange={handleNovaClinicaInputChange}
-                  placeholder="(11) 99999-9999"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Endereço</label>
+                <label className="form-label">Endereço (Rua e Número)</label>
                 <input
                   type="text"
                   name="endereco"
                   className="form-input"
                   value={novaClinicaFormData.endereco}
                   onChange={handleNovaClinicaInputChange}
-                  placeholder="Ex: Rua das Flores, 123 - Centro"
+                  placeholder="Ex: Rua das Flores, 123"
+                />
+              </div>
+
+              <div className="grid grid-3">
+                <div className="form-group">
+                  <label className="form-label">Estado *</label>
+                  <select
+                    name="estado"
+                    className="form-select"
+                    value={novaClinicaFormData.estado}
+                    onChange={handleNovaClinicaInputChange}
+                    required
+                  >
+                    <option value="">Selecione o estado</option>
+                    {estadosBrasileiros.map(estado => (
+                      <option key={estado.sigla} value={estado.sigla}>
+                        {estado.sigla} - {estado.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Cidade *</label>
+                  {novaClinicaFormData.estado && cidadesPorEstado[novaClinicaFormData.estado] && !cidadeCustomizadaNova ? (
+                    <select
+                      name="cidade"
+                      className="form-select"
+                      value={novaClinicaFormData.cidade}
+                      onChange={(e) => {
+                        if (e.target.value === 'OUTRA') {
+                          setCidadeCustomizadaNova(true);
+                          setNovaClinicaFormData(prev => ({ ...prev, cidade: '' }));
+                        } else {
+                          handleNovaClinicaInputChange(e);
+                        }
+                      }}
+                      required
+                    >
+                      <option value="">Selecione a cidade</option>
+                      {cidadesPorEstado[novaClinicaFormData.estado].map(cidade => (
+                        <option key={cidade} value={cidade}>{cidade}</option>
+                      ))}
+                      <option value="OUTRA">Outra cidade</option>
+                    </select>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        name="cidade"
+                        className="form-input"
+                        value={novaClinicaFormData.cidade}
+                        onChange={handleNovaClinicaInputChange}
+                        placeholder="Digite o nome da cidade"
+                        disabled={!novaClinicaFormData.estado}
+                        required
+                      />
+                      {novaClinicaFormData.estado && cidadesPorEstado[novaClinicaFormData.estado] && cidadeCustomizadaNova && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ whiteSpace: 'nowrap', fontSize: '0.875rem', padding: '0.5rem' }}
+                          onClick={() => {
+                            setCidadeCustomizadaNova(false);
+                            setNovaClinicaFormData(prev => ({ ...prev, cidade: '' }));
+                          }}
+                        >
+                          Voltar
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Bairro</label>
+                  <input
+                    type="text"
+                    name="bairro"
+                    className="form-input"
+                    value={novaClinicaFormData.bairro}
+                    onChange={handleNovaClinicaInputChange}
+                    placeholder="Bairro"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">Nicho</label>
+                  <input
+                    type="text"
+                    name="nicho"
+                    className="form-input"
+                    value={novaClinicaFormData.nicho}
+                    onChange={handleNovaClinicaInputChange}
+                    placeholder="Ex: Odontologia, Estética"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Telefone</label>
+                  <input
+                    type="tel"
+                    name="telefone"
+                    className="form-input"
+                    value={novaClinicaFormData.telefone}
+                    onChange={handleNovaClinicaInputChange}
+                    placeholder="(11) 99999-9999"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">E-mail</label>
+                <input
+                  type="email"
+                  name="email"
+                  className="form-input"
+                  value={novaClinicaFormData.email}
+                  onChange={handleNovaClinicaInputChange}
+                  placeholder="email@clinica.com.br"
                 />
               </div>
 
@@ -1336,12 +1494,18 @@ const Clinicas = () => {
                   onClick={() => {
                     setShowNovaClinicaModal(false);
                     setNovaClinicaFormData({ 
-                      nome: '', 
-                      telefone: '', 
-                      endereco: '', 
+                      nome: '',
+                      endereco: '',
+                      bairro: '',
+                      cidade: '',
+                      estado: '',
+                      nicho: '',
+                      telefone: '',
+                      email: '',
                       status: 'tem_interesse',
-                      observacoes: '' 
+                      observacoes: ''
                     });
+                    setCidadeCustomizadaNova(false);
                   }}
                 >
                   Cancelar

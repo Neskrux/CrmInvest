@@ -1250,7 +1250,7 @@ app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
 
 app.post('/api/novas-clinicas', authenticateToken, async (req, res) => {
   try {
-    const { nome, telefone, endereco, status, observacoes } = req.body;
+    const { nome, endereco, bairro, cidade, estado, nicho, telefone, email, status, observacoes } = req.body;
     
     // Normalizar telefone (remover formatação)
     const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
@@ -1278,8 +1278,13 @@ app.post('/api/novas-clinicas', authenticateToken, async (req, res) => {
       .from('novas_clinicas')
       .insert([{ 
         nome, 
-        telefone: telefoneNumeros, 
         endereco,
+        bairro,
+        cidade,
+        estado,
+        nicho,
+        telefone: telefoneNumeros,
+        email,
         status: status || 'tem_interesse',
         observacoes
       }])
