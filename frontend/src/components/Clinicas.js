@@ -580,59 +580,368 @@ const Clinicas = () => {
 
       {/* Conteúdo da aba Mapa */}
       {activeTab === 'mapa' && (
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Mapa de Clínicas</h2>
-            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-              {geocoding ? 'Localizando endereços…' : `${clinicasGeo.length} clínicas e ${novasClinicasGeo.length} novas clínicas no mapa`}
+        <div className="card" style={{ 
+          padding: 0, 
+          overflow: 'hidden',
+          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.1)',
+          borderRadius: '12px'
+        }}>
+          {/* Header Moderno */}
+          <div style={{ 
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            padding: '1.5rem 2rem',
+            color: 'white'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ 
+                  fontSize: '1.75rem', 
+                  fontWeight: '700',
+                  margin: 0,
+                  color: 'white',
+                  textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}>
+                  🗺️ Mapa de Clínicas
+                </h2>
+                <p style={{ 
+                  fontSize: '0.95rem', 
+                  opacity: 0.95,
+                  marginTop: '0.5rem',
+                  margin: '0.5rem 0 0 0'
+                }}>
+                  Visualização geográfica de todas as clínicas parceiras e prospects
+                </p>
+              </div>
+              
+              {/* Estatísticas */}
+              <div style={{ 
+                display: 'flex', 
+                gap: '2rem',
+                alignItems: 'center'
+              }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ 
+                    fontSize: '2rem', 
+                    fontWeight: '700',
+                    lineHeight: 1
+                  }}>
+                    {clinicasGeo.length}
+                  </div>
+                  <div style={{ 
+                    fontSize: '0.75rem', 
+                    opacity: 0.9,
+                    marginTop: '0.25rem'
+                  }}>
+                    Clínicas Parceiras
+                  </div>
+                </div>
+                <div style={{ 
+                  width: '1px', 
+                  height: '40px', 
+                  backgroundColor: 'rgba(255,255,255,0.3)' 
+                }}></div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ 
+                    fontSize: '2rem', 
+                    fontWeight: '700',
+                    lineHeight: 1
+                  }}>
+                    {novasClinicasGeo.length}
+                  </div>
+                  <div style={{ 
+                    fontSize: '0.75rem', 
+                    opacity: 0.9,
+                    marginTop: '0.25rem'
+                  }}>
+                    Novas Clínicas
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div style={{ padding: '0 1.5rem 1rem 1.5rem' }}>
-            <span className="badge" style={{ backgroundColor: '#10b981', color: 'white', marginRight: '0.5rem' }}>Clínicas</span>
-            <span className="badge" style={{ backgroundColor: '#f59e0b', color: 'white' }}>Novas Clínicas</span>
+          {/* Barra de Legenda Moderna */}
+          <div style={{ 
+            backgroundColor: '#f8fafc',
+            padding: '1rem 2rem',
+            borderBottom: '1px solid #e2e8f0',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem',
+                padding: '0.5rem 1rem',
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+              }}>
+                <div style={{ 
+                  width: '12px', 
+                  height: '12px', 
+                  borderRadius: '50%',
+                  backgroundColor: '#10b981',
+                  boxShadow: '0 0 0 3px rgba(16, 185, 129, 0.2)'
+                }}></div>
+                <span style={{ 
+                  fontSize: '0.875rem', 
+                  fontWeight: '600',
+                  color: '#1f2937'
+                }}>
+                  Clínicas Parceiras
+                </span>
+              </div>
+              
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem',
+                padding: '0.5rem 1rem',
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+              }}>
+                <div style={{ 
+                  width: '12px', 
+                  height: '12px', 
+                  borderRadius: '50%',
+                  backgroundColor: '#f59e0b',
+                  boxShadow: '0 0 0 3px rgba(245, 158, 11, 0.2)'
+                }}></div>
+                <span style={{ 
+                  fontSize: '0.875rem', 
+                  fontWeight: '600',
+                  color: '#1f2937'
+                }}>
+                  Novas Clínicas (Prospects)
+                </span>
+              </div>
+            </div>
+
+            {geocoding && (
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem',
+                padding: '0.5rem 1rem',
+                backgroundColor: '#fef3c7',
+                borderRadius: '8px',
+                border: '1px solid #fcd34d'
+              }}>
+                <div className="spinner" style={{ 
+                  width: '16px', 
+                  height: '16px',
+                  border: '2px solid #f59e0b',
+                  borderTopColor: 'transparent'
+                }}></div>
+                <span style={{ 
+                  fontSize: '0.875rem', 
+                  color: '#92400e',
+                  fontWeight: '500'
+                }}>
+                  Carregando localizações...
+                </span>
+              </div>
+            )}
           </div>
 
-          <div style={{ height: '520px', width: '100%', borderTop: '1px solid #e5e7eb' }}>
+          {/* Mapa com bordas arredondadas */}
+          <div style={{ 
+            height: '600px', 
+            width: '100%',
+            position: 'relative',
+            backgroundColor: '#e5e7eb'
+          }}>
             <MapContainer
-              center={clinicasGeo[0] ? [clinicasGeo[0].lat, clinicasGeo[0].lon] : [-25.4284, -49.2733]}
-              zoom={11}
-              style={{ height: '100%', width: '100%' }}
+              center={clinicasGeo[0] ? [clinicasGeo[0].lat, clinicasGeo[0].lon] : [-15.7801, -47.9292]}
+              zoom={clinicasGeo.length > 0 ? 11 : 5}
+              style={{ 
+                height: '100%', 
+                width: '100%'
+              }}
+              zoomControl={true}
             >
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
 
+              {/* Clínicas Parceiras */}
               {clinicasGeo.map(({ lat, lon, item }) => (
-                <CircleMarker key={`c-${item.id}`} center={[lat, lon]} radius={8} pathOptions={{ color: '#10b981', fillColor: '#10b981', fillOpacity: 0.8 }}>
+                <CircleMarker 
+                  key={`c-${item.id}`} 
+                  center={[lat, lon]} 
+                  radius={10} 
+                  pathOptions={{ 
+                    color: '#059669',
+                    fillColor: '#10b981', 
+                    fillOpacity: 0.9,
+                    weight: 2
+                  }}
+                >
                   <Popup>
-                    <div style={{ minWidth: '180px' }}>
-                      <strong>{item.nome}</strong>
-                      <div style={{ color: '#6b7280', marginTop: '0.25rem' }}>
-                        {(item.endereco || '')}
-                        {item.cidade || item.estado ? <div>{item.cidade}{item.estado ? `/${item.estado}` : ''}</div> : null}
+                    <div style={{ 
+                      minWidth: '250px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    }}>
+                      <div style={{ 
+                        backgroundColor: '#10b981',
+                        margin: '-12px -12px 12px -12px',
+                        padding: '12px',
+                        borderRadius: '4px 4px 0 0'
+                      }}>
+                        <strong style={{ 
+                          color: 'white',
+                          fontSize: '1.1rem'
+                        }}>
+                          {item.nome}
+                        </strong>
                       </div>
-                      {item.telefone && <div style={{ marginTop: '0.25rem' }}>{formatarTelefone(item.telefone)}</div>}
-                      {item.nicho && <div style={{ marginTop: '0.25rem' }}>Nicho: {item.nicho}</div>}
+                      
+                      {item.nicho && (
+                        <div style={{ 
+                          marginBottom: '8px',
+                          padding: '4px 8px',
+                          backgroundColor: '#ecfdf5',
+                          borderRadius: '4px',
+                          display: 'inline-block'
+                        }}>
+                          <span style={{ 
+                            color: '#065f46',
+                            fontSize: '0.875rem',
+                            fontWeight: '600'
+                          }}>
+                            {item.nicho}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {(item.endereco || item.cidade || item.estado) && (
+                        <div style={{ 
+                          color: '#4b5563', 
+                          marginBottom: '8px',
+                          fontSize: '0.875rem'
+                        }}>
+                          📍 {item.endereco && <span>{item.endereco}<br/></span>}
+                          {(item.cidade || item.estado) && (
+                            <span style={{ fontWeight: '500' }}>
+                              {item.cidade}{item.estado ? `, ${item.estado}` : ''}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      
+                      {item.telefone && (
+                        <div style={{ 
+                          color: '#4b5563',
+                          fontSize: '0.875rem'
+                        }}>
+                          📞 {formatarTelefone(item.telefone)}
+                        </div>
+                      )}
+                      
+                      {item.email && (
+                        <div style={{ 
+                          color: '#4b5563',
+                          fontSize: '0.875rem',
+                          marginTop: '4px'
+                        }}>
+                          ✉️ {item.email}
+                        </div>
+                      )}
                     </div>
                   </Popup>
                 </CircleMarker>
               ))}
 
+              {/* Novas Clínicas */}
               {novasClinicasGeo.map(({ lat, lon, item }) => (
-                <CircleMarker key={`n-${item.id}`} center={[lat, lon]} radius={8} pathOptions={{ color: '#f59e0b', fillColor: '#f59e0b', fillOpacity: 0.8 }}>
+                <CircleMarker 
+                  key={`n-${item.id}`} 
+                  center={[lat, lon]} 
+                  radius={10} 
+                  pathOptions={{ 
+                    color: '#d97706',
+                    fillColor: '#f59e0b', 
+                    fillOpacity: 0.9,
+                    weight: 2
+                  }}
+                >
                   <Popup>
-                    <div style={{ minWidth: '180px' }}>
-                      <strong>{item.nome}</strong>
-                      {item.endereco && (
-                        <div style={{ color: '#6b7280', marginTop: '0.25rem' }}>{item.endereco}</div>
-                      )}
+                    <div style={{ 
+                      minWidth: '250px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    }}>
+                      <div style={{ 
+                        backgroundColor: '#f59e0b',
+                        margin: '-12px -12px 12px -12px',
+                        padding: '12px',
+                        borderRadius: '4px 4px 0 0'
+                      }}>
+                        <strong style={{ 
+                          color: 'white',
+                          fontSize: '1.1rem'
+                        }}>
+                          {item.nome}
+                        </strong>
+                        <div style={{ 
+                          fontSize: '0.75rem',
+                          opacity: 0.9,
+                          marginTop: '2px'
+                        }}>
+                          Nova Clínica (Prospect)
+                        </div>
+                      </div>
+                      
                       {item.status && (
-                        <div style={{ marginTop: '0.25rem' }}>Status: {getStatusNovaClinicaInfo(item.status)?.label || item.status}</div>
+                        <div style={{ marginBottom: '8px' }}>
+                          <span style={{ 
+                            padding: '4px 8px',
+                            backgroundColor: getStatusNovaClinicaInfo(item.status)?.color + '20',
+                            color: getStatusNovaClinicaInfo(item.status)?.color,
+                            borderRadius: '4px',
+                            fontSize: '0.875rem',
+                            fontWeight: '600'
+                          }}>
+                            {getStatusNovaClinicaInfo(item.status)?.label || item.status}
+                          </span>
+                        </div>
                       )}
-                      {item.telefone && <div style={{ marginTop: '0.25rem' }}>{formatarTelefone(item.telefone)}</div>}
-                      <div style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: '#9ca3af' }}>Nova clínica</div>
+                      
+                      {item.endereco && (
+                        <div style={{ 
+                          color: '#4b5563', 
+                          marginBottom: '8px',
+                          fontSize: '0.875rem'
+                        }}>
+                          📍 {item.endereco}
+                        </div>
+                      )}
+                      
+                      {item.telefone && (
+                        <div style={{ 
+                          color: '#4b5563',
+                          fontSize: '0.875rem'
+                        }}>
+                          📞 {formatarTelefone(item.telefone)}
+                        </div>
+                      )}
+                      
+                      {item.observacoes && (
+                        <div style={{ 
+                          marginTop: '8px',
+                          padding: '8px',
+                          backgroundColor: '#fef3c7',
+                          borderRadius: '4px',
+                          fontSize: '0.75rem',
+                          color: '#78350f'
+                        }}>
+                          💬 {item.observacoes}
+                        </div>
+                      )}
                     </div>
                   </Popup>
                 </CircleMarker>
