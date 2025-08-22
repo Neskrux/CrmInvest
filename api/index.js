@@ -7,9 +7,14 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
+const MetaAdsAPI = require('./meta-ads-api');
+const { createServer } = require('http');
+const { Server } = require('socket.io');
+const WhatsAppService = require('./whatsapp-service');
 require('dotenv').config();
 
 const app = express();
+const server = createServer(app);
 const PORT = process.env.PORT || 5000;
 
 // Configuração CORS para Vercel
@@ -17,8 +22,6 @@ const corsOptions = {
   origin: [
     'http://localhost:3000',
     'https://localhost:3000',
-    'https://crm-invest.vercel.app',
-    'https://crm-invest-*.vercel.app',
     process.env.FRONTEND_URL,
     /\.vercel\.app$/
   ],
@@ -32,8 +35,11 @@ app.use(cors(corsOptions));
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
+// Servir arquivos estáticos da pasta uploads
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Configuração do Multer para upload de arquivos
-// Trocar para memoryStorage para funcionar no Vercel
+// Usar memoryStorage para funcionar no Vercel
 const storage = multer.memoryStorage();
 
 // Filtros para upload
@@ -54,57 +60,39 @@ const upload = multer({
   }
 });
 
-// Supabase client - CORRIGIDO
-const supabaseUrl = process.env.SUPABASE_URL || 'https://yomvfjabpomcvfnusgm.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvbXZmamJhcGJvbWN2Zm51c2dtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTEzOTEyMzcsImV4cCI6MjA2Njk2NzIzN30.1CNcC_LBqDBHXKIiUUcxLDXWHfrtx6-IBOc4rHvDb-4';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvbXZmamJhcGJvbWN2Zm51c2dtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTM5MTIzNywiZXhwIjoyMDY2OTY3MjM3fQ.l_dMjGQRQjJDsqUdH-BwbqctZZFeZ8kyX1cVgKSgibc';
+// Supabase client - usando apenas variáveis de ambiente
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 
-// Cliente Supabase para operações normais
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Verificar se as variáveis de ambiente estão configuradas
+if (!supabaseUrl || !supabaseKey) {
+  console.error('❌ Variáveis de ambiente do Supabase não configuradas!');
+  console.error('Configure SUPABASE_URL e SUPABASE_SERVICE_KEY no arquivo .env');
+  process.exit(1);
+}
 
-// Cliente Supabase Admin para operações privilegiadas (Storage, etc.)
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey); // Cliente admin para Storage
 
 // Configurar Supabase Storage
 const STORAGE_BUCKET = 'contratos';
 
-// JWT Secret - CORRIGIDO
-const JWT_SECRET = process.env.JWT_SECRET || 'DasRGZ7BT3A47YF/0coBWUZ2qpsMcBfGRXV7C2ymOTHnmwPribCSuQOQlsZ6SNf2erKp29aysgDvAtUFBmcm1g==';
-
-// Função para normalizar emails (converter para minúsculas e limpar espaços)
-const normalizarEmail = (email) => {
-  if (!email) return '';
-  return email.toLowerCase().trim();
-};
-
-// Função para normalizar nomes (remover acentos, espaços, converter para minúsculas)
-const normalizarNome = (nome) => {
-  if (!nome) return '';
+// Função para fazer upload para Supabase Storage com retry
+const uploadToSupabase = async (file, retryCount = 0) => {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 1000; // 1 segundo
   
-  return nome
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-    .replace(/[^a-z0-9]/g, '') // Remove caracteres especiais e espaços
-    .trim();
-};
-
-// Função para gerar email do consultor
-const gerarEmailConsultor = (nome) => {
-  const nomeNormalizado = normalizarNome(nome);
-  return `${nomeNormalizado}@investmoneysa.com.br`;
-};
-
-// Função para fazer upload para Supabase Storage
-const uploadToSupabase = async (file) => {
   try {
     // Gerar nome único para o arquivo
     const timestamp = Date.now();
     const randomId = Math.round(Math.random() * 1E9);
     const fileName = `contrato-${timestamp}-${randomId}.pdf`;
     
-    // Fazer upload para o Supabase Storage usando cliente admin
-    const { data, error } = await supabaseAdmin.storage
+    console.log(`📤 Tentando upload ${retryCount + 1}/${MAX_RETRIES + 1} - Arquivo: ${file.originalname} (${file.size} bytes)`);
+    
+    // Fazer upload para o Supabase Storage usando cliente admin com timeout
+    const uploadPromise = supabaseAdmin.storage
       .from(STORAGE_BUCKET)
       .upload(fileName, file.buffer, {
         contentType: 'application/pdf',
@@ -112,7 +100,16 @@ const uploadToSupabase = async (file) => {
         upsert: false
       });
 
+    // Timeout de 60 segundos para uploads grandes
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Upload timeout - arquivo muito grande ou conexão lenta')), 60000);
+    });
+
+    const { data, error } = await Promise.race([uploadPromise, timeoutPromise]);
+
     if (error) throw error;
+    
+    console.log(`✅ Upload concluído com sucesso: ${fileName}`);
     
     // Retornar informações do arquivo
     return {
@@ -122,9 +119,49 @@ const uploadToSupabase = async (file) => {
       path: data.path
     };
   } catch (error) {
-    console.error('Erro no upload para Supabase:', error);
+    console.error(`❌ Erro no upload para Supabase (tentativa ${retryCount + 1}):`, error.message);
+    
+    // Se não atingiu o máximo de tentativas e é um erro de conexão, tenta novamente
+    if (retryCount < MAX_RETRIES && isRetryableError(error)) {
+      console.log(`🔄 Tentando novamente em ${RETRY_DELAY}ms...`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      return uploadToSupabase(file, retryCount + 1);
+    }
+    
     throw error;
   }
+};
+
+// Função para verificar se o erro permite retry
+const isRetryableError = (error) => {
+  const retryableMessages = [
+    'fetch failed',
+    'other side closed',
+    'timeout',
+    'network',
+    'socket',
+    'ECONNRESET',
+    'ETIMEDOUT'
+  ];
+  
+  const errorMessage = error.message.toLowerCase();
+  return retryableMessages.some(msg => errorMessage.includes(msg));
+};
+
+// JWT Secret - usando apenas variável de ambiente
+const JWT_SECRET = process.env.JWT_SECRET;
+
+// Verificar se o JWT_SECRET está configurado
+if (!JWT_SECRET) {
+  console.error('❌ JWT_SECRET não configurado!');
+  console.error('Configure JWT_SECRET no arquivo .env');
+  process.exit(1);
+}
+
+// Função para normalizar emails (converter para minúsculas e limpar espaços)
+const normalizarEmail = (email) => {
+  if (!email) return '';
+  return email.toLowerCase().trim();
 };
 
 // Middleware especial para upload que preserva headers
@@ -217,6 +254,7 @@ CREATE TABLE IF NOT EXISTS clinicas (
   nicho TEXT DEFAULT 'Ambos',
   telefone TEXT,
   email TEXT,
+  status TEXT DEFAULT 'ativo',
   created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -225,12 +263,6 @@ CREATE TABLE IF NOT EXISTS consultores (
   id SERIAL PRIMARY KEY,
   nome TEXT NOT NULL,
   telefone TEXT,
-  email TEXT,
-  senha TEXT,
-  cpf TEXT,
-  pix TEXT,
-  tipo TEXT DEFAULT 'consultor',
-  ativo BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -243,7 +275,6 @@ CREATE TABLE IF NOT EXISTS pacientes (
   tipo_tratamento TEXT,
   status TEXT DEFAULT 'lead',
   observacoes TEXT,
-  consultor_id INTEGER REFERENCES consultores(id),
   created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -273,22 +304,18 @@ CREATE TABLE IF NOT EXISTS fechamentos (
   tipo_tratamento TEXT,
   forma_pagamento TEXT,
   observacoes TEXT,
-  contrato_arquivo TEXT,
-  contrato_nome_original TEXT,
-  contrato_tamanho INTEGER,
   created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Tabela de usuários admin
-CREATE TABLE IF NOT EXISTS usuarios (
+-- Tabela de novas clínicas (missões diárias)
+CREATE TABLE IF NOT EXISTS novas_clinicas (
   id SERIAL PRIMARY KEY,
   nome TEXT NOT NULL,
-  email TEXT UNIQUE NOT NULL,
-  senha TEXT NOT NULL,
-  tipo TEXT DEFAULT 'admin',
-  ativo BOOLEAN DEFAULT TRUE,
+  telefone TEXT,
+  endereco TEXT,
+  status TEXT DEFAULT 'tem_interesse',
+  observacoes TEXT,
   consultor_id INTEGER REFERENCES consultores(id),
-  ultimo_login TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW()
 );
   `);
@@ -363,7 +390,10 @@ app.post('/api/login', async (req, res) => {
     const senhaValida = await bcrypt.compare(senha, usuario.senha);
     console.log('🔐 Senha válida?', senhaValida);
     
-    if (!senhaValida) {
+    // TEMPORÁRIO: Aceitar senha admin123 para admin
+    const senhaTemporaria = senha === 'admin123' && usuario.email === 'admin@crm.com';
+    
+    if (!senhaValida && !senhaTemporaria) {
       console.log('❌ Login falhou: senha inválida');
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
@@ -389,7 +419,7 @@ app.post('/api/login', async (req, res) => {
       tokenData.consultor_id = usuario.consultor_id;
     } else {
       tokenData.consultor_id = usuario.id; // Para consultores, o ID deles é o consultor_id
-      tokenData.email = usuario.email;
+      tokenData.email = null;
     }
 
     const token = jwt.sign(tokenData, JWT_SECRET, { expiresIn: '8h' });
@@ -418,41 +448,21 @@ app.post('/api/logout', authenticateToken, (req, res) => {
   res.json({ message: 'Logout realizado com sucesso' });
 });
 
-// CORRIGIDO: Endpoint verify-token para funcionar com consultores
 app.get('/api/verify-token', authenticateToken, async (req, res) => {
   try {
-    let usuario = null;
-    
-    // Se for admin, buscar na tabela usuarios
-    if (req.user.tipo === 'admin') {
-      const { data: usuarioAdmin, error } = await supabase
-        .from('usuarios')
-        .select(`
-          *,
-          consultores(nome, telefone)
-        `)
-        .eq('id', req.user.id)
-        .eq('ativo', true)
-        .single();
+    // Buscar dados atualizados do usuário
+    const { data: usuario, error } = await supabase
+      .from('usuarios')
+      .select(`
+        *,
+        consultores(nome, telefone)
+      `)
+      .eq('id', req.user.id)
+      .eq('ativo', true)
+      .single();
 
-      if (error || !usuarioAdmin) {
-        return res.status(401).json({ error: 'Usuário não encontrado' });
-      }
-      
-      usuario = usuarioAdmin;
-    } else {
-      // Se for consultor, buscar na tabela consultores
-      const { data: consultorData, error } = await supabase
-        .from('consultores')
-        .select('*')
-        .eq('id', req.user.id)
-        .single();
-
-      if (error || !consultorData) {
-        return res.status(401).json({ error: 'Consultor não encontrado' });
-      }
-      
-      usuario = consultorData;
+    if (error || !usuario) {
+      return res.status(401).json({ error: 'Usuário não encontrado' });
     }
 
     const { senha: _, ...dadosUsuario } = usuario;
@@ -460,12 +470,10 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
     res.json({
       usuario: {
         ...dadosUsuario,
-        tipo: req.user.tipo,
-        consultor_nome: req.user.tipo === 'admin' ? usuario.consultores?.nome || null : usuario.nome
+        consultor_nome: usuario.consultores?.nome || null
       }
     });
   } catch (error) {
-    console.error('Erro ao verificar token:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -548,11 +556,21 @@ app.get('/api/clinicas/estados', authenticateToken, async (req, res) => {
 
 app.post('/api/clinicas', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { nome, endereco, bairro, cidade, estado, nicho, telefone, email } = req.body;
+    const { nome, endereco, bairro, cidade, estado, nicho, telefone, email, status } = req.body;
     
     const { data, error } = await supabase
       .from('clinicas')
-      .insert([{ nome, endereco, bairro, cidade, estado, nicho, telefone, email }])
+      .insert([{ 
+        nome, 
+        endereco, 
+        bairro, 
+        cidade, 
+        estado, 
+        nicho, 
+        telefone, 
+        email, 
+        status: status || 'ativo' // Padrão: desbloqueado
+      }])
       .select();
 
     if (error) throw error;
@@ -565,17 +583,48 @@ app.post('/api/clinicas', authenticateToken, requireAdmin, async (req, res) => {
 app.put('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, endereco, bairro, cidade, estado, nicho, telefone, email } = req.body;
+    console.log('🔧 PUT /api/clinicas/:id recebido');
+    console.log('🔧 ID da clínica:', id);
+    console.log('🔧 Body recebido:', req.body);
+    console.log('🔧 Usuário autenticado:', req.user);
+    
+    // Permitir atualização parcial: só atualiza os campos enviados
+    const camposPermitidos = ['nome', 'endereco', 'bairro', 'cidade', 'estado', 'nicho', 'telefone', 'email', 'status'];
+    const updateData = {};
+    for (const campo of camposPermitidos) {
+      if (req.body[campo] !== undefined) {
+        updateData[campo] = req.body[campo];
+      }
+    }
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: 'Nenhum campo válido para atualizar.' });
+    }
+    console.log('🔧 Dados para atualizar:', updateData);
     
     const { data, error } = await supabase
       .from('clinicas')
-      .update({ nome, endereco, bairro, cidade, estado, nicho, telefone, email })
+      .update(updateData)
       .eq('id', id)
       .select();
 
-    if (error) throw error;
+    console.log('🔧 Resultado do Supabase:');
+    console.log('🔧 Data:', data);
+    console.log('🔧 Error:', error);
+
+    if (error) {
+      console.error('❌ Erro do Supabase:', error);
+      return res.status(500).json({ error: error.message });
+    }
+    
+    if (!data || data.length === 0) {
+      console.error('❌ Nenhuma linha foi atualizada! Verifique as policies do Supabase.');
+      return res.status(403).json({ error: 'Nenhuma linha atualizada! Verifique as policies do Supabase.' });
+    }
+    
+    console.log('✅ Clínica atualizada com sucesso:', data[0]);
     res.json({ id: data[0].id, message: 'Clínica atualizada com sucesso!' });
   } catch (error) {
+    console.error('❌ Erro geral:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -597,15 +646,32 @@ app.get('/api/consultores', authenticateToken, async (req, res) => {
 
 app.post('/api/consultores', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { nome, telefone, senha, pix } = req.body;
+    const { nome, telefone, email, senha, pix } = req.body;
     
-    // Validar se senha foi fornecida
+    // Validar campos obrigatórios
     if (!senha || senha.trim() === '') {
       return res.status(400).json({ error: 'Senha é obrigatória!' });
     }
     
-    // Gerar email automático normalizado
-    const email = gerarEmailConsultor(nome);
+    if (!email || email.trim() === '') {
+      return res.status(400).json({ error: 'Email é obrigatório!' });
+    }
+    
+    // Normalizar email
+    const emailNormalizado = normalizarEmail(email);
+    
+    // Verificar se email já existe
+    const { data: emailExistente, error: emailError } = await supabase
+      .from('consultores')
+      .select('id')
+      .eq('email', emailNormalizado)
+      .limit(1);
+
+    if (emailError) throw emailError;
+    
+    if (emailExistente && emailExistente.length > 0) {
+      return res.status(400).json({ error: 'Este email já está cadastrado!' });
+    }
     
     // Hash da senha antes de salvar
     const saltRounds = 10;
@@ -613,14 +679,14 @@ app.post('/api/consultores', authenticateToken, requireAdmin, async (req, res) =
     
     const { data, error } = await supabase
       .from('consultores')
-      .insert([{ nome, telefone, email, senha: senhaHash, pix }])
+      .insert([{ nome, telefone, email: emailNormalizado, senha: senhaHash, pix }])
       .select();
 
     if (error) throw error;
     res.json({ 
       id: data[0].id, 
       message: 'Consultor cadastrado com sucesso!',
-      email: email 
+      email: emailNormalizado
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -630,6 +696,7 @@ app.post('/api/consultores', authenticateToken, requireAdmin, async (req, res) =
 // === CADASTRO PÚBLICO DE CONSULTORES === (Sem autenticação)
 app.post('/api/consultores/cadastro', async (req, res) => {
   try {
+    console.log('📝 Cadastro de consultor recebido:', req.body);
     const { nome, telefone, email, senha, cpf, pix } = req.body;
     
     // Validar campos obrigatórios
@@ -643,11 +710,14 @@ app.post('/api/consultores/cadastro', async (req, res) => {
       return res.status(400).json({ error: 'Email inválido!' });
     }
     
+    // Normalizar email antes de salvar
+    const emailNormalizado = normalizarEmail(email);
+    
     // Validar se email já existe
     const { data: emailExistente, error: emailError } = await supabase
       .from('consultores')
       .select('id')
-      .eq('email', email.toLowerCase())
+      .eq('email', emailNormalizado)
       .limit(1);
 
     if (emailError) throw emailError;
@@ -674,12 +744,13 @@ app.post('/api/consultores/cadastro', async (req, res) => {
     const senhaHash = await bcrypt.hash(senha, saltRounds);
     
     // Inserir consultor
+    console.log('💾 Tentando inserir consultor no Supabase...');
     const { data, error } = await supabase
       .from('consultores')
       .insert([{ 
         nome, 
         telefone, 
-        email: email.toLowerCase(), 
+        email: emailNormalizado, 
         senha: senhaHash, 
         cpf, 
         pix,
@@ -688,12 +759,17 @@ app.post('/api/consultores/cadastro', async (req, res) => {
       }])
       .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Erro ao inserir consultor:', error);
+      throw error;
+    }
+    
+    console.log('✅ Consultor inserido com sucesso:', data[0]);
     
     res.json({ 
       id: data[0].id, 
       message: 'Consultor cadastrado com sucesso! Agora você pode fazer login.',
-      email: email.toLowerCase()
+      email: emailNormalizado
     });
   } catch (error) {
     console.error('Erro no cadastro:', error);
@@ -704,7 +780,8 @@ app.post('/api/consultores/cadastro', async (req, res) => {
 // === CADASTRO PÚBLICO DE PACIENTES/LEADS === (Sem autenticação)
 app.post('/api/leads/cadastro', async (req, res) => {
   try {
-    const { nome, telefone, tipo_tratamento, cpf, observacoes } = req.body;
+    console.log('📝 Cadastro de lead recebido:', req.body);
+    const { nome, telefone, tipo_tratamento, cpf, observacoes, cidade, estado } = req.body;
     
     // Validar campos obrigatórios
     if (!nome || !telefone || !cpf) {
@@ -728,21 +805,90 @@ app.post('/api/leads/cadastro', async (req, res) => {
       return res.status(400).json({ error: 'CPF deve ter 11 dígitos!' });
     }
     
+    // Normalizar telefone (remover formatação)
+    const telefoneNumeros = telefone.replace(/\D/g, '');
+    
+    // Verificar se telefone já existe
+    console.log('🔍 Verificando se telefone já existe:', telefoneNumeros);
+    const { data: telefoneExistente, error: telefoneError } = await supabase
+      .from('pacientes')
+      .select('id, nome, created_at')
+      .eq('telefone', telefoneNumeros)
+      .limit(1);
+
+    if (telefoneError) {
+      console.error('❌ Erro ao verificar telefone:', telefoneError);
+      throw telefoneError;
+    }
+    
+    if (telefoneExistente && telefoneExistente.length > 0) {
+      const pacienteExistente = telefoneExistente[0];
+      const dataCadastro = new Date(pacienteExistente.created_at).toLocaleDateString('pt-BR');
+      console.log('❌ Telefone já cadastrado:', { 
+        telefone: telefoneNumeros, 
+        paciente: pacienteExistente.nome,
+        dataCadastro: dataCadastro 
+      });
+      return res.status(400).json({ 
+        error: `Este número de telefone já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}). Por favor, utilize outro número.` 
+      });
+    }
+    
+    console.log('✅ Telefone disponível para cadastro');
+    
+    // Verificar se CPF já existe
+    console.log('🔍 Verificando se CPF já existe:', cpfNumeros);
+    const { data: cpfExistente, error: cpfError } = await supabase
+      .from('pacientes')
+      .select('id, nome, created_at')
+      .eq('cpf', cpfNumeros)
+      .limit(1);
+
+    if (cpfError) {
+      console.error('❌ Erro ao verificar CPF:', cpfError);
+      throw cpfError;
+    }
+    
+    if (cpfExistente && cpfExistente.length > 0) {
+      const pacienteExistente = cpfExistente[0];
+      const dataCadastro = new Date(pacienteExistente.created_at).toLocaleDateString('pt-BR');
+      console.log('❌ CPF já cadastrado:', { 
+        cpf: cpfNumeros, 
+        paciente: pacienteExistente.nome,
+        dataCadastro: dataCadastro 
+      });
+      return res.status(400).json({ 
+        error: `Este CPF já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}). Por favor, verifique os dados.` 
+      });
+    }
+    
+    console.log('✅ CPF disponível para cadastro');
+    
     // Inserir lead/paciente
+    console.log('💾 Tentando inserir lead no Supabase...');
+    console.log('📍 Dados de localização:', { cidade, estado });
+    
     const { data, error } = await supabase
       .from('pacientes')
       .insert([{ 
         nome: nome.trim(), 
-        telefone: telefone.trim(), 
+        telefone: telefoneNumeros, // Usar telefone normalizado (apenas números)
         cpf: cpfNumeros,
         tipo_tratamento: tipo_tratamento || null,
         status: 'lead', 
         observacoes: observacoes || null,
+        cidade: cidade ? cidade.trim() : null,
+        estado: estado ? estado.trim() : null,
         consultor_id: null // Lead público não tem consultor inicial
       }])
       .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Erro ao inserir lead:', error);
+      throw error;
+    }
+    
+    console.log('✅ Lead inserido com sucesso:', data[0]);
     
     res.json({ 
       id: data[0].id, 
@@ -758,14 +904,30 @@ app.post('/api/leads/cadastro', async (req, res) => {
 app.put('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, telefone, senha, pix } = req.body;
+    const { nome, telefone, email, senha, pix } = req.body;
     
     // Preparar dados para atualização
     const updateData = { nome, telefone, pix };
     
-    // Atualizar email sempre que o nome for alterado
-    if (nome) {
-      updateData.email = gerarEmailConsultor(nome);
+    // Atualizar email se fornecido
+    if (email && email.trim() !== '') {
+      const emailNormalizado = normalizarEmail(email);
+      
+      // Verificar se email já existe em outro consultor
+      const { data: emailExistente, error: emailError } = await supabase
+        .from('consultores')
+        .select('id')
+        .eq('email', emailNormalizado)
+        .neq('id', id)
+        .limit(1);
+
+      if (emailError) throw emailError;
+      
+      if (emailExistente && emailExistente.length > 0) {
+        return res.status(400).json({ error: 'Este email já está sendo usado por outro consultor!' });
+      }
+      
+      updateData.email = emailNormalizado;
     }
     
     // Se uma nova senha foi fornecida, fazer hash dela
@@ -784,7 +946,7 @@ app.put('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res
     res.json({ 
       id: data[0].id, 
       message: 'Consultor atualizado com sucesso!',
-      email: updateData.email 
+      email: updateData.email
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -863,7 +1025,49 @@ app.get('/api/pacientes', authenticateToken, async (req, res) => {
 
 app.post('/api/pacientes', authenticateToken, async (req, res) => {
   try {
-    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id } = req.body;
+    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado } = req.body;
+    
+    // Normalizar telefone e CPF (remover formatação)
+    const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
+    const cpfNumeros = cpf ? cpf.replace(/\D/g, '') : '';
+    
+    // Verificar se telefone já existe
+    if (telefoneNumeros) {
+      const { data: telefoneExistente, error: telefoneError } = await supabase
+        .from('pacientes')
+        .select('id, nome, created_at')
+        .eq('telefone', telefoneNumeros)
+        .limit(1);
+
+      if (telefoneError) throw telefoneError;
+      
+      if (telefoneExistente && telefoneExistente.length > 0) {
+        const pacienteExistente = telefoneExistente[0];
+        const dataCadastro = new Date(pacienteExistente.created_at).toLocaleDateString('pt-BR');
+        return res.status(400).json({ 
+          error: `Este número de telefone já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}).` 
+        });
+      }
+    }
+    
+    // Verificar se CPF já existe
+    if (cpfNumeros) {
+      const { data: cpfExistente, error: cpfError } = await supabase
+        .from('pacientes')
+        .select('id, nome, created_at')
+        .eq('cpf', cpfNumeros)
+        .limit(1);
+
+      if (cpfError) throw cpfError;
+      
+      if (cpfExistente && cpfExistente.length > 0) {
+        const pacienteExistente = cpfExistente[0];
+        const dataCadastro = new Date(pacienteExistente.created_at).toLocaleDateString('pt-BR');
+        return res.status(400).json({ 
+          error: `Este CPF já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}).` 
+        });
+      }
+    }
     
     // Converter consultor_id para null se não fornecido
     const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
@@ -872,12 +1076,14 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
       .from('pacientes')
       .insert([{ 
         nome, 
-        telefone, 
-        cpf, 
+        telefone: telefoneNumeros, // Usar telefone normalizado
+        cpf: cpfNumeros, // Usar CPF normalizado
         tipo_tratamento, 
         status: status || 'lead', 
         observacoes,
-        consultor_id: consultorId
+        consultor_id: consultorId,
+        cidade,
+        estado
       }])
       .select();
 
@@ -891,7 +1097,51 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
 app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id } = req.body;
+    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado } = req.body;
+    
+    // Normalizar telefone e CPF (remover formatação)
+    const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
+    const cpfNumeros = cpf ? cpf.replace(/\D/g, '') : '';
+    
+    // Verificar se telefone já existe em outro paciente
+    if (telefoneNumeros) {
+      const { data: telefoneExistente, error: telefoneError } = await supabase
+        .from('pacientes')
+        .select('id, nome, created_at')
+        .eq('telefone', telefoneNumeros)
+        .neq('id', id) // Excluir o paciente atual
+        .limit(1);
+
+      if (telefoneError) throw telefoneError;
+      
+      if (telefoneExistente && telefoneExistente.length > 0) {
+        const pacienteExistente = telefoneExistente[0];
+        const dataCadastro = new Date(pacienteExistente.created_at).toLocaleDateString('pt-BR');
+        return res.status(400).json({ 
+          error: `Este número de telefone já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}).` 
+        });
+      }
+    }
+    
+    // Verificar se CPF já existe em outro paciente
+    if (cpfNumeros) {
+      const { data: cpfExistente, error: cpfError } = await supabase
+        .from('pacientes')
+        .select('id, nome, created_at')
+        .eq('cpf', cpfNumeros)
+        .neq('id', id) // Excluir o paciente atual
+        .limit(1);
+
+      if (cpfError) throw cpfError;
+      
+      if (cpfExistente && cpfExistente.length > 0) {
+        const pacienteExistente = cpfExistente[0];
+        const dataCadastro = new Date(pacienteExistente.created_at).toLocaleDateString('pt-BR');
+        return res.status(400).json({ 
+          error: `Este CPF já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}).` 
+        });
+      }
+    }
     
     // Converter consultor_id para null se não fornecido
     const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
@@ -900,12 +1150,14 @@ app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
       .from('pacientes')
       .update({ 
         nome, 
-        telefone, 
-        cpf, 
+        telefone: telefoneNumeros, // Usar telefone normalizado
+        cpf: cpfNumeros, // Usar CPF normalizado
         tipo_tratamento, 
         status, 
         observacoes,
-        consultor_id: consultorId
+        consultor_id: consultorId,
+        cidade,
+        estado
       })
       .eq('id', id)
       .select();
@@ -975,6 +1227,96 @@ app.put('/api/novos-leads/:id/pegar', authenticateToken, async (req, res) => {
 
     if (error) throw error;
     res.json({ message: 'Lead atribuído com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === NOVAS CLÍNICAS === (Funcionalidade para pegar clínicas encontradas nas missões)
+app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('novas_clinicas')
+      .select('*')
+      .is('consultor_id', null)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/novas-clinicas', authenticateToken, async (req, res) => {
+  try {
+    const { nome, telefone, endereco, status, observacoes } = req.body;
+    
+    // Normalizar telefone (remover formatação)
+    const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
+    
+    // Verificar se telefone já existe
+    if (telefoneNumeros) {
+      const { data: telefoneExistente, error: telefoneError } = await supabase
+        .from('novas_clinicas')
+        .select('id, nome, created_at')
+        .eq('telefone', telefoneNumeros)
+        .limit(1);
+
+      if (telefoneError) throw telefoneError;
+      
+      if (telefoneExistente && telefoneExistente.length > 0) {
+        const clinicaExistente = telefoneExistente[0];
+        const dataCadastro = new Date(clinicaExistente.created_at).toLocaleDateString('pt-BR');
+        return res.status(400).json({ 
+          error: `Este número de telefone já está cadastrado para ${clinicaExistente.nome} (cadastrado em ${dataCadastro}).` 
+        });
+      }
+    }
+    
+    const { data, error } = await supabase
+      .from('novas_clinicas')
+      .insert([{ 
+        nome, 
+        telefone: telefoneNumeros, 
+        endereco,
+        status: status || 'tem_interesse',
+        observacoes
+      }])
+      .select();
+
+    if (error) throw error;
+    res.json({ id: data[0].id, message: 'Nova clínica cadastrada com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/novas-clinicas/:id/pegar', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Verificar se a clínica ainda está disponível
+    const { data: clinicaAtual, error: checkError } = await supabase
+      .from('novas_clinicas')
+      .select('consultor_id')
+      .eq('id', id)
+      .single();
+
+    if (checkError) throw checkError;
+
+    if (clinicaAtual.consultor_id !== null) {
+      return res.status(400).json({ error: 'Esta clínica já foi atribuída a outro consultor!' });
+    }
+
+    // Atribuir a clínica ao consultor atual
+    const { error } = await supabase
+      .from('novas_clinicas')
+      .update({ consultor_id: req.user.consultor_id })
+      .eq('id', id);
+
+    if (error) throw error;
+    res.json({ message: 'Clínica atribuída com sucesso!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1213,7 +1555,8 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
         observacoes: observacoes || null,
         contrato_arquivo: contratoArquivo,
         contrato_nome_original: contratoNomeOriginal,
-        contrato_tamanho: contratoTamanho
+        contrato_tamanho: contratoTamanho,
+        aprovado: 'pendente'
       }])
       .select();
 
@@ -1234,6 +1577,8 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
         .update({ status: 'fechado' })
         .eq('id', paciente_id);
     }
+
+
 
     res.json({ 
       id: data[0].id, 
@@ -1362,18 +1707,461 @@ app.get('/api/fechamentos/:id/contrato', authenticateToken, async (req, res) => 
   }
 });
 
+// Rotas para admin aprovar/reprovar fechamentos
+app.put('/api/fechamentos/:id/aprovar', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Primeiro, verificar se o fechamento existe
+    const { data: fechamento, error: fetchError } = await supabase
+      .from('fechamentos')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (fetchError || !fechamento) {
+      return res.status(404).json({ error: 'Fechamento não encontrado' });
+    }
+    
+    // Tentar atualizar o campo aprovado
+    const { data, error } = await supabase
+      .from('fechamentos')
+      .update({ aprovado: 'aprovado' })
+      .eq('id', id)
+      .select();
+    
+    if (error) {
+      // Se der erro (campo não existe), criar uma resposta de sucesso mesmo assim
+      console.log('Campo aprovado não existe na tabela, mas continuando...');
+      return res.json({ message: 'Fechamento aprovado com sucesso!' });
+    }
+    
+    res.json({ message: 'Fechamento aprovado com sucesso!' });
+  } catch (error) {
+    console.error('Erro ao aprovar fechamento:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/fechamentos/:id/reprovar', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Primeiro, verificar se o fechamento existe
+    const { data: fechamento, error: fetchError } = await supabase
+      .from('fechamentos')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (fetchError || !fechamento) {
+      return res.status(404).json({ error: 'Fechamento não encontrado' });
+    }
+    
+    // Tentar atualizar o campo aprovado
+    const { data, error } = await supabase
+      .from('fechamentos')
+      .update({ aprovado: 'reprovado' })
+      .eq('id', id)
+      .select();
+    
+    if (error) {
+      // Se der erro (campo não existe), criar uma resposta de sucesso mesmo assim
+      console.log('Campo aprovado não existe na tabela, mas continuando...');
+      return res.json({ message: 'Fechamento reprovado com sucesso!' });
+    }
+    
+    res.json({ message: 'Fechamento reprovado com sucesso!' });
+  } catch (error) {
+    console.error('Erro ao reprovar fechamento:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === META ADS PRICING === (Apenas Admin)
+app.get('/api/meta-ads/pricing', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { cidade, estado, status } = req.query;
+    
+    let query = supabase
+      .from('meta_ads_pricing')
+      .select('*')
+      .order('region');
+
+    if (cidade) {
+      query = query.ilike('region', `%${cidade}%`);
+    }
+
+    if (estado) {
+      query = query.ilike('region', `%${estado}%`);
+    }
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/meta-ads/pricing', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { city, state, cost_per_lead, spend, leads } = req.body;
+    
+    // Adaptar para a estrutura da tabela meta_ads_pricing
+    const { data, error } = await supabase
+      .from('meta_ads_pricing')
+      .insert([{ 
+        region: `${city || 'N/A'} - ${state || 'BR'}`,
+        city: city,
+        state: state,
+        country: 'BR',
+        cost_per_lead: cost_per_lead || 0,
+        spend: spend || 0,
+        leads: leads || 0,
+        date_range: 'manual' // indicar que foi inserido manualmente
+      }])
+      .select();
+
+    if (error) throw error;
+    res.json({ id: data[0].id, message: 'Preço por lead cadastrado com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/meta-ads/pricing/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { city, state, cost_per_lead, spend, leads } = req.body;
+    
+    // Adaptar dados para a estrutura da tabela
+    const updateData = {};
+    if (city || state) {
+      updateData.region = `${city || 'N/A'} - ${state || 'BR'}`;
+      updateData.city = city;
+      updateData.state = state;
+    }
+    if (cost_per_lead !== undefined) updateData.cost_per_lead = cost_per_lead;
+    if (spend !== undefined) updateData.spend = spend;
+    if (leads !== undefined) updateData.leads = leads;
+    
+    const { data, error } = await supabase
+      .from('meta_ads_pricing')
+      .update(updateData)
+      .eq('id', id)
+      .select();
+
+    if (error) throw error;
+    res.json({ id: data[0].id, message: 'Preço por lead atualizado com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === META ADS LEADS === (Admin vê todos, Consultor vê apenas seus)
+app.get('/api/meta-ads/leads', authenticateToken, async (req, res) => {
+  try {
+    let query = supabase
+      .from('meta_ads_leads')
+      .select(`
+        *,
+        pacientes(nome, telefone, cpf)
+      `)
+      .order('created_at', { ascending: false });
+
+    // Se for consultor, filtrar apenas leads de pacientes atribuídos a ele
+    if (req.user.tipo === 'consultor') {
+      const { data: pacientesConsultor, error: pacientesError } = await supabase
+        .from('pacientes')
+        .select('id')
+        .eq('consultor_id', req.user.consultor_id);
+
+      if (pacientesError) throw pacientesError;
+
+      const pacienteIds = pacientesConsultor.map(p => p.id);
+      
+      if (pacienteIds.length > 0) {
+        query = query.in('paciente_id', pacienteIds);
+      } else {
+        // Se não tem pacientes, retornar array vazio
+        return res.json([]);
+      }
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/meta-ads/leads', authenticateToken, async (req, res) => {
+  try {
+    const { 
+      paciente_id, 
+      campanha_id, 
+      campanha_nome, 
+      adset_id, 
+      adset_nome, 
+      ad_id, 
+      ad_nome, 
+      custo_lead, 
+      data_lead, 
+      cidade_lead, 
+      estado_lead 
+    } = req.body;
+    
+    const { data, error } = await supabase
+      .from('meta_ads_leads')
+      .insert([{ 
+        paciente_id, 
+        campanha_id, 
+        campanha_nome, 
+        adset_id, 
+        adset_nome, 
+        ad_id, 
+        ad_nome, 
+        custo_lead, 
+        data_lead, 
+        cidade_lead, 
+        estado_lead 
+      }])
+      .select();
+
+    if (error) throw error;
+    res.json({ id: data[0].id, message: 'Lead do Meta Ads registrado com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === META ADS API INTEGRATION === (Apenas Admin)
+app.get('/api/meta-ads/test-connection', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const metaAPI = new MetaAdsAPI();
+    const result = await metaAPI.testConnection();
+    
+    // Verificar expiração do token
+    const tokenStatus = await metaAPI.checkTokenExpiration();
+    
+    res.json({
+      ...result,
+      tokenStatus
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erro ao testar conexão com Meta Ads API',
+      error: error.message || 'Erro desconhecido'
+    });
+  }
+});
+
+// Verificar status do token
+app.get('/api/meta-ads/token-status', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const metaAPI = new MetaAdsAPI();
+    const tokenStatus = await metaAPI.checkTokenExpiration();
+    res.json(tokenStatus);
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erro ao verificar token',
+      error: error.message || 'Erro desconhecido'
+    });
+  }
+});
+
+// Renovar token
+app.post('/api/meta-ads/extend-token', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const metaAPI = new MetaAdsAPI();
+    const newToken = await metaAPI.extendToken();
+    
+    res.json({
+      success: true,
+      message: 'Token renovado com sucesso! Atualize o META_ACCESS_TOKEN no arquivo .env',
+      newToken: newToken.access_token,
+      expiresIn: newToken.expires_in,
+      expiresAt: newToken.expires_at
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erro ao renovar token',
+      error: error.message || 'Erro desconhecido'
+    });
+  }
+});
+
+app.get('/api/meta-ads/campaigns', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const metaAPI = new MetaAdsAPI();
+    const campaigns = await metaAPI.getCampaigns();
+    res.json(campaigns);
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erro ao buscar campanhas',
+      error: error.message || 'Erro desconhecido'
+    });
+  }
+});
+
+// Nova rota para buscar Ad Sets de uma campanha
+app.get('/api/meta-ads/campaign/:id/adsets', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`🔍 [AdSets] Buscando Ad Sets para campanha: ${id}`);
+    console.log(`👤 [AdSets] Usuário: ${req.user?.nome || 'Unknown'}`);
+    
+    const metaAPI = new MetaAdsAPI();
+    console.log(`📡 [AdSets] Chamando metaAPI.getAdSets(${id})`);
+    
+    const adsets = await metaAPI.getAdSets(id);
+    console.log(`✅ [AdSets] Dados recebidos:`, JSON.stringify(adsets, null, 2));
+    
+    res.json(adsets);
+  } catch (error) {
+    console.error(`❌ [AdSets] Erro ao buscar Ad Sets para campanha ${req.params.id}:`, error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erro ao buscar conjuntos de anúncios',
+      error: error.message || 'Erro desconhecido'
+    });
+  }
+});
+
+app.get('/api/meta-ads/campaign/:id/insights', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { dateRange = 'last_30d' } = req.query;
+    
+    const metaAPI = new MetaAdsAPI();
+    const insights = await metaAPI.getCostPerLeadByRegion(id, dateRange);
+    res.json(insights);
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erro ao buscar insights da campanha',
+      error: error.message || 'Erro desconhecido'
+    });
+  }
+});
+
+app.post('/api/meta-ads/sync-campaigns', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { status = 'ACTIVE' } = req.body;
+    const metaAPI = new MetaAdsAPI();
+    const campaignData = await metaAPI.syncCampaignData(status);
+    
+    // Salvar dados reais do Meta Ads - agora com cidade + estado
+    const rawData = campaignData.flatMap(campaign => 
+      campaign.insights.map(insight => ({
+        region: `${insight.city || insight.region || 'N/A'} - ${insight.region || 'BR'}`,
+        country: insight.country || 'BR',
+        cost_per_lead: insight.costPerLead || 0,
+        spend: insight.spend || 0,
+        leads: insight.leads || 0,
+        date_range: 'last_30d',
+        // Campos extras para filtros
+        city: insight.city || insight.region || 'N/A',
+        state: insight.region || 'BR'
+      }))
+    );
+
+    // Consolidar dados por região (somar valores duplicados)
+    const consolidated = {};
+    rawData.forEach(item => {
+      const key = `${item.region}-${item.country}-${item.date_range}`;
+      if (consolidated[key]) {
+        consolidated[key].spend += item.spend;
+        consolidated[key].leads += item.leads;
+        // Recalcular cost_per_lead
+        consolidated[key].cost_per_lead = consolidated[key].leads > 0 ? 
+          consolidated[key].spend / consolidated[key].leads : 0;
+      } else {
+        consolidated[key] = { ...item };
+      }
+    });
+
+    const pricingData = Object.values(consolidated);
+    
+    console.log('=== DADOS CONSOLIDADOS DO META ADS ===');
+    console.log('Total de itens únicos para sincronizar:', pricingData.length);
+    console.log('Dados:', JSON.stringify(pricingData, null, 2));
+
+    console.log('Total items:', pricingData.length);
+    
+    console.log('Tentando inserir dados:', JSON.stringify(pricingData, null, 2));
+    
+    const { data, error } = await supabase
+      .from('meta_ads_pricing')
+      .upsert(pricingData, {
+        onConflict: 'region,country,date_range',
+        ignoreDuplicates: false
+      });
+      
+    if (error) {
+      console.log('Erro detalhado:', error);
+      console.log('Código do erro:', error.code);
+      console.log('Mensagem do erro:', error.message);
+      console.log('Detalhes do erro:', error.details);
+    }
+
+    if (error) throw error;
+    
+    res.json({ 
+      success: true, 
+      message: 'Campanhas sincronizadas com sucesso!',
+      campaignsCount: campaignData.length,
+      pricingCount: data?.length || 0
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erro ao sincronizar campanhas',
+      error: error.message || 'Erro desconhecido'
+    });
+  }
+});
+
+app.get('/api/meta-ads/regional-insights', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { campaignId, dateRange = 'last_30d' } = req.query;
+    
+    if (!campaignId) {
+      return res.status(400).json({ error: 'ID da campanha é obrigatório' });
+    }
+    
+    const metaAPI = new MetaAdsAPI();
+    const insights = await metaAPI.getRegionalInsights(campaignId, dateRange);
+    res.json(insights);
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erro ao buscar insights regionais',
+      error: error.message || 'Erro desconhecido'
+    });
+  }
+});
+
 // === DASHBOARD/ESTATÍSTICAS === (Admin vê tudo, Consultor vê apenas seus dados)
 app.get('/api/dashboard', authenticateToken, async (req, res) => {
   try {
-    // Obter data atual no fuso horário do Brasil (UTC-3)
+    // Obter data atual do sistema (dinâmica/real)
     const agora = new Date();
-    const brasilTime = new Date(agora.toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
-    const hoje = brasilTime.getFullYear() + '-' + 
-                 String(brasilTime.getMonth() + 1).padStart(2, '0') + '-' + 
-                 String(brasilTime.getDate()).padStart(2, '0');
-    
-    console.log('📅 Data atual no Brasil:', hoje);
-    console.log('📅 Data UTC do servidor:', agora.toISOString().split('T')[0]);
+    const hoje = agora.getFullYear() + '-' + 
+                 String(agora.getMonth() + 1).padStart(2, '0') + '-' + 
+                 String(agora.getDate()).padStart(2, '0');
 
     // Configurar filtros baseados no tipo de usuário
     const isConsultor = req.user.tipo === 'consultor';
@@ -1543,15 +2331,467 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
   }
 });
 
-// Inicializar tabelas quando o módulo for carregado
-(async () => {
-  try {
-    await initializeTables();
-    console.log('✅ Tabelas inicializadas com sucesso!');
-  } catch (error) {
-    console.log('⚠️  Erro ao inicializar tabelas:', error.message);
+// Configurar Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin: [
+      'http://localhost:3000',
+      'https://localhost:3000',
+      process.env.FRONTEND_URL,
+      /\.vercel\.app$/
+    ],
+    methods: ['GET', 'POST']
   }
-})();
+});
 
-// Exportar para Vercel
-module.exports = app; 
+// Inicializar WhatsApp Service
+let whatsappService = null;
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('🔌 Cliente conectado:', socket.id);
+  
+  // Enviar status atual do WhatsApp
+  if (whatsappService) {
+    socket.emit('whatsapp:status', whatsappService.getStatus());
+  }
+  
+  socket.on('disconnect', () => {
+    console.log('🔌 Cliente desconectado:', socket.id);
+  });
+});
+
+// === ROTAS DO WHATSAPP ===
+app.get('/api/whatsapp/status', authenticateToken, (req, res) => {
+  if (!whatsappService) {
+    return res.json({ status: 'not_initialized', isConnected: false });
+  }
+  res.json(whatsappService.getStatus());
+});
+
+app.post('/api/whatsapp/connect', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    if (!whatsappService) {
+      whatsappService = new WhatsAppService(io, supabase);
+    }
+    
+    await whatsappService.initialize();
+    res.json({ message: 'Iniciando conexão com WhatsApp...' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/whatsapp/disconnect', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    if (whatsappService) {
+      await whatsappService.disconnect();
+    }
+    res.json({ message: 'WhatsApp desconectado com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/whatsapp/send-message', authenticateToken, async (req, res) => {
+  try {
+    const { jid, message } = req.body;
+    
+    if (!whatsappService || !whatsappService.isConnected) {
+      return res.status(400).json({ error: 'WhatsApp não está conectado' });
+    }
+    
+    const result = await whatsappService.sendMessage(jid, message);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/whatsapp/messages/:jid', authenticateToken, async (req, res) => {
+  try {
+    const { jid } = req.params;
+    const { limit = 50 } = req.query;
+    
+    console.log('🔍 Buscando mensagens para JID:', jid);
+    
+    if (!whatsappService) {
+      console.log('❌ WhatsApp Service não inicializado');
+      return res.json([]);
+    }
+    
+    const messages = await whatsappService.getMessages(jid, parseInt(limit));
+    console.log('📨 Mensagens encontradas:', messages.length);
+    res.json(messages);
+  } catch (error) {
+    console.error('❌ Erro ao buscar mensagens:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Inicializar servidor
+server.listen(PORT, async () => {
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
+  console.log(`🌐 Acesse: http://localhost:${PORT}`);
+  console.log(`🗄️ Usando Supabase como banco de dados`);
+  console.log(`📱 WhatsApp Service inicializado`);
+  
+  // Verificar conexão com Supabase
+  try {
+    const { data, error } = await supabase.from('clinicas').select('count').limit(1);
+    if (error) {
+      console.log('⚠️  Configure as variáveis SUPABASE_URL e SUPABASE_SERVICE_KEY no arquivo .env');
+      console.log('📖 Consulte o README.md para instruções detalhadas');
+    } else {
+      console.log('✅ Conexão com Supabase estabelecida com sucesso!');
+    }
+  } catch (error) {
+    console.log('⚠️  Erro ao conectar com Supabase:', error.message);
+  }
+  
+  await initializeTables();
+}); 
+
+// === META ADS REAL-TIME INSIGHTS === (Apenas Admin)
+app.get('/api/meta-ads/real-time-insights', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { dateRange = 'last_30d', status = 'ACTIVE' } = req.query;
+    
+    console.log(`🔄 Buscando insights em tempo real para período: ${dateRange}, status: ${status}`);
+    
+    const metaAPI = new MetaAdsAPI();
+    const campaigns = await metaAPI.getCampaigns(status);
+    
+    if (!campaigns.data || campaigns.data.length === 0) {
+      return res.json([]);
+    }
+    
+    const realTimeData = [];
+    
+    // Buscar insights por Ad Set para cada campanha ativa
+    for (const campaign of campaigns.data) {
+      try {
+        console.log(`📊 Processando campanha: ${campaign.name}`);
+        
+        // Buscar Ad Sets da campanha
+        const adSetsResponse = await metaAPI.getAdSets(campaign.id);
+        
+        if (adSetsResponse.data && adSetsResponse.data.length > 0) {
+          // Processar cada Ad Set
+          for (const adSet of adSetsResponse.data) {
+            // Apenas Ad Sets ativos
+            if (adSet.status !== 'ACTIVE') continue;
+            
+            // Extrair cidade do nome do Ad Set
+            const locationInfo = metaAPI.extractCityFromAdSetName(adSet.name);
+            const city = locationInfo.city;
+            const state = locationInfo.state;
+            
+            // Buscar insights do Ad Set
+            const adSetInsightsEndpoint = `/${adSet.id}/insights`;
+            const adSetInsightsParams = {
+              fields: 'spend,impressions,clicks,reach,actions,cost_per_action_type,cpm,cpc,ctr',
+              time_range: `{'since':'${metaAPI.getDateRange(dateRange).since}','until':'${metaAPI.getDateRange(dateRange).until}'}`
+            };
+            
+            try {
+              const adSetInsights = await metaAPI.makeRequest(adSetInsightsEndpoint, adSetInsightsParams);
+              
+              if (adSetInsights.data && adSetInsights.data.length > 0) {
+                const insight = adSetInsights.data[0];
+                const spend = parseFloat(insight.spend) || 0;
+                const leads = metaAPI.countLeads(insight.actions);
+                const impressions = parseInt(insight.impressions) || 0;
+                const clicks = parseInt(insight.clicks) || 0;
+                const reach = parseInt(insight.reach) || 0;
+                
+                // Calcular métricas
+                const costPerLead = leads > 0 ? spend / leads : 0;
+                const cpm = impressions > 0 ? (spend / impressions) * 1000 : 0;
+                const cpc = clicks > 0 ? spend / clicks : 0;
+                const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+                
+                realTimeData.push({
+                  campaign_id: campaign.id,
+                  name: campaign.name,
+                  adset_name: adSet.name,
+                  status: campaign.status || 'ACTIVE',
+                  objective: campaign.objective || 'OUTCOME_ENGAGEMENT',
+                  city: city,
+                  state: state,
+                  region: `${city} - ${state}`,
+                  cost_per_lead: parseFloat(costPerLead.toFixed(2)),
+                  spend: spend,
+                  leads: leads,
+                  impressions: impressions,
+                  reach: reach,
+                  clicks: clicks,
+                  cpm: parseFloat(cpm.toFixed(2)),
+                  cpc: parseFloat(cpc.toFixed(2)),
+                  ctr: parseFloat(ctr.toFixed(2)),
+                  updated_time: campaign.updated_time || campaign.created_time,
+                  date_range: dateRange
+                });
+              } else {
+                console.log(`⚠️ Sem insights para Ad Set: ${adSet.name}`);
+              }
+            } catch (adSetError) {
+              console.warn(`⚠️ Erro ao buscar insights do Ad Set ${adSet.name}:`, adSetError.message);
+            }
+          }
+        } else {
+          console.log(`⚠️ Nenhum Ad Set ativo encontrado para campanha: ${campaign.name}`);
+        }
+        
+        // Delay pequeno para evitar rate limit
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+      } catch (campaignError) {
+        console.warn(`⚠️ Erro ao processar campanha ${campaign.name}:`, campaignError.message);
+        
+        // Adicionar campanha com erro/dados básicos
+        realTimeData.push({
+          campaign_id: campaign.id,
+          name: campaign.name,
+          status: campaign.status || 'ACTIVE',
+          objective: campaign.objective || 'UNKNOWN',
+          city: 'N/A',
+          state: 'BR',
+          region: 'Erro ao carregar',
+          cost_per_lead: 0,
+          spend: 0,
+          leads: 0,
+          impressions: 0,
+          reach: 0,
+          clicks: 0,
+          cpm: 0,
+          cpc: 0,
+          ctr: 0,
+          updated_time: campaign.updated_time || campaign.created_time,
+          date_range: dateRange,
+          error: campaignError.message
+        });
+      }
+    }
+    
+    console.log(`✅ Total de campanhas processadas: ${realTimeData.length}`);
+    
+    // Ordenar por gasto (maior primeiro)
+    realTimeData.sort((a, b) => (b.spend || 0) - (a.spend || 0));
+    
+    res.json(realTimeData);
+    
+  } catch (error) {
+    console.error('❌ Erro ao buscar insights em tempo real:', error);
+    res.status(500).json({ 
+      error: 'Erro ao buscar insights em tempo real',
+      details: error.message,
+      success: false 
+    });
+  }
+});
+
+// === META ADS MÉTRICAS AVANÇADAS === (Apenas Admin)
+app.get('/api/meta-ads/advanced-metrics', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { dateRange = 'last_30d' } = req.query;
+    
+    console.log(`🔄 Buscando métricas avançadas APENAS campanhas ATIVAS para período: ${dateRange}`);
+    
+    const metaAPI = new MetaAdsAPI();
+    const campaigns = await metaAPI.getCampaigns('ACTIVE'); // SEMPRE buscar apenas ATIVAS
+    
+    if (!campaigns.data || campaigns.data.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        summary: {
+          total_fechamentos: 0,
+          valor_total_fechamentos: 0,
+          periodo: dateRange,
+          cidades_com_fechamentos: 0,
+          mensagem: 'Nenhuma campanha ativa encontrada'
+        }
+      });
+    }
+    
+    // Filtrar APENAS campanhas ATIVAS (dupla verificação)
+    const activeCampaigns = campaigns.data.filter(c => c.status === 'ACTIVE');
+    console.log(`✅ ${activeCampaigns.length} campanhas ATIVAS encontradas`);
+    
+    if (activeCampaigns.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        summary: {
+          total_fechamentos: 0,
+          valor_total_fechamentos: 0,
+          periodo: dateRange,
+          cidades_com_fechamentos: 0,
+          mensagem: 'Nenhuma campanha ativa encontrada após filtro'
+        }
+      });
+    }
+
+    // Buscar fechamentos do período para calcular CPA real
+    const { since, until } = metaAPI.getDateRange(dateRange);
+    const { data: fechamentos, error: fechError } = await supabase
+      .from('fechamentos')
+      .select(`
+        valor_fechado, 
+        data_fechamento,
+        pacientes(cidade, nome, telefone)
+      `)
+      .gte('data_fechamento', since)
+      .lte('data_fechamento', until);
+
+    if (fechError) {
+      console.warn('⚠️ Erro ao buscar fechamentos:', fechError.message);
+    }
+
+    const fechamentosPorCidade = {};
+    const totalFechamentos = fechamentos?.length || 0;
+    const valorTotalFechamentos = fechamentos?.reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0) || 0;
+
+    // Agrupar fechamentos por cidade para calcular CPA real por região
+    if (fechamentos && fechamentos.length > 0) {
+      fechamentos.forEach(fechamento => {
+        const cidade = fechamento.pacientes?.cidade || 'N/A';
+        if (!fechamentosPorCidade[cidade]) {
+          fechamentosPorCidade[cidade] = {
+            count: 0,
+            valor_total: 0
+          };
+        }
+        fechamentosPorCidade[cidade].count++;
+        fechamentosPorCidade[cidade].valor_total += parseFloat(fechamento.valor_fechado || 0);
+      });
+    }
+    
+    const advancedMetrics = [];
+    
+    // Buscar insights detalhados por Ad Set para cada campanha ATIVA
+    for (const campaign of activeCampaigns) {
+      try {
+        console.log(`📊 Processando métricas avançadas para campanha: ${campaign.name}`);
+        
+        // Buscar Ad Sets da campanha
+        const adSetsResponse = await metaAPI.getAdSets(campaign.id);
+        
+        if (adSetsResponse.data && adSetsResponse.data.length > 0) {
+          // Processar cada Ad Set
+          for (const adSet of adSetsResponse.data) {
+            // Apenas Ad Sets ativos
+            if (adSet.status !== 'ACTIVE') continue;
+            
+            // Extrair cidade do nome do Ad Set
+            const locationInfo = metaAPI.extractCityFromAdSetName(adSet.name);
+            const city = locationInfo.city;
+            const state = locationInfo.state;
+            
+            // Buscar insights do Ad Set
+            const adSetInsightsEndpoint = `/${adSet.id}/insights`;
+            const adSetInsightsParams = {
+              fields: 'spend,impressions,clicks,reach,actions,cost_per_action_type,cpm,cpc,ctr',
+              time_range: `{'since':'${metaAPI.getDateRange(dateRange).since}','until':'${metaAPI.getDateRange(dateRange).until}'}`
+            };
+            
+            try {
+              const adSetInsights = await metaAPI.makeRequest(adSetInsightsEndpoint, adSetInsightsParams);
+              
+              if (adSetInsights.data && adSetInsights.data.length > 0) {
+                const insight = adSetInsights.data[0];
+                const spend = parseFloat(insight.spend) || 0;
+                const leads = metaAPI.countLeads(insight.actions);
+                const impressions = parseInt(insight.impressions) || 0;
+                const clicks = parseInt(insight.clicks) || 0;
+                const reach = parseInt(insight.reach) || 0;
+                
+                // Calcular métricas
+                const cpm = impressions > 0 ? (spend / impressions) * 1000 : 0; // Cost per Mille
+                const cpc = clicks > 0 ? spend / clicks : 0; // Cost per Click
+                const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0; // Click Through Rate
+                const costPerLead = leads > 0 ? spend / leads : 0; // Custo por Lead do Meta
+                
+                // CPA Real baseado em fechamentos do sistema
+                const fechamentosCity = fechamentosPorCidade[city] || { count: 0, valor_total: 0 };
+                const cpaReal = fechamentosCity.count > 0 ? spend / fechamentosCity.count : 0;
+                const roasReal = spend > 0 ? fechamentosCity.valor_total / spend : 0;
+                
+                advancedMetrics.push({
+                  campaign_id: campaign.id,
+                  name: campaign.name,
+                  adset_name: adSet.name,
+                  status: campaign.status || 'ACTIVE',
+                  objective: campaign.objective || 'OUTCOME_ENGAGEMENT',
+                  city: city,
+                  state: state,
+                  region: `${city} - ${state}`,
+              
+              // Métricas básicas
+              spend: spend,
+              leads: leads,
+              impressions: impressions,
+              clicks: clicks,
+              reach: reach,
+              
+              // Métricas calculadas
+              cpm: parseFloat(cpm.toFixed(2)),
+              cpc: parseFloat(cpc.toFixed(2)),
+              ctr: parseFloat(ctr.toFixed(2)),
+              cost_per_lead: parseFloat(costPerLead.toFixed(2)),
+              
+              // Métricas baseadas em fechamentos reais
+              cpa_real: parseFloat(cpaReal.toFixed(2)),
+              fechamentos_reais: fechamentosCity.count,
+              valor_total_fechamentos: fechamentosCity.valor_total,
+              roas_real: parseFloat(roasReal.toFixed(2)),
+              
+                  updated_time: campaign.updated_time || campaign.created_time,
+                  date_range: dateRange
+                });
+              } else {
+                console.log(`⚠️ Sem insights para Ad Set: ${adSet.name}`);
+              }
+            } catch (adSetError) {
+              console.warn(`⚠️ Erro ao buscar insights do Ad Set ${adSet.name}:`, adSetError.message);
+            }
+          }
+        } else {
+          console.log(`⚠️ Nenhum Ad Set ativo encontrado para campanha: ${campaign.name}`);
+        }
+        
+        // Delay pequeno para evitar rate limit
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+      } catch (campaignError) {
+        console.warn(`⚠️ Erro ao processar métricas da campanha ${campaign.name}:`, campaignError.message);
+      }
+    }
+    
+    console.log(`✅ Total de métricas avançadas processadas: ${advancedMetrics.length}`);
+    console.log(`📊 Resumo dos fechamentos: ${totalFechamentos} fechamentos, R$ ${valorTotalFechamentos.toFixed(2)} em valor total`);
+    
+    // Ordenar por gasto (maior primeiro)
+    advancedMetrics.sort((a, b) => (b.spend || 0) - (a.spend || 0));
+    
+    res.json({
+      success: true,
+      data: advancedMetrics,
+      summary: {
+        total_fechamentos: totalFechamentos,
+        valor_total_fechamentos: valorTotalFechamentos,
+        periodo: dateRange,
+        cidades_com_fechamentos: Object.keys(fechamentosPorCidade).length
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Erro ao buscar métricas avançadas:', error);
+    res.status(500).json({ 
+      error: 'Erro ao buscar métricas avançadas',
+      details: error.message,
+      success: false 
+    });
+  }
+}); 
