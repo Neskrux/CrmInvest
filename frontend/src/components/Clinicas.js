@@ -203,20 +203,42 @@ const Clinicas = () => {
     setGeocoding(true);
     const cache = getGeocodeCache();
 
-    const clinicasToGeo = clinicasFiltradas.slice(0, 200);
+    const clinicasToGeo = clinicasFiltradas.slice(0, 500); // Aumentado limite pois é mais rápido
     const clinicasPoints = [];
+    
     for (const c of clinicasToGeo) {
-      const address = normalizeAddress(c.endereco, c.cidade, c.estado);
-      const pt = await geocodeAddress(address, cache);
-      if (pt) clinicasPoints.push({ ...pt, item: c });
+      // Primeiro verifica se já tem coordenadas salvas no banco
+      if (c.latitude && c.longitude) {
+        clinicasPoints.push({ 
+          lat: c.latitude, 
+          lon: c.longitude, 
+          item: c 
+        });
+      } else {
+        // Se não tem, tenta geocodificar
+        const address = normalizeAddress(c.endereco, c.cidade, c.estado);
+        const pt = await geocodeAddress(address, cache);
+        if (pt) clinicasPoints.push({ ...pt, item: c });
+      }
     }
 
-    const novasToGeo = novasClinicas.slice(0, 200);
+    const novasToGeo = novasClinicas.slice(0, 500); // Aumentado limite
     const novasPoints = [];
+    
     for (const c of novasToGeo) {
-      const address = normalizeAddress(c.endereco || c.nome, null, null);
-      const pt = await geocodeAddress(address, cache);
-      if (pt) novasPoints.push({ ...pt, item: c });
+      // Primeiro verifica se já tem coordenadas salvas no banco
+      if (c.latitude && c.longitude) {
+        novasPoints.push({ 
+          lat: c.latitude, 
+          lon: c.longitude, 
+          item: c 
+        });
+      } else {
+        // Se não tem, tenta geocodificar
+        const address = normalizeAddress(c.endereco || c.nome, c.cidade, c.estado);
+        const pt = await geocodeAddress(address, cache);
+        if (pt) novasPoints.push({ ...pt, item: c });
+      }
     }
 
     setClinicasGeo(clinicasPoints);

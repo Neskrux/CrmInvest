@@ -558,6 +558,27 @@ app.post('/api/clinicas', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { nome, endereco, bairro, cidade, estado, nicho, telefone, email, status } = req.body;
     
+    // Geocodificar endereço se tiver cidade e estado
+    let latitude = null;
+    let longitude = null;
+    
+    if (cidade && estado) {
+      try {
+        const address = `${endereco ? endereco + ', ' : ''}${cidade}, ${estado}, Brasil`;
+        const geocodeUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
+        const geocodeResponse = await fetch(geocodeUrl);
+        const geocodeData = await geocodeResponse.json();
+        
+        if (geocodeData && geocodeData.length > 0) {
+          latitude = parseFloat(geocodeData[0].lat);
+          longitude = parseFloat(geocodeData[0].lon);
+        }
+      } catch (geocodeError) {
+        console.error('Erro ao geocodificar:', geocodeError);
+        // Continua sem coordenadas se falhar
+      }
+    }
+    
     const { data, error } = await supabase
       .from('clinicas')
       .insert([{ 
@@ -569,7 +590,9 @@ app.post('/api/clinicas', authenticateToken, requireAdmin, async (req, res) => {
         nicho, 
         telefone, 
         email, 
-        status: status || 'ativo' // Padrão: desbloqueado
+        status: status || 'ativo', // Padrão: desbloqueado
+        latitude,
+        longitude
       }])
       .select();
 
@@ -1274,6 +1297,27 @@ app.post('/api/novas-clinicas', authenticateToken, async (req, res) => {
       }
     }
     
+    // Geocodificar endereço se tiver cidade e estado
+    let latitude = null;
+    let longitude = null;
+    
+    if (cidade && estado) {
+      try {
+        const address = `${endereco ? endereco + ', ' : ''}${cidade}, ${estado}, Brasil`;
+        const geocodeUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
+        const geocodeResponse = await fetch(geocodeUrl);
+        const geocodeData = await geocodeResponse.json();
+        
+        if (geocodeData && geocodeData.length > 0) {
+          latitude = parseFloat(geocodeData[0].lat);
+          longitude = parseFloat(geocodeData[0].lon);
+        }
+      } catch (geocodeError) {
+        console.error('Erro ao geocodificar:', geocodeError);
+        // Continua sem coordenadas se falhar
+      }
+    }
+    
     const { data, error } = await supabase
       .from('novas_clinicas')
       .insert([{ 
@@ -1286,7 +1330,9 @@ app.post('/api/novas-clinicas', authenticateToken, async (req, res) => {
         telefone: telefoneNumeros,
         email,
         status: status || 'tem_interesse',
-        observacoes
+        observacoes,
+        latitude,
+        longitude
       }])
       .select();
 
