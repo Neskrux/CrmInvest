@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/Toast';
 import '../App.css';
 
 function MetaAds() {
   const { user, makeRequest } = useAuth();
+  const { showSuccessToast, showErrorToast, showInfoToast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
 
   const [campaigns, setCampaigns] = useState([]);
   const [selectedCampaign, setSelectedCampaign] = useState('');
@@ -21,8 +22,13 @@ function MetaAds() {
   const isAdmin = user?.tipo === 'admin';
 
   useEffect(() => {
-    // Carregar dados iniciais
-    fetchAdvancedMetrics();
+    // Carregar dados iniciais apenas se houver indicação de configuração
+    // Evitar múltiplas chamadas desnecessárias
+    const timer = setTimeout(() => {
+      fetchAdvancedMetrics();
+    }, 1000); // Delay para evitar chamadas simultâneas
+
+    return () => clearTimeout(timer);
   }, []);
 
   const fetchCampaigns = async () => {
@@ -34,31 +40,29 @@ function MetaAds() {
         setCampaigns(data.data || []);
       } else {
         console.error('Erro ao carregar campanhas:', data.error);
-        setMessage('Erro ao carregar campanhas: ' + (data.error || 'Erro desconhecido'));
+        showErrorToast('Erro ao carregar campanhas: ' + (data.error || 'Erro desconhecido'));
       }
     } catch (error) {
       console.error('Erro ao carregar campanhas:', error);
-      setMessage('Erro ao conectar com o servidor');
+      showErrorToast('Erro ao conectar com o servidor');
     }
   };
 
   const syncCampaigns = async () => {
     try {
       setSyncing(true);
-      setMessage(''); // Limpar mensagens anteriores
       const response = await makeRequest('/meta-ads/sync-campaigns', {
         method: 'POST'
       });
       const data = await response.json();
       
       if (response.ok) {
-        setMessage(data.message);
-        setTimeout(() => setMessage(''), 5000);
+        showSuccessToast(data.message);
       } else {
-        setMessage('Erro ao sincronizar: ' + (data.error || 'Erro desconhecido'));
+        showErrorToast('Erro ao sincronizar: ' + (data.error || 'Erro desconhecido'));
       }
     } catch (error) {
-      setMessage('Erro ao sincronizar campanhas: ' + (error.message || 'Erro desconhecido'));
+      showErrorToast('Erro ao sincronizar campanhas: ' + (error.message || 'Erro desconhecido'));
     } finally {
       setSyncing(false);
     }
@@ -67,13 +71,11 @@ function MetaAds() {
   // Função para buscar conjuntos de anúncios de uma campanha
   const fetchAdSets = async (campaignId) => {
     if (!campaignId) {
-      console.log('Não há campaignId para buscar Ad Sets');
       return;
     }
     
     try {
       setLoadingAdSets(true);
-      console.log(`Buscando Ad Sets para campanha: ${campaignId}`);
       
       const response = await makeRequest(`/meta-ads/campaign/${campaignId}/adsets`);
       
@@ -84,35 +86,31 @@ function MetaAds() {
       }
       
       const data = await response.json();
-      console.log('Dados recebidos:', JSON.stringify(data, null, 2));
       
       if (data && data.data && Array.isArray(data.data)) {
-        console.log(`${data.data.length} Ad Sets encontrados:`, data.data.map(ad => ad.name));
         
         // Filtrar apenas Ad Sets ativos
         const activeAdSets = data.data.filter(adSet => adSet.status === 'ACTIVE');
-        console.log(`${activeAdSets.length} Ad Sets ativos:`, activeAdSets.map(ad => ad.name));
         
         setAdSets(activeAdSets);
-        setMessage(`${activeAdSets.length} conjunto(s) de anúncios ativo(s) encontrado(s)`);
+        showInfoToast(`${activeAdSets.length} conjunto(s) de anúncios ativo(s) encontrado(s)`);
         
         // Salvar no cache automaticamente
         setTimeout(() => {
           saveCacheData(realTimeData, activeAdSets, campaignId);
         }, 500);
       } else {
-        console.log('Resposta sem campo "data":', data);
         setAdSets([]);
-        setMessage('Resposta da API sem dados de Ad Sets');
+        showErrorToast('Resposta da API sem dados de Ad Sets');
       }
     } catch (error) {
       console.error('Erro ao buscar Ad Sets:', error);
       
       // Tratamento específico para rate limit
       if (error.message.includes('request limit reached') || error.message.includes('rate limit')) {
-        setMessage('Muitas chamadas à API Meta Ads. Aguarde 15-30 minutos e tente novamente.');
+        showErrorToast('Muitas chamadas à API Meta Ads. Aguarde 15-30 minutos e tente novamente.');
       } else {
-        setMessage('Erro ao buscar conjuntos de anúncios: ' + error.message);
+        showErrorToast('Erro ao buscar conjuntos de anúncios: ' + error.message);
       }
       
       setAdSets([]);
@@ -136,7 +134,6 @@ function MetaAds() {
   const fetchRealTimeData = async () => {
     try {
       setLoading(true);
-      console.log(`Buscando apenas campanhas ativas: período=${dateRange}`);
       
       // Sempre buscar apenas campanhas ativas
       const response = await makeRequest(`/meta-ads/real-time-insights?dateRange=${dateRange}&status=ACTIVE`);
@@ -145,7 +142,6 @@ function MetaAds() {
       if (response.ok) {
         // Filtrar apenas campanhas ativas
         const activeCampaigns = data.filter(campaign => campaign.status === 'ACTIVE');
-        console.log(`Campanhas ativas: ${activeCampaigns.length}`, activeCampaigns);
         
         // Mostrar apenas a campanha principal (primeira encontrada)
         const mainCampaign = activeCampaigns.length > 0 ? [activeCampaigns[0]] : [];
@@ -154,13 +150,10 @@ function MetaAds() {
         
         if (mainCampaign.length > 0) {
           const campaign = mainCampaign[0];
-          console.log('Campanha principal selecionada:', campaign);
-          console.log('Campaign ID:', campaign.campaign_id);
-          setMessage(`Campanha principal: ${campaign.name}`);
+          showInfoToast(`Campanha principal: ${campaign.name}`);
           
           // Auto-selecionar a campanha principal e buscar seus Ad Sets
           if (campaign.campaign_id !== selectedCampaign) {
-            console.log('Mudando campanha selecionada para:', campaign.campaign_id);
             setSelectedCampaign(campaign.campaign_id);
             await fetchAdSets(campaign.campaign_id);
             
@@ -169,21 +162,20 @@ function MetaAds() {
               saveCacheData(mainCampaign, adSets, campaign.campaign_id);
             }, 1000); // Aguardar 1 segundo para garantir que adSets foi atualizado
           } else {
-            console.log('Campanha já selecionada, buscando Ad Sets novamente...');
             await fetchAdSets(campaign.campaign_id);
           }
         } else {
           setSelectedCampaign('');
           setAdSets([]);
-          setMessage('Nenhuma campanha ativa encontrada');
+          showInfoToast('Nenhuma campanha ativa encontrada');
         }
       } else {
         console.error('Erro ao carregar dados em tempo real:', data.error);
-        setMessage('Erro ao carregar dados em tempo real');
+        showErrorToast('Erro ao carregar dados em tempo real');
       }
     } catch (error) {
       console.error('Erro ao buscar dados em tempo real:', error);
-      setMessage('Erro ao buscar dados em tempo real');
+      showErrorToast('Erro ao buscar dados em tempo real');
     } finally {
       setLoading(false);
     }
@@ -193,35 +185,43 @@ function MetaAds() {
   const fetchAdvancedMetrics = async () => {
     try {
       setLoading(true);
-      console.log(`Buscando métricas avançadas: período=${dateRange}`);
-      
+
       const response = await makeRequest(`/meta-ads/advanced-metrics?dateRange=${dateRange}`);
       const data = await response.json();
-      
+
       if (response.ok && data.success) {
-        console.log(`Métricas avançadas carregadas:`, data.data);
-        console.log(`Resumo:`, data.summary);
-        
+
         // Usar dados avançados em vez dos básicos
         setRealTimeData(data.data);
         setLastUpdate(new Date());
-        
+
         if (data.data.length > 0) {
           const campaign = data.data[0]; // Primeira campanha
           setSelectedCampaign(campaign.campaign_id);
           await fetchAdSets(campaign.campaign_id);
-          
-          setMessage(`Métricas avançadas carregadas - ${data.summary.total_fechamentos} fechamentos no período`);
+
+          showSuccessToast(`Métricas avançadas carregadas - ${data.summary.total_fechamentos} fechamentos no período`);
         } else {
-          setMessage('Nenhuma campanha ativa encontrada');
+          showInfoToast('Nenhuma campanha ativa encontrada');
         }
       } else {
-        console.error('Erro ao carregar métricas avançadas:', data.error);
-        setMessage('Erro ao carregar métricas avançadas');
+        // Verificar se é erro de configuração
+        if (data.error && data.error.includes('não configuradas')) {
+          showErrorToast('Meta Ads não configurado. Configure as credenciais no backend.');
+        } else {
+          console.error('Erro ao carregar métricas avançadas:', data.error);
+          showErrorToast('Erro ao carregar métricas avançadas');
+        }
       }
     } catch (error) {
       console.error('Erro ao buscar métricas avançadas:', error);
-      setMessage('Erro ao buscar métricas avançadas');
+
+      // Verificar se é erro de configuração
+      if (error.message && error.message.includes('não configuradas')) {
+        showErrorToast('Meta Ads não configurado. Configure as credenciais no backend.');
+      } else {
+        showErrorToast('Erro ao buscar métricas avançadas');
+      }
     } finally {
       setLoading(false);
     }
@@ -249,12 +249,11 @@ function MetaAds() {
       const isCacheValid = cacheAge < 10 * 60 * 1000; // 10 minutos
       
       if (isCacheValid && cachedCampaigns && cachedAdSets && cachedCampaignId) {
-        console.log('Carregando dados do cache local');
         setRealTimeData(JSON.parse(cachedCampaigns));
         setAdSets(JSON.parse(cachedAdSets));
         setSelectedCampaign(cachedCampaignId);
         setLastUpdate(new Date(parseInt(cachedTimestamp)));
-        setMessage('Dados carregados do cache local');
+        showInfoToast('Dados carregados do cache local');
         return true;
       }
     } catch (error) {
@@ -271,7 +270,6 @@ function MetaAds() {
       localStorage.setItem('metaAds_adSets', JSON.stringify(adSets));
       localStorage.setItem('metaAds_selectedCampaign', campaignId);
       localStorage.setItem('metaAds_timestamp', timestamp);
-      console.log('Dados salvos no cache local');
     } catch (error) {
       console.error('Erro ao salvar cache:', error);
     }
@@ -281,7 +279,6 @@ function MetaAds() {
   useEffect(() => {
     // Tentar carregar do cache primeiro
     if (!loadCachedData()) {
-      console.log('Cache inválido, buscando dados frescos...');
       fetchAdvancedMetrics(); // Usar métricas avançadas por padrão
     }
   }, [dateRange]);
@@ -293,8 +290,7 @@ function MetaAds() {
       localStorage.removeItem('metaAds_adSets');
       localStorage.removeItem('metaAds_selectedCampaign');
       localStorage.removeItem('metaAds_timestamp');
-      console.log('Cache limpo, forçando atualização...');
-      setMessage('Cache limpo, atualizando dados...');
+      showInfoToast('Cache limpo, atualizando dados...');
       fetchAdvancedMetrics(); // Usar métricas avançadas
     } catch (error) {
       console.error('Erro ao limpar cache:', error);
@@ -342,12 +338,6 @@ function MetaAds() {
         <h1>Meta Ads Dashboard</h1>
         <p>Gerencie campanhas e analise performance em tempo real</p>
       </div>
-
-      {message && (
-        <div className="alert alert-info">
-          <p>{message}</p>
-        </div>
-      )}
 
       {/* Dashboard */}
       <div className="dashboard-container">

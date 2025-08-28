@@ -2,7 +2,6 @@ const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLat
 const QRCode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
-const { createClient } = require('@supabase/supabase-js');
 
 class WhatsAppService {
   constructor(io, supabase) {
@@ -20,6 +19,18 @@ class WhatsAppService {
     }
   }
 
+
+  async resetSession() {
+    // Apaga a pasta de autenticação para forçar novo QR code
+    if (fs.existsSync(this.authDir)) {
+      fs.rmSync(this.authDir, { recursive: true, force: true });
+    }
+    this.sock = null;
+    this.isConnected = false;
+    this.connectionStatus = 'disconnected';
+    this.qrCodeData = null;
+  }
+
   async initialize() {
     try {
       console.log('🔄 Inicializando WhatsApp Service...');
@@ -31,8 +42,11 @@ class WhatsAppService {
     }
   }
 
-  async connectToWhatsApp() {
+  async connectToWhatsApp(forceReset = false) {
     try {
+      if (forceReset) {
+        await this.resetSession();
+      }
       const { state, saveCreds } = await useMultiFileAuthState(this.authDir);
       const { version, isLatest } = await fetchLatestBaileysVersion();
       
@@ -102,7 +116,7 @@ class WhatsAppService {
         console.log('🔄 Aguardando 5 segundos para reconectar...');
         setTimeout(() => {
           this.connectToWhatsApp();
-        }, 5000);
+        }, 50000);
       }
     } else if (connection === 'open') {
       console.log('✅ WhatsApp conectado com sucesso!');
@@ -194,7 +208,7 @@ class WhatsAppService {
       return { jid };
     }
   }
-
+  
   async saveMessage(messageData) {
     try {
       const { error } = await this.supabase

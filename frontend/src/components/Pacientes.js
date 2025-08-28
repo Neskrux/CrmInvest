@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/Toast';
 
 const Pacientes = () => {
   const { makeRequest } = useAuth();
@@ -9,7 +10,6 @@ const Pacientes = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingPaciente, setEditingPaciente] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState('pacientes');
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [filtroNome, setFiltroNome] = useState('');
@@ -36,6 +36,72 @@ const Pacientes = () => {
   });
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewPaciente, setViewPaciente] = useState(null);
+  const [showObservacoesModal, setShowObservacoesModal] = useState(false);
+  const [observacoesAtual, setObservacoesAtual] = useState('');
+  const { error: showErrorToast, success: showSuccessToast } = useToast();
+  const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
+
+  // Estados brasileiros
+  const estadosBrasileiros = [
+    { sigla: 'AC', nome: 'Acre' },
+    { sigla: 'AL', nome: 'Alagoas' },
+    { sigla: 'AP', nome: 'Amapá' },
+    { sigla: 'AM', nome: 'Amazonas' },
+    { sigla: 'BA', nome: 'Bahia' },
+    { sigla: 'CE', nome: 'Ceará' },
+    { sigla: 'DF', nome: 'Distrito Federal' },
+    { sigla: 'ES', nome: 'Espírito Santo' },
+    { sigla: 'GO', nome: 'Goiás' },
+    { sigla: 'MA', nome: 'Maranhão' },
+    { sigla: 'MT', nome: 'Mato Grosso' },
+    { sigla: 'MS', nome: 'Mato Grosso do Sul' },
+    { sigla: 'MG', nome: 'Minas Gerais' },
+    { sigla: 'PA', nome: 'Pará' },
+    { sigla: 'PB', nome: 'Paraíba' },
+    { sigla: 'PR', nome: 'Paraná' },
+    { sigla: 'PE', nome: 'Pernambuco' },
+    { sigla: 'PI', nome: 'Piauí' },
+    { sigla: 'RJ', nome: 'Rio de Janeiro' },
+    { sigla: 'RN', nome: 'Rio Grande do Norte' },
+    { sigla: 'RS', nome: 'Rio Grande do Sul' },
+    { sigla: 'RO', nome: 'Rondônia' },
+    { sigla: 'RR', nome: 'Roraima' },
+    { sigla: 'SC', nome: 'Santa Catarina' },
+    { sigla: 'SP', nome: 'São Paulo' },
+    { sigla: 'SE', nome: 'Sergipe' },
+    { sigla: 'TO', nome: 'Tocantins' }
+  ];
+
+  // Principais cidades por estado
+  const cidadesPorEstado = {
+    'SP': ['São Paulo', 'Campinas', 'Santos', 'São Bernardo do Campo', 'Santo André', 'Osasco', 'Ribeirão Preto', 'Sorocaba'],
+    'RJ': ['Rio de Janeiro', 'Niterói', 'Nova Iguaçu', 'Duque de Caxias', 'Campos dos Goytacazes', 'Petrópolis', 'Volta Redonda'],
+    'MG': ['Belo Horizonte', 'Uberlândia', 'Contagem', 'Juiz de Fora', 'Betim', 'Montes Claros', 'Ribeirão das Neves'],
+    'ES': ['Vitória', 'Serra', 'Vila Velha', 'Cariacica', 'Linhares', 'Cachoeiro de Itapemirim', 'Colatina'],
+    'PR': ['Curitiba', 'Londrina', 'Maringá', 'Ponta Grossa', 'Cascavel', 'São José dos Pinhais', 'Foz do Iguaçu'],
+    'RS': ['Porto Alegre', 'Caxias do Sul', 'Pelotas', 'Canoas', 'Santa Maria', 'Gravataí', 'Viamão'],
+    'SC': ['Florianópolis', 'Joinville', 'Blumenau', 'São José', 'Criciúma', 'Chapecó', 'Itajaí'],
+    'BA': ['Salvador', 'Feira de Santana', 'Vitória da Conquista', 'Camaçari', 'Juazeiro', 'Ilhéus', 'Itabuna'],
+    'GO': ['Goiânia', 'Aparecida de Goiânia', 'Anápolis', 'Rio Verde', 'Luziânia', 'Águas Lindas de Goiás'],
+    'PE': ['Recife', 'Jaboatão dos Guararapes', 'Olinda', 'Caruaru', 'Petrolina', 'Paulista', 'Cabo de Santo Agostinho'],
+    'CE': ['Fortaleza', 'Caucaia', 'Juazeiro do Norte', 'Maracanaú', 'Sobral', 'Crato', 'Itapipoca'],
+    'DF': ['Brasília', 'Taguatinga', 'Ceilândia', 'Samambaia', 'Planaltina', 'Águas Claras', 'Guará'],
+    'MT': ['Cuiabá', 'Várzea Grande', 'Rondonópolis', 'Sinop', 'Tangará da Serra', 'Cáceres', 'Barra do Garças'],
+    'MS': ['Campo Grande', 'Dourados', 'Três Lagoas', 'Corumbá', 'Ponta Porã', 'Aquidauana', 'Naviraí'],
+    'AL': ['Maceió', 'Arapiraca', 'Rio Largo', 'Palmeira dos Índios', 'União dos Palmares', 'Penedo'],
+    'SE': ['Aracaju', 'Nossa Senhora do Socorro', 'Lagarto', 'Itabaiana', 'Estância', 'Tobias Barreto'],
+    'PB': ['João Pessoa', 'Campina Grande', 'Santa Rita', 'Patos', 'Bayeux', 'Sousa', 'Cajazeiras'],
+    'RN': ['Natal', 'Mossoró', 'Parnamirim', 'São Gonçalo do Amarante', 'Macaíba', 'Ceará-Mirim'],
+    'PI': ['Teresina', 'Parnaíba', 'Picos', 'Piripiri', 'Floriano', 'Campo Maior', 'Barras'],
+    'MA': ['São Luís', 'Imperatriz', 'São José de Ribamar', 'Timon', 'Caxias', 'Codó', 'Paço do Lumiar'],
+    'TO': ['Palmas', 'Araguaína', 'Gurupi', 'Porto Nacional', 'Paraíso do Tocantins', 'Colinas do Tocantins'],
+    'AC': ['Rio Branco', 'Cruzeiro do Sul', 'Sena Madureira', 'Tarauacá', 'Feijó', 'Brasileia'],
+    'RO': ['Porto Velho', 'Ji-Paraná', 'Ariquemes', 'Vilhena', 'Cacoal', 'Rolim de Moura'],
+    'RR': ['Boa Vista', 'Rorainópolis', 'Caracaraí', 'Alto Alegre', 'Mucajaí', 'Cantá'],
+    'AP': ['Macapá', 'Santana', 'Laranjal do Jari', 'Oiapoque', 'Mazagão', 'Porto Grande'],
+    'AM': ['Manaus', 'Parintins', 'Itacoatiara', 'Manacapuru', 'Coari', 'Tefé', 'Tabatinga'],
+    'PA': ['Belém', 'Ananindeua', 'Santarém', 'Marabá', 'Parauapebas', 'Castanhal', 'Abaetetuba']
+  };
 
   // Status disponíveis para o pipeline
   const statusOptions = [
@@ -59,12 +125,33 @@ const Pacientes = () => {
   useEffect(() => {
     fetchPacientes();
     fetchConsultores();
+    fetchNovosLeads(); // Sempre buscar novos leads para mostrar o badge
+  }, []);
+
+  // Atualizar novos leads quando mudar de aba
+  useEffect(() => {
     if (activeTab === 'novos-leads') {
-      fetchNovosLeads();
+      fetchNovosLeads(); // Atualizar quando entrar na aba
     }
   }, [activeTab]);
 
-  // Sempre que filtros ou a lista mudarem, voltar para a primeira página
+  // Controlar scroll do body quando modal estiver aberto
+  useEffect(() => {
+    if (showModal || showViewModal || showObservacoesModal) {
+      // Bloquear scroll da página
+      document.body.style.overflow = 'hidden';
+    } else {
+      // Restaurar scroll da página
+      document.body.style.overflow = 'unset';
+    }
+
+    // Cleanup: garantir que o scroll seja restaurado quando o componente for desmontado
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showModal, showViewModal, showObservacoesModal]);
+  
+  //Sempre que filtros ou a lista mudarem, voltar para a primeira página
   useEffect(() => {
     setCurrentPage(1);
   }, [
@@ -88,11 +175,11 @@ const Pacientes = () => {
         setPacientes(data);
       } else {
         console.error('Erro ao carregar pacientes:', data.error);
-        setMessage('Erro ao carregar pacientes: ' + data.error);
+        showErrorToast('Erro ao carregar pacientes: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao carregar pacientes:', error);
-      setMessage('Erro ao conectar com o servidor');
+      showErrorToast('Erro ao conectar com o servidor');
     } finally {
       setLoading(false);
     }
@@ -122,11 +209,11 @@ const Pacientes = () => {
         setNovosLeads(data);
       } else {
         console.error('Erro ao carregar novos leads:', data.error);
-        setMessage('Erro ao carregar novos leads: ' + data.error);
+        showErrorToast('Erro ao carregar novos leads: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao carregar novos leads:', error);
-      setMessage('Erro ao conectar com o servidor');
+      showErrorToast('Erro ao conectar com o servidor');
     }
   };
 
@@ -139,16 +226,15 @@ const Pacientes = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setMessage('Lead atribuído com sucesso!');
+        showSuccessToast('Lead atribuído com sucesso!');
         fetchNovosLeads();
         fetchPacientes();
-        setTimeout(() => setMessage(''), 3000);
       } else {
-        setMessage('Erro ao pegar lead: ' + data.error);
+        showErrorToast('Erro ao pegar lead: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao pegar lead:', error);
-      setMessage('Erro ao pegar lead');
+      showErrorToast('Erro ao pegar lead');
     }
   };
 
@@ -171,7 +257,7 @@ const Pacientes = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setMessage(editingPaciente ? 'Paciente atualizado com sucesso!' : 'Paciente cadastrado com sucesso!');
+        showSuccessToast(editingPaciente ? 'Paciente atualizado com sucesso!' : 'Paciente cadastrado com sucesso!');
         setShowModal(false);
         setEditingPaciente(null);
         setFormData({
@@ -186,13 +272,12 @@ const Pacientes = () => {
           consultor_id: ''
         });
         fetchPacientes();
-        setTimeout(() => setMessage(''), 3000);
       } else {
-        setMessage('Erro ao salvar paciente: ' + data.error);
+        showErrorToast('Erro ao salvar paciente: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao salvar paciente:', error);
-      setMessage('Erro ao salvar paciente');
+      showErrorToast('Erro ao salvar paciente');
     }
   };
 
@@ -209,12 +294,24 @@ const Pacientes = () => {
       observacoes: paciente.observacoes || '',
       consultor_id: paciente.consultor_id || ''
     });
+    
+    // Verificar se a cidade é customizada (não está na lista de cidades do estado)
+    const cidadesDoEstado = paciente.estado ? (cidadesPorEstado[paciente.estado] || []) : [];
+    const isCidadeCustomizada = paciente.cidade && paciente.estado && 
+      !cidadesDoEstado.includes(paciente.cidade);
+    setCidadeCustomizada(isCidadeCustomizada);
+    
     setShowModal(true);
   };
 
   const handleView = (paciente) => {
     setViewPaciente(paciente);
     setShowViewModal(true);
+  };
+
+  const handleViewObservacoes = (observacoes) => {
+    setObservacoesAtual(observacoes || 'Nenhuma observação cadastrada.');
+    setShowObservacoesModal(true);
   };
 
   // Função para formatar telefone
@@ -234,32 +331,78 @@ const Pacientes = () => {
       .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
   }
 
-  // Função para formatar cidade no padrão: Cidade/ESTADO
+  // Função para formatar nome (sem números)
+  function formatarNome(value) {
+    if (!value) return '';
+    
+    // Remove números e caracteres especiais, mantém apenas letras, espaços e acentos
+    let cleanValue = value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
+    
+    // Remove espaços do início
+    cleanValue = cleanValue.trimStart();
+    
+    // Remove espaços duplos ou múltiplos, deixando apenas um espaço entre palavras
+    cleanValue = cleanValue.replace(/\s+/g, ' ');
+
+    // Primeira letra maiúscula no nome
+    const nomeFormatado = cleanValue.charAt(0).toUpperCase() + cleanValue.slice(1).toLowerCase();
+    
+    return nomeFormatado;
+  }
+
+  // Função para formatar cidade - padronização completa
   function formatarCidade(value) {
     if (!value) return '';
     
-    // Remove caracteres especiais exceto barra e espaços
-    const cleanValue = value.replace(/[^a-zA-ZÀ-ÿ\s\/]/g, '');
+    // Remove apenas números e caracteres especiais perigosos, mantém letras, espaços, acentos e hífen
+    let cleanValue = value.replace(/[0-9!@#$%^&*()_+=\[\]{}|\\:";'<>?,./~`]/g, '');
+
+    // Não aplicar formatação completa se o usuário ainda está digitando (termina com espaço)
+    const isTyping = value.endsWith(' ') && value.length > 0;
     
-    // Se contém barra, formatar cidade/estado
-    if (cleanValue.includes('/')) {
-      const parts = cleanValue.split('/');
-      if (parts.length >= 2) {
-        const cidade = parts[0].trim();
-        const estado = parts[1].trim().toUpperCase();
-        
-        // Primeira letra maiúscula na cidade
-        const cidadeFormatada = cidade.charAt(0).toUpperCase() + cidade.slice(1).toLowerCase();
-        
-        // Limitar estado a 2 caracteres
-        const estadoFormatado = estado.substring(0, 2);
-        
-        return `${cidadeFormatada}/${estadoFormatado}`;
-      }
+    if (isTyping) {
+      // Durante a digitação, apenas remove caracteres inválidos
+      return cleanValue;
     }
     
-    // Se não tem barra, apenas primeira maiúscula
-    return cleanValue.charAt(0).toUpperCase() + cleanValue.slice(1).toLowerCase();
+    // Remove espaços extras apenas quando não está digitando
+    cleanValue = cleanValue.replace(/\s+/g, ' ').trim();
+    
+    // Não permite string vazia
+    if (!cleanValue) return '';
+    
+    // Se tem menos de 2 caracteres, não formatar ainda
+    if (cleanValue.length < 2) return cleanValue;
+    
+    // Verifica se está todo em maiúscula (mais de 3 caracteres) e converte para title case
+    const isAllUpperCase = cleanValue.length > 3 && cleanValue === cleanValue.toUpperCase();
+    
+    if (isAllUpperCase) {
+      // Converte para title case
+      return cleanValue.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+    }
+    
+    // Para entradas normais, aplica title case
+    return cleanValue
+      .toLowerCase()
+      .split(' ')
+      .map((palavra, index) => {
+        // Palavras que devem ficar em minúscula (exceto se for a primeira)
+        const preposicoes = ['de', 'da', 'do', 'das', 'dos', 'e', 'em', 'na', 'no', 'nas', 'nos'];
+        
+        // Primeira palavra sempre maiúscula
+        if (index === 0) {
+          return palavra.charAt(0).toUpperCase() + palavra.slice(1);
+        }
+        
+        if (preposicoes.includes(palavra)) {
+          return palavra;
+        }
+        
+        // Primeira letra maiúscula
+        return palavra.charAt(0).toUpperCase() + palavra.slice(1);
+      })
+      .join(' ');
   }
 
   const handleInputChange = (e) => {
@@ -271,13 +414,24 @@ const Pacientes = () => {
     } else {
     if (name === 'telefone') value = maskTelefone(value);
     if (name === 'cpf') value = maskCPF(value);
+    if (name === 'nome') value = formatarNome(value);
       if (name === 'cidade') value = formatarCidade(value);
     }
     
-    setFormData({
-      ...formData,
-      [name]: value
-    });
+    // Se mudou o estado, limpar a cidade e resetar cidade customizada
+    if (name === 'estado') {
+      setCidadeCustomizada(false);
+      setFormData({
+        ...formData,
+        [name]: value,
+        cidade: '' // Limpar cidade quando estado muda
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value
+      });
+    }
   };
 
   const updateStatus = async (pacienteId, newStatus) => {
@@ -290,15 +444,14 @@ const Pacientes = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setMessage('Status atualizado com sucesso!');
+        showSuccessToast('Status atualizado com sucesso!');
         fetchPacientes();
-        setTimeout(() => setMessage(''), 3000);
       } else {
-        setMessage('Erro ao atualizar status: ' + data.error);
+        showErrorToast('Erro ao atualizar status: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
-      setMessage('Erro ao atualizar status');
+      showErrorToast('Erro ao atualizar status');
     }
   };
 
@@ -342,6 +495,7 @@ const Pacientes = () => {
     });
     setEditingPaciente(null);
     setShowModal(false);
+    setCidadeCustomizada(false);
   };
 
   const pacientesFiltrados = pacientes.filter(p => {
@@ -421,12 +575,6 @@ const Pacientes = () => {
       {/* Conteúdo da aba Pacientes */}
       {activeTab === 'pacientes' && (
         <>
-          {message && (
-            <div className={`alert ${message.includes('sucesso') ? 'alert-success' : 'alert-error'}`}>
-              {message}
-            </div>
-          )}
-
           {/* Resumo de Estatísticas */}
           <div className="stats-grid" style={{ marginBottom: '2rem' }}>
             <div className="stat-card">
@@ -592,8 +740,27 @@ const Pacientes = () => {
                             <div>
                               <strong>{paciente.nome}</strong>
                               {paciente.observacoes && (
-                                <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
-                                  {paciente.observacoes}
+                                <div style={{ marginTop: '0.25rem' }}>
+                                  <button
+                                    onClick={() => handleViewObservacoes(paciente.observacoes)}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: '#6b7280',
+                                      cursor: 'pointer',
+                                      fontSize: '0.75rem',
+                                      padding: '0.25rem',
+                                      borderRadius: '4px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center'
+                                    }}
+                                    title="Ver observações"
+                                    onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                                  >
+                                    •••
+                                  </button>
                                 </div>
                               )}
                             </div>
@@ -704,12 +871,6 @@ const Pacientes = () => {
       {/* Conteúdo da aba Novos Leads */}
       {activeTab === 'novos-leads' && (
         <>
-          {message && (
-            <div className={`alert ${message.includes('sucesso') ? 'alert-success' : 'alert-error'}`}>
-              {message}
-            </div>
-          )}
-
           <div className="card">
             <div className="card-header">
               <h2 className="card-title">Novos Leads Disponíveis</h2>
@@ -750,8 +911,27 @@ const Pacientes = () => {
                             <div>
                               <strong>{lead.nome}</strong>
                               {lead.observacoes && (
-                                <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
-                                  {lead.observacoes}
+                                <div style={{ marginTop: '0.25rem' }}>
+                                  <button
+                                    onClick={() => handleViewObservacoes(lead.observacoes)}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: '#6b7280',
+                                      cursor: 'pointer',
+                                      fontSize: '0.75rem',
+                                      padding: '0.25rem',
+                                      borderRadius: '4px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center'
+                                    }}
+                                    title="Ver observações"
+                                    onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                                  >
+                                    •••
+                                  </button>
                                 </div>
                               )}
                             </div>
@@ -779,7 +959,7 @@ const Pacientes = () => {
                             </span>
                           </td>
                           <td>{formatarData(lead.created_at)}</td>
-                          <td>
+                          <td style={{ padding: '0' }}>
                             <button
                               onClick={() => pegarLead(lead.id)}
                               className="btn btn-primary"
@@ -847,23 +1027,12 @@ const Pacientes = () => {
                     value={formData.cpf}
                     onChange={handleInputChange}
                     placeholder="000.000.000-00"
+                    maxLength="14"
                   />
                 </div>
               </div>
 
               <div className="grid grid-2">
-                <div className="form-group">
-                  <label className="form-label">Cidade</label>
-                  <input
-                    type="text"
-                    name="cidade"
-                    className="form-input"
-                    value={formData.cidade}
-                    onChange={handleInputChange}
-                    placeholder="Digite a cidade"
-                  />
-                </div>
-
                 <div className="form-group">
                   <label className="form-label">Estado</label>
                   <select
@@ -873,34 +1042,62 @@ const Pacientes = () => {
                     onChange={handleInputChange}
                   >
                     <option value="">Selecione o estado</option>
-                    <option value="AC">Acre</option>
-                    <option value="AL">Alagoas</option>
-                    <option value="AP">Amapá</option>
-                    <option value="AM">Amazonas</option>
-                    <option value="BA">Bahia</option>
-                    <option value="CE">Ceará</option>
-                    <option value="DF">Distrito Federal</option>
-                    <option value="ES">Espírito Santo</option>
-                    <option value="GO">Goiás</option>
-                    <option value="MA">Maranhão</option>
-                    <option value="MT">Mato Grosso</option>
-                    <option value="MS">Mato Grosso do Sul</option>
-                    <option value="MG">Minas Gerais</option>
-                    <option value="PA">Pará</option>
-                    <option value="PB">Paraíba</option>
-                    <option value="PR">Paraná</option>
-                    <option value="PE">Pernambuco</option>
-                    <option value="PI">Piauí</option>
-                    <option value="RJ">Rio de Janeiro</option>
-                    <option value="RN">Rio Grande do Norte</option>
-                    <option value="RS">Rio Grande do Sul</option>
-                    <option value="RO">Rondônia</option>
-                    <option value="RR">Roraima</option>
-                    <option value="SC">Santa Catarina</option>
-                    <option value="SP">São Paulo</option>
-                    <option value="SE">Sergipe</option>
-                    <option value="TO">Tocantins</option>
+                    {estadosBrasileiros.map(estado => (
+                      <option key={estado.sigla} value={estado.sigla}>
+                        {estado.sigla} - {estado.nome}
+                      </option>
+                    ))}
                   </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Cidade</label>
+                  {formData.estado && cidadesPorEstado[formData.estado] && !cidadeCustomizada ? (
+                    <select
+                      name="cidade"
+                      className="form-select"
+                      value={formData.cidade}
+                      onChange={(e) => {
+                        if (e.target.value === 'OUTRA') {
+                          setCidadeCustomizada(true);
+                          setFormData(prev => ({ ...prev, cidade: '' }));
+                        } else {
+                          handleInputChange(e);
+                        }
+                      }}
+                    >
+                      <option value="">Selecione a cidade</option>
+                      {cidadesPorEstado[formData.estado].map(cidade => (
+                        <option key={cidade} value={cidade}>{cidade}</option>
+                      ))}
+                      <option value="OUTRA">Outra cidade</option>
+                    </select>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        name="cidade"
+                        className="form-input"
+                        value={formData.cidade}
+                        onChange={handleInputChange}
+                        placeholder="Digite o nome da cidade"
+                        disabled={!formData.estado}
+                      />
+                      {formData.estado && cidadesPorEstado[formData.estado] && cidadeCustomizada && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ whiteSpace: 'nowrap', fontSize: '0.875rem', padding: '0.5rem' }}
+                          onClick={() => {
+                            setCidadeCustomizada(false);
+                            setFormData(prev => ({ ...prev, cidade: '' }));
+                          }}
+                        >
+                          Voltar
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1022,6 +1219,40 @@ const Pacientes = () => {
               <div className="form-group">
                 <label className="form-label">Cadastrado em</label>
                 <input type="text" className="form-input" value={viewPaciente.created_at ? formatarData(viewPaciente.created_at) : '-'} readOnly />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Observações */}
+      {showObservacoesModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Observações sobre o paciente</h2> 
+            </div>
+            <div style={{ padding: '1.5rem' }}>
+              <div style={{
+                backgroundColor: '#f9fafb',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                padding: '1rem',
+                minHeight: '120px',
+                fontSize: '0.875rem',
+                lineHeight: '1.5',
+                color: '#374151',
+                whiteSpace: 'pre-wrap'
+              }}>
+                {observacoesAtual}
+              </div>
+              <div style={{ marginTop: '1rem', textAlign: 'right' }}>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={() => setShowObservacoesModal(false)}
+                >
+                  Fechar
+                </button>
               </div>
             </div>
           </div>

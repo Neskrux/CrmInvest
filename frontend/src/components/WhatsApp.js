@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/Toast';
 import io from 'socket.io-client';
 
 const WhatsApp = () => {
   const { makeRequest } = useAuth();
+  const { showSuccessToast, showInfoToast, showErrorToast } = useToast();
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [qrCode, setQrCode] = useState(null);
   const [chats, setChats] = useState([]);
@@ -11,60 +13,41 @@ const WhatsApp = () => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
   const socketRef = useRef(null);
 
   useEffect(() => {
     // Conectar ao Socket.IO
-    const socketUrl = process.env.NODE_ENV === 'production' 
-      ? window.location.origin 
+    const socketUrl = process.env.NODE_ENV === 'production'
+      ? window.location.origin
       : 'http://localhost:5000';
-    
-    console.log('🔌 Conectando Socket.IO em:', socketUrl);
+
     socketRef.current = io(socketUrl, {
       transports: ['websocket', 'polling'],
       timeout: 20000,
       forceNew: true
     });
 
-    // Debug do Socket.IO
-    socketRef.current.on('connect', () => {
-      console.log('✅ Socket.IO conectado!');
-    });
-
-    socketRef.current.on('disconnect', () => {
-      console.log('❌ Socket.IO desconectado!');
-    });
-
-    socketRef.current.on('connect_error', (error) => {
-      console.error('❌ Erro na conexão Socket.IO:', error);
-    });
-
     // Listeners do Socket.IO
     socketRef.current.on('whatsapp:status', (status) => {
-      console.log('📱 Status do WhatsApp recebido:', status);
       setConnectionStatus(status.status);
       setQrCode(status.qrCode);
     });
 
     socketRef.current.on('whatsapp:chats-loaded', (chatsData) => {
-      console.log('💬 Chats carregados:', chatsData);
       setChats(chatsData);
     });
 
     socketRef.current.on('whatsapp:new-message', (messageData) => {
-      console.log('📨 Nova mensagem:', messageData);
-      
       // Atualizar mensagens se for do chat selecionado
       if (selectedChat && messageData.remoteJid === selectedChat.jid) {
         setMessages(prev => [...prev, messageData]);
       }
-      
+
       // Atualizar lista de chats
       setChats(prev => {
         const updated = [...prev];
         const chatIndex = updated.findIndex(c => c.jid === messageData.remoteJid);
-        
+
         if (chatIndex >= 0) {
           updated[chatIndex] = {
             ...updated[chatIndex],
@@ -89,13 +72,8 @@ const WhatsApp = () => {
     });
 
     socketRef.current.on('whatsapp:new-lead', (leadData) => {
-      console.log('🆕 Novo lead criado:', leadData);
-      setMessage(`Novo lead criado automaticamente: ${leadData.nome}`);
-      setTimeout(() => setMessage(''), 5000);
+      showSuccessToast(`Novo lead criado automaticamente: ${leadData.nome}`);
     });
-
-    // Buscar status inicial
-    fetchWhatsAppStatus();
 
     return () => {
       if (socketRef.current) {
@@ -104,54 +82,37 @@ const WhatsApp = () => {
     };
   }, []);
 
-  const fetchWhatsAppStatus = async () => {
-    try {
-      const response = await makeRequest('/whatsapp/status');
-      const data = await response.json();
-      
-      if (response.ok) {
-        setConnectionStatus(data.status);
-        setQrCode(data.qrCode);
-      }
-    } catch (error) {
-      console.error('Erro ao buscar status do WhatsApp:', error);
-    }
-  };
-
   const connectWhatsApp = async () => {
     try {
       setLoading(true);
-      setMessage('Iniciando conexão com WhatsApp...');
-      console.log('🔄 Iniciando conexão com WhatsApp...');
-      
+
       const response = await makeRequest('/whatsapp/connect', {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ forceReset: true })
       });
-      
-      console.log('📡 Resposta da API:', response.status);
+
       const data = await response.json();
-      console.log('📄 Dados recebidos:', data);
-      
+
       if (response.ok) {
-        setMessage(data.message);
-        console.log('✅ Conexão iniciada com sucesso');
+        showSuccessToast('Conexão iniciada! Aguardando QR Code...');
+        setConnectionStatus('connecting');
       } else {
-        setMessage('Erro ao conectar: ' + data.error);
+        showErrorToast('Erro ao conectar: ' + data.error);
         console.error('❌ Erro na resposta:', data.error);
       }
     } catch (error) {
       console.error('❌ Erro ao conectar WhatsApp:', error);
-      setMessage('Erro ao conectar WhatsApp: ' + error.message);
+      showErrorToast('Erro ao conectar WhatsApp: ' + error.message);
     } finally {
       setLoading(false);
-      setTimeout(() => setMessage(''), 5000);
     }
   };
 
   const disconnectWhatsApp = async () => {
     try {
       setLoading(true);
-      setMessage('Desconectando WhatsApp...');
+      showInfoToast('Desconectando WhatsApp...');
       
       const response = await makeRequest('/whatsapp/disconnect', {
         method: 'POST'
@@ -160,52 +121,45 @@ const WhatsApp = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setMessage(data.message);
         setConnectionStatus('disconnected');
         setQrCode(null);
         setChats([]);
         setSelectedChat(null);
         setMessages([]);
       } else {
-        setMessage('Erro ao desconectar: ' + data.error);
+        showErrorToast('Erro ao desconectar: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao desconectar WhatsApp:', error);
-      setMessage('Erro ao desconectar WhatsApp');
+      showErrorToast('Erro ao desconectar WhatsApp');
     } finally {
       setLoading(false);
-      setTimeout(() => setMessage(''), 3000);
     }
   };
 
   const selectChat = async (chat) => {
     try {
-      console.log('🔍 Selecionando chat:', chat);
       setSelectedChat(chat);
       setLoading(true);
-      
+
       // Buscar mensagens do chat
-      console.log('🔍 Buscando mensagens para JID:', chat.jid);
       const response = await makeRequest(`/whatsapp/messages/${encodeURIComponent(chat.jid)}`);
       const data = await response.json();
-      
-      console.log('📨 Resposta da API de mensagens:', data);
-      
+
       if (response.ok) {
-        console.log('✅ Mensagens carregadas:', data.length, 'mensagens');
         setMessages(data);
-        
+
         // Marcar chat como lido
-        setChats(prev => prev.map(c => 
+        setChats(prev => prev.map(c =>
           c.jid === chat.jid ? { ...c, unread: 0 } : c
         ));
       } else {
         console.error('❌ Erro na resposta:', data);
-        setMessage('Erro ao carregar mensagens: ' + data.error);
+        showErrorToast('Erro ao carregar mensagens: ' + data.error);
       }
     } catch (error) {
       console.error('❌ Erro ao carregar mensagens:', error);
-      setMessage('Erro ao carregar mensagens');
+      showErrorToast('Erro ao carregar mensagens');
     } finally {
       setLoading(false);
     }
@@ -244,11 +198,11 @@ const WhatsApp = () => {
             : c
         ));
       } else {
-        setMessage('Erro ao enviar mensagem: ' + data.error);
+        showErrorToast('Erro ao enviar mensagem: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
-      setMessage('Erro ao enviar mensagem');
+      showErrorToast('Erro ao enviar mensagem');
     }
   };
 
@@ -259,9 +213,6 @@ const WhatsApp = () => {
     });
   };
 
-  const formatDate = (timestamp) => {
-    return new Date(timestamp).toLocaleDateString('pt-BR');
-  };
 
   const getStatusColor = () => {
     switch (connectionStatus) {
@@ -325,12 +276,6 @@ const WhatsApp = () => {
           )}
         </div>
       </div>
-
-      {message && (
-        <div className={`alert ${message.includes('sucesso') || message.includes('Novo lead') ? 'alert-success' : 'alert-info'}`}>
-          {message}
-        </div>
-      )}
 
       {/* QR Code */}
       {qrCode && connectionStatus === 'qr' && (

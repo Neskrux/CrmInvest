@@ -1516,7 +1516,7 @@ app.delete('/api/agendamentos/:id', authenticateToken, requireAdmin, async (req,
 // === FECHAMENTOS === (Admin vê todos, Consultor vê apenas os seus)
 app.get('/api/fechamentos', authenticateToken, async (req, res) => {
   try {
-    let query = supabase
+    let query = supabaseAdmin
       .from('fechamentos')
       .select(`
         *,
@@ -1594,14 +1594,14 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
       }
     }
     
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('fechamentos')
-      .insert([{ 
-        paciente_id: parseInt(paciente_id), 
-        consultor_id: consultorId, 
-        clinica_id: clinicaId, 
-        valor_fechado: parseFloat(valor_fechado), 
-        data_fechamento, 
+      .insert([{
+        paciente_id: parseInt(paciente_id),
+        consultor_id: consultorId,
+        clinica_id: clinicaId,
+        valor_fechado: parseFloat(valor_fechado),
+        data_fechamento,
         tipo_tratamento: tipo_tratamento || null,
         observacoes: observacoes || null,
         contrato_arquivo: contratoArquivo,
@@ -1623,7 +1623,7 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
 
     // Atualizar status do paciente para "fechado"
     if (paciente_id) {
-      await supabase
+      await supabaseAdmin
         .from('pacientes')
         .update({ status: 'fechado' })
         .eq('id', paciente_id);
@@ -1659,7 +1659,7 @@ app.put('/api/fechamentos/:id', authenticateToken, async (req, res) => {
     const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
     const clinicaId = clinica_id && String(clinica_id).trim() !== '' ? parseInt(clinica_id) : null;
     
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('fechamentos')
       .update({ 
         paciente_id: parseInt(paciente_id), 
@@ -1685,7 +1685,7 @@ app.delete('/api/fechamentos/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     
     // Buscar dados do fechamento antes de deletar para remover arquivo
-    const { data: fechamento, error: selectError } = await supabase
+    const { data: fechamento, error: selectError } = await supabaseAdmin
       .from('fechamentos')
       .select('contrato_arquivo')
       .eq('id', id)
@@ -1694,7 +1694,7 @@ app.delete('/api/fechamentos/:id', authenticateToken, async (req, res) => {
     if (selectError) throw selectError;
 
     // Deletar fechamento do banco
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from('fechamentos')
       .delete()
       .eq('id', id);
@@ -1724,7 +1724,7 @@ app.get('/api/fechamentos/:id/contrato', authenticateToken, async (req, res) => 
     const { id } = req.params;
 
     // Buscar dados do fechamento
-    const { data: fechamento, error } = await supabase
+    const { data: fechamento, error } = await supabaseAdmin
       .from('fechamentos')
       .select('contrato_arquivo, contrato_nome_original')
       .eq('id', id)
@@ -1764,7 +1764,7 @@ app.put('/api/fechamentos/:id/aprovar', authenticateToken, requireAdmin, async (
     const { id } = req.params;
     
     // Primeiro, verificar se o fechamento existe
-    const { data: fechamento, error: fetchError } = await supabase
+    const { data: fechamento, error: fetchError } = await supabaseAdmin
       .from('fechamentos')
       .select('*')
       .eq('id', id)
@@ -1775,7 +1775,7 @@ app.put('/api/fechamentos/:id/aprovar', authenticateToken, requireAdmin, async (
     }
     
     // Tentar atualizar o campo aprovado
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('fechamentos')
       .update({ aprovado: 'aprovado' })
       .eq('id', id)
@@ -1799,7 +1799,7 @@ app.put('/api/fechamentos/:id/reprovar', authenticateToken, requireAdmin, async 
     const { id } = req.params;
     
     // Primeiro, verificar se o fechamento existe
-    const { data: fechamento, error: fetchError } = await supabase
+    const { data: fechamento, error: fetchError } = await supabaseAdmin
       .from('fechamentos')
       .select('*')
       .eq('id', id)
@@ -1810,7 +1810,7 @@ app.put('/api/fechamentos/:id/reprovar', authenticateToken, requireAdmin, async 
     }
     
     // Tentar atualizar o campo aprovado
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('fechamentos')
       .update({ aprovado: 'reprovado' })
       .eq('id', id)
@@ -2272,7 +2272,7 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
     if (error3) throw error3;
 
     // Buscar fechamentos
-    let fechamentosQuery = supabase
+    let fechamentosQuery = supabaseAdmin
       .from('fechamentos')
       .select('*');
     
@@ -2284,13 +2284,13 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
     if (error5) throw error5;
 
     // Estatísticas de fechamentos
-    const fechamentosHoje = fechamentos.filter(f => f.data_fechamento === hoje).length;
+    const fechamentosHoje = fechamentos.filter(f => f.data_fechamento === hoje && f.aprovado !== 'reprovado').length;
     
     const fechamentosMes = fechamentos.filter(f => {
       const mesAtual = new Date().getMonth();
       const anoAtual = new Date().getFullYear();
       const dataFechamento = new Date(f.data_fechamento + 'T12:00:00'); // Forçar meio-dia para evitar timezone
-      return dataFechamento.getMonth() === mesAtual && dataFechamento.getFullYear() === anoAtual;
+      return dataFechamento.getMonth() === mesAtual && dataFechamento.getFullYear() === anoAtual && f.aprovado !== 'reprovado';
     });
 
     const valorTotalMes = fechamentosMes.reduce((acc, f) => acc + parseFloat(f.valor_fechado || 0), 0);
@@ -2322,7 +2322,7 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
     if (agendError) throw agendError;
 
     // Buscar todos os fechamentos
-    let fechamentosConsultorQuery = supabase
+    let fechamentosConsultorQuery = supabaseAdmin
       .from('fechamentos')
       .select('id, consultor_id, valor_fechado, data_fechamento');
 
@@ -2346,7 +2346,7 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
       const fechamentosConsultorMes = fechamentosConsultor.filter(f => {
         const anoAtual = new Date().getFullYear();
         const dataFechamento = new Date(f.data_fechamento + 'T12:00:00'); // Forçar meio-dia para evitar timezone
-        return dataFechamento.getFullYear() === anoAtual; // Mostrar fechamentos do ano todo
+        return dataFechamento.getFullYear() === anoAtual && f.aprovado !== 'reprovado'; // Mostrar fechamentos do ano todo
       });
 
       const valorTotalConsultor = fechamentosConsultorMes.reduce((acc, f) => acc + parseFloat(f.valor_fechado || 0), 0);
@@ -2374,7 +2374,7 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
       fechamentosMes: fechamentosMes.length,
       valorTotalMes,
       ticketMedio,
-      totalFechamentos: fechamentos.length,
+      totalFechamentos: fechamentos.filter(f => f.aprovado !== 'reprovado').length,
       estatisticasConsultores
     });
   } catch (error) {
@@ -2686,7 +2686,7 @@ app.get('/api/meta-ads/advanced-metrics', authenticateToken, requireAdmin, async
 
     // Buscar fechamentos do período para calcular CPA real
     const { since, until } = metaAPI.getDateRange(dateRange);
-    const { data: fechamentos, error: fechError } = await supabase
+    const { data: fechamentos, error: fechError } = await supabaseAdmin
       .from('fechamentos')
       .select(`
         valor_fechado, 
@@ -2700,13 +2700,13 @@ app.get('/api/meta-ads/advanced-metrics', authenticateToken, requireAdmin, async
       console.warn('⚠️ Erro ao buscar fechamentos:', fechError.message);
     }
 
-    const fechamentosPorCidade = {};
-    const totalFechamentos = fechamentos?.length || 0;
-    const valorTotalFechamentos = fechamentos?.reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0) || 0;
+    const fechamentosAprovados = fechamentos?.filter(f => f.aprovado !== 'reprovado') || [];
+    const totalFechamentos = fechamentosAprovados.length;
+    const valorTotalFechamentos = fechamentosAprovados.reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0);
 
     // Agrupar fechamentos por cidade para calcular CPA real por região
-    if (fechamentos && fechamentos.length > 0) {
-      fechamentos.forEach(fechamento => {
+    if (fechamentosAprovados && fechamentosAprovados.length > 0) {
+      fechamentosAprovados.forEach(fechamento => {
         const cidade = fechamento.pacientes?.cidade || 'N/A';
         if (!fechamentosPorCidade[cidade]) {
           fechamentosPorCidade[cidade] = {

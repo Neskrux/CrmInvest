@@ -333,8 +333,8 @@ app.post('/api/login', async (req, res) => {
     let usuario = null;
     let tipoLogin = null;
 
-    // Primeiro, tentar login como admin (por email)
-    if (email.includes('@')) {
+  // Primeiro, tentar login como admin (por email)
+  if (typeof email === 'string' && email.includes('@')) {
       const { data: usuarios, error } = await supabase
         .from('usuarios')
         .select(`
@@ -353,8 +353,8 @@ app.post('/api/login', async (req, res) => {
       }
     }
 
-    // Se não encontrou admin, tentar login como consultor (apenas por email)
-    if (!usuario && email.includes('@')) {
+  // Se não encontrou admin, tentar login como consultor (apenas por email)
+  if (!usuario && typeof email === 'string' && email.includes('@')) {
       // Normalizar email para busca
       const emailNormalizado = normalizarEmail(email);
       console.log('🔍 Buscando consultor por email:', emailNormalizado);
@@ -398,12 +398,14 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
-    // Atualizar último login (apenas para admin)
-    if (tipoLogin === 'admin') {
+    // Atualizar último login
+    try {
       await supabase
         .from('usuarios')
         .update({ ultimo_login: new Date().toISOString() })
         .eq('id', usuario.id);
+    } catch (error) {
+      console.log('Erro ao atualizar ultimo_login:', error);
     }
 
     // Gerar token JWT
@@ -446,6 +448,123 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/logout', authenticateToken, (req, res) => {
   // Com JWT stateless, o logout é feito removendo o token do cliente
   res.json({ message: 'Logout realizado com sucesso' });
+});
+
+// Atualizar perfil do usuário
+app.put('/api/usuarios/perfil', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { nome, email, senhaAtual, novaSenha } = req.body;
+
+    // Validações básicas
+    if (!nome || !email) {
+      return res.status(400).json({ error: 'Nome e email são obrigatórios' });
+    }
+
+    // Verificar se o email já está sendo usado por outro usuário
+    const { data: emailExistente } = await supabase
+      .from('usuarios')
+      .select('id')
+      .eq('email', email)
+      .neq('id', userId)
+      .single();
+
+    if (emailExistente) {
+      return res.status(400).json({ error: 'Este email já está sendo usado por outro usuário' });
+    }
+
+    // Se foi fornecida nova senha, verificar senha atual
+    if (novaSenha && novaSenha.trim() !== '') {
+      if (!senhaAtual) {
+        return res.status(400).json({ error: 'Senha atual é obrigatória para alterar a senha' });
+      }
+
+      // Buscar senha atual do usuário
+      const { data: usuario, error: userError } = await supabase
+        .from('usuarios')
+        .select('senha')
+        .eq('id', userId)
+        .single();
+
+      if (userError || !usuario) {
+        return res.status(404).json({ error: 'Usuário não encontrado' });
+      }
+
+      // Verificar se senha atual está correta
+      const senhaCorreta = await bcrypt.compare(senhaAtual, usuario.senha);
+      if (!senhaCorreta) {
+        return res.status(400).json({ error: 'Senha atual incorreta' });
+      }
+    }
+
+    // Preparar dados para atualização
+    const updateData = {
+      nome,
+      email
+    };
+
+    // Se nova senha foi fornecida, incluir na atualização
+    if (novaSenha && novaSenha.trim() !== '') {
+      const hashedPassword = await bcrypt.hash(novaSenha, 10);
+      updateData.senha = hashedPassword;
+    }
+
+    // Executar atualização
+    const { error: updateError } = await supabase
+      .from('usuarios')
+      .update(updateData)
+      .eq('id', userId);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    // Buscar dados atualizados do usuário
+    const { data: usuarioAtualizado, error: fetchError } = await supabase
+      .from('usuarios')
+      .select('id, nome, email, tipo, ultimo_login, created_at')
+      .eq('id', userId)
+      .single();
+
+    if (fetchError) {
+      throw fetchError;
+    }
+
+    res.json({
+      message: 'Perfil atualizado com sucesso',
+      usuario: usuarioAtualizado
+    });
+
+  } catch (error) {
+    console.error('Erro ao atualizar perfil:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Buscar informações completas do perfil do usuário
+app.get('/api/usuarios/perfil', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Buscar dados completos do usuário
+    const { data: usuario, error } = await supabase
+      .from('usuarios')
+      .select('id, nome, email, tipo, ultimo_login, created_at')
+      .eq('id', userId)
+      .single();
+
+    if (error || !usuario) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+
+    res.json({
+      usuario: usuario
+    });
+
+  } catch (error) {
+    console.error('Erro ao buscar perfil:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
 });
 
 app.get('/api/verify-token', authenticateToken, async (req, res) => {
@@ -1516,7 +1635,7 @@ app.delete('/api/agendamentos/:id', authenticateToken, requireAdmin, async (req,
 // === FECHAMENTOS === (Admin vê todos, Consultor vê apenas os seus)
 app.get('/api/fechamentos', authenticateToken, async (req, res) => {
   try {
-    let query = supabase
+    let query = supabaseAdmin
       .from('fechamentos')
       .select(`
         *,
@@ -1594,14 +1713,14 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
       }
     }
     
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('fechamentos')
-      .insert([{ 
-        paciente_id: parseInt(paciente_id), 
-        consultor_id: consultorId, 
-        clinica_id: clinicaId, 
-        valor_fechado: parseFloat(valor_fechado), 
-        data_fechamento, 
+      .insert([{
+        paciente_id: parseInt(paciente_id),
+        consultor_id: consultorId,
+        clinica_id: clinicaId,
+        valor_fechado: parseFloat(valor_fechado),
+        data_fechamento,
         tipo_tratamento: tipo_tratamento || null,
         observacoes: observacoes || null,
         contrato_arquivo: contratoArquivo,
@@ -1623,7 +1742,7 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
 
     // Atualizar status do paciente para "fechado"
     if (paciente_id) {
-      await supabase
+      await supabaseAdmin
         .from('pacientes')
         .update({ status: 'fechado' })
         .eq('id', paciente_id);
@@ -1659,7 +1778,7 @@ app.put('/api/fechamentos/:id', authenticateToken, async (req, res) => {
     const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
     const clinicaId = clinica_id && String(clinica_id).trim() !== '' ? parseInt(clinica_id) : null;
     
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('fechamentos')
       .update({ 
         paciente_id: parseInt(paciente_id), 
@@ -1685,7 +1804,7 @@ app.delete('/api/fechamentos/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     
     // Buscar dados do fechamento antes de deletar para remover arquivo
-    const { data: fechamento, error: selectError } = await supabase
+    const { data: fechamento, error: selectError } = await supabaseAdmin
       .from('fechamentos')
       .select('contrato_arquivo')
       .eq('id', id)
@@ -1694,7 +1813,7 @@ app.delete('/api/fechamentos/:id', authenticateToken, async (req, res) => {
     if (selectError) throw selectError;
 
     // Deletar fechamento do banco
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from('fechamentos')
       .delete()
       .eq('id', id);
@@ -1724,7 +1843,7 @@ app.get('/api/fechamentos/:id/contrato', authenticateToken, async (req, res) => 
     const { id } = req.params;
 
     // Buscar dados do fechamento
-    const { data: fechamento, error } = await supabase
+    const { data: fechamento, error } = await supabaseAdmin
       .from('fechamentos')
       .select('contrato_arquivo, contrato_nome_original')
       .eq('id', id)
@@ -1764,7 +1883,7 @@ app.put('/api/fechamentos/:id/aprovar', authenticateToken, requireAdmin, async (
     const { id } = req.params;
     
     // Primeiro, verificar se o fechamento existe
-    const { data: fechamento, error: fetchError } = await supabase
+    const { data: fechamento, error: fetchError } = await supabaseAdmin
       .from('fechamentos')
       .select('*')
       .eq('id', id)
@@ -1775,7 +1894,7 @@ app.put('/api/fechamentos/:id/aprovar', authenticateToken, requireAdmin, async (
     }
     
     // Tentar atualizar o campo aprovado
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('fechamentos')
       .update({ aprovado: 'aprovado' })
       .eq('id', id)
@@ -1799,7 +1918,7 @@ app.put('/api/fechamentos/:id/reprovar', authenticateToken, requireAdmin, async 
     const { id } = req.params;
     
     // Primeiro, verificar se o fechamento existe
-    const { data: fechamento, error: fetchError } = await supabase
+    const { data: fechamento, error: fetchError } = await supabaseAdmin
       .from('fechamentos')
       .select('*')
       .eq('id', id)
@@ -1810,7 +1929,7 @@ app.put('/api/fechamentos/:id/reprovar', authenticateToken, requireAdmin, async 
     }
     
     // Tentar atualizar o campo aprovado
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('fechamentos')
       .update({ aprovado: 'reprovado' })
       .eq('id', id)
@@ -2272,7 +2391,7 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
     if (error3) throw error3;
 
     // Buscar fechamentos
-    let fechamentosQuery = supabase
+    let fechamentosQuery = supabaseAdmin
       .from('fechamentos')
       .select('*');
     
@@ -2284,13 +2403,13 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
     if (error5) throw error5;
 
     // Estatísticas de fechamentos
-    const fechamentosHoje = fechamentos.filter(f => f.data_fechamento === hoje).length;
+    const fechamentosHoje = fechamentos.filter(f => f.data_fechamento === hoje && f.aprovado !== 'reprovado').length;
     
     const fechamentosMes = fechamentos.filter(f => {
       const mesAtual = new Date().getMonth();
       const anoAtual = new Date().getFullYear();
       const dataFechamento = new Date(f.data_fechamento + 'T12:00:00'); // Forçar meio-dia para evitar timezone
-      return dataFechamento.getMonth() === mesAtual && dataFechamento.getFullYear() === anoAtual;
+      return dataFechamento.getMonth() === mesAtual && dataFechamento.getFullYear() === anoAtual && f.aprovado !== 'reprovado';
     });
 
     const valorTotalMes = fechamentosMes.reduce((acc, f) => acc + parseFloat(f.valor_fechado || 0), 0);
@@ -2322,7 +2441,7 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
     if (agendError) throw agendError;
 
     // Buscar todos os fechamentos
-    let fechamentosConsultorQuery = supabase
+    let fechamentosConsultorQuery = supabaseAdmin
       .from('fechamentos')
       .select('id, consultor_id, valor_fechado, data_fechamento');
 
@@ -2346,7 +2465,7 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
       const fechamentosConsultorMes = fechamentosConsultor.filter(f => {
         const anoAtual = new Date().getFullYear();
         const dataFechamento = new Date(f.data_fechamento + 'T12:00:00'); // Forçar meio-dia para evitar timezone
-        return dataFechamento.getFullYear() === anoAtual; // Mostrar fechamentos do ano todo
+        return dataFechamento.getFullYear() === anoAtual && f.aprovado !== 'reprovado'; // Mostrar fechamentos do ano todo
       });
 
       const valorTotalConsultor = fechamentosConsultorMes.reduce((acc, f) => acc + parseFloat(f.valor_fechado || 0), 0);
@@ -2374,7 +2493,7 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
       fechamentosMes: fechamentosMes.length,
       valorTotalMes,
       ticketMedio,
-      totalFechamentos: fechamentos.length,
+      totalFechamentos: fechamentos.filter(f => f.aprovado !== 'reprovado').length,
       estatisticasConsultores
     });
   } catch (error) {
@@ -2422,12 +2541,12 @@ app.get('/api/whatsapp/status', authenticateToken, (req, res) => {
 
 app.post('/api/whatsapp/connect', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    const forceReset = req.body?.forceReset || false;
     if (!whatsappService) {
       whatsappService = new WhatsAppService(io, supabase);
     }
-    
-    await whatsappService.initialize();
-    res.json({ message: 'Iniciando conexão com WhatsApp...' });
+    await whatsappService.connectToWhatsApp(forceReset);
+    res.json({ message: 'Conexão iniciada' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -2686,7 +2805,7 @@ app.get('/api/meta-ads/advanced-metrics', authenticateToken, requireAdmin, async
 
     // Buscar fechamentos do período para calcular CPA real
     const { since, until } = metaAPI.getDateRange(dateRange);
-    const { data: fechamentos, error: fechError } = await supabase
+    const { data: fechamentos, error: fechError } = await supabaseAdmin
       .from('fechamentos')
       .select(`
         valor_fechado, 
@@ -2700,13 +2819,13 @@ app.get('/api/meta-ads/advanced-metrics', authenticateToken, requireAdmin, async
       console.warn('⚠️ Erro ao buscar fechamentos:', fechError.message);
     }
 
-    const fechamentosPorCidade = {};
-    const totalFechamentos = fechamentos?.length || 0;
-    const valorTotalFechamentos = fechamentos?.reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0) || 0;
+    const fechamentosAprovados = fechamentos?.filter(f => f.aprovado !== 'reprovado') || [];
+    const totalFechamentos = fechamentosAprovados.length;
+    const valorTotalFechamentos = fechamentosAprovados.reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0);
 
     // Agrupar fechamentos por cidade para calcular CPA real por região
-    if (fechamentos && fechamentos.length > 0) {
-      fechamentos.forEach(fechamento => {
+    if (fechamentosAprovados && fechamentosAprovados.length > 0) {
+      fechamentosAprovados.forEach(fechamento => {
         const cidade = fechamento.pacientes?.cidade || 'N/A';
         if (!fechamentosPorCidade[cidade]) {
           fechamentosPorCidade[cidade] = {
