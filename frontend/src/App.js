@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Link, useNavigate } from 'react-router-dom';
 import './App.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ToastProvider } from './components/Toast';
 import LandingPage from './components/LandingPage';
 import CadastroConsultor from './components/CadastroConsultor';
 import CadastroSucesso from './components/CadastroSucesso';
@@ -16,6 +17,7 @@ import Agendamentos from './components/Agendamentos';
 import Fechamentos from './components/Fechamentos';
 import MetaAds from './components/MetaAds';
 import WhatsApp from './components/WhatsApp';
+import Perfil from './components/Perfil';
 import logoBrasao from './images/logobrasao.png';
 import logoHorizontal from './images/logohorizontal.png';
 import logoHorizontalPreto from './images/logohorizontalpreto.png';
@@ -42,6 +44,8 @@ const ProtectedRoute = ({ children }) => {
 function AppContent() {
   const { user, logout, loading } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
   
   // Determinar aba ativa baseada na rota atual
   const getActiveTab = () => {
@@ -53,10 +57,25 @@ function AppContent() {
     if (path.includes('/fechamentos')) return 'fechamentos';
     if (path.includes('/meta-ads')) return 'meta-ads';
     if (path.includes('/whatsapp')) return 'whatsapp';
+    if (path.includes('/perfil')) return 'perfil';
     return 'dashboard';
   };
   
   const activeTab = getActiveTab();
+
+  // Fechar dropdown quando clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showUserDropdown && !event.target.closest('[data-user-dropdown]')) {
+        setShowUserDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showUserDropdown]);
 
   if (loading) {
     return (
@@ -91,6 +110,7 @@ function AppContent() {
         <Route path="/fechamentos" element={<Fechamentos />} />
         <Route path="/meta-ads" element={<MetaAds />} />
         <Route path="/whatsapp" element={<WhatsApp />} />
+        <Route path="/perfil" element={<Perfil />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
@@ -248,9 +268,19 @@ function AppContent() {
               <p>{user.tipo === 'admin' ? 'Administrador' : 'Consultor'}</p>
             </div>
           </div>
+          <Link
+            to="/perfil"
+            className={`nav-link-profile ${activeTab === 'perfil' ? 'active' : ''}`}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            Editar Perfil
+          </Link>
           <button
             onClick={logout}
-            className="nav-link"
+            className="nav-link-logout"
             style={{ marginTop: '1rem', color: '#ef4444' }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -270,7 +300,7 @@ function AppContent() {
               src={logoHorizontalPreto} 
               alt="CRM System" 
               style={{ 
-                height: '32px', 
+                height: '90px', 
                 objectFit: 'contain'
               }} 
             />
@@ -291,8 +321,13 @@ function AppContent() {
               padding: '0.5rem 1rem',
               backgroundColor: '#f9fafb',
               borderRadius: '8px',
-              border: '1px solid #e5e7eb'
-            }}>
+              border: '1px solid #e5e7eb',
+              cursor: 'pointer',
+              position: 'relative'
+            }}
+            onClick={() => setShowUserDropdown(!showUserDropdown)}
+            data-user-dropdown
+            >
               <div style={{ 
                 width: '32px', 
                 height: '32px',
@@ -315,6 +350,102 @@ function AppContent() {
                   {user.tipo === 'admin' ? 'Administrador' : 'Consultor'}
                 </div>
               </div>
+              <svg 
+                width="16" 
+                height="16" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2"
+                style={{ 
+                  transition: 'transform 0.2s',
+                  transform: showUserDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
+                  color: '#6b7280'
+                }}
+              >
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+
+              {/* Dropdown Menu */}
+              {showUserDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '0.5rem',
+                  backgroundColor: 'white',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                  minWidth: '200px',
+                  zIndex: 50
+                }}>
+                  <div style={{ padding: '0.5rem 0' }}>
+                    <button
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        textAlign: 'left',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        border: 'none',
+                        backgroundColor: 'transparent',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        color: '#374151',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowUserDropdown(false);
+                        navigate('/perfil');
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                      </svg>
+                      Editar Perfil
+                    </button>
+                    
+                    <div style={{ height: '1px', backgroundColor: '#e5e7eb', margin: '0.5rem 0' }}></div>
+                    
+                    <button
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        textAlign: 'left',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        border: 'none',
+                        backgroundColor: 'transparent',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        color: '#ef4444',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#fef2f2'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowUserDropdown(false);
+                        logout();
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                      </svg>
+                      Sair
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>
@@ -329,18 +460,20 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          {/* Rotas públicas - Captura de leads */}
-          <Route path="/captura-lead" element={<CapturaLead />} />
-          <Route path="/captura-sucesso" element={<CapturaSucesso />} />
-          
-          {/* Rotas da aplicação principal */}
-          <Route path="/*" element={<AppContent />} />
-        </Routes>
-      </Router>
-    </AuthProvider>
+    <ToastProvider>
+      <AuthProvider>
+        <Router>
+          <Routes>
+            {/* Rotas públicas - Captura de leads */}
+            <Route path="/captura-lead" element={<CapturaLead />} />
+            <Route path="/captura-sucesso" element={<CapturaSucesso />} />
+            
+            {/* Rotas da aplicação principal */}
+            <Route path="/*" element={<AppContent />} />
+          </Routes>
+        </Router>
+      </AuthProvider>
+    </ToastProvider>
   );
 }
 

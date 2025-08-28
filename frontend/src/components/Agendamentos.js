@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/Toast';
 
 const Agendamentos = () => {
   const { makeRequest } = useAuth();
+  const { showSuccessToast, showErrorToast } = useToast();
   const [agendamentos, setAgendamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [consultores, setConsultores] = useState([]);
@@ -10,7 +12,6 @@ const Agendamentos = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingAgendamento, setEditingAgendamento] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('');
   
   // Estados dos filtros
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
@@ -29,6 +30,8 @@ const Agendamentos = () => {
     status: 'agendado',
     observacoes: ''
   });
+  const [showDetalhesModal, setShowDetalhesModal] = useState(false);
+  const [detalhesAtual, setDetalhesAtual] = useState({ telefone: '', observacoes: '' });
 
   // Status disponíveis para agendamentos
   const statusOptions = [
@@ -52,6 +55,22 @@ const Agendamentos = () => {
     fetchClinicas();
   }, []);
 
+  // Controlar scroll do body quando modal estiver aberto
+  useEffect(() => {
+    if (showModal || showDetalhesModal) {
+      // Bloquear scroll da página
+      document.body.style.overflow = 'hidden';
+    } else {
+      // Restaurar scroll da página
+      document.body.style.overflow = 'unset';
+    }
+
+    // Cleanup: garantir que o scroll seja restaurado quando o componente for desmontado
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showModal, showDetalhesModal]);
+
   const fetchAgendamentos = async () => {
     try {
       const response = await makeRequest('/agendamentos');
@@ -61,11 +80,11 @@ const Agendamentos = () => {
         setAgendamentos(data);
       } else {
         console.error('Erro ao carregar agendamentos:', data.error);
-        setMessage('Erro ao carregar agendamentos: ' + data.error);
+        showErrorToast('Erro ao carregar agendamentos: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao carregar agendamentos:', error);
-      setMessage('Erro ao conectar com o servidor');
+      showErrorToast('Erro ao conectar com o servidor');
     } finally {
       setLoading(false);
     }
@@ -135,7 +154,7 @@ const Agendamentos = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setMessage(editingAgendamento ? 'Agendamento atualizado com sucesso!' : 'Agendamento criado com sucesso!');
+        showSuccessToast(editingAgendamento ? 'Agendamento atualizado com sucesso!' : 'Agendamento criado com sucesso!');
         setShowModal(false);
         setEditingAgendamento(null);
         setFormData({
@@ -148,13 +167,12 @@ const Agendamentos = () => {
           observacoes: ''
         });
         fetchAgendamentos();
-        setTimeout(() => setMessage(''), 3000);
       } else {
-        setMessage('Erro ao salvar agendamento: ' + data.error);
+        showErrorToast('Erro ao salvar agendamento: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao salvar agendamento:', error);
-      setMessage('Erro ao salvar agendamento');
+      showErrorToast('Erro ao salvar agendamento');
     }
   };
 
@@ -170,6 +188,14 @@ const Agendamentos = () => {
       observacoes: agendamento.observacoes || ''
     });
     setShowModal(true);
+  };
+
+  const handleViewDetalhes = (telefone, observacoes) => {
+    setDetalhesAtual({
+      telefone: telefone || 'Nenhum telefone cadastrado.',
+      observacoes: observacoes || 'Nenhuma observação cadastrada.'
+    });
+    setShowDetalhesModal(true);
   };
 
   const handleInputChange = (e) => {
@@ -189,15 +215,14 @@ const Agendamentos = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setMessage('Status atualizado com sucesso!');
+        showSuccessToast('Status atualizado com sucesso!');
         fetchAgendamentos();
-        setTimeout(() => setMessage(''), 3000);
       } else {
-        setMessage('Erro ao atualizar status: ' + data.error);
+        showErrorToast('Erro ao atualizar status: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
-      setMessage('Erro ao atualizar status');
+      showErrorToast('Erro ao atualizar status');
     }
   };
 
@@ -214,15 +239,14 @@ const Agendamentos = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setMessage('Paciente marcado como lembrado!');
+        showSuccessToast('Paciente marcado como lembrado!');
         fetchAgendamentos();
-        setTimeout(() => setMessage(''), 3000);
       } else {
-        setMessage('Erro ao marcar como lembrado: ' + data.error);
+        showErrorToast('Erro ao marcar como lembrado: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao marcar como lembrado:', error);
-      setMessage('Erro ao marcar como lembrado');
+      showErrorToast('Erro ao marcar como lembrado');
     }
   };
 
@@ -325,12 +349,6 @@ const Agendamentos = () => {
         <p className="page-subtitle">Gerencie consultas e acompanhe o pipeline de vendas</p>
       </div>
 
-      {message && (
-        <div className={`alert ${message.includes('sucesso') ? 'alert-success' : 'alert-error'}`}>
-          {message}
-        </div>
-      )}
-
       {/* Dashboard de Agendamentos */}
       <div className="stats-grid" style={{ marginBottom: '2rem' }}>
         <div className="stat-card">
@@ -370,78 +388,17 @@ const Agendamentos = () => {
         </div>
       )}
 
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">Lista de Agendamentos</h2>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <button 
-              className="btn btn-secondary"
-              onClick={() => setMostrarFiltros(!mostrarFiltros)}
-              style={{ position: 'relative' }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M3 4h18M7 8h10M10 12h4M12 16h0" />
-              </svg>
-              Filtros
-              {temFiltrosAtivos && (
-                <span style={{
-                  position: 'absolute',
-                  top: '-5px',
-                  right: '-5px',
-                  width: '8px',
-                  height: '8px',
-                  backgroundColor: '#ef4444',
-                  borderRadius: '50%'
-                }} />
-              )}
-            </button>
-            <button 
-              className="btn btn-primary"
-              onClick={() => setShowModal(true)}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              Novo Agendamento
-            </button>
-          </div>
+      {/* Seção de Filtros */}
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 className="card-title" style={{ fontSize: '1.1rem' }}>Filtros</h2>
+          <button className="btn btn-secondary" onClick={() => setMostrarFiltros(!mostrarFiltros)}>
+            {mostrarFiltros ? 'Ocultar Filtros' : 'Filtros'}
+          </button>
         </div>
-
-        {/* Filtros - Só aparece quando mostrarFiltros é true */}
         {mostrarFiltros && (
-          <div style={{ 
-            padding: '1.5rem', 
-            marginBottom: '1.5rem',
-            backgroundColor: '#f9fafb',
-            borderRadius: '8px',
-            border: '1px solid #e5e7eb'
-          }}>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'space-between', 
-              marginBottom: '1rem' 
-            }}>
-              <h3 style={{ 
-                fontSize: '1.1rem', 
-                fontWeight: '600', 
-                color: '#1a1d23', 
-                margin: 0
-              }}>
-                Filtros de Busca
-              </h3>
-              {temFiltrosAtivos && (
-                <button 
-                  onClick={limparFiltros}
-                  className="btn btn-secondary"
-                  style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
-                >
-                  Limpar Filtros
-                </button>
-              )}
-            </div>
-            
-            <div className="grid grid-2" style={{ marginBottom: '1rem' }}>
+          <div style={{ padding: '1.5rem', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+            <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">Consultor</label>
                 <select
@@ -475,7 +432,7 @@ const Agendamentos = () => {
               </div>
             </div>
 
-            <div className="grid grid-3">
+            <div className="grid grid-3" style={{ gap: '1rem' }}>
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">Data Início</label>
                 <input
@@ -513,21 +470,24 @@ const Agendamentos = () => {
               </div>
             </div>
 
-            {/* Contador de resultados */}
-            {temFiltrosAtivos && (
-              <div style={{ 
-                marginTop: '1rem', 
-                padding: '0.75rem', 
-                backgroundColor: '#f3f4f6', 
-                borderRadius: '6px',
-                color: '#4b5563',
-                fontSize: '0.9rem'
-              }}>
-                Mostrando <strong>{agendamentosFiltrados.length}</strong> de {agendamentos.length} agendamento(s)
-              </div>
-            )}
+            <button className="btn btn-sm btn-secondary" style={{ marginTop: '1rem' }} onClick={limparFiltros}>
+              Limpar Filtros
+            </button>
           </div>
         )}
+      </div>
+
+      <div className="card">
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 className="card-title">Lista de Agendamentos</h2>
+          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Novo Agendamento
+          </button>
+        </div>
 
         {loading ? (
           <p>Carregando agendamentos...</p>
@@ -560,17 +520,33 @@ const Agendamentos = () => {
                       backgroundColor: ehHoje(agendamento.data_agendamento) ? '#fef3c7' : 'transparent'
                     }}>
                       <td>
-                        <strong>{agendamento.paciente_nome}</strong>
-                        {agendamento.paciente_telefone && (
-                          <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
-                            {agendamento.paciente_telefone}
-                          </div>
-                        )}
-                        {agendamento.observacoes && (
-                          <div style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                            {agendamento.observacoes}
-                          </div>
-                        )}
+                        <div>
+                          <strong>{agendamento.paciente_nome}</strong>
+                          {(agendamento.paciente_telefone || agendamento.observacoes) && (
+                            <div style={{ marginTop: '0.25rem' }}>
+                              <button
+                                onClick={() => handleViewDetalhes(agendamento.paciente_telefone, agendamento.observacoes)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#6b7280',
+                                  cursor: 'pointer',
+                                  fontSize: '0.75rem',
+                                  padding: '0.25rem',
+                                  borderRadius: '4px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}
+                                title="Ver detalhes"
+                                onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                              >
+                                •••
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td>{agendamento.consultor_nome}</td>
                       <td>{agendamento.clinica_nome}</td>
@@ -598,9 +574,13 @@ const Agendamentos = () => {
                           onChange={(e) => updateStatus(agendamento.id, e.target.value)}
                           className="status-select"
                           style={{
-                            backgroundColor: statusInfo.color + '10',
-                            color: statusInfo.color,
-                            border: `1px solid ${statusInfo.color}`
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                backgroundColor: statusInfo.color + '10',
+                                color: statusInfo.color,
+                                border: `1px solid ${statusInfo.color}`,
+                                cursor: 'pointer'
                           }}
                         >
                           {statusOptions.map(option => (
@@ -794,6 +774,60 @@ const Agendamentos = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Detalhes */}
+      {showDetalhesModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Detalhes do agendamento</h2>
+            </div>
+            <div style={{ padding: '1.5rem' }}>
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Telefone do paciente</label>
+                <div style={{
+                  backgroundColor: '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  padding: '1rem',
+                  fontSize: '0.875rem',
+                  lineHeight: '1.5',
+                  color: '#374151',
+                  fontWeight: '500'
+                }}>
+                  {detalhesAtual.telefone}
+                </div>
+              </div>
+              
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Observações do agendamento</label>
+                <div style={{
+                  backgroundColor: '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  padding: '1rem',
+                  minHeight: '120px',
+                  fontSize: '0.875rem',
+                  lineHeight: '1.5',
+                  color: '#374151',
+                  whiteSpace: 'pre-wrap'
+                }}>
+                  {detalhesAtual.observacoes}
+                </div>
+              </div>
+              
+              <div style={{ textAlign: 'right' }}>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={() => setShowDetalhesModal(false)}
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

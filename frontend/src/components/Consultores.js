@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/Toast';
 
 const Consultores = () => {
   const { makeRequest, isAdmin } = useAuth();
+  const { showErrorToast, showSuccessToast } = useToast();
   const [consultores, setConsultores] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingConsultor, setEditingConsultor] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('');
   const [showSenhaModal, setShowSenhaModal] = useState(false);
   const [consultorSenha, setConsultorSenha] = useState(null);
   const [showPixModal, setShowPixModal] = useState(false);
@@ -29,11 +30,11 @@ const Consultores = () => {
         setConsultores(data);
       } else {
         console.error('Erro ao carregar consultores:', data.error);
-        setMessage('Erro ao carregar consultores: ' + data.error);
+        showErrorToast('Erro ao carregar consultores: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao carregar consultores:', error);
-      setMessage('Erro ao conectar com o servidor');
+      showErrorToast('Erro ao conectar com o servidor');
     } finally {
       setLoading(false);
     }
@@ -62,7 +63,7 @@ const Consultores = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setMessage(editingConsultor ? 'Consultor atualizado com sucesso!' : 'Consultor cadastrado com sucesso!');
+        showSuccessToast(editingConsultor ? 'Consultor atualizado com sucesso!' : 'Consultor cadastrado com sucesso!');
         setShowModal(false);
         setEditingConsultor(null);
         setFormData({
@@ -73,13 +74,12 @@ const Consultores = () => {
           pix: ''
         });
         fetchConsultores();
-        setTimeout(() => setMessage(''), 3000);
       } else {
-        setMessage('Erro ao salvar consultor: ' + data.error);
+        showErrorToast('Erro ao salvar consultor: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao salvar consultor:', error);
-      setMessage('Erro ao salvar consultor');
+      showErrorToast('Erro ao salvar consultor');
     }
   };
 
@@ -170,19 +170,18 @@ const Consultores = () => {
         });
         setShowSenhaModal(true);
       } else {
-        setMessage('Erro ao carregar dados do consultor: ' + data.error);
+        showErrorToast('Erro ao carregar dados do consultor: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao carregar consultor:', error);
-      setMessage('Erro ao conectar com o servidor');
+      showErrorToast('Erro ao conectar com o servidor');
     }
   };
 
   const copiarPix = async (pix) => {
     try {
       await navigator.clipboard.writeText(pix);
-      setMessage('PIX copiado para a área de transferência!');
-      setTimeout(() => setMessage(''), 2000);
+      showSuccessToast('PIX copiado para a área de transferência!');
     } catch (error) {
       // Fallback para navegadores mais antigos
       const textArea = document.createElement('textarea');
@@ -191,8 +190,7 @@ const Consultores = () => {
       textArea.select();
       document.execCommand('copy');
       document.body.removeChild(textArea);
-      setMessage('PIX copiado para a área de transferência!');
-      setTimeout(() => setMessage(''), 2000);
+      showSuccessToast('PIX copiado para a área de transferência!');
     }
   };
 
@@ -224,15 +222,14 @@ const Consultores = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setMessage('Senha redefinida com sucesso!');
+        showSuccessToast('Senha redefinida com sucesso!');
         setShowSenhaModal(false);
-        setTimeout(() => setMessage(''), 3000);
       } else {
-        setMessage('Erro ao redefinir senha: ' + data.error);
+        showErrorToast('Erro ao redefinir senha: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao redefinir senha:', error);
-      setMessage('Erro ao redefinir senha');
+      showErrorToast('Erro ao redefinir senha');
     }
   };
 
@@ -242,12 +239,6 @@ const Consultores = () => {
         <h1 className="page-title">Gerenciar Consultores</h1>
         <p className="page-subtitle">Gerencie a equipe de consultores</p>
       </div>
-
-      {message && (
-        <div className={`alert ${message.includes('sucesso') ? 'alert-success' : 'alert-error'}`}>
-          {message}
-        </div>
-      )}
 
       <div className="card">
         <div className="card-header">
@@ -528,7 +519,7 @@ const Consultores = () => {
                 e.preventDefault();
                 const novaSenha = e.target.novaSenha.value;
                 if (novaSenha.length < 3) {
-                  alert('A senha deve ter pelo menos 3 caracteres');
+                  showErrorToast('A senha deve ter pelo menos 3 caracteres');
                   return;
                 }
                 if (window.confirm(`Tem certeza que deseja ${consultorSenha.temSenha ? 'alterar' : 'definir'} a senha?`)) {

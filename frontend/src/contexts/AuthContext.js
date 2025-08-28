@@ -26,7 +26,6 @@ export const AuthProvider = ({ children }) => {
       : 'http://localhost:5000/api');
 
   const clearAllData = () => {
-    console.log('Limpando todos os dados de autenticação');
     setUser(null);
     setToken(null);
     localStorage.removeItem('token');
@@ -85,8 +84,6 @@ export const AuthProvider = ({ children }) => {
       setToken(newToken);
       setUser(usuario);
 
-      console.log('✅ Login realizado com sucesso:', { usuario: usuario.nome, token: newToken ? 'presente' : 'ausente' });
-
       return { success: true, user: usuario };
     } catch (error) {
       console.error('Erro no login:', error);
@@ -102,24 +99,20 @@ export const AuthProvider = ({ children }) => {
     const currentToken = localStorage.getItem('token');
     
     if (!currentToken || currentToken === 'null' || currentToken.trim() === '') {
-      console.log('Nenhum token válido encontrado - redirecionando para login');
       clearAllData();
       setLoading(false);
       return;
     }
 
-    console.log('Verificando token...');
     try {
       const response = await makeRequest('/verify-token');
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Token válido - usuário autenticado:', data.usuario.nome || data.usuario.email);
         setUser(data.usuario);
         setToken(currentToken);
         localStorage.setItem('user', JSON.stringify(data.usuario));
       } else {
-        console.log('Token inválido - fazendo logout');
         clearAllData();
       }
     } catch (error) {
@@ -131,22 +124,15 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    console.log('🔄 Iniciando verificação de autenticação...');
     
     // Verificar se há dados corrompidos e limpar se necessário
     try {
       const savedUser = localStorage.getItem('user');
       const savedToken = localStorage.getItem('token');
       
-      console.log('📊 Estado inicial:', { 
-        hasUser: !!savedUser, 
-        hasToken: !!savedToken,
-        tokenState: !!token 
-      });
 
       // Se há dados inconsistentes, limpar tudo
       if ((savedUser && !savedToken) || (!savedUser && savedToken)) {
-        console.log('⚠️ Dados inconsistentes no localStorage - limpando');
         clearAllData();
         setLoading(false);
         return;
@@ -154,7 +140,6 @@ export const AuthProvider = ({ children }) => {
       
       // Se há usuário salvo mas token é inválido
       if (savedUser && savedToken && (!token || token.trim() === '' || token === 'null')) {
-        console.log('⚠️ Token inválido mas usuário salvo - limpando');
         clearAllData();
         setLoading(false);
         return;
@@ -166,7 +151,6 @@ export const AuthProvider = ({ children }) => {
       }
       
     } catch (error) {
-      console.log('💥 Dados corrompidos no localStorage - limpando');
       clearAllData();
       setLoading(false);
       return;
@@ -187,15 +171,6 @@ export const AuthProvider = ({ children }) => {
     isAdmin: user?.tipo === 'admin',
     isConsultor: user?.tipo === 'consultor'
   };
-
-  // Log do estado atual para debug
-  console.log('🔍 AuthContext State:', {
-    hasUser: !!user,
-    hasToken: !!token,
-    loading,
-    isAuthenticated: !!user && !!token,
-    userType: user?.tipo
-  });
 
   return (
     <AuthContext.Provider value={value}>

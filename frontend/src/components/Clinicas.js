@@ -1,25 +1,25 @@
-  import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/Toast';
 // Mapa (Leaflet)
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 const Clinicas = () => {
   const { makeRequest, user } = useAuth();
+  const { showSuccessToast, showErrorToast } = useToast();
   const [clinicas, setClinicas] = useState([]);
   const [novasClinicas, setNovasClinicas] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showNovaClinicaModal, setShowNovaClinicaModal] = useState(false);
   const [editingClinica, setEditingClinica] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState('clinicas');
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroCity, setFiltroCity] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewingClinica, setViewingClinica] = useState(null);
-  // Estados para o mapa
   const [clinicasGeo, setClinicasGeo] = useState([]);
   const [novasClinicasGeo, setNovasClinicasGeo] = useState([]);
   const [geocoding, setGeocoding] = useState(false);
@@ -122,10 +122,8 @@ const Clinicas = () => {
 
   useEffect(() => {
     fetchClinicas();
-    if (activeTab === 'novas-clinicas' || activeTab === 'mapa') {
-      fetchNovasClinicas();
-    }
-  }, [activeTab]);
+    fetchNovasClinicas(); // Sempre carregar novas clínicas
+  }, []);
 
   // Regeocodificar quando filtros/dados mudarem e a aba for mapa
   useEffect(() => {
@@ -144,11 +142,11 @@ const Clinicas = () => {
         setClinicas(data);
       } else {
         console.error('Erro ao carregar clínicas:', data.error);
-        setMessage('Erro ao carregar clínicas: ' + data.error);
+        showErrorToast('Erro ao carregar clínicas: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao carregar clínicas:', error);
-      setMessage('Erro ao conectar com o servidor');
+      showErrorToast('Erro ao conectar com o servidor');
     } finally {
       setLoading(false);
     }
@@ -255,11 +253,11 @@ const Clinicas = () => {
         setNovasClinicas(data);
       } else {
         console.error('Erro ao carregar novas clínicas:', data.error);
-        setMessage('Erro ao carregar novas clínicas: ' + data.error);
+        showErrorToast('Erro ao carregar novas clínicas: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao carregar novas clínicas:', error);
-      setMessage('Erro ao conectar com o servidor');
+      showErrorToast('Erro ao conectar com o servidor');
     }
   };
 
@@ -272,15 +270,14 @@ const Clinicas = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setMessage('Clínica atribuída com sucesso!');
+        showSuccessToast('Clínica atribuída com sucesso!');
         fetchNovasClinicas();
-        setTimeout(() => setMessage(''), 3000);
       } else {
-        setMessage('Erro ao pegar clínica: ' + data.error);
+        showErrorToast('Erro ao pegar clínica: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao pegar clínica:', error);
-      setMessage('Erro ao pegar clínica');
+      showErrorToast('Erro ao pegar clínica');
     }
   };
 
@@ -295,7 +292,7 @@ const Clinicas = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setMessage('Nova clínica cadastrada com sucesso!');
+        showSuccessToast('Nova clínica cadastrada com sucesso!');
         setShowNovaClinicaModal(false);
         setNovaClinicaFormData({
           nome: '',
@@ -311,13 +308,12 @@ const Clinicas = () => {
         });
         setCidadeCustomizadaNova(false);
         fetchNovasClinicas();
-        setTimeout(() => setMessage(''), 3000);
       } else {
-        setMessage('Erro ao cadastrar nova clínica: ' + data.error);
+        showErrorToast('Erro ao cadastrar nova clínica: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao cadastrar nova clínica:', error);
-      setMessage('Erro ao cadastrar nova clínica');
+      showErrorToast('Erro ao cadastrar nova clínica');
     }
   };
 
@@ -340,7 +336,7 @@ const Clinicas = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setMessage(editingClinica ? 'Clínica atualizada com sucesso!' : 'Clínica cadastrada com sucesso!');
+        showSuccessToast(editingClinica ? 'Clínica atualizada com sucesso!' : 'Clínica cadastrada com sucesso!');
         setShowModal(false);
         setEditingClinica(null);
         setFormData({
@@ -356,13 +352,12 @@ const Clinicas = () => {
         });
         setCidadeCustomizada(false);
         fetchClinicas();
-        setTimeout(() => setMessage(''), 3000);
       } else {
-        setMessage('Erro ao salvar clínica: ' + data.error);
+        showErrorToast('Erro ao salvar clínica: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao salvar clínica:', error);
-      setMessage('Erro ao salvar clínica');
+      showErrorToast('Erro ao salvar clínica');
     }
   };
 
@@ -428,8 +423,68 @@ const Clinicas = () => {
     setShowModal(false);
   };
 
+  // Função para formatar cidade - padronização completa
+  function formatarCidade(value) {
+    if (!value) return '';
+    
+    // Remove apenas números e caracteres especiais perigosos, mantém letras, espaços, acentos e hífen
+    let cleanValue = value.replace(/[0-9!@#$%^&*()_+=\[\]{}|\\:";'<>?,./~`]/g, '');
+    
+    // Não aplicar formatação completa se o usuário ainda está digitando (termina com espaço)
+    const isTyping = value.endsWith(' ') && value.length > 0;
+    
+    if (isTyping) {
+      // Durante a digitação, apenas remove caracteres inválidos
+      return cleanValue;
+    }
+    
+    // Remove espaços extras apenas quando não está digitando
+    cleanValue = cleanValue.replace(/\s+/g, ' ').trim();
+    
+    // Não permite string vazia
+    if (!cleanValue) return '';
+    
+    // Se tem menos de 2 caracteres, não formatar ainda
+    if (cleanValue.length < 2) return cleanValue;
+    
+    // Verifica se está todo em maiúscula (mais de 3 caracteres) e converte para title case
+    const isAllUpperCase = cleanValue.length > 3 && cleanValue === cleanValue.toUpperCase();
+    
+    if (isAllUpperCase) {
+      // Converte para title case
+      return cleanValue.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+    }
+    
+    // Para entradas normais, aplica title case
+    return cleanValue
+      .toLowerCase()
+      .split(' ')
+      .map((palavra, index) => {
+        // Palavras que devem ficar em minúscula (exceto se for a primeira)
+        const preposicoes = ['de', 'da', 'do', 'das', 'dos', 'e', 'em', 'na', 'no', 'nas', 'nos'];
+        
+        // Primeira palavra sempre maiúscula
+        if (index === 0) {
+          return palavra.charAt(0).toUpperCase() + palavra.slice(1);
+        }
+        
+        if (preposicoes.includes(palavra)) {
+          return palavra;
+        }
+        
+        // Primeira letra maiúscula
+        return palavra.charAt(0).toUpperCase() + palavra.slice(1);
+      })
+      .join(' ');
+  }
+
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+    
+    // Aplicar formatação na cidade
+    if (name === 'cidade') {
+      value = formatarCidade(value);
+    }
     
     // Limpar cidade se estado mudar
     if (name === 'estado') {
@@ -463,6 +518,11 @@ const Clinicas = () => {
         .replace(/(-\d{4})\d+?$/, '$1');
     }
     
+    // Aplicar formatação na cidade
+    if (name === 'cidade') {
+      value = formatarCidade(value);
+    }
+    
     // Limpar cidade se estado mudar
     if (name === 'estado') {
       setNovaClinicaFormData(prev => ({
@@ -490,7 +550,7 @@ const Clinicas = () => {
     // Buscar a clínica completa para garantir todos os campos
     const clinicaCompleta = clinicas.find(c => c.id === clinica.id);
     if (!clinicaCompleta) {
-      setMessage('Erro: clínica não encontrada.');
+      showErrorToast('Erro: clínica não encontrada.');
       return;
     }
     const clinicaParaAtualizar = { ...clinicaCompleta, status: novaStatus };
@@ -504,15 +564,14 @@ const Clinicas = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setMessage(`Clínica ${acao}da com sucesso!`);
+        showSuccessToast(`Clínica ${acao}da com sucesso!`);
         fetchClinicas();
-        setTimeout(() => setMessage(''), 3000);
       } else {
-        setMessage('Erro ao alterar status: ' + data.error);
+        showErrorToast('Erro ao alterar status: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao alterar status:', error);
-      setMessage('Erro ao alterar status da clínica');
+      showErrorToast('Erro ao alterar status da clínica');
     }
   };
 
@@ -571,12 +630,6 @@ const Clinicas = () => {
           Mapa
         </button>
       </div>
-
-      {message && (
-        <div className={`alert ${message.includes('sucesso') ? 'alert-success' : 'alert-error'}`}>
-          {message}
-        </div>
-      )}
 
       {/* Conteúdo da aba Mapa */}
       {activeTab === 'mapa' && (
@@ -1290,7 +1343,9 @@ const Clinicas = () => {
                           </span>
                         </td>
                         <td>{formatarData(clinica.created_at)}</td>
-                        <td>
+                        <td style={{
+                              padding: 0
+                            }}>
                           <button
                             onClick={() => pegarClinica(clinica.id)}
                             className="btn btn-primary"

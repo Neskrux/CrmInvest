@@ -11,6 +11,7 @@ const Dashboard = () => {
   const [filtroRegiao, setFiltroRegiao] = useState({ cidade: '', estado: '' });
   const [cidadesDisponiveis, setCidadesDisponiveis] = useState([]);
   const [estadosDisponiveis, setEstadosDisponiveis] = useState([]);
+  const [showConsultoresExtrasModal, setShowConsultoresExtrasModal] = useState(false); // Modal dos consultores do 4º em diante
   const [stats, setStats] = useState({
     totalPacientes: 0,
     totalAgendamentos: 0,
@@ -89,6 +90,27 @@ const Dashboard = () => {
       const consultores = await consultoresRes.json();
       const clinicasFiltradas = await clinicasRes.json();
 
+      // Calcular períodos para comparação de crescimento
+      const hoje = new Date();
+      const mesAtual = hoje.getMonth();
+      const anoAtual = hoje.getFullYear();
+      
+      // Mês anterior
+      const mesAnterior = mesAtual === 0 ? 11 : mesAtual - 1;
+      const anoMesAnterior = mesAtual === 0 ? anoAtual - 1 : anoAtual;
+      
+      // Função para verificar se data está no mês atual
+      const isNoMesAtual = (data) => {
+        const dataObj = new Date(data);
+        return dataObj.getMonth() === mesAtual && dataObj.getFullYear() === anoAtual;
+      };
+      
+      // Função para verificar se data está no mês anterior
+      const isNoMesAnterior = (data) => {
+        const dataObj = new Date(data);
+        return dataObj.getMonth() === mesAnterior && dataObj.getFullYear() === anoMesAnterior;
+      };
+
       // Aplicar filtros por região se especificados
       if (filtroRegiao.cidade || filtroRegiao.estado) {
         const clinicasIds = clinicasFiltradas.map(c => c.id);
@@ -106,16 +128,40 @@ const Dashboard = () => {
         });
       }
 
-      const hoje = new Date();
       const hojeStr = hoje.toISOString().split('T')[0];
       const agendamentosHoje = agendamentos.filter(a => a.data_agendamento === hojeStr).length;
+
+      // Calcular crescimentos dinâmicos
+      const pacientesNoMesAtual = pacientes.filter(p => isNoMesAtual(p.created_at)).length;
+      const pacientesNoMesAnterior = pacientes.filter(p => isNoMesAnterior(p.created_at)).length;
+      const crescimentoPacientes = pacientesNoMesAnterior > 0 
+        ? ((pacientesNoMesAtual - pacientesNoMesAnterior) / pacientesNoMesAnterior * 100)
+        : pacientesNoMesAtual > 0 ? 100 : 0;
+
+      const fechamentosNoMesAtual = fechamentos.filter(f => f.aprovado !== 'reprovado' && isNoMesAtual(f.data_fechamento)).length;
+      const fechamentosNoMesAnterior = fechamentos.filter(f => f.aprovado !== 'reprovado' && isNoMesAnterior(f.data_fechamento)).length;
+      const crescimentoFechamentos = fechamentosNoMesAnterior > 0 
+        ? ((fechamentosNoMesAtual - fechamentosNoMesAnterior) / fechamentosNoMesAnterior * 100)
+        : fechamentosNoMesAtual > 0 ? 100 : 0;
+
+      const valorNoMesAtual = fechamentos
+        .filter(f => f.aprovado !== 'reprovado' && isNoMesAtual(f.data_fechamento))
+        .reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0);
+      const valorNoMesAnterior = fechamentos
+        .filter(f => f.aprovado !== 'reprovado' && isNoMesAnterior(f.data_fechamento))
+        .reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0);
+      const crescimentoValor = valorNoMesAnterior > 0 
+        ? ((valorNoMesAtual - valorNoMesAnterior) / valorNoMesAnterior * 100)
+        : valorNoMesAtual > 0 ? 100 : 0;
 
       const leadsPorStatus = pacientes.reduce((acc, p) => {
         acc[p.status] = (acc[p.status] || 0) + 1;
         return acc;
       }, {});
 
-      const valorTotal = fechamentos.reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0);
+      const valorTotal = fechamentos
+        .filter(f => f.aprovado !== 'reprovado')
+        .reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0);
 
       // Calcular data de início e fim baseado no período selecionado
       let dataInicio = null;
@@ -162,10 +208,12 @@ const Dashboard = () => {
         return data >= dataInicio && data <= dataFim;
       }).length : agendamentos.length;
 
-      const fechamentosPeriodo = dataInicio ? fechamentos.filter(f => {
-        const data = new Date(f.data_fechamento);
-        return data >= dataInicio && data <= dataFim;
-      }) : fechamentos;
+      const fechamentosPeriodo = dataInicio ? fechamentos
+        .filter(f => f.aprovado !== 'reprovado')
+        .filter(f => {
+          const data = new Date(f.data_fechamento);
+          return data >= dataInicio && data <= dataFim;
+        }) : fechamentos.filter(f => f.aprovado !== 'reprovado');
 
       const valorPeriodo = fechamentosPeriodo.reduce((sum, f) => 
         sum + parseFloat(f.valor_fechado || 0), 0
@@ -189,8 +237,11 @@ const Dashboard = () => {
           estatisticasPorDia[diasSemana[i]] = {
             data: diaData,
             agendamentos: agendamentos.filter(a => a.data_agendamento === diaStr).length,
-            fechamentos: fechamentos.filter(f => f.data_fechamento === diaStr).length,
+            fechamentos: fechamentos
+              .filter(f => f.aprovado !== 'reprovado')
+              .filter(f => f.data_fechamento === diaStr).length,
             valor: fechamentos
+              .filter(f => f.aprovado !== 'reprovado')
               .filter(f => f.data_fechamento === diaStr)
               .reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0)
           };
@@ -266,23 +317,25 @@ const Dashboard = () => {
       });
 
       // Agrupar fechamentos por cidade das clínicas
-      fechamentos.forEach(fechamento => {
-        if (fechamento.clinica_id) {
-          const clinica = clinicasMap[fechamento.clinica_id];
-          if (clinica && clinica.cidade) {
-            const cidade = clinica.cidade;
-            if (!dadosPorCidade[cidade]) {
-              dadosPorCidade[cidade] = {
-                cidade: cidade,
-                pacientes: 0,
-                agendamentos: 0,
-                fechamentos: 0
-              };
+      fechamentos
+        .filter(f => f.aprovado !== 'reprovado')
+        .forEach(fechamento => {
+          if (fechamento.clinica_id) {
+            const clinica = clinicasMap[fechamento.clinica_id];
+            if (clinica && clinica.cidade) {
+              const cidade = clinica.cidade;
+              if (!dadosPorCidade[cidade]) {
+                dadosPorCidade[cidade] = {
+                  cidade: cidade,
+                  pacientes: 0,
+                  agendamentos: 0,
+                  fechamentos: 0
+                };
+              }
+              dadosPorCidade[cidade].fechamentos++;
             }
-            dadosPorCidade[cidade].fechamentos++;
           }
-        }
-      });
+        });
 
       // Converter para array e ordenar por total (pacientes + agendamentos + fechamentos)
       const agendamentosPorCidadeArray = Object.values(dadosPorCidade)
@@ -296,9 +349,6 @@ const Dashboard = () => {
         .slice(0, 10); // Mostrar apenas top 10 cidades
 
       // Calcular comissões
-      const mesAtual = new Date().getMonth();
-      const anoAtual = new Date().getFullYear();
-      
       let comissaoTotalMes = 0;
       let comissaoTotalGeral = 0;
 
@@ -330,32 +380,34 @@ const Dashboard = () => {
         }
       });
 
-      fechamentos.forEach(f => {
-        if (f.consultor_nome && consultoresMap[f.consultor_nome]) {
-          const valor = parseFloat(f.valor_fechado || 0);
-          consultoresMap[f.consultor_nome].totalFechamentos++;
-          consultoresMap[f.consultor_nome].valorFechado += valor;
-          
-          const comissao = calcularComissao(valor);
-          consultoresMap[f.consultor_nome].comissaoTotal += comissao;
-          comissaoTotalGeral += comissao;
+      fechamentos
+        .filter(f => f.aprovado !== 'reprovado')
+        .forEach(f => {
+          if (f.consultor_nome && consultoresMap[f.consultor_nome]) {
+            const valor = parseFloat(f.valor_fechado || 0);
+            consultoresMap[f.consultor_nome].totalFechamentos++;
+            consultoresMap[f.consultor_nome].valorFechado += valor;
+            
+            const comissao = calcularComissao(valor);
+            consultoresMap[f.consultor_nome].comissaoTotal += comissao;
+            comissaoTotalGeral += comissao;
 
-          // Verificar se é do mês atual
-          const dataFechamento = new Date(f.data_fechamento);
-          if (dataFechamento.getMonth() === mesAtual && dataFechamento.getFullYear() === anoAtual) {
-            consultoresMap[f.consultor_nome].valorFechadoMes += valor;
-            consultoresMap[f.consultor_nome].comissaoMes += comissao;
-            comissaoTotalMes += comissao;
+            // Verificar se é do mês atual
+            const dataFechamento = new Date(f.data_fechamento);
+            if (dataFechamento.getMonth() === mesAtual && dataFechamento.getFullYear() === anoAtual) {
+              consultoresMap[f.consultor_nome].valorFechadoMes += valor;
+              consultoresMap[f.consultor_nome].comissaoMes += comissao;
+              comissaoTotalMes += comissao;
+            }
           }
-        }
-      });
+        });
 
       const consultoresStats = Object.values(consultoresMap);
 
       setStats({
         totalPacientes: pacientes.length,
         totalAgendamentos: agendamentos.length,
-        totalFechamentos: fechamentos.length,
+        totalFechamentos: fechamentos.filter(f => f.aprovado !== 'reprovado').length,
         valorTotalFechamentos: valorTotal,
         agendamentosHoje,
         leadsPorStatus,
@@ -367,7 +419,11 @@ const Dashboard = () => {
         valorPeriodo,
         novosLeadsPeriodo,
         estatisticasPorDia,
-        agendamentosPorCidade: agendamentosPorCidadeArray
+        agendamentosPorCidade: agendamentosPorCidadeArray,
+        // Crescimentos dinâmicos
+        crescimentoPacientes,
+        crescimentoFechamentos,
+        crescimentoValor
       });
       setLoading(false);
     } catch (error) {
@@ -400,6 +456,12 @@ const Dashboard = () => {
     } else {
       return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     }
+  };
+
+  const formatPercentage = (value) => {
+    const absValue = Math.abs(value);
+    const signal = value >= 0 ? '+' : '-';
+    return `${signal}${absValue.toFixed(1)}%`;
   };
 
   const formatarMesAno = (data) => {
@@ -807,12 +869,21 @@ const Dashboard = () => {
           <div className="stat-card">
             <div className="stat-label">Total de Pacientes</div>
             <div className="stat-value">{stats.totalPacientes}</div>
-            <div className="stat-change positive">
+            <div className={`stat-change ${stats.crescimentoPacientes >= 0 ? 'positive' : 'negative'}`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                <polyline points="17 6 23 6 23 12"></polyline>
+                {stats.crescimentoPacientes >= 0 ? (
+                  <>
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                    <polyline points="17 6 23 6 23 12"></polyline>
+                  </>
+                ) : (
+                  <>
+                    <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
+                    <polyline points="17 18 23 18 23 12"></polyline>
+                  </>
+                )}
               </svg>
-              +12% este mês
+              {formatPercentage(stats.crescimentoPacientes)} este mês
             </div>
           </div>
 
@@ -831,25 +902,36 @@ const Dashboard = () => {
           <div className="stat-card">
             <div className="stat-label">Fechamentos</div>
             <div className="stat-value">{stats.totalFechamentos}</div>
-            <div className="stat-change positive">
+            <div className={`stat-change ${stats.crescimentoFechamentos >= 0 ? 'positive' : 'negative'}`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                <polyline points="17 6 23 6 23 12"></polyline>
+                {stats.crescimentoFechamentos >= 0 ? (
+                  <>
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                    <polyline points="17 6 23 6 23 12"></polyline>
+                  </>
+                ) : (
+                  <>
+                    <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
+                    <polyline points="17 18 23 18 23 12"></polyline>
+                  </>
+                )}
               </svg>
-              +8% este mês
+              {formatPercentage(stats.crescimentoFechamentos)} este mês
             </div>
           </div>
 
           <div className="stat-card">
             <div className="stat-label">Valor Total</div>
             <div className="stat-value">{formatCurrency(stats.valorTotalFechamentos)}</div>
-            <div className="stat-change positive">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                <polyline points="17 6 23 6 23 12"></polyline>
-              </svg>
-              +15% este mês
-            </div>
+            {stats.crescimentoValor > 0 && (
+              <div className="stat-change positive">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                  <polyline points="17 6 23 6 23 12"></polyline>
+                </svg>
+                {formatPercentage(stats.crescimentoValor)} este mês
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1219,14 +1301,30 @@ const Dashboard = () => {
                                 </div>
                               </div>
 
-                              <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontWeight: '700', color: '#059669' }}>
-                                  {formatCurrency(consultor.valorFechado)}
-                                </div>
-                                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                                  Comissão: {formatCurrency(consultor.comissaoTotal)}
-                                </div>
-                              </div>
+                              <button
+                                onClick={() => setShowConsultoresExtrasModal(consultor)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  padding: '0.5rem',
+                                  borderRadius: '6px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'background-color 0.2s',
+                                  minWidth: '40px'
+                                }}
+                                onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                                title="Ver valores financeiros"
+                              >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
+                                  <circle cx="12" cy="12" r="1"></circle>
+                                  <circle cx="19" cy="12" r="1"></circle>
+                                  <circle cx="5" cy="12" r="1"></circle>
+                                </svg>
+                              </button>
                             </div>
                           ))}
                         </div>
@@ -1364,6 +1462,136 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal dos Valores Financeiros do Consultor */}
+      {showConsultoresExtrasModal && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setShowConsultoresExtrasModal(false)}
+        >
+          <div 
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '12px',
+              padding: '2rem',
+              maxWidth: '500px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1e293b', margin: 0 }}>
+                💰 Valores Financeiros
+              </h3>
+              <button
+                onClick={() => setShowConsultoresExtrasModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1e293b', marginBottom: '0.5rem' }}>
+                {showConsultoresExtrasModal.nome}
+              </div>
+              <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                {showConsultoresExtrasModal.posicao}ª posição no ranking
+              </div>
+            </div>
+
+            <div style={{ 
+              display: 'grid', 
+              gap: '1rem' 
+            }}>
+              <div style={{
+                padding: '1.5rem',
+                backgroundColor: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                borderRadius: '12px',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '0.875rem', color: '#166534', marginBottom: '0.5rem', fontWeight: '600' }}>
+                  💵 Valor Total Fechado
+                </div>
+                <div style={{ fontSize: '2rem', fontWeight: '700', color: '#059669' }}>
+                  {formatCurrency(showConsultoresExtrasModal.valorFechado)}
+                </div>
+              </div>
+
+              <div style={{
+                padding: '1.5rem',
+                backgroundColor: '#fef3c7',
+                border: '1px solid #fde68a',
+                borderRadius: '12px',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '0.875rem', color: '#92400e', marginBottom: '0.5rem', fontWeight: '600' }}>
+                  🎯 Comissão Total
+                </div>
+                <div style={{ fontSize: '2rem', fontWeight: '700', color: '#d97706' }}>
+                  {formatCurrency(showConsultoresExtrasModal.comissaoTotal)}
+                </div>
+              </div>
+
+              <div style={{
+                padding: '1rem',
+                backgroundColor: '#f8fafc',
+                borderRadius: '8px',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '1rem',
+                textAlign: 'center'
+              }}>
+                <div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1e293b' }}>
+                    {showConsultoresExtrasModal.totalPacientes}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Pacientes</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: '600', color: '#3b82f6' }}>
+                    {showConsultoresExtrasModal.totalAgendamentos}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Agendamentos</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: '600', color: '#10b981' }}>
+                    {showConsultoresExtrasModal.totalFechamentos}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Fechamentos</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

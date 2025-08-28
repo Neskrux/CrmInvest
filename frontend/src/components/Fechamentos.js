@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/Toast';
 
 const Fechamentos = () => {
   const { makeRequest, isAdmin } = useAuth();
@@ -28,10 +29,29 @@ const Fechamentos = () => {
   });
   const [contratoSelecionado, setContratoSelecionado] = useState(null);
   const [salvando, setSalvando] = useState(false);
+  const [showObservacoesModal, setShowObservacoesModal] = useState(false);
+  const [observacoesAtual, setObservacoesAtual] = useState('');
+  const { error: showErrorToast, success: showSuccessToast, warning: showWarningToast, info: showInfoToast } = useToast();
 
   useEffect(() => {
     carregarDados();
   }, []);
+
+  // Controlar scroll do body quando modal estiver aberto
+  useEffect(() => {
+    if (modalAberto || showObservacoesModal) {
+      // Bloquear scroll da página
+      document.body.style.overflow = 'hidden';
+    } else {
+      // Restaurar scroll da página
+      document.body.style.overflow = 'unset';
+    }
+
+    // Cleanup: garantir que o scroll seja restaurado quando o componente for desmontado
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [modalAberto, showObservacoesModal]);
 
   const carregarDados = async () => {
     try {
@@ -61,7 +81,7 @@ const Fechamentos = () => {
       setConsultores(Array.isArray(consultoresData) ? consultoresData : []);
       setClinicas(Array.isArray(clinicasData) ? clinicasData : []);
       setAgendamentos(Array.isArray(agendamentosData) ? agendamentosData : []);
-      
+
       setCarregando(false);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -98,24 +118,57 @@ const Fechamentos = () => {
 
   const calcularEstatisticas = () => {
     const fechamentosFiltrados = filtrarFechamentos();
-    // Considerar apenas fechamentos aprovados para estatísticas
-    const fechamentosAprovados = fechamentosFiltrados.filter(f => f.aprovado === 'aprovado');
-    
-    const total = fechamentosAprovados.length;
-    const valorTotal = fechamentosAprovados.reduce((acc, f) => acc + parseFloat(f.valor_fechado || 0), 0);
-    const ticketMedio = total > 0 ? valorTotal / total : 0;
-    
-    const hoje = new Date().toISOString().split('T')[0];
-    const fechamentosHoje = fechamentosAprovados.filter(f => f.data_fechamento === hoje).length;
 
-    const mesAtual = new Date();
-    const fechamentosMes = fechamentosAprovados.filter(f => {
-      const dataFechamento = new Date(f.data_fechamento);
-      return dataFechamento.getMonth() === mesAtual.getMonth() && 
-             dataFechamento.getFullYear() === mesAtual.getFullYear();
+    // Filtrar apenas fechamentos aprovados (excluir reprovados)
+    const fechamentosParaCalculo = fechamentosFiltrados.filter(fechamento => 
+      fechamento.aprovado !== 'reprovado'
+    );
+
+    // Calcular total
+    const total = fechamentosParaCalculo.length;
+
+    // Calcular valor total com validação robusta
+    let valorTotal = 0;
+    fechamentosParaCalculo.forEach(f => {
+      let valor = 0;
+      if (f.valor_fechado !== null && f.valor_fechado !== undefined && f.valor_fechado !== '') {
+        // Tentar diferentes formatos
+        if (typeof f.valor_fechado === 'string') {
+          // Remover formatação de moeda se existir
+          const valorLimpo = f.valor_fechado.toString().replace(/[^\d.,-]/g, '').replace(',', '.');
+          valor = parseFloat(valorLimpo) || 0;
+        } else {
+          valor = parseFloat(f.valor_fechado) || 0;
+        }
+      }
+      valorTotal += valor;
+    });
+
+    const ticketMedio = total > 0 ? valorTotal / total : 0;
+
+    // Calcular fechamentos de hoje
+    const hoje = new Date();
+    const hojeStr = hoje.getFullYear() + '-' +
+                   String(hoje.getMonth() + 1).padStart(2, '0') + '-' +
+                   String(hoje.getDate()).padStart(2, '0');
+
+    const fechamentosHoje = fechamentosParaCalculo.filter(f => {
+      if (!f.data_fechamento) return false;
+      const dataFechamento = f.data_fechamento.split('T')[0]; // Remover hora se existir
+      return dataFechamento === hojeStr;
     }).length;
 
-    return { total, valorTotal, ticketMedio, fechamentosHoje, fechamentosMes };
+    // Calcular fechamentos do mês
+    const fechamentosMes = fechamentosParaCalculo.filter(f => {
+      if (!f.data_fechamento) return false;
+      const dataFechamento = new Date(f.data_fechamento);
+      return dataFechamento.getMonth() === hoje.getMonth() &&
+             dataFechamento.getFullYear() === hoje.getFullYear();
+    }).length;
+
+    const resultado = { total, valorTotal, ticketMedio, fechamentosHoje, fechamentosMes };
+
+    return resultado;
   };
 
   const contarFiltrosAtivos = () => {
@@ -130,6 +183,11 @@ const Fechamentos = () => {
     setFiltroConsultor('');
     setFiltroClinica('');
     setFiltroMes('');
+  };
+
+  const handleViewObservacoes = (observacoes) => {
+    setObservacoesAtual(observacoes || 'Nenhuma observação cadastrada.');
+    setShowObservacoesModal(true);
   };
 
   const abrirModal = (fechamento = null) => {
@@ -183,33 +241,33 @@ const Fechamentos = () => {
     try {
       const token = localStorage.getItem('token');
       if (!token || token === 'null' || token.trim() === '') {
-        alert('Sua sessão expirou. Faça login novamente.');
+        showErrorToast('Sua sessão expirou. Faça login novamente.');
         window.location.href = '/login';
         return;
       }
 
       if (!novoFechamento.paciente_id) {
-        alert('Por favor, selecione um paciente!');
+        showWarningToast('Por favor, selecione um paciente!');
         return;
       }
       
       if (!novoFechamento.valor_fechado || parseFloat(novoFechamento.valor_fechado) <= 0) {
-        alert('Por favor, informe um valor válido!');
+        showWarningToast('Por favor, informe um valor válido!');
         return;
       }
 
       if (!fechamentoEditando && !contratoSelecionado) {
-        alert('Por favor, selecione o contrato em PDF!');
+        showWarningToast('Por favor, selecione o contrato em PDF!');
         return;
       }
 
       if (contratoSelecionado && contratoSelecionado.type !== 'application/pdf') {
-        alert('Apenas arquivos PDF são permitidos para o contrato!');
+        showErrorToast('Apenas arquivos PDF são permitidos para o contrato!');
         return;
       }
 
       if (contratoSelecionado && contratoSelecionado.size > 10 * 1024 * 1024) {
-        alert('O arquivo deve ter no máximo 10MB!');
+        showErrorToast('O arquivo deve ter no máximo 10MB!');
         return;
       }
 
@@ -241,8 +299,6 @@ const Fechamentos = () => {
         ? `${API_BASE_URL}/fechamentos/${fechamentoEditando.id}`
         : `${API_BASE_URL}/fechamentos`;
       
-      console.log('🔐 Enviando requisição com token:', token ? 'presente' : 'ausente');
-      
              const response = await fetch(url, {
          method: fechamentoEditando ? 'PUT' : 'POST',
          headers: {
@@ -259,10 +315,10 @@ const Fechamentos = () => {
       if (response.ok) {
         carregarDados();
         fecharModal();
-        alert(fechamentoEditando ? 'Fechamento atualizado!' : `Fechamento registrado com sucesso! Contrato: ${result.contrato || 'anexado'}`);
+        showSuccessToast(fechamentoEditando ? 'Fechamento atualizado!' : `Fechamento registrado com sucesso! Contrato: ${result.contrato || 'anexado'}`);
       } else {
         console.error('Erro na resposta:', result);
-        alert('Erro: ' + (result.error || 'Erro desconhecido'));
+        showErrorToast('Erro: ' + (result.error || 'Erro desconhecido'));
       }
          } catch (error) {
        console.error('Erro ao salvar fechamento:', error);
@@ -277,7 +333,7 @@ const Fechamentos = () => {
          mensagemErro += ': ' + error.message;
        }
        
-       alert(mensagemErro);
+       showErrorToast(mensagemErro);
      } finally {
        setSalvando(false);
      }
@@ -292,14 +348,14 @@ const Fechamentos = () => {
 
         if (response.ok) {
           carregarDados();
-          alert('Fechamento excluído!');
+          showSuccessToast('Fechamento excluído!');
         } else {
           const data = await response.json();
-          alert('Erro ao excluir: ' + (data.error || 'Erro desconhecido'));
+          showErrorToast('Erro ao excluir: ' + (data.error || 'Erro desconhecido'));
         }
       } catch (error) {
         console.error('Erro ao excluir fechamento:', error);
-        alert('Erro ao excluir: ' + error.message);
+        showErrorToast('Erro ao excluir: ' + error.message);
       }
     }
   };
@@ -307,28 +363,32 @@ const Fechamentos = () => {
   // Função para alterar status de aprovação
   const alterarStatusAprovacao = async (fechamentoId, novoStatus) => {
     try {
-      console.log(`Alterando status do fechamento ${fechamentoId} para ${novoStatus}`);
       
       const endpoint = novoStatus === 'aprovado' ? 'aprovar' : 'reprovar';
       const response = await makeRequest(`/fechamentos/${fechamentoId}/${endpoint}`, { 
         method: 'PUT' 
       });
       
-      console.log('Resposta da API:', response.status);
       
       if (response.ok) {
         const result = await response.json();
-        console.log('Sucesso:', result);
-        carregarDados();
-        alert(`Fechamento ${novoStatus === 'aprovado' ? 'aprovado' : 'reprovado'} com sucesso!`);
+        
+        // Recarregar dados após alteração
+        try {
+          await carregarDados();
+          showSuccessToast(`Fechamento ${novoStatus === 'aprovado' ? 'aprovado' : 'reprovado'} com sucesso!`);
+        } catch (reloadError) {
+          console.error('Erro ao recarregar dados:', reloadError);
+          showWarningToast('Status alterado, mas houve erro ao atualizar a tela. Recarregue a página.');
+        }
       } else {
         const error = await response.json();
         console.error('Erro da API:', error);
-        alert('Erro ao alterar status: ' + (error.error || 'Erro desconhecido'));
+        showErrorToast('Erro ao alterar status: ' + (error.error || 'Erro desconhecido'));
       }
     } catch (error) {
       console.error('Erro na requisição:', error);
-      alert('Erro de conexão: ' + error.message);
+      showErrorToast('Erro de conexão: ' + error.message);
     }
   };
 
@@ -406,7 +466,7 @@ const Fechamentos = () => {
       
       const token = localStorage.getItem('token');
       if (!token || token === 'null' || token.trim() === '') {
-        alert('Sua sessão expirou. Faça login novamente.');
+        showErrorToast('Sua sessão expirou. Faça login novamente.');
         window.location.href = '/login';
         return;
       }
@@ -419,7 +479,7 @@ const Fechamentos = () => {
 
       if (!response.ok) {
         const data = await response.json();
-        alert('Erro ao baixar contrato: ' + (data.error || 'Erro desconhecido'));
+        showErrorToast('Erro ao baixar contrato: ' + (data.error || 'Erro desconhecido'));
         return;
       }
 
@@ -434,7 +494,7 @@ const Fechamentos = () => {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Erro ao baixar contrato:', error);
-      alert('Erro ao baixar contrato: ' + error.message);
+      showErrorToast('Erro ao baixar contrato: ' + error.message);
     }
   };
 
@@ -475,27 +535,27 @@ const Fechamentos = () => {
       <div className="stats-grid" style={{ marginBottom: '2rem' }}>
         <div className="stat-card">
           <div className="stat-label">Total de Fechamentos</div>
-          <div className="stat-value">{stats.total}</div>
+          <div className="stat-value">{stats.total || 0}</div>
         </div>
-        
+
         <div className="stat-card">
           <div className="stat-label">Valor Total</div>
-          <div className="stat-value">{formatarMoeda(stats.valorTotal)}</div>
+          <div className="stat-value">{formatarMoeda(stats.valorTotal || 0)}</div>
         </div>
-        
+
         <div className="stat-card">
           <div className="stat-label">Ticket Médio</div>
-          <div className="stat-value">{formatarMoeda(stats.ticketMedio)}</div>
+          <div className="stat-value">{formatarMoeda(stats.ticketMedio || 0)}</div>
         </div>
-        
+
         <div className="stat-card">
           <div className="stat-label">Fechamentos Hoje</div>
-          <div className="stat-value">{stats.fechamentosHoje}</div>
+          <div className="stat-value">{stats.fechamentosHoje || 0}</div>
         </div>
-        
+
         <div className="stat-card">
           <div className="stat-label">Fechamentos no Mês</div>
-          <div className="stat-value">{stats.fechamentosMes}</div>
+          <div className="stat-value">{stats.fechamentosMes || 0}</div>
         </div>
       </div>
 
@@ -614,8 +674,27 @@ const Fechamentos = () => {
                           <div>
                             <div style={{ fontWeight: '500' }}>{paciente?.nome || 'N/A'}</div>
                             {fechamento.observacoes && (
-                              <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                                {fechamento.observacoes}
+                              <div style={{ marginTop: '0.25rem' }}>
+                                <button
+                                  onClick={() => handleViewObservacoes(fechamento.observacoes)}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#6b7280',
+                                    cursor: 'pointer',
+                                    fontSize: '0.75rem',
+                                    padding: '0.25rem',
+                                    borderRadius: '4px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                  title="Ver observações"
+                                  onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                                >
+                                  •••
+                                </button>
                               </div>
                             )}
                           </div>
@@ -639,9 +718,7 @@ const Fechamentos = () => {
                               value={fechamento.aprovado || 'pendente'} 
                               onChange={(e) => alterarStatusAprovacao(fechamento.id, e.target.value)}
                               className="form-select"
-                              style={{ minWidth: '120px' }}
                             >
-                              <option value="pendente">Pendente</option>
                               <option value="aprovado">Aprovado</option>
                               <option value="reprovado">Reprovado</option>
                             </select>
@@ -853,6 +930,40 @@ const Fechamentos = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Observações */}
+      {showObservacoesModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Observações do fechamento</h2>
+            </div>
+            <div style={{ padding: '1.5rem' }}>
+              <div style={{
+                backgroundColor: '#f9fafb',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                padding: '1rem',
+                minHeight: '120px',
+                fontSize: '0.875rem',
+                lineHeight: '1.5',
+                color: '#374151',
+                whiteSpace: 'pre-wrap'
+              }}>
+                {observacoesAtual}
+              </div>
+              <div style={{ marginTop: '1rem', textAlign: 'right' }}>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={() => setShowObservacoesModal(false)}
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
