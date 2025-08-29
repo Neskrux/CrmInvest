@@ -235,6 +235,52 @@ const requireOwnerOrAdmin = (req, res, next) => {
   return res.status(403).json({ error: 'Acesso negado' });
 };
 
+
+app.post('/api/login', async (req, res) => {
+  const { email, senha } = req.body;
+  if (!email || !senha) {
+    return res.status(400).json({ error: 'Email e senha são obrigatórios.' });
+  }
+
+  // Buscar usuário pelo email
+  const { data: usuarios, error } = await supabase
+    .from('usuarios')
+    .select('*')
+    .eq('email', email)
+    .limit(1);
+
+  if (error) {
+    return res.status(500).json({ error: 'Erro ao buscar usuário.' });
+  }
+
+  const usuario = usuarios && usuarios[0];
+  if (!usuario || !usuario.ativo) {
+    return res.status(401).json({ error: 'Usuário não encontrado ou inativo.' });
+  }
+
+  // Verificar senha (se estiver criptografada, use bcrypt.compare)
+  const senhaCorreta = await bcrypt.compare(senha, usuario.senha);
+  if (!senhaCorreta) {
+    return res.status(401).json({ error: 'Senha incorreta.' });
+  }
+
+  // Montar payload do token (não inclua a senha)
+  const payload = {
+    id: usuario.id,
+    nome: usuario.nome,
+    email: usuario.email,
+    tipo: usuario.tipo,
+    consultor_id: usuario.consultor_id
+  };
+
+  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
+
+  // Remover senha do objeto antes de enviar para o front
+  delete usuario.senha;
+
+  res.json({ token, usuario });
+});
+
 // Helper function para inicializar tabelas no Supabase
 const initializeTables = async () => {
   console.log('🔄 Verificando estrutura das tabelas no Supabase...');
@@ -2823,6 +2869,8 @@ app.get('/api/meta-ads/advanced-metrics', authenticateToken, requireAdmin, async
     const totalFechamentos = fechamentosAprovados.length;
     const valorTotalFechamentos = fechamentosAprovados.reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0);
 
+    // Corrigido: declarar fechamentosPorCidade antes de usar
+    const fechamentosPorCidade = {};
     // Agrupar fechamentos por cidade para calcular CPA real por região
     if (fechamentosAprovados && fechamentosAprovados.length > 0) {
       fechamentosAprovados.forEach(fechamento => {
