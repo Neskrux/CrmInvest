@@ -211,11 +211,7 @@ const Perfil = () => {
         </div>
         
         <form onSubmit={handleSubmit} className="card-body">
-          {/* Seção de Foto de Perfil */}
-          <div className="form-group profile-photo-container">
-            <label className="form-label">Foto de Perfil</label>
-            
-            {/* Avatar */}
+          {/* Seção de Foto de Perfil 
             <div 
               className="profile-avatar"
               style={{ 
@@ -224,8 +220,7 @@ const Perfil = () => {
             >
               {!previewPhoto && getUserInitials()}
             </div>
-            
-            {/* Botões de Ação */}
+
             <div className="profile-photo-actions">
               <label 
                 htmlFor="profile-photo-input" 
@@ -255,7 +250,6 @@ const Perfil = () => {
               )}
             </div>
             
-            {/* Input file oculto */}
             <input
               id="profile-photo-input"
               type="file"
@@ -267,7 +261,8 @@ const Perfil = () => {
             <div className="profile-photo-hint">
               Formatos aceitos: JPG, PNG, GIF. Tamanho máximo: 5MB
             </div>
-          </div>
+          </div>*/}
+          
 
           <div className="form-group">
             <label className="form-label">Nome Completo *</label>
@@ -297,19 +292,32 @@ const Perfil = () => {
 
           <div className="form-group">
             <label className="form-label">Tipo de Usuário</label>
-            <select
-              name="tipo"
-              className="form-select"
-              value={formData.tipo}
-              onChange={handleInputChange}
-            >
-              <option value="admin">Administrador</option>
-              <option value="consultor">Consultor</option>
-            </select>
-            <small style={{ color: '#6b7280', fontSize: '0.875rem', marginTop: '0.25rem', display: 'block' }}>
-              {formData.tipo === 'admin' && 'Acesso total ao sistema'}
-              {formData.tipo === 'consultor' && 'Acesso às funcionalidades de consultor'}
-            </small>
+            {user?.tipo === 'consultor' ? (
+              <input
+                type="text"
+                className="form-input"
+                value="Consultor"
+                disabled
+                readOnly
+                style={{ backgroundColor: '#f3f4f6', color: '#6b7280' }}
+              />
+            ) : (
+              <>
+                <select
+                  name="tipo"
+                  className="form-select"
+                  value={formData.tipo}
+                  onChange={handleInputChange}
+                >
+                  <option value="admin">Administrador</option>
+                  <option value="consultor">Consultor</option>
+                </select>
+                <small style={{ color: '#6b7280', fontSize: '0.875rem', marginTop: '0.25rem', display: 'block' }}>
+                  {formData.tipo === 'admin' && 'Acesso total ao sistema'}
+                  {formData.tipo === 'consultor' && 'Acesso às funcionalidades de consultor'}
+                </small>
+              </>
+            )}
           </div>
 
           <div className="form-group">

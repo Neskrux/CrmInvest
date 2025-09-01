@@ -236,136 +236,6 @@ const requireOwnerOrAdmin = (req, res, next) => {
 };
 
 
-app.post('/api/login', async (req, res) => {
-  const { email, senha } = req.body;
-  if (!email || !senha) {
-    return res.status(400).json({ error: 'Email e senha são obrigatórios.' });
-  }
-
-  // Buscar usuário pelo email
-  const { data: usuarios, error } = await supabase
-    .from('usuarios')
-    .select('*')
-    .eq('email', email)
-    .limit(1);
-
-  if (error) {
-    return res.status(500).json({ error: 'Erro ao buscar usuário.' });
-  }
-
-  const usuario = usuarios && usuarios[0];
-  if (!usuario || !usuario.ativo) {
-    return res.status(401).json({ error: 'Usuário não encontrado ou inativo.' });
-  }
-
-  // Verificar senha (se estiver criptografada, use bcrypt.compare)
-  const senhaCorreta = await bcrypt.compare(senha, usuario.senha);
-  if (!senhaCorreta) {
-    return res.status(401).json({ error: 'Senha incorreta.' });
-  }
-
-  // Montar payload do token (não inclua a senha)
-  const payload = {
-    id: usuario.id,
-    nome: usuario.nome,
-    email: usuario.email,
-    tipo: usuario.tipo,
-    consultor_id: usuario.consultor_id
-  };
-
-  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
-
-  // Remover senha do objeto antes de enviar para o front
-  delete usuario.senha;
-
-  res.json({ token, usuario });
-});
-
-// Helper function para inicializar tabelas no Supabase
-const initializeTables = async () => {
-  console.log('🔄 Verificando estrutura das tabelas no Supabase...');
-  
-  // As tabelas serão criadas via SQL no painel do Supabase
-  console.log('✅ Para configurar o banco, execute as migrações em backend/migrations/');
-  console.log('📁 Use o arquivo: backend/migrations/run_migrations.sql');
-  console.log(`
--- Tabela de clínicas (atualizada)
-CREATE TABLE IF NOT EXISTS clinicas (
-  id SERIAL PRIMARY KEY,
-  nome TEXT NOT NULL,
-  endereco TEXT,
-  bairro TEXT,
-  cidade TEXT,
-  estado VARCHAR(2),
-  nicho TEXT DEFAULT 'Ambos',
-  telefone TEXT,
-  email TEXT,
-  status TEXT DEFAULT 'ativo',
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Tabela de consultores
-CREATE TABLE IF NOT EXISTS consultores (
-  id SERIAL PRIMARY KEY,
-  nome TEXT NOT NULL,
-  telefone TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Tabela de pacientes/leads
-CREATE TABLE IF NOT EXISTS pacientes (
-  id SERIAL PRIMARY KEY,
-  nome TEXT NOT NULL,
-  telefone TEXT,
-  cpf TEXT,
-  tipo_tratamento TEXT,
-  status TEXT DEFAULT 'lead',
-  observacoes TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Tabela de agendamentos
-CREATE TABLE IF NOT EXISTS agendamentos (
-  id SERIAL PRIMARY KEY,
-  paciente_id INTEGER REFERENCES pacientes(id),
-  consultor_id INTEGER REFERENCES consultores(id),
-  clinica_id INTEGER REFERENCES clinicas(id),
-  data_agendamento DATE,
-  horario TIME,
-  status TEXT DEFAULT 'agendado',
-  lembrado BOOLEAN DEFAULT FALSE,
-  observacoes TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Tabela de fechamentos
-CREATE TABLE IF NOT EXISTS fechamentos (
-  id SERIAL PRIMARY KEY,
-  paciente_id INTEGER REFERENCES pacientes(id) ON DELETE CASCADE,
-  consultor_id INTEGER REFERENCES consultores(id) ON DELETE SET NULL,
-  clinica_id INTEGER REFERENCES clinicas(id) ON DELETE SET NULL,
-  agendamento_id INTEGER REFERENCES agendamentos(id) ON DELETE SET NULL,
-  valor_fechado DECIMAL(10,2) NOT NULL,
-  data_fechamento DATE NOT NULL DEFAULT CURRENT_DATE,
-  tipo_tratamento TEXT,
-  forma_pagamento TEXT,
-  observacoes TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Tabela de novas clínicas (missões diárias)
-CREATE TABLE IF NOT EXISTS novas_clinicas (
-  id SERIAL PRIMARY KEY,
-  nome TEXT NOT NULL,
-  telefone TEXT,
-  endereco TEXT,
-  status TEXT DEFAULT 'tem_interesse',
-  observacoes TEXT,
-  consultor_id INTEGER REFERENCES consultores(id),
-  created_at TIMESTAMP DEFAULT NOW()
-);
-  `);
-};
 
 // === ROTAS DE AUTENTICAÇÃO ===
 app.post('/api/login', async (req, res) => {
@@ -454,36 +324,24 @@ app.post('/api/login', async (req, res) => {
       console.log('Erro ao atualizar ultimo_login:', error);
     }
 
-    // Gerar token JWT
-    const tokenData = {
+    // Padronizar payload e resposta para compatibilidade com Meta Ads
+    const payload = {
       id: usuario.id,
       nome: usuario.nome,
-      tipo: tipoLogin
+      email: usuario.email,
+      tipo: usuario.tipo,
+      consultor_id: usuario.consultor_id !== undefined ? usuario.consultor_id : (tipoLogin === 'consultor' ? usuario.id : null)
     };
 
-    // Adicionar dados específicos baseado no tipo
-    if (tipoLogin === 'admin') {
-      tokenData.email = usuario.email;
-      tokenData.consultor_id = usuario.consultor_id;
-    } else {
-      tokenData.consultor_id = usuario.id; // Para consultores, o ID deles é o consultor_id
-      tokenData.email = null;
-    }
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
 
-    const token = jwt.sign(tokenData, JWT_SECRET, { expiresIn: '8h' });
+    // Remover senha do objeto antes de enviar para o front
+    delete usuario.senha;
 
-    // Retornar dados do usuário (sem a senha)
-    const { senha: _, ...dadosUsuario } = usuario;
+    // Garante que usuario.consultor_id também esteja presente no objeto de resposta
+    usuario.consultor_id = payload.consultor_id;
 
-    res.json({
-      message: 'Login realizado com sucesso',
-      token,
-      usuario: {
-        ...dadosUsuario,
-        tipo: tipoLogin,
-        consultor_nome: tipoLogin === 'admin' ? usuario.consultores?.nome || null : usuario.nome
-      }
-    });
+    res.json({ token, usuario });
 
   } catch (error) {
     console.error('Erro no login:', error);
@@ -615,27 +473,51 @@ app.get('/api/usuarios/perfil', authenticateToken, async (req, res) => {
 
 app.get('/api/verify-token', authenticateToken, async (req, res) => {
   try {
-    // Buscar dados atualizados do usuário
-    const { data: usuario, error } = await supabase
+    // Buscar dados atualizados do usuário na tabela usuarios
+    let usuario = null;
+    let tipo = null;
+    let consultor_nome = null;
+    let consultor_id = null;
+
+    const { data: usuarioData, error: errorUsuario } = await supabase
       .from('usuarios')
-      .select(`
-        *,
-        consultores(nome, telefone)
-      `)
+      .select('*')
       .eq('id', req.user.id)
       .eq('ativo', true)
       .single();
 
-    if (error || !usuario) {
+    if (usuarioData) {
+      usuario = usuarioData;
+      tipo = usuario.tipo || 'admin';
+      consultor_id = usuario.consultor_id || null;
+    } else {
+      // Se não achou em usuarios, buscar em consultores
+      const { data: consultorData, error: errorConsultor } = await supabase
+        .from('consultores')
+        .select('*')
+        .eq('id', req.user.id)
+        .eq('ativo', true)
+        .single();
+
+      if (consultorData) {
+        usuario = consultorData;
+        tipo = usuario.tipo || 'consultor';
+        consultor_id = usuario.id;
+      }
+    }
+
+    if (!usuario) {
       return res.status(401).json({ error: 'Usuário não encontrado' });
     }
 
+    // Remover senha do objeto antes de enviar para o front
     const { senha: _, ...dadosUsuario } = usuario;
 
     res.json({
       usuario: {
         ...dadosUsuario,
-        consultor_nome: usuario.consultores?.nome || null
+        tipo,
+        consultor_id
       }
     });
   } catch (error) {
@@ -1211,6 +1093,32 @@ app.get('/api/pacientes', authenticateToken, async (req, res) => {
   }
 });
 
+app.get('/api/dashboard/pacientes', authenticateToken, async (req, res) => {
+  try {
+    let query = supabase
+      .from('pacientes')
+      .select(`
+        *,
+        consultores(nome)
+      `)
+      .order('created_at', { ascending: false });
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+    
+    // Reformatar dados para compatibilidade com frontend
+    const formattedData = data.map(paciente => ({
+      ...paciente,
+      consultor_nome: paciente.consultores?.nome
+    }));
+
+    res.json(formattedData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/pacientes', authenticateToken, async (req, res) => {
   try {
     const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado } = req.body;
@@ -1258,7 +1166,8 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
     }
     
     // Converter consultor_id para null se não fornecido
-    const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
+    const consultorId = consultor_id && consultor_id !== '' ? 
+      (typeof consultor_id === 'number' ? consultor_id : parseInt(consultor_id)) : null;
     
     const { data, error } = await supabase
       .from('pacientes')
@@ -1332,7 +1241,8 @@ app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
     }
     
     // Converter consultor_id para null se não fornecido
-    const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
+    const consultorId = consultor_id && consultor_id !== '' ? 
+      (typeof consultor_id === 'number' ? consultor_id : parseInt(consultor_id)) : null;
     
     const { data, error } = await supabase
       .from('pacientes')
@@ -1362,14 +1272,109 @@ app.put('/api/pacientes/:id/status', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     
+    // Buscar dados do paciente primeiro
+    const { data: paciente, error: pacienteError } = await supabase
+      .from('pacientes')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (pacienteError) throw pacienteError;
+    if (!paciente) {
+      return res.status(404).json({ error: 'Paciente não encontrado' });
+    }
+
+    // Atualizar status do paciente
     const { error } = await supabase
       .from('pacientes')
       .update({ status })
       .eq('id', id);
 
     if (error) throw error;
+
+    // Automação do pipeline
+    if (status === 'fechado') {
+      // Verificar se já existe fechamento
+      const { data: fechamentoExistente } = await supabase
+        .from('fechamentos')
+        .select('id')
+        .eq('paciente_id', id)
+        .single();
+
+      if (!fechamentoExistente) {
+        // Buscar agendamento relacionado
+        const { data: agendamento } = await supabase
+          .from('agendamentos')
+          .select('*')
+          .eq('paciente_id', id)
+          .single();
+
+        // Criar fechamento automaticamente
+        await supabase
+          .from('fechamentos')
+          .insert({
+            paciente_id: id,
+            consultor_id: paciente.consultor_id,
+            clinica_id: agendamento?.clinica_id || null,
+            agendamento_id: agendamento?.id || null,
+            valor_fechado: 0,
+            data_fechamento: new Date().toISOString().split('T')[0],
+            tipo_tratamento: paciente.tipo_tratamento,
+            forma_pagamento: 'A definir',
+            observacoes: 'Fechamento criado automaticamente pelo pipeline',
+            aprovado: 'pendente'
+          });
+      }
+    }
+
     res.json({ message: 'Status atualizado com sucesso!' });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE - Excluir paciente (apenas admin)
+app.delete('/api/pacientes/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    
+    // Verificar se o usuário é admin
+    const { data: user, error: userError } = await supabase
+      .from('usuarios')
+      .select('tipo')
+      .eq('id', userId)
+      .single();
+    
+    if (userError) throw userError;
+    
+    if (user.tipo !== 'admin') {
+      return res.status(403).json({ error: 'Acesso negado. Apenas administradores podem excluir pacientes.' });
+    }
+    
+    // Excluir agendamentos relacionados primeiro
+    await supabase
+      .from('agendamentos')
+      .delete()
+      .eq('paciente_id', id);
+    
+    // Excluir fechamentos relacionados
+    await supabase
+      .from('fechamentos')
+      .delete()
+      .eq('paciente_id', id);
+    
+    // Excluir o paciente
+    const { error } = await supabase
+      .from('pacientes')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+
+    res.json({ message: 'Paciente e registros relacionados excluídos com sucesso!' });
+  } catch (error) {
+    console.error('Erro ao excluir paciente:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1538,7 +1543,6 @@ app.put('/api/novas-clinicas/:id/pegar', authenticateToken, async (req, res) => 
   }
 });
 
-// === AGENDAMENTOS === (Admin vê todos, Consultor vê apenas os seus)
 app.get('/api/agendamentos', authenticateToken, async (req, res) => {
   try {
     let query = supabase
@@ -1576,14 +1580,64 @@ app.get('/api/agendamentos', authenticateToken, async (req, res) => {
   }
 });
 
+app.get('/api/dashboard/agendamentos', authenticateToken, async (req, res) => {
+  try {
+    let query = supabase
+      .from('agendamentos')
+      .select(`
+        *,
+        pacientes(nome, telefone),
+        consultores(nome),
+        clinicas(nome)
+      `)
+      .order('data_agendamento', { ascending: false })
+      .order('horario');
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    // Reformatar dados para compatibilidade com frontend
+    const formattedData = data.map(agendamento => ({
+      ...agendamento,
+      paciente_nome: agendamento.pacientes?.nome,
+      paciente_telefone: agendamento.pacientes?.telefone,
+      consultor_nome: agendamento.consultores?.nome,
+      clinica_nome: agendamento.clinicas?.nome
+    }));
+
+    res.json(formattedData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/agendamentos', authenticateToken, async (req, res) => {
   try {
-    const { paciente_id, consultor_id, clinica_id, data_agendamento, horario, observacoes } = req.body;
+    const { paciente_id, consultor_id, clinica_id, data_agendamento, horario, status, observacoes } = req.body;
     
-    const { data, error } = await supabase
+    // Primeiro, tenta inserir normalmente
+    let { data, error } = await supabase
       .from('agendamentos')
-      .insert([{ paciente_id, consultor_id, clinica_id, data_agendamento, horario, observacoes }])
+      .insert([{ paciente_id, consultor_id, clinica_id, data_agendamento, horario, status: status || 'agendado', observacoes }])
       .select();
+
+    // Se der erro de chave duplicada, tenta corrigir a sequência
+    if (error && error.message.includes('duplicate key value violates unique constraint')) {
+      console.log('Erro de sequência detectado, tentando corrigir...');
+      
+      // Corrigir a sequência
+      await supabase.rpc('reset_agendamentos_sequence');
+      
+      // Tentar inserir novamente
+      const retryResult = await supabase
+        .from('agendamentos')
+        .insert([{ paciente_id, consultor_id, clinica_id, data_agendamento, horario, status: status || 'agendado', observacoes }])
+        .select();
+      
+      data = retryResult.data;
+      error = retryResult.error;
+    }
 
     if (error) throw error;
 
@@ -1597,6 +1651,7 @@ app.post('/api/agendamentos', authenticateToken, async (req, res) => {
 
     res.json({ id: data[0].id, message: 'Agendamento criado com sucesso!' });
   } catch (error) {
+    console.error('Erro ao criar agendamento:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1633,12 +1688,36 @@ app.put('/api/agendamentos/:id/status', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     
+    // Buscar dados do agendamento primeiro
+    const { data: agendamento, error: agendamentoError } = await supabase
+      .from('agendamentos')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (agendamentoError) throw agendamentoError;
+    if (!agendamento) {
+      return res.status(404).json({ error: 'Agendamento não encontrado' });
+    }
+
+    // Atualizar status do agendamento
     const { error } = await supabase
       .from('agendamentos')
       .update({ status })
       .eq('id', id);
 
     if (error) throw error;
+
+    // Automação do pipeline: se status for "fechado", criar fechamento
+    // NOTA: A criação do fechamento agora é feita pelo frontend via modal de valor
+    if (status === 'fechado') {
+      // Apenas atualizar status do paciente para "fechado"
+      await supabase
+        .from('pacientes')
+        .update({ status: 'fechado' })
+        .eq('id', agendamento.paciente_id);
+    }
+
     res.json({ message: 'Status atualizado com sucesso!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1717,6 +1796,40 @@ app.get('/api/fechamentos', authenticateToken, async (req, res) => {
   }
 });
 
+// === FECHAMENTOS === (Admin vê todos, Consultor vê apenas os seus)
+app.get('/api/dashboard/fechamentos', authenticateToken, async (req, res) => {
+  try {
+    let query = supabaseAdmin
+      .from('fechamentos')
+      .select(`
+        *,
+        pacientes(nome, telefone, cpf),
+        consultores(nome),
+        clinicas(nome)
+      `)
+      .order('data_fechamento', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    // Reformatar dados para compatibilidade com frontend
+    const formattedData = data.map(fechamento => ({
+      ...fechamento,
+      paciente_nome: fechamento.pacientes?.nome,
+      paciente_telefone: fechamento.pacientes?.telefone,
+      paciente_cpf: fechamento.pacientes?.cpf,
+      consultor_nome: fechamento.consultores?.nome,
+      clinica_nome: fechamento.clinicas?.nome
+    }));
+
+    res.json(formattedData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), async (req, res) => {
   try {
     const { 
@@ -1729,14 +1842,25 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
       observacoes 
     } = req.body;
 
-    // Verificar se o arquivo foi enviado
-    if (!req.file) {
+    // Verificar se é fechamento automático (baseado nas observações)
+    const isAutomaticFechamento = observacoes && observacoes.includes('automaticamente pelo pipeline');
+    
+    // Verificar se o arquivo foi enviado (obrigatório apenas para fechamentos manuais)
+    if (!req.file && !isAutomaticFechamento) {
       return res.status(400).json({ error: 'Contrato em PDF é obrigatório!' });
     }
 
     // Converter campos opcionais para null se não enviados ou vazios
-    const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
-    const clinicaId = clinica_id && String(clinica_id).trim() !== '' ? parseInt(clinica_id) : null;
+    const consultorId = consultor_id && consultor_id !== '' ? 
+      (typeof consultor_id === 'number' ? consultor_id : parseInt(consultor_id)) : null;
+    const clinicaId = clinica_id && clinica_id !== '' ? 
+      (typeof clinica_id === 'number' ? clinica_id : parseInt(clinica_id)) : null;
+
+    // Validar valor_fechado para garantir que não seja null/NaN
+    const valorFechado = parseFloat(valor_fechado);
+    if (isNaN(valorFechado) || valorFechado < 0) {
+      return res.status(400).json({ error: 'Valor de fechamento deve ser um número válido maior ou igual a zero' });
+    }
 
     // Dados do contrato (se houver arquivo)
     let contratoArquivo = null;
@@ -1765,7 +1889,7 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
         paciente_id: parseInt(paciente_id),
         consultor_id: consultorId,
         clinica_id: clinicaId,
-        valor_fechado: parseFloat(valor_fechado),
+        valor_fechado: valorFechado,
         data_fechamento,
         tipo_tratamento: tipo_tratamento || null,
         observacoes: observacoes || null,
@@ -1807,9 +1931,16 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
   }
 });
 
-app.put('/api/fechamentos/:id', authenticateToken, async (req, res) => {
+app.put('/api/fechamentos/:id', authenticateUpload, upload.single('contrato'), async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Debug: Log completo do que está chegando
+    console.log('PUT /api/fechamentos/:id - req.body:', req.body);
+    console.log('PUT /api/fechamentos/:id - Content-Type:', req.headers['content-type']);
+    console.log('PUT /api/fechamentos/:id - typeof valor_fechado:', typeof req.body.valor_fechado);
+    console.log('PUT /api/fechamentos/:id - valor_fechado raw:', req.body.valor_fechado);
+    
     const { 
       paciente_id, 
       consultor_id, 
@@ -1821,8 +1952,30 @@ app.put('/api/fechamentos/:id', authenticateToken, async (req, res) => {
     } = req.body;
 
     // Converter campos opcionais para null se não enviados ou vazios
-    const consultorId = consultor_id && String(consultor_id).trim() !== '' ? parseInt(consultor_id) : null;
-    const clinicaId = clinica_id && String(clinica_id).trim() !== '' ? parseInt(clinica_id) : null;
+    const consultorId = consultor_id && consultor_id !== '' ? 
+      (typeof consultor_id === 'number' ? consultor_id : parseInt(consultor_id)) : null;
+    const clinicaId = clinica_id && clinica_id !== '' ? 
+      (typeof clinica_id === 'number' ? clinica_id : parseInt(clinica_id)) : null;
+    
+    // Validar valor_fechado para garantir que não seja null/NaN
+    console.log('Antes da validação - valor_fechado:', valor_fechado, 'typeof:', typeof valor_fechado);
+    
+    let valorFechado;
+    if (valor_fechado === null || valor_fechado === undefined || valor_fechado === '') {
+      console.log('Valor fechado é null/undefined/vazio');
+      return res.status(400).json({ error: 'Valor de fechamento é obrigatório' });
+    }
+    
+    valorFechado = parseFloat(valor_fechado);
+    console.log('Após parseFloat - valorFechado:', valorFechado, 'isNaN:', isNaN(valorFechado));
+    
+    if (isNaN(valorFechado) || valorFechado < 0) {
+      console.log('Valor inválido - NaN ou negativo');
+      return res.status(400).json({ 
+        error: 'Valor de fechamento deve ser um número válido maior ou igual a zero',
+        debug: { valorOriginal: valor_fechado, valorParsed: valorFechado }
+      });
+    }
     
     const { data, error } = await supabaseAdmin
       .from('fechamentos')
@@ -1830,7 +1983,7 @@ app.put('/api/fechamentos/:id', authenticateToken, async (req, res) => {
         paciente_id: parseInt(paciente_id), 
         consultor_id: consultorId, 
         clinica_id: clinicaId, 
-        valor_fechado: parseFloat(valor_fechado), 
+        valor_fechado: valorFechado, 
         data_fechamento, 
         tipo_tratamento: tipo_tratamento || null,
         observacoes: observacoes || null 
@@ -1947,8 +2100,7 @@ app.put('/api/fechamentos/:id/aprovar', authenticateToken, requireAdmin, async (
       .select();
     
     if (error) {
-      // Se der erro (campo não existe), criar uma resposta de sucesso mesmo assim
-      console.log('Campo aprovado não existe na tabela, mas continuando...');
+      // Campo aprovado não existe na tabela, mas continuar
       return res.json({ message: 'Fechamento aprovado com sucesso!' });
     }
     
@@ -1982,8 +2134,7 @@ app.put('/api/fechamentos/:id/reprovar', authenticateToken, requireAdmin, async 
       .select();
     
     if (error) {
-      // Se der erro (campo não existe), criar uma resposta de sucesso mesmo assim
-      console.log('Campo aprovado não existe na tabela, mas continuando...');
+      // Campo aprovado não existe na tabela, mas continuar
       return res.json({ message: 'Fechamento reprovado com sucesso!' });
     }
     
@@ -2664,8 +2815,6 @@ server.listen(PORT, async () => {
   } catch (error) {
     console.log('⚠️  Erro ao conectar com Supabase:', error.message);
   }
-  
-  await initializeTables();
 }); 
 
 // === META ADS REAL-TIME INSIGHTS === (Apenas Admin)
@@ -2869,8 +3018,6 @@ app.get('/api/meta-ads/advanced-metrics', authenticateToken, requireAdmin, async
     const totalFechamentos = fechamentosAprovados.length;
     const valorTotalFechamentos = fechamentosAprovados.reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0);
 
-    // Corrigido: declarar fechamentosPorCidade antes de usar
-    const fechamentosPorCidade = {};
     // Agrupar fechamentos por cidade para calcular CPA real por região
     if (fechamentosAprovados && fechamentosAprovados.length > 0) {
       fechamentosAprovados.forEach(fechamento => {

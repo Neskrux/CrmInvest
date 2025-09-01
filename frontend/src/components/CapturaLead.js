@@ -14,10 +14,75 @@ const CapturaLead = () => {
     estado: '',
     observacoes: '',
     melhor_dia1: '',
-    melhor_dia2: ''
+    melhor_horario1: '',
+    melhor_dia2: '',
+    melhor_horario2: ''
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
+
+  // Estados brasileiros
+  const estadosBrasileiros = [
+    { sigla: 'AC', nome: 'Acre' },
+    { sigla: 'AL', nome: 'Alagoas' },
+    { sigla: 'AP', nome: 'Amapá' },
+    { sigla: 'AM', nome: 'Amazonas' },
+    { sigla: 'BA', nome: 'Bahia' },
+    { sigla: 'CE', nome: 'Ceará' },
+    { sigla: 'DF', nome: 'Distrito Federal' },
+    { sigla: 'ES', nome: 'Espírito Santo' },
+    { sigla: 'GO', nome: 'Goiás' },
+    { sigla: 'MA', nome: 'Maranhão' },
+    { sigla: 'MT', nome: 'Mato Grosso' },
+    { sigla: 'MS', nome: 'Mato Grosso do Sul' },
+    { sigla: 'MG', nome: 'Minas Gerais' },
+    { sigla: 'PA', nome: 'Pará' },
+    { sigla: 'PB', nome: 'Paraíba' },
+    { sigla: 'PR', nome: 'Paraná' },
+    { sigla: 'PE', nome: 'Pernambuco' },
+    { sigla: 'PI', nome: 'Piauí' },
+    { sigla: 'RJ', nome: 'Rio de Janeiro' },
+    { sigla: 'RN', nome: 'Rio Grande do Norte' },
+    { sigla: 'RS', nome: 'Rio Grande do Sul' },
+    { sigla: 'RO', nome: 'Rondônia' },
+    { sigla: 'RR', nome: 'Roraima' },
+    { sigla: 'SC', nome: 'Santa Catarina' },
+    { sigla: 'SP', nome: 'São Paulo' },
+    { sigla: 'SE', nome: 'Sergipe' },
+    { sigla: 'TO', nome: 'Tocantins' }
+  ];
+
+  // Principais cidades por estado
+  const cidadesPorEstado = {
+    'SP': ['São Paulo', 'Campinas', 'Santos', 'São Bernardo do Campo', 'Santo André', 'Osasco', 'Ribeirão Preto', 'Sorocaba'],
+    'RJ': ['Rio de Janeiro', 'Niterói', 'Nova Iguaçu', 'Duque de Caxias', 'Campos dos Goytacazes', 'Petrópolis', 'Volta Redonda'],
+    'MG': ['Belo Horizonte', 'Uberlândia', 'Contagem', 'Juiz de Fora', 'Betim', 'Montes Claros', 'Ribeirão das Neves'],
+    'ES': ['Vitória', 'Serra', 'Vila Velha', 'Cariacica', 'Linhares', 'Cachoeiro de Itapemirim', 'Colatina'],
+    'PR': ['Curitiba', 'Londrina', 'Maringá', 'Ponta Grossa', 'Cascavel', 'São José dos Pinhais', 'Foz do Iguaçu'],
+    'RS': ['Porto Alegre', 'Caxias do Sul', 'Pelotas', 'Canoas', 'Santa Maria', 'Gravataí', 'Viamão'],
+    'SC': ['Florianópolis', 'Joinville', 'Blumenau', 'São José', 'Criciúma', 'Chapecó', 'Itajaí'],
+    'BA': ['Salvador', 'Feira de Santana', 'Vitória da Conquista', 'Camaçari', 'Juazeiro', 'Ilhéus', 'Itabuna'],
+    'GO': ['Goiânia', 'Aparecida de Goiânia', 'Anápolis', 'Rio Verde', 'Luziânia', 'Águas Lindas de Goiás'],
+    'PE': ['Recife', 'Jaboatão dos Guararapes', 'Olinda', 'Caruaru', 'Petrolina', 'Paulista', 'Cabo de Santo Agostinho'],
+    'CE': ['Fortaleza', 'Caucaia', 'Juazeiro do Norte', 'Maracanaú', 'Sobral', 'Crato', 'Itapipoca'],
+    'DF': ['Brasília', 'Taguatinga', 'Ceilândia', 'Samambaia', 'Planaltina', 'Águas Claras', 'Guará'],
+    'MT': ['Cuiabá', 'Várzea Grande', 'Rondonópolis', 'Sinop', 'Tangará da Serra', 'Cáceres', 'Barra do Garças'],
+    'MS': ['Campo Grande', 'Dourados', 'Três Lagoas', 'Corumbá', 'Ponta Porã', 'Aquidauana', 'Naviraí'],
+    'AL': ['Maceió', 'Arapiraca', 'Rio Largo', 'Palmeira dos Índios', 'União dos Palmares', 'Penedo'],
+    'SE': ['Aracaju', 'Nossa Senhora do Socorro', 'Lagarto', 'Itabaiana', 'Estância', 'Tobias Barreto'],
+    'PB': ['João Pessoa', 'Campina Grande', 'Santa Rita', 'Patos', 'Bayeux', 'Sousa', 'Cajazeiras'],
+    'RN': ['Natal', 'Mossoró', 'Parnamirim', 'São Gonçalo do Amarante', 'Macaíba', 'Ceará-Mirim'],
+    'PI': ['Teresina', 'Parnaíba', 'Picos', 'Piripiri', 'Floriano', 'Campo Maior', 'Barras'],
+    'MA': ['São Luís', 'Imperatriz', 'São José de Ribamar', 'Timon', 'Caxias', 'Codó', 'Paço do Lumiar'],
+    'TO': ['Palmas', 'Araguaína', 'Gurupi', 'Porto Nacional', 'Paraíso do Tocantins', 'Colinas do Tocantins'],
+    'AC': ['Rio Branco', 'Cruzeiro do Sul', 'Sena Madureira', 'Tarauacá', 'Feijó', 'Brasileia'],
+    'RO': ['Porto Velho', 'Ji-Paraná', 'Ariquemes', 'Vilhena', 'Cacoal', 'Rolim de Moura'],
+    'RR': ['Boa Vista', 'Rorainópolis', 'Caracaraí', 'Alto Alegre', 'Mucajaí', 'Cantá'],
+    'AP': ['Macapá', 'Santana', 'Laranjal do Jari', 'Oiapoque', 'Mazagão', 'Porto Grande'],
+    'AM': ['Manaus', 'Parintins', 'Itacoatiara', 'Manacapuru', 'Coari', 'Tefé', 'Tabatinga'],
+    'PA': ['Belém', 'Ananindeua', 'Santarém', 'Marabá', 'Parauapebas', 'Castanhal', 'Abaetetuba']
+  };
 
   const formatarTelefone = (value) => {
     const numbers = value.replace(/\D/g, '');
@@ -33,6 +98,60 @@ const CapturaLead = () => {
     return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   };
 
+  const formatarCidade = (value) => {
+    if (!value) return '';
+    
+    // Remove apenas números e caracteres especiais perigosos, mantém letras, espaços, acentos e hífen
+    let cleanValue = value.replace(/[0-9!@#$%^&*()_+=\[\]{}|\\:";'<>?,./~`]/g, '');
+
+    // Não aplicar formatação completa se o usuário ainda está digitando (termina com espaço)
+    const isTyping = value.endsWith(' ') && value.length > 0;
+    
+    if (isTyping) {
+      // Durante a digitação, apenas remove caracteres inválidos
+      return cleanValue;
+    }
+    
+    // Remove espaços extras apenas quando não está digitando
+    cleanValue = cleanValue.replace(/\s+/g, ' ').trim();
+    
+    // Não permite string vazia
+    if (!cleanValue) return '';
+    
+    // Se tem menos de 2 caracteres, não formatar ainda
+    if (cleanValue.length < 2) return cleanValue;
+    
+    // Verifica se está todo em maiúscula (mais de 3 caracteres) e converte para title case
+    const isAllUpperCase = cleanValue.length > 3 && cleanValue === cleanValue.toUpperCase();
+    
+    if (isAllUpperCase) {
+      // Converte para title case
+      return cleanValue.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+    }
+    
+    // Para entradas normais, aplica title case
+    return cleanValue
+      .toLowerCase()
+      .split(' ')
+      .map((palavra, index) => {
+        // Palavras que devem ficar em minúscula (exceto se for a primeira)
+        const preposicoes = ['de', 'da', 'do', 'das', 'dos', 'e', 'em', 'na', 'no', 'nas', 'nos'];
+        
+        // Primeira palavra sempre maiúscula
+        if (index === 0) {
+          return palavra.charAt(0).toUpperCase() + palavra.slice(1);
+        }
+        
+        if (preposicoes.includes(palavra)) {
+          return palavra;
+        }
+        
+        // Primeira letra maiúscula
+        return palavra.charAt(0).toUpperCase() + palavra.slice(1);
+      })
+      .join(' ');
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     
@@ -42,6 +161,13 @@ const CapturaLead = () => {
     } else if (name === 'cpf') {
       const formattedValue = formatarCPF(value);
       setFormData(prev => ({ ...prev, [name]: formattedValue }));
+    } else if (name === 'cidade') {
+      const formattedValue = formatarCidade(value);
+      setFormData(prev => ({ ...prev, [name]: formattedValue }));
+    } else if (name === 'estado') {
+      // Resetar cidade e cidadeCustomizada quando estado muda
+      setFormData(prev => ({ ...prev, [name]: value, cidade: '' }));
+      setCidadeCustomizada(false);
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
@@ -88,11 +214,11 @@ const CapturaLead = () => {
     
     // Concatenar os melhores dias/horários à observação
     let observacoesComDias = formData.observacoes || '';
-    if (formData.melhor_dia1) {
-      observacoesComDias += `\n1º Melhor dia/horário: ${formData.melhor_dia1}`;
+    if (formData.melhor_dia1 && formData.melhor_horario1) {
+      observacoesComDias += `\n1º Melhor dia/horário: ${formData.melhor_dia1} às ${formData.melhor_horario1}`;
     }
-    if (formData.melhor_dia2) {
-      observacoesComDias += `\n2º Melhor dia/horário: ${formData.melhor_dia2}`;
+    if (formData.melhor_dia2 && formData.melhor_horario2) {
+      observacoesComDias += `\n2º Melhor dia/horário: ${formData.melhor_dia2} às ${formData.melhor_horario2}`;
     }
     const formDataToSend = {
       ...formData,
@@ -234,19 +360,6 @@ const CapturaLead = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Cidade</label>
-                <input
-                  type="text"
-                  name="cidade"
-                  className="form-input"
-                  value={formData.cidade}
-                  onChange={handleInputChange}
-                  placeholder="Digite sua cidade"
-                  disabled={loading}
-                />
-              </div>
-
-              <div className="form-group">
                 <label className="form-label">Estado</label>
                 <select
                   name="estado"
@@ -256,57 +369,155 @@ const CapturaLead = () => {
                   disabled={loading}
                 >
                   <option value="">Selecione seu estado</option>
-                  <option value="AC">Acre</option>
-                  <option value="AL">Alagoas</option>
-                  <option value="AP">Amapá</option>
-                  <option value="AM">Amazonas</option>
-                  <option value="BA">Bahia</option>
-                  <option value="CE">Ceará</option>
-                  <option value="DF">Distrito Federal</option>
-                  <option value="ES">Espírito Santo</option>
-                  <option value="GO">Goiás</option>
-                  <option value="MA">Maranhão</option>
-                  <option value="MT">Mato Grosso</option>
-                  <option value="MS">Mato Grosso do Sul</option>
-                  <option value="MG">Minas Gerais</option>
-                  <option value="PA">Pará</option>
-                  <option value="PB">Paraíba</option>
-                  <option value="PR">Paraná</option>
-                  <option value="PE">Pernambuco</option>
-                  <option value="PI">Piauí</option>
-                  <option value="RJ">Rio de Janeiro</option>
-                  <option value="RN">Rio Grande do Norte</option>
-                  <option value="RS">Rio Grande do Sul</option>
-                  <option value="RO">Rondônia</option>
-                  <option value="RR">Roraima</option>
-                  <option value="SC">Santa Catarina</option>
-                  <option value="SP">São Paulo</option>
-                  <option value="SE">Sergipe</option>
-                  <option value="TO">Tocantins</option>
+                  {estadosBrasileiros.map(estado => (
+                    <option key={estado.sigla} value={estado.sigla}>
+                      {estado.sigla} - {estado.nome}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               <div className="form-group">
-                <label className="form-label">1º Melhor dia/horário para agendamento</label>
+                <label className="form-label">Cidade</label>
+                {formData.estado && cidadesPorEstado[formData.estado] && !cidadeCustomizada ? (
+                  <select
+                    name="cidade"
+                    className="form-select"
+                    value={formData.cidade}
+                    onChange={(e) => {
+                      if (e.target.value === 'OUTRA') {
+                        setCidadeCustomizada(true);
+                        setFormData(prev => ({ ...prev, cidade: '' }));
+                      } else {
+                        handleInputChange(e);
+                      }
+                    }}
+                    disabled={loading}
+                  >
+                    <option value="">Selecione a cidade</option>
+                    {cidadesPorEstado[formData.estado].map(cidade => (
+                      <option key={cidade} value={cidade}>{cidade}</option>
+                    ))}
+                    <option value="OUTRA">Outra cidade</option>
+                  </select>
+                ) : (
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      name="cidade"
+                      className="form-input"
+                      value={formData.cidade}
+                      onChange={handleInputChange}
+                      placeholder="Digite o nome da cidade"
+                      disabled={loading || !formData.estado}
+                    />
+                    {formData.estado && cidadesPorEstado[formData.estado] && cidadeCustomizada && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ whiteSpace: 'nowrap', fontSize: '0.875rem', padding: '0.5rem' }}
+                        onClick={() => {
+                          setCidadeCustomizada(false);
+                          setFormData(prev => ({ ...prev, cidade: '' }));
+                        }}
+                        disabled={loading}
+                      >
+                        Voltar
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">1ª Opção - Melhor dia para agendamento</label>
                 <input
-                  type="datetime-local"
+                  type="date"
                   name="melhor_dia1"
                   className="form-input"
                   value={formData.melhor_dia1}
                   onChange={handleInputChange}
                   disabled={loading}
+                  min={new Date().toISOString().split('T')[0]}
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">2º Melhor dia/horário para agendamento</label>
+                <label className="form-label">1ª Opção - Melhor horário</label>
+                <select
+                  name="melhor_horario1"
+                  className="form-select"
+                  value={formData.melhor_horario1}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                >
+                  <option value="">Selecione o horário</option>
+                  <option value="08:00">08:00</option>
+                  <option value="08:30">08:30</option>
+                  <option value="09:00">09:00</option>
+                  <option value="09:30">09:30</option>
+                  <option value="10:00">10:00</option>
+                  <option value="10:30">10:30</option>
+                  <option value="11:00">11:00</option>
+                  <option value="11:30">11:30</option>
+                  <option value="12:00">12:00</option>
+                  <option value="12:30">12:30</option>
+                  <option value="13:00">13:00</option>
+                  <option value="13:30">13:30</option>
+                  <option value="14:00">14:00</option>
+                  <option value="14:30">14:30</option>
+                  <option value="15:00">15:00</option>
+                  <option value="15:30">15:30</option>
+                  <option value="16:00">16:00</option>
+                  <option value="16:30">16:30</option>
+                  <option value="17:00">17:00</option>
+                  <option value="17:30">17:30</option>
+                  <option value="18:00">18:00</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">2ª Opção - Melhor dia para agendamento</label>
                 <input
-                  type="datetime-local"
+                  type="date"
                   name="melhor_dia2"
                   className="form-input"
                   value={formData.melhor_dia2}
                   onChange={handleInputChange}
                   disabled={loading}
+                  min={new Date().toISOString().split('T')[0]}
                 />
+              </div>
+              <div className="form-group">
+                <label className="form-label">2ª Opção - Melhor horário</label>
+                <select
+                  name="melhor_horario2"
+                  className="form-select"
+                  value={formData.melhor_horario2}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                >
+                  <option value="">Selecione o horário</option>
+                  <option value="08:00">08:00</option>
+                  <option value="08:30">08:30</option>
+                  <option value="09:00">09:00</option>
+                  <option value="09:30">09:30</option>
+                  <option value="10:00">10:00</option>
+                  <option value="10:30">10:30</option>
+                  <option value="11:00">11:00</option>
+                  <option value="11:30">11:30</option>
+                  <option value="12:00">12:00</option>
+                  <option value="12:30">12:30</option>
+                  <option value="13:00">13:00</option>
+                  <option value="13:30">13:30</option>
+                  <option value="14:00">14:00</option>
+                  <option value="14:30">14:30</option>
+                  <option value="15:00">15:00</option>
+                  <option value="15:30">15:30</option>
+                  <option value="16:00">16:00</option>
+                  <option value="16:30">16:30</option>
+                  <option value="17:00">17:00</option>
+                  <option value="17:30">17:30</option>
+                  <option value="18:00">18:00</option>
+                </select>
               </div>
 
               <div className="form-group">
@@ -328,7 +539,7 @@ const CapturaLead = () => {
                 disabled={loading}
               >
                 {loading ? (
-                  <span className="loading-spinner">Enviando...</span>
+                  <div className="loading-spinner"></div>
                 ) : (
                   <>
                     <span>Agendar Consulta Gratuita</span>
@@ -467,7 +678,7 @@ const CapturaLead = () => {
           border: 1px solid rgba(255, 255, 255, 0.2);
           color: white;
           font-weight: 600;
-          font-size: 0.9rem;
+          font-size: 0.78rem;
         }
 
         .benefit-icon {
@@ -680,12 +891,29 @@ const CapturaLead = () => {
           opacity: 0.8;
         }
 
-        .cpf-info {
-          display: block;
-          color: #6b7280;
-          font-size: 0.85rem;
-          margin-top: 4px;
-          margin-left: 2px;
+        .btn {
+          padding: 10px 15px;
+          border: none;
+          border-radius: 8px;
+          font-size: 0.9rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+
+        .btn-secondary {
+          background: #e2e8f0;
+          color: #4a5568;
+          border: 1px solid #cbd5e0;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+          background: #cbd5e0;
+        }
+
+        .btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
         }
 
         @media (max-width: 768px) {
@@ -699,11 +927,6 @@ const CapturaLead = () => {
 
           .captura-form-container {
             padding: 30px 20px;
-          }
-
-          .benefit-item {
-            font-size: 0.8rem;
-            padding: 10px 12px;
           }
 
           .security-badges {

@@ -37,6 +37,28 @@ const Fechamentos = () => {
     carregarDados();
   }, []);
 
+  // Atualização automática dos dados a cada 30 segundos
+  useEffect(() => {
+    const interval = setInterval(() => {
+      carregarDados();
+    }, 30000); // 30 segundos
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Listener para sincronização entre telas
+  useEffect(() => {
+    const handleDataUpdate = () => {
+      carregarDados();
+    };
+
+    window.addEventListener('data_updated', handleDataUpdate);
+    
+    return () => {
+      window.removeEventListener('data_updated', handleDataUpdate);
+    };
+  }, []);
+
   // Controlar scroll do body quando modal estiver aberto
   useEffect(() => {
     if (modalAberto || showObservacoesModal) {
@@ -192,16 +214,41 @@ const Fechamentos = () => {
 
   const abrirModal = (fechamento = null) => {
     if (fechamento) {
+      console.log('Debug - Abrindo modal com fechamento:', fechamento);
       setFechamentoEditando(fechamento);
-      const valorFormatado = fechamento.valor_fechado 
-        ? parseFloat(fechamento.valor_fechado).toLocaleString('pt-BR', {
+      
+      // Garantir que valor_fechado seja um número válido
+      const valorOriginal = fechamento.valor_fechado;
+      let valorNumerico = '';
+      let valorFormatado = '';
+      
+      console.log('Debug - Valor original do banco:', valorOriginal, 'tipo:', typeof valorOriginal);
+      
+      if (valorOriginal !== null && valorOriginal !== undefined && valorOriginal !== '') {
+        // Converter para número, independente se vier como string ou número
+        const numeroLimpo = typeof valorOriginal === 'string' 
+          ? parseFloat(valorOriginal.replace(/[^\d.,-]/g, '').replace(',', '.'))
+          : parseFloat(valorOriginal);
+        
+        console.log('Debug - Número limpo:', numeroLimpo);
+        
+        if (!isNaN(numeroLimpo)) {
+          valorNumerico = numeroLimpo.toString();
+          valorFormatado = numeroLimpo.toLocaleString('pt-BR', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
-          })
-        : '';
+          });
+        }
+      }
+      
+      console.log('Debug - Valores finais:', { valorNumerico, valorFormatado });
       
       setNovoFechamento({ 
         ...fechamento, 
+        consultor_id: fechamento.consultor_id || '',
+        clinica_id: fechamento.clinica_id || '',
+        tipo_tratamento: fechamento.tipo_tratamento || '',
+        valor_fechado: valorNumerico,
         valor_formatado: valorFormatado 
       });
     } else {
@@ -250,11 +297,6 @@ const Fechamentos = () => {
         showWarningToast('Por favor, selecione um paciente!');
         return;
       }
-      
-      if (!novoFechamento.valor_fechado || parseFloat(novoFechamento.valor_fechado) <= 0) {
-        showWarningToast('Por favor, informe um valor válido!');
-        return;
-      }
 
       if (!fechamentoEditando && !contratoSelecionado) {
         showWarningToast('Por favor, selecione o contrato em PDF!');
@@ -275,18 +317,50 @@ const Fechamentos = () => {
       
       formData.append('paciente_id', parseInt(novoFechamento.paciente_id));
       
-      if (novoFechamento.consultor_id && novoFechamento.consultor_id.trim() !== '') {
+      if (novoFechamento.consultor_id && novoFechamento.consultor_id !== '') {
         formData.append('consultor_id', parseInt(novoFechamento.consultor_id));
       }
       
-      if (novoFechamento.clinica_id && novoFechamento.clinica_id.trim() !== '') {
+      if (novoFechamento.clinica_id && novoFechamento.clinica_id !== '') {
         formData.append('clinica_id', parseInt(novoFechamento.clinica_id));
       }
       
-      formData.append('valor_fechado', parseFloat(novoFechamento.valor_fechado));
+      // Validar e enviar valor_fechado
+      const valorFechado = parseFloat(novoFechamento.valor_fechado);
+      console.log('Debug - Validação valor:', {
+        valorOriginal: novoFechamento.valor_fechado,
+        valorFechado,
+        isNaN: isNaN(valorFechado),
+        condicao: isNaN(valorFechado) || valorFechado < 0,
+        fechamentoEditando: !!fechamentoEditando
+      });
+      
+      // Para novos fechamentos, valor deve ser maior que 0
+      // Para fechamentos existentes (editando), pode ser 0 ou maior
+      const valorMinimo = fechamentoEditando ? 0 : 0.01;
+      
+      if (isNaN(valorFechado) || valorFechado < 0) {
+        showWarningToast('Por favor, informe um valor válido!');
+        return;
+      }
+      
+      if (valorFechado < valorMinimo) {
+        showWarningToast(fechamentoEditando ? 
+          'Valor deve ser maior ou igual a zero!' : 
+          'Valor deve ser maior que zero!');
+        return;
+      }
+      
+      formData.append('valor_fechado', valorFechado);
       formData.append('data_fechamento', novoFechamento.data_fechamento);
       formData.append('tipo_tratamento', novoFechamento.tipo_tratamento || '');
       formData.append('observacoes', novoFechamento.observacoes || '');
+      
+      // Debug: verificar o que está sendo enviado
+      console.log('Debug - Dados sendo enviados no FormData:');
+      for (let pair of formData.entries()) {
+        console.log(pair[0] + ': ' + pair[1]);
+      }
       
       if (contratoSelecionado) {
         formData.append('contrato', contratoSelecionado);
@@ -444,6 +518,13 @@ const Fechamentos = () => {
           paciente_id: pacienteId,
           consultor_id: paciente.consultor_id.toString()
         }));
+      } else {
+        // Se não tem consultor, manter vazio
+        setNovoFechamento(prev => ({
+          ...prev,
+          paciente_id: pacienteId,
+          consultor_id: ''
+        }));
       }
       
       // Buscar último agendamento do paciente para pegar a clínica
@@ -455,6 +536,12 @@ const Fechamentos = () => {
         setNovoFechamento(prev => ({
           ...prev,
           clinica_id: ultimoAgendamento.clinica_id.toString()
+        }));
+      } else {
+        // Se não tem clínica, manter vazio
+        setNovoFechamento(prev => ({
+          ...prev,
+          clinica_id: ''
         }));
       }
     }
@@ -752,7 +839,7 @@ const Fechamentos = () => {
                               </button>
                             )}
                             <button 
-                              className="btn btn-sm btn-secondary"
+                              className="btn-action"
                               onClick={() => abrirModal(fechamento)}
                               title="Editar fechamento"
                             >
@@ -761,16 +848,22 @@ const Fechamentos = () => {
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                               </svg>
                             </button>
-                            <button 
-                              className="btn btn-sm btn-danger"
-                              onClick={() => excluirFechamento(fechamento.id)}
-                              title="Excluir fechamento"
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <polyline points="3 6 5 6 21 6"></polyline>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                              </svg>
-                            </button>
+                            {isAdmin && (
+                              <button 
+                                className="btn-action"
+                                onClick={() => excluirFechamento(fechamento.id)}
+                                title="Excluir fechamento"
+                                style={{ color: '#dc2626', marginLeft: '0.5rem' }}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <polyline points="3 6 5 6 21 6"></polyline>
+                                  <path d="m19 6-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                                  <path d="m10 11 0 6"></path>
+                                  <path d="m14 11 0 6"></path>
+                                  <path d="M5 6l1-2a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1l1 2"></path>
+                                </svg>
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -801,12 +894,15 @@ const Fechamentos = () => {
                 <label className="form-label">Paciente *</label>
                 <select 
                   className="form-select"
-                  value={novoFechamento.paciente_id}
+                  value={novoFechamento.paciente_id || ''}
                   onChange={(e) => handlePacienteChange(e.target.value)}
                   required
                 >
                   <option value="">Selecione um paciente</option>
-                  {pacientes.map(p => (
+                  {pacientes.filter(p => 
+                    // Mostrar apenas pacientes com status apropriados para fechamento
+                    ['agendado', 'compareceu', 'fechado'].includes(p.status)
+                  ).map(p => (
                     <option key={p.id} value={p.id}>
                       {p.nome} {p.telefone && `- ${p.telefone}`}
                     </option>
@@ -831,7 +927,7 @@ const Fechamentos = () => {
                   <label className="form-label">Consultor</label>
                   <select 
                     className="form-select"
-                    value={novoFechamento.consultor_id}
+                    value={novoFechamento.consultor_id || ''}
                     onChange={(e) => setNovoFechamento({...novoFechamento, consultor_id: e.target.value})}
                   >
                     <option value="">Selecione um consultor</option>
@@ -846,7 +942,7 @@ const Fechamentos = () => {
                 <label className="form-label">Clínica</label>
                 <select 
                   className="form-select"
-                  value={novoFechamento.clinica_id}
+                  value={novoFechamento.clinica_id || ''}
                   onChange={(e) => setNovoFechamento({...novoFechamento, clinica_id: e.target.value})}
                 >
                   <option value="">Selecione uma clínica</option>
@@ -871,7 +967,7 @@ const Fechamentos = () => {
                   <label className="form-label">Tipo de Tratamento</label>
                   <select 
                     className="form-select"
-                    value={novoFechamento.tipo_tratamento}
+                    value={novoFechamento.tipo_tratamento || ''}
                     onChange={(e) => setNovoFechamento({...novoFechamento, tipo_tratamento: e.target.value})}
                   >
                     <option value="">Selecione</option>

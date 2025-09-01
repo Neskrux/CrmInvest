@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 
 const Pacientes = () => {
-  const { makeRequest } = useAuth();
+  const { makeRequest, user, isAdmin } = useAuth();
   const [pacientes, setPacientes] = useState([]);
   const [novosLeads, setNovosLeads] = useState([]);
   const [consultores, setConsultores] = useState([]);
@@ -38,8 +38,34 @@ const Pacientes = () => {
   const [viewPaciente, setViewPaciente] = useState(null);
   const [showObservacoesModal, setShowObservacoesModal] = useState(false);
   const [observacoesAtual, setObservacoesAtual] = useState('');
+
+  // Estados para modal de fechamento
+  const [showFechamentoModal, setShowFechamentoModal] = useState(false);
+  const [pacienteParaFechar, setPacienteParaFechar] = useState(null);
+  const [valorFechamento, setValorFechamento] = useState('');
+  const [valorFormatado, setValorFormatado] = useState('');
+  const [salvandoFechamento, setSalvandoFechamento] = useState(false);
+  const [contratoFechamento, setContratoFechamento] = useState(null);
+  const [tipoTratamentoFechamento, setTipoTratamentoFechamento] = useState('');
+  const [observacoesFechamento, setObservacoesFechamento] = useState('');
+  const [dataFechamento, setDataFechamento] = useState(new Date().toISOString().split('T')[0]);
+
+  // Estado para controlar valores temporários dos selects (quando modal está aberto)
+  const [statusTemporario, setStatusTemporario] = useState({});
   const { error: showErrorToast, success: showSuccessToast } = useToast();
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
+
+  // Estados para modal de agendamento
+  const [showAgendamentoModal, setShowAgendamentoModal] = useState(false);
+  const [pacienteParaAgendar, setPacienteParaAgendar] = useState(null);
+  const [clinicas, setClinicas] = useState([]);
+  const [agendamentoData, setAgendamentoData] = useState({
+    clinica_id: '',
+    data_agendamento: '',
+    horario: '',
+    observacoes: ''
+  });
+  const [salvandoAgendamento, setSalvandoAgendamento] = useState(false);
 
   // Estados brasileiros
   const estadosBrasileiros = [
@@ -105,27 +131,38 @@ const Pacientes = () => {
 
   // Status disponíveis para o pipeline
   const statusOptions = [
-    { value: 'lead', label: 'Lead', color: '#f59e0b' },
-    { value: 'em_conversa', label: 'Em conversa', color: '#0ea5e9' },
-    { value: 'cpf_aprovado', label: 'CPF Aprovado', color: '#10b981' },
-    { value: 'cpf_reprovado', label: 'CPF Reprovado', color: '#ef4444' },
-    { value: 'nao_passou_cpf', label: 'Não passou CPF', color: '#6366f1' },
-    { value: 'nao_tem_outro_cpf', label: 'Não tem outro CPF', color: '#a3a3a3' },
-    { value: 'nao_tem_interesse', label: 'Não tem interesse', color: '#9ca3af' },
-    { value: 'sem_cedente', label: 'Sem cedente (CPF Aprovado)', color: '#fbbf24' },
+    { value: 'lead', label: 'Lead', color: '#f59e0b', description: 'Lead inicial' },
+    { value: 'em_conversa', label: 'Em conversa', color: '#0ea5e9', description: 'Conversando com o cliente' },
+    { value: 'cpf_aprovado', label: 'CPF Aprovado', color: '#10b981', description: 'CPF foi aprovado' },
+    { value: 'cpf_reprovado', label: 'CPF Reprovado', color: '#ef4444', description: 'CPF foi reprovado' },
+    { value: 'nao_passou_cpf', label: 'Não passou CPF', color: '#6366f1', description: 'Cliente não forneceu CPF' },
+    { value: 'nao_tem_outro_cpf', label: 'Não tem outro CPF', color: '#a3a3a3', description: 'Cliente não tem CPF alternativo' },
+    { value: 'nao_tem_interesse', label: 'Não tem interesse', color: '#9ca3af', description: 'Cliente perdeu interesse' },
+    { value: 'sem_cedente', label: 'Sem cedente (CPF Aprovado)', color: '#fbbf24', description: 'CPF aprovado mas sem cedente' },
     // Demais status no final
-    { value: 'agendado', label: 'Agendado', color: '#3b82f6' },
-    { value: 'compareceu', label: 'Compareceu', color: '#10b981' },
-    { value: 'fechado', label: 'Fechado', color: '#059669' },
-    { value: 'nao_fechou', label: 'Não Fechou', color: '#dc2626' },
-    { value: 'nao_compareceu', label: 'Não Compareceu', color: '#ef4444' },
-    { value: 'reagendado', label: 'Reagendado', color: '#8b5cf6' }
+    { value: 'agendado', label: 'Agendado', color: '#3b82f6', description: 'Abre modal para criar agendamento' },
+    { value: 'compareceu', label: 'Compareceu', color: '#10b981', description: 'Cliente compareceu ao agendamento' },
+    { value: 'fechado', label: 'Fechado', color: '#059669', description: '💰 Abre modal para criar fechamento' },
+    { value: 'nao_fechou', label: 'Não Fechou', color: '#dc2626', description: 'Cliente não fechou o negócio' },
+    { value: 'nao_compareceu', label: 'Não Compareceu', color: '#ef4444', description: 'Cliente não compareceu' },
+    { value: 'reagendado', label: 'Reagendado', color: '#8b5cf6', description: 'Agendamento foi reagendado' }
   ];
 
   useEffect(() => {
     fetchPacientes();
     fetchConsultores();
+    fetchClinicas();
     fetchNovosLeads(); // Sempre buscar novos leads para mostrar o badge
+  }, []);
+
+  // Atualização automática dos dados a cada 30 segundos
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchPacientes();
+      fetchNovosLeads();
+    }, 30000); // 30 segundos
+
+    return () => clearInterval(interval);
   }, []);
 
   // Atualizar novos leads quando mudar de aba
@@ -137,7 +174,7 @@ const Pacientes = () => {
 
   // Controlar scroll do body quando modal estiver aberto
   useEffect(() => {
-    if (showModal || showViewModal || showObservacoesModal) {
+    if (showModal || showViewModal || showObservacoesModal || showAgendamentoModal) {
       // Bloquear scroll da página
       document.body.style.overflow = 'hidden';
     } else {
@@ -149,7 +186,7 @@ const Pacientes = () => {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [showModal, showViewModal, showObservacoesModal]);
+  }, [showModal, showViewModal, showObservacoesModal, showAgendamentoModal, showFechamentoModal]);
   
   //Sempre que filtros ou a lista mudarem, voltar para a primeira página
   useEffect(() => {
@@ -197,6 +234,21 @@ const Pacientes = () => {
       }
     } catch (error) {
       console.error('Erro ao carregar consultores:', error);
+    }
+  };
+
+  const fetchClinicas = async () => {
+    try {
+      const response = await makeRequest('/clinicas');
+      const data = await response.json();
+      
+      if (response.ok) {
+        setClinicas(data);
+      } else {
+        console.error('Erro ao carregar clínicas:', data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar clínicas:', error);
     }
   };
 
@@ -435,6 +487,28 @@ const Pacientes = () => {
   };
 
   const updateStatus = async (pacienteId, newStatus) => {
+    // Se o status for "agendado" ou "fechado", abrir modal primeiro sem atualizar status
+    if (newStatus === 'agendado') {
+      const paciente = pacientes.find(p => p.id === pacienteId);
+      if (paciente) {
+        // Definir status temporário para o select
+        setStatusTemporario(prev => ({ ...prev, [pacienteId]: newStatus }));
+        abrirModalAgendamento(paciente, newStatus);
+      }
+      return;
+    }
+    
+    if (newStatus === 'fechado') {
+      const paciente = pacientes.find(p => p.id === pacienteId);
+      if (paciente) {
+        // Definir status temporário para o select
+        setStatusTemporario(prev => ({ ...prev, [pacienteId]: newStatus }));
+        abrirModalFechamento(paciente, newStatus);
+      }
+      return;
+    }
+
+    // Para outros status, atualizar normalmente
     try {
       const response = await makeRequest(`/pacientes/${pacienteId}/status`, {
         method: 'PUT',
@@ -444,14 +518,109 @@ const Pacientes = () => {
       const data = await response.json();
       
       if (response.ok) {
-        showSuccessToast('Status atualizado com sucesso!');
-        fetchPacientes();
+        // Atualizar o estado local imediatamente para melhor UX
+        setPacientes(prevPacientes => 
+          prevPacientes.map(paciente => 
+            paciente.id === pacienteId 
+              ? { ...paciente, status: newStatus }
+              : paciente
+          )
+        );
+
+        // Mensagem personalizada baseada no status
+        let message = 'Status atualizado com sucesso!';
+        
+        showSuccessToast(message);
+        
+        // Recarregar dados completos para garantir sincronia entre todas as telas
+        await fetchPacientes();
+        
+        // Também forçar atualização nas outras telas via localStorage para sincronização imediata
+        const timestamp = Date.now();
+        localStorage.setItem('data_sync_trigger', timestamp.toString());
+        window.dispatchEvent(new CustomEvent('data_updated', { detail: { timestamp } }));
       } else {
         showErrorToast('Erro ao atualizar status: ' + data.error);
       }
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
       showErrorToast('Erro ao atualizar status');
+    }
+  };
+
+  // Função auxiliar para atualizar status após confirmação do modal
+  const atualizarStatusPaciente = async (pacienteId, newStatus) => {
+    try {
+      const response = await makeRequest(`/pacientes/${pacienteId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Atualizar o estado local imediatamente para melhor UX
+        setPacientes(prevPacientes => 
+          prevPacientes.map(paciente => 
+            paciente.id === pacienteId 
+              ? { ...paciente, status: newStatus }
+              : paciente
+          )
+        );
+
+        // Recarregar dados completos para garantir sincronia entre todas as telas
+        await fetchPacientes();
+        
+        // Também forçar atualização nas outras telas via localStorage para sincronização imediata
+        const timestamp = Date.now();
+        localStorage.setItem('data_sync_trigger', timestamp.toString());
+        window.dispatchEvent(new CustomEvent('data_updated', { detail: { timestamp } }));
+        
+        return true;
+      } else {
+        showErrorToast('Erro ao atualizar status: ' + data.error);
+        return false;
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar status:', error);
+      showErrorToast('Erro ao atualizar status');
+      return false;
+    }
+  };
+
+  const excluirPaciente = async (pacienteId) => {
+    // Confirmar antes de excluir
+    if (!window.confirm('Tem certeza que deseja excluir este paciente? Esta ação não pode ser desfeita e removerá todos os agendamentos e fechamentos relacionados.')) {
+      return;
+    }
+
+    try {
+      const response = await makeRequest(`/pacientes/${pacienteId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        showSuccessToast('Paciente excluído com sucesso!');
+        
+        // Atualizar estado local removendo o paciente
+        setPacientes(prevPacientes => 
+          prevPacientes.filter(paciente => paciente.id !== pacienteId)
+        );
+        
+        // Recarregar dados para garantir sincronia
+        await fetchPacientes();
+        
+        // Forçar atualização nas outras telas
+        const timestamp = Date.now();
+        localStorage.setItem('data_sync_trigger', timestamp.toString());
+        window.dispatchEvent(new CustomEvent('data_updated', { detail: { timestamp } }));
+      } else {
+        const data = await response.json();
+        showErrorToast('Erro ao excluir paciente: ' + (data.error || 'Erro desconhecido'));
+      }
+    } catch (error) {
+      console.error('Erro ao excluir paciente:', error);
+      showErrorToast('Erro ao excluir paciente');
     }
   };
 
@@ -479,6 +648,221 @@ const Pacientes = () => {
       return `${numbers.substring(0, 3)}.${numbers.substring(3, 6)}.${numbers.substring(6, 9)}-${numbers.substring(9)}`;
     }
     return cpf;
+  };
+
+  // Funções do modal de agendamento
+  const abrirModalAgendamento = (paciente, novoStatus = null) => {
+    setPacienteParaAgendar({ ...paciente, novoStatus });
+    setAgendamentoData({
+      clinica_id: '',
+      data_agendamento: '',
+      horario: '',
+      observacoes: ''
+    });
+    setShowAgendamentoModal(true);
+  };
+
+  const fecharModalAgendamento = () => {
+    // Limpar status temporário quando cancelar
+    if (pacienteParaAgendar && pacienteParaAgendar.novoStatus) {
+      setStatusTemporario(prev => {
+        const newState = { ...prev };
+        delete newState[pacienteParaAgendar.id];
+        return newState;
+      });
+    }
+    
+    setShowAgendamentoModal(false);
+    setPacienteParaAgendar(null);
+    setAgendamentoData({
+      clinica_id: '',
+      data_agendamento: '',
+      horario: '',
+      observacoes: ''
+    });
+  };
+
+  const salvarAgendamento = async () => {
+    if (!agendamentoData.clinica_id || !agendamentoData.data_agendamento || !agendamentoData.horario) {
+      showErrorToast('Por favor, preencha todos os campos obrigatórios!');
+      return;
+    }
+
+    setSalvandoAgendamento(true);
+    try {
+      const response = await makeRequest('/agendamentos', {
+        method: 'POST',
+        body: JSON.stringify({
+          paciente_id: pacienteParaAgendar.id,
+          consultor_id: pacienteParaAgendar.consultor_id,
+          clinica_id: parseInt(agendamentoData.clinica_id),
+          data_agendamento: agendamentoData.data_agendamento,
+          horario: agendamentoData.horario,
+          status: 'agendado',
+          observacoes: agendamentoData.observacoes || ''
+        })
+      });
+
+      if (response.ok) {
+        // Se há um novo status para atualizar, atualizar o status do paciente
+        if (pacienteParaAgendar.novoStatus) {
+          await atualizarStatusPaciente(pacienteParaAgendar.id, pacienteParaAgendar.novoStatus);
+          // Limpar status temporário após confirmação
+          setStatusTemporario(prev => {
+            const newState = { ...prev };
+            delete newState[pacienteParaAgendar.id];
+            return newState;
+          });
+        }
+        
+        showSuccessToast('Agendamento criado com sucesso!');
+        fecharModalAgendamento();
+      } else {
+        const data = await response.json();
+        showErrorToast('Erro ao criar agendamento: ' + (data.error || 'Erro desconhecido'));
+      }
+    } catch (error) {
+      console.error('Erro ao salvar agendamento:', error);
+      showErrorToast('Erro ao salvar agendamento: ' + error.message);
+    } finally {
+      setSalvandoAgendamento(false);
+    }
+  };
+
+  // Funções do modal de fechamento
+  const abrirModalFechamento = (paciente, novoStatus = null) => {
+    setPacienteParaFechar({ ...paciente, novoStatus });
+    setValorFechamento('');
+    setValorFormatado('');
+    setContratoFechamento(null);
+    setTipoTratamentoFechamento(paciente.tipo_tratamento || '');
+    setObservacoesFechamento('');
+    setDataFechamento(new Date().toISOString().split('T')[0]);
+    setShowFechamentoModal(true);
+  };
+
+  const fecharModalFechamento = () => {
+    // Limpar status temporário quando cancelar
+    if (pacienteParaFechar && pacienteParaFechar.novoStatus) {
+      setStatusTemporario(prev => {
+        const newState = { ...prev };
+        delete newState[pacienteParaFechar.id];
+        return newState;
+      });
+    }
+    
+    setShowFechamentoModal(false);
+    setPacienteParaFechar(null);
+    setValorFechamento('');
+    setValorFormatado('');
+    setContratoFechamento(null);
+    setTipoTratamentoFechamento('');
+    setObservacoesFechamento('');
+    setDataFechamento(new Date().toISOString().split('T')[0]);
+  };
+
+  const formatarValorInput = (valor) => {
+    const numbers = valor.replace(/[^\d]/g, '');
+    const formatted = new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(numbers / 100);
+    return formatted;
+  };
+
+  const desformatarValor = (valorFormatado) => {
+    return valorFormatado.replace(/[^\d]/g, '') / 100;
+  };
+
+  const handleValorChange = (e) => {
+    const valorDigitado = e.target.value;
+    const valorFormatado = formatarValorInput(valorDigitado);
+    const valorNumerico = desformatarValor(valorFormatado);
+    
+    setValorFormatado(valorFormatado);
+    setValorFechamento(valorNumerico);
+  };
+
+  const confirmarFechamento = async () => {
+    if (!valorFechamento || valorFechamento <= 0) {
+      showErrorToast('Por favor, informe um valor válido para o fechamento!');
+      return;
+    }
+
+    if (!contratoFechamento) {
+      showErrorToast('Por favor, selecione o contrato em PDF!');
+      return;
+    }
+
+    if (contratoFechamento && contratoFechamento.type !== 'application/pdf') {
+      showErrorToast('Apenas arquivos PDF são permitidos para o contrato!');
+      return;
+    }
+
+    if (contratoFechamento && contratoFechamento.size > 10 * 1024 * 1024) {
+      showErrorToast('O arquivo deve ter no máximo 10MB!');
+      return;
+    }
+
+    setSalvandoFechamento(true);
+    try {
+      // Criar o fechamento com o valor informado
+      const formData = new FormData();
+      formData.append('paciente_id', pacienteParaFechar.id);
+      formData.append('consultor_id', pacienteParaFechar.consultor_id || '');
+      formData.append('clinica_id', ''); // Não temos clínica associada diretamente ao paciente
+      formData.append('valor_fechado', parseFloat(valorFechamento));
+      formData.append('data_fechamento', dataFechamento);
+      formData.append('tipo_tratamento', tipoTratamentoFechamento || '');
+      formData.append('observacoes', observacoesFechamento || 'Fechamento criado pelo pipeline');
+      
+      if (contratoFechamento) {
+        formData.append('contrato', contratoFechamento);
+      }
+
+      const API_BASE_URL = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000/api';
+      const token = localStorage.getItem('token');
+      
+      const fechamentoResponse = await fetch(`${API_BASE_URL}/fechamentos`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (fechamentoResponse.ok) {
+        // Se há um novo status para atualizar, atualizar o status do paciente
+        if (pacienteParaFechar.novoStatus) {
+          await atualizarStatusPaciente(pacienteParaFechar.id, pacienteParaFechar.novoStatus);
+          // Limpar status temporário após confirmação
+          setStatusTemporario(prev => {
+            const newState = { ...prev };
+            delete newState[pacienteParaFechar.id];
+            return newState;
+          });
+        }
+        
+        showSuccessToast(`Fechamento criado com sucesso! Valor: R$ ${valorFormatado}`);
+        fecharModalFechamento();
+        
+        // Recarregar dados para manter sincronia
+        await fetchPacientes();
+        
+        // Forçar atualização nas outras telas
+        const timestamp = Date.now();
+        localStorage.setItem('data_sync_trigger', timestamp.toString());
+        window.dispatchEvent(new CustomEvent('data_updated', { detail: { timestamp } }));
+      } else {
+        const errorData = await fechamentoResponse.json();
+        showErrorToast('Erro ao criar fechamento: ' + errorData.error);
+      }
+    } catch (error) {
+      console.error('Erro ao confirmar fechamento:', error);
+      showErrorToast('Erro ao confirmar fechamento: ' + error.message);
+    } finally {
+      setSalvandoFechamento(false);
+    }
   };
 
   const resetForm = () => {
@@ -550,6 +934,24 @@ const Pacientes = () => {
       <div className="page-header">
         <h1 className="page-title">Gestão de Pacientes</h1>
         <p className="page-subtitle">Cadastre e acompanhe seus pacientes e leads</p>
+
+        <div style={{
+          backgroundColor: '#f0f9ff',
+          border: '1px solid #bae6fd',
+          borderRadius: '8px',
+          padding: '1rem',
+          marginTop: '1rem',
+          fontSize: '0.875rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <span style={{ color: '#0284c7', fontSize: '1.25rem' }}>🔄</span>
+            <strong style={{ color: '#0c4a6e' }}>Pipeline Automático Ativo</strong>
+          </div>
+          <div style={{ color: '#0c4a6e', lineHeight: '1.4' }}>
+            • Ao alterar status para <strong>"Agendado"</strong> → Abre modal para criar agendamento com dados específicos<br/>
+            • Ao alterar status para <strong>"Fechado"</strong> → Abre modal para criar fechamento com valor e contrato
+          </div>
+        </div>
       </div>
 
       {/* Navegação por abas */}
@@ -728,7 +1130,7 @@ const Pacientes = () => {
                       <th>Tipo</th>
                       <th>Status</th>
                       <th>Cadastrado</th>
-                      <th style={{ width: '100px' }}>Ações</th>
+                      <th style={{ width: '140px' }}>Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -791,7 +1193,7 @@ const Pacientes = () => {
                           </td>
                           <td>
                             <select
-                              value={paciente.status}
+                              value={statusTemporario[paciente.id] || paciente.status}
                               onChange={(e) => updateStatus(paciente.id, e.target.value)}
                               style={{
                                 padding: '0.25rem 0.5rem',
@@ -802,9 +1204,10 @@ const Pacientes = () => {
                                 border: `1px solid ${statusInfo.color}`,
                                 cursor: 'pointer'
                               }}
+                              title={statusInfo.description || statusInfo.label}
                             >
                               {statusOptions.map(option => (
-                                <option key={option.value} value={option.value}>
+                                <option key={option.value} value={option.value} title={option.description}>
                                   {option.label}
                                 </option>
                               ))}
@@ -833,6 +1236,22 @@ const Pacientes = () => {
                                 <circle cx="12" cy="12" r="3" />
                               </svg>
                             </button>
+                            {isAdmin && (
+                              <button
+                                onClick={() => excluirPaciente(paciente.id)}
+                                className="btn-action"
+                                title="Excluir Paciente"
+                                style={{ marginLeft: '0.5rem', color: '#dc2626' }}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <polyline points="3 6 5 6 21 6"></polyline>
+                                  <path d="m19 6-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                                  <path d="m10 11 0 6"></path>
+                                  <path d="m14 11 0 6"></path>
+                                  <path d="M5 6l1-2a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1l1 2"></path>
+                                </svg>
+                              </button>
+                            )}
                           </td>
                         </tr>
                       );
@@ -1115,6 +1534,7 @@ const Pacientes = () => {
                     <option value="">Selecione</option>
                     <option value="Estético">Estético</option>
                     <option value="Odontológico">Odontológico</option>
+                    <option value="Ambos">Ambos</option>
                   </select>
                 </div>
 
@@ -1252,6 +1672,254 @@ const Pacientes = () => {
                   onClick={() => setShowObservacoesModal(false)}
                 >
                   Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Agendamento */}
+      {showAgendamentoModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Criar Agendamento</h2>
+              <button className="close-btn" onClick={fecharModalAgendamento}>
+                ×
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem' }}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <p style={{ 
+                  color: '#374151', 
+                  marginBottom: '1rem',
+                  lineHeight: '1.5'
+                }}>
+                  <strong>Paciente:</strong> {pacienteParaAgendar?.nome}
+                </p>
+                <p style={{ 
+                  color: '#6b7280', 
+                  fontSize: '0.875rem',
+                  lineHeight: '1.5'
+                }}>
+                  Preencha os dados do agendamento:
+                </p>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Clínica *</label>
+                <select 
+                  className="form-select"
+                  value={agendamentoData.clinica_id}
+                  onChange={(e) => setAgendamentoData({...agendamentoData, clinica_id: e.target.value})}
+                >
+                  <option value="">Selecione uma clínica</option>
+                  {clinicas.map(c => (
+                    <option key={c.id} value={c.id}>{c.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Data do Agendamento *</label>
+                  <input 
+                    type="date"
+                    className="form-input"
+                    value={agendamentoData.data_agendamento}
+                    onChange={(e) => setAgendamentoData({...agendamentoData, data_agendamento: e.target.value})}
+                    min={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Horário *</label>
+                  <input 
+                    type="time"
+                    className="form-input"
+                    value={agendamentoData.horario}
+                    onChange={(e) => setAgendamentoData({...agendamentoData, horario: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Observações</label>
+                <textarea 
+                  className="form-textarea"
+                  rows="3"
+                  value={agendamentoData.observacoes}
+                  onChange={(e) => setAgendamentoData({...agendamentoData, observacoes: e.target.value})}
+                  placeholder="Informações adicionais sobre o agendamento..."
+                />
+              </div>
+
+              <div style={{ 
+                display: 'flex', 
+                gap: '1rem', 
+                justifyContent: 'flex-end' 
+              }}>
+                <button 
+                  type="button"
+                  className="btn btn-secondary" 
+                  onClick={fecharModalAgendamento}
+                  disabled={salvandoAgendamento}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={salvarAgendamento}
+                  disabled={salvandoAgendamento || !agendamentoData.clinica_id || !agendamentoData.data_agendamento || !agendamentoData.horario}
+                >
+                  {salvandoAgendamento ? (
+                    <>
+                      <span className="loading-spinner" style={{ 
+                        display: 'inline-block', 
+                        verticalAlign: 'middle', 
+                        marginRight: 8 
+                      }}></span>
+                      Criando...
+                    </>
+                  ) : (
+                    'Criar Agendamento'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Fechamento */}
+      {showFechamentoModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Criar Fechamento</h2>
+              <button className="close-btn" onClick={fecharModalFechamento}>
+                ×
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem' }}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <p style={{ 
+                  color: '#374151', 
+                  marginBottom: '1rem',
+                  lineHeight: '1.5'
+                }}>
+                  <strong>Paciente:</strong> {pacienteParaFechar?.nome}
+                </p>
+                <p style={{ 
+                  color: '#6b7280', 
+                  fontSize: '0.875rem',
+                  lineHeight: '1.5'
+                }}>
+                  Preencha os dados do fechamento:
+                </p>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Valor do Fechamento *</label>
+                <input 
+                  type="text"
+                  className="form-input"
+                  value={valorFormatado}
+                  onChange={handleValorChange}
+                  placeholder="R$ 0,00"
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Contrato (PDF) *</label>
+                <input 
+                  type="file"
+                  className="form-input"
+                  accept=".pdf"
+                  onChange={(e) => setContratoFechamento(e.target.files[0])}
+                />
+                {contratoFechamento && (
+                  <div style={{ 
+                    marginTop: '0.5rem', 
+                    fontSize: '0.875rem', 
+                    color: '#059669' 
+                  }}>
+                    ✓ {contratoFechamento.name}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Tipo de Tratamento</label>
+                  <select 
+                    className="form-select"
+                    value={tipoTratamentoFechamento}
+                    onChange={(e) => setTipoTratamentoFechamento(e.target.value)}
+                  >
+                    <option value="">Selecione</option>
+                    <option value="Estético">Estético</option>
+                    <option value="Odontológico">Odontológico</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Data do Fechamento</label>
+                  <input 
+                    type="date"
+                    className="form-input"
+                    value={dataFechamento}
+                    onChange={(e) => setDataFechamento(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Observações</label>
+                <textarea 
+                  className="form-textarea"
+                  rows="3"
+                  value={observacoesFechamento}
+                  onChange={(e) => setObservacoesFechamento(e.target.value)}
+                  placeholder="Observações sobre o fechamento..."
+                />
+              </div>
+
+              <div style={{ 
+                display: 'flex', 
+                gap: '1rem', 
+                justifyContent: 'flex-end' 
+              }}>
+                <button 
+                  type="button"
+                  className="btn btn-secondary" 
+                  onClick={fecharModalFechamento}
+                  disabled={salvandoFechamento}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={confirmarFechamento}
+                  disabled={salvandoFechamento || !valorFechamento}
+                >
+                  {salvandoFechamento ? (
+                    <>
+                      <span className="loading-spinner" style={{ 
+                        display: 'inline-block', 
+                        verticalAlign: 'middle', 
+                        marginRight: 8 
+                      }}></span>
+                      Criando...
+                    </>
+                  ) : (
+                    'Criar Fechamento'
+                  )}
                 </button>
               </div>
             </div>
