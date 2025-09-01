@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 
 const Agendamentos = () => {
-  const { makeRequest } = useAuth();
+  const { makeRequest, user, isAdmin } = useAuth();
   const { showSuccessToast, showErrorToast } = useToast();
   const [agendamentos, setAgendamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
@@ -33,19 +33,30 @@ const Agendamentos = () => {
   const [showDetalhesModal, setShowDetalhesModal] = useState(false);
   const [detalhesAtual, setDetalhesAtual] = useState({ telefone: '', observacoes: '' });
 
+  // Estados para modal de valor de fechamento
+  const [showValorModal, setShowValorModal] = useState(false);
+  const [agendamentoParaFechar, setAgendamentoParaFechar] = useState(null);
+  const [valorFechamento, setValorFechamento] = useState('');
+  const [valorFormatado, setValorFormatado] = useState('');
+  const [salvandoFechamento, setSalvandoFechamento] = useState(false);
+  const [contratoFechamento, setContratoFechamento] = useState(null);
+  const [tipoTratamentoFechamento, setTipoTratamentoFechamento] = useState('');
+  const [observacoesFechamento, setObservacoesFechamento] = useState('');
+  const [dataFechamento, setDataFechamento] = useState(new Date().toISOString().split('T')[0]);
+
   // Status disponíveis para agendamentos
   const statusOptions = [
-    { value: 'agendado', label: 'Agendado', color: '#2563eb' },
-    { value: 'lembrado', label: 'Lembrado', color: '#059669' },
-    { value: 'compareceu', label: 'Compareceu', color: '#10b981' },
-    { value: 'nao_compareceu', label: 'Não Compareceu', color: '#dc2626' },
-    { value: 'fechado', label: 'Fechado', color: '#059669' },
-    { value: 'nao_fechou', label: 'Não Fechou', color: '#ef4444' },
-    { value: 'reagendado', label: 'Reagendado', color: '#8b5cf6' },
-    { value: 'cancelado', label: 'Cancelado', color: '#6b7280' },
-    { value: 'nao_passou_cpf', label: 'Não passou CPF', color: '#6366f1' },
-    { value: 'aguardando_fechamento', label: 'Aguardando Fechamento', color: '#fbbf24' },
-    { value: 'nao_quer_reagendar', label: 'Não quer reagendar', color: '#9ca3af' }
+    { value: 'agendado', label: 'Agendado', color: '#2563eb', description: 'Agendamento confirmado' },
+    { value: 'lembrado', label: 'Lembrado', color: '#059669', description: 'Cliente foi lembrado' },
+    { value: 'compareceu', label: 'Compareceu', color: '#10b981', description: 'Cliente compareceu ao agendamento' },
+    { value: 'nao_compareceu', label: 'Não Compareceu', color: '#dc2626', description: 'Cliente não compareceu' },
+    { value: 'fechado', label: 'Fechado', color: '#059669', description: '🔄 Cria fechamento automaticamente' },
+    { value: 'nao_fechou', label: 'Não Fechou', color: '#ef4444', description: 'Cliente não fechou o negócio' },
+    { value: 'reagendado', label: 'Reagendado', color: '#8b5cf6', description: 'Agendamento foi reagendado' },
+    { value: 'cancelado', label: 'Cancelado', color: '#6b7280', description: 'Agendamento cancelado' },
+    { value: 'nao_passou_cpf', label: 'Não passou CPF', color: '#6366f1', description: 'Cliente não forneceu CPF' },
+    { value: 'aguardando_fechamento', label: 'Aguardando Fechamento', color: '#fbbf24', description: 'Aguardando fechamento' },
+    { value: 'nao_quer_reagendar', label: 'Não quer reagendar', color: '#9ca3af', description: 'Cliente recusou reagendamento' }
   ];
 
   useEffect(() => {
@@ -55,9 +66,33 @@ const Agendamentos = () => {
     fetchClinicas();
   }, []);
 
+  // Atualização automática dos dados a cada 30 segundos
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchAgendamentos();
+      fetchPacientes();
+    }, 30000); // 30 segundos
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Listener para sincronização entre telas
+  useEffect(() => {
+    const handleDataUpdate = () => {
+      fetchAgendamentos();
+      fetchPacientes();
+    };
+
+    window.addEventListener('data_updated', handleDataUpdate);
+    
+    return () => {
+      window.removeEventListener('data_updated', handleDataUpdate);
+    };
+  }, []);
+
   // Controlar scroll do body quando modal estiver aberto
   useEffect(() => {
-    if (showModal || showDetalhesModal) {
+    if (showModal || showDetalhesModal || showValorModal) {
       // Bloquear scroll da página
       document.body.style.overflow = 'hidden';
     } else {
@@ -69,7 +104,7 @@ const Agendamentos = () => {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [showModal, showDetalhesModal]);
+  }, [showModal, showDetalhesModal, showValorModal]);
 
   const fetchAgendamentos = async () => {
     try {
@@ -205,7 +240,42 @@ const Agendamentos = () => {
     });
   };
 
+  // Funções para formatação do valor
+  const formatarValorInput = (valor) => {
+    const numeros = valor.replace(/\D/g, '');
+    if (!numeros) return '';
+    const numero = parseFloat(numeros) / 100;
+    return numero.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
+  const desformatarValor = (valorFormatado) => {
+    if (!valorFormatado) return '';
+    return valorFormatado.replace(/\./g, '').replace(',', '.');
+  };
+
+  const handleValorChange = (e) => {
+    const valorDigitado = e.target.value;
+    const valorFormatado = formatarValorInput(valorDigitado);
+    const valorNumerico = desformatarValor(valorFormatado);
+    
+    setValorFormatado(valorFormatado);
+    setValorFechamento(valorNumerico);
+  };
+
   const updateStatus = async (agendamentoId, newStatus) => {
+    // Se o status for "fechado", abrir modal para inserir valor
+    if (newStatus === 'fechado') {
+      const agendamento = agendamentos.find(a => a.id === agendamentoId);
+      setAgendamentoParaFechar(agendamento);
+      setValorFechamento('');
+      setValorFormatado('');
+      setShowValorModal(true);
+      return;
+    }
+
     try {
       const response = await makeRequest(`/agendamentos/${agendamentoId}/status`, {
         method: 'PUT',
@@ -216,7 +286,16 @@ const Agendamentos = () => {
       
       if (response.ok) {
         showSuccessToast('Status atualizado com sucesso!');
-        fetchAgendamentos();
+        // Recarregar agendamentos e pacientes para manter sincronia
+        await Promise.all([
+          fetchAgendamentos(),
+          fetchPacientes()
+        ]);
+        
+        // Também forçar atualização nas outras telas via localStorage para sincronização imediata
+        const timestamp = Date.now();
+        localStorage.setItem('data_sync_trigger', timestamp.toString());
+        window.dispatchEvent(new CustomEvent('data_updated', { detail: { timestamp } }));
       } else {
         showErrorToast('Erro ao atualizar status: ' + data.error);
       }
@@ -230,24 +309,128 @@ const Agendamentos = () => {
     return statusOptions.find(option => option.value === status) || statusOptions[0];
   };
 
-  const marcarComoLembrado = async (agendamentoId) => {
+  const excluirAgendamento = async (agendamentoId) => {
+    // Confirmar antes de excluir
+    if (!window.confirm('Tem certeza que deseja excluir este agendamento? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+
     try {
-      const response = await makeRequest(`/agendamentos/${agendamentoId}/lembrado`, {
-        method: 'PUT'
+      const response = await makeRequest(`/agendamentos/${agendamentoId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        showSuccessToast('Agendamento excluído com sucesso!');
+        // Recarregar dados e sincronizar com outras telas
+        await Promise.all([
+          fetchAgendamentos(),
+          fetchPacientes()
+        ]);
+        
+        // Forçar atualização nas outras telas
+        const timestamp = Date.now();
+        localStorage.setItem('data_sync_trigger', timestamp.toString());
+        window.dispatchEvent(new CustomEvent('data_updated', { detail: { timestamp } }));
+      } else {
+        const data = await response.json();
+        showErrorToast('Erro ao excluir agendamento: ' + (data.error || 'Erro desconhecido'));
+      }
+    } catch (error) {
+      console.error('Erro ao excluir agendamento:', error);
+      showErrorToast('Erro ao excluir agendamento');
+    }
+  };
+
+  const confirmarFechamento = async () => {
+    if (!valorFechamento || parseFloat(valorFechamento) < 0) {
+      showErrorToast('Por favor, informe um valor válido!');
+      return;
+    }
+
+    if (!contratoFechamento) {
+      showErrorToast('Por favor, selecione o contrato em PDF!');
+      return;
+    }
+
+    if (contratoFechamento && contratoFechamento.type !== 'application/pdf') {
+      showErrorToast('Apenas arquivos PDF são permitidos para o contrato!');
+      return;
+    }
+
+    if (contratoFechamento && contratoFechamento.size > 10 * 1024 * 1024) {
+      showErrorToast('O arquivo deve ter no máximo 10MB!');
+      return;
+    }
+
+    setSalvandoFechamento(true);
+    try {
+      // Primeiro, atualizar o status do agendamento para "fechado"
+      const response = await makeRequest(`/agendamentos/${agendamentoParaFechar.id}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'fechado' })
       });
 
       const data = await response.json();
       
       if (response.ok) {
-        showSuccessToast('Paciente marcado como lembrado!');
-        fetchAgendamentos();
+        // Agora criar o fechamento com o valor informado
+        const formData = new FormData();
+        formData.append('paciente_id', agendamentoParaFechar.paciente_id);
+        formData.append('consultor_id', agendamentoParaFechar.consultor_id || '');
+        formData.append('clinica_id', agendamentoParaFechar.clinica_id || '');
+        formData.append('valor_fechado', parseFloat(valorFechamento));
+        formData.append('data_fechamento', dataFechamento);
+        formData.append('tipo_tratamento', tipoTratamentoFechamento || '');
+        formData.append('observacoes', observacoesFechamento || 'Fechamento criado automaticamente pelo pipeline');
+        
+        if (contratoFechamento) {
+          formData.append('contrato', contratoFechamento);
+        }
+
+        const API_BASE_URL = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000/api';
+        const token = localStorage.getItem('token');
+        
+        const fechamentoResponse = await fetch(`${API_BASE_URL}/fechamentos`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
+        });
+
+        if (fechamentoResponse.ok) {
+          showSuccessToast(`Status atualizado! Fechamento criado com valor de R$ ${valorFormatado}`);
+          cancelarFechamento();
+          // Recarregar agendamentos e pacientes para manter sincronia
+          await Promise.all([
+            fetchAgendamentos(),
+            fetchPacientes()
+          ]);
+        } else {
+          const errorData = await fechamentoResponse.json();
+          showErrorToast('Erro ao criar fechamento: ' + errorData.error);
+        }
       } else {
-        showErrorToast('Erro ao marcar como lembrado: ' + data.error);
+        showErrorToast('Erro ao atualizar status: ' + data.error);
       }
     } catch (error) {
-      console.error('Erro ao marcar como lembrado:', error);
-      showErrorToast('Erro ao marcar como lembrado');
+      console.error('Erro ao confirmar fechamento:', error);
+      showErrorToast('Erro ao confirmar fechamento: ' + error.message);
+    } finally {
+      setSalvandoFechamento(false);
     }
+  };
+
+  const cancelarFechamento = () => {
+    setShowValorModal(false);
+    setAgendamentoParaFechar(null);
+    setValorFechamento('');
+    setValorFormatado('');
+    setContratoFechamento(null);
+    setTipoTratamentoFechamento('');
+    setObservacoesFechamento('');
+    setDataFechamento(new Date().toISOString().split('T')[0]);
   };
 
   const formatarData = (data) => {
@@ -347,6 +530,24 @@ const Agendamentos = () => {
       <div className="page-header">
         <h1 className="page-title">Gerenciar Agendamentos</h1>
         <p className="page-subtitle">Gerencie consultas e acompanhe o pipeline de vendas</p>
+        
+        {/* Aviso sobre automação do pipeline */}
+        <div style={{
+          backgroundColor: '#f0f9ff',
+          border: '1px solid #bae6fd',
+          borderRadius: '8px',
+          padding: '1rem',
+          marginTop: '1rem',
+          fontSize: '0.875rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <span style={{ color: '#0284c7', fontSize: '1.25rem' }}>🔄</span>
+            <strong style={{ color: '#0c4a6e' }}>Pipeline Automático Ativo</strong>
+          </div>
+          <div style={{ color: '#0c4a6e', lineHeight: '1.4' }}>
+            • Ao alterar status para <strong>"Fechado"</strong> → Abre modal para criar fechamento com valor e contrato
+          </div>
+        </div>
       </div>
 
       {/* Dashboard de Agendamentos */}
@@ -379,14 +580,6 @@ const Agendamentos = () => {
           </div>
         </div>
       </div>
-
-      {/* Alerta para agendamentos de hoje */}
-      {agendamentos.filter(a => ehHoje(a.data_agendamento)).length > 0 && (
-        <div className="alert alert-warning" style={{ marginBottom: '2rem' }}>
-          <strong>Atenção!</strong> Você tem <strong>{agendamentos.filter(a => ehHoje(a.data_agendamento)).length}</strong> 
-          agendamento(s) para hoje! Não se esqueça de fazer os lembretes.
-        </div>
-      )}
 
       {/* Seção de Filtros */}
       <div className="card" style={{ marginBottom: '1.5rem' }}>
@@ -582,9 +775,10 @@ const Agendamentos = () => {
                                 border: `1px solid ${statusInfo.color}`,
                                 cursor: 'pointer'
                           }}
+                          title={statusInfo.description || statusInfo.label}
                         >
                           {statusOptions.map(option => (
-                            <option key={option.value} value={option.value}>
+                            <option key={option.value} value={option.value} title={option.description}>
                               {option.label}
                             </option>
                           ))}
@@ -602,14 +796,19 @@ const Agendamentos = () => {
                               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                             </svg>
                           </button>
-                          {!agendamento.lembrado && !ehPassado(agendamento.data_agendamento) && agendamento.status === 'agendado' && (
+                          {isAdmin && (
                             <button
-                              onClick={() => marcarComoLembrado(agendamento.id)}
-                              className="btn-action btn-success"
-                              title="Marcar como lembrado"
+                              onClick={() => excluirAgendamento(agendamento.id)}
+                              className="btn-action"
+                              title="Excluir agendamento"
+                              style={{ color: '#dc2626', marginLeft: '0.5rem' }}
                             >
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <polyline points="20 6 9 17 4 12"></polyline>
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="m19 6-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                                <path d="m10 11 0 6"></path>
+                                <path d="m14 11 0 6"></path>
+                                <path d="M5 6l1-2a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1l1 2"></path>
                               </svg>
                             </button>
                           )}
@@ -651,7 +850,10 @@ const Agendamentos = () => {
                   required
                 >
                   <option value="">Selecione um paciente</option>
-                  {pacientes.map(paciente => (
+                  {pacientes.filter(paciente => 
+                    // Mostrar apenas pacientes com status apropriados para agendamento
+                    ['lead', 'em_conversa', 'cpf_aprovado', 'sem_cedente', 'agendado', 'compareceu', 'nao_compareceu', 'reagendado'].includes(paciente.status)
+                  ).map(paciente => (
                     <option key={paciente.id} value={paciente.id}>
                       {paciente.nome} {paciente.telefone && `- ${paciente.telefone}`}
                     </option>
@@ -825,6 +1027,135 @@ const Agendamentos = () => {
                   onClick={() => setShowDetalhesModal(false)}
                 >
                   Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Valor de Fechamento */}
+      {showValorModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Dados do Fechamento</h2>
+              <button className="close-btn" onClick={cancelarFechamento}>
+                ×
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem' }}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <p style={{ 
+                  color: '#374151', 
+                  marginBottom: '1rem',
+                  lineHeight: '1.5'
+                }}>
+                  <strong>Paciente:</strong> {agendamentoParaFechar?.paciente_nome}
+                </p>
+                <p style={{ 
+                  color: '#6b7280', 
+                  fontSize: '0.875rem',
+                  lineHeight: '1.5'
+                }}>
+                  Complete as informações do fechamento:
+                </p>
+              </div>
+
+              <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Valor da Venda (R$) *</label>
+                  <input 
+                    type="text"
+                    className="form-input"
+                    value={valorFormatado}
+                    onChange={handleValorChange}
+                    placeholder="0,00"
+                    style={{ fontSize: '1.125rem', textAlign: 'right' }}
+                    autoFocus
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Data do Fechamento *</label>
+                  <input 
+                    type="date"
+                    className="form-input"
+                    value={dataFechamento}
+                    onChange={(e) => setDataFechamento(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Tipo de Tratamento</label>
+                <select 
+                  className="form-select"
+                  value={tipoTratamentoFechamento}
+                  onChange={(e) => setTipoTratamentoFechamento(e.target.value)}
+                >
+                  <option value="">Selecione</option>
+                  <option value="Estético">Estético</option>
+                  <option value="Odontológico">Odontológico</option>
+                </select>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Contrato (PDF) *</label>
+                <input 
+                  type="file"
+                  className="form-input"
+                  accept=".pdf"
+                  onChange={(e) => setContratoFechamento(e.target.files[0])}
+                />
+                <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                  Arquivo deve ser PDF com no máximo 10MB
+                </p>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Observações</label>
+                <textarea 
+                  className="form-textarea"
+                  rows="3"
+                  value={observacoesFechamento}
+                  onChange={(e) => setObservacoesFechamento(e.target.value)}
+                  placeholder="Informações adicionais sobre o fechamento..."
+                />
+              </div>
+
+              <div style={{ 
+                display: 'flex', 
+                gap: '1rem', 
+                justifyContent: 'flex-end' 
+              }}>
+                <button 
+                  type="button"
+                  className="btn btn-secondary" 
+                  onClick={cancelarFechamento}
+                  disabled={salvandoFechamento}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={confirmarFechamento}
+                  disabled={salvandoFechamento || !valorFechamento}
+                >
+                  {salvandoFechamento ? (
+                    <>
+                      <span className="loading-spinner" style={{ 
+                        display: 'inline-block', 
+                        verticalAlign: 'middle', 
+                        marginRight: 8 
+                      }}></span>
+                      {contratoFechamento ? 'Enviando contrato...' : 'Processando...'}
+                    </>
+                  ) : (
+                    'Confirmar Fechamento'
+                  )}
                 </button>
               </div>
             </div>

@@ -3,7 +3,15 @@ import { useAuth } from '../contexts/AuthContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const Dashboard = () => {
-  const { makeRequest, user } = useAuth();
+  // Estado separado para KPIs principais (dados filtrados)
+  const [kpisPrincipais, setKpisPrincipais] = useState({
+    totalPacientes: 0,
+    totalAgendamentos: 0,
+    totalFechamentos: 0,
+    valorTotalFechamentos: 0,
+    agendamentosHoje: 0
+  });
+  const { makeRequest, user, isAdmin } = useAuth();
   const [periodo, setPeriodo] = useState('total'); // total, semanal, mensal
   const [subPeriodo, setSubPeriodo] = useState(null); // para dias da semana
   const [semanaOpcao, setSemanaOpcao] = useState('atual'); // atual, proxima
@@ -11,6 +19,8 @@ const Dashboard = () => {
   const [filtroRegiao, setFiltroRegiao] = useState({ cidade: '', estado: '' });
   const [cidadesDisponiveis, setCidadesDisponiveis] = useState([]);
   const [estadosDisponiveis, setEstadosDisponiveis] = useState([]);
+  const [rankingGeral, setRankingGeral] = useState([]);
+  const [loadingRanking, setLoadingRanking] = useState(true);
   const [showConsultoresExtrasModal, setShowConsultoresExtrasModal] = useState(false); // Modal dos consultores do 4º em diante
   const [stats, setStats] = useState({
     totalPacientes: 0,
@@ -35,7 +45,106 @@ const Dashboard = () => {
   });
   const [loading, setLoading] = useState(true);
 
+  // KPIs e dados filtrados: sempre usar as rotas normais (filtradas)
+  const [dadosFiltrados, setDadosFiltrados] = useState({ pacientes: [], agendamentos: [], fechamentos: [] });
+  const [comissoesFiltradas, setComissoesFiltradas] = useState({ mes: 0, total: 0 });
+  const [crescimentosFiltrados, setCrescimentosFiltrados] = useState({
+    crescimentoPacientes: 0,
+    crescimentoFechamentos: 0,
+    crescimentoValor: 0
+  });
+  const [pipelineFiltrado, setPipelineFiltrado] = useState({});
   useEffect(() => {
+    const fetchKPIsPrincipais = async () => {
+      try {
+        const [pacientesRes, agendamentosRes, fechamentosRes] = await Promise.all([
+          makeRequest('/pacientes'),
+          makeRequest('/agendamentos'),
+          makeRequest('/fechamentos'),
+        ]);
+        const pacientes = await pacientesRes.json();
+        const agendamentos = await agendamentosRes.json();
+        const fechamentos = await fechamentosRes.json();
+        setDadosFiltrados({ pacientes, agendamentos, fechamentos });
+        setKpisPrincipais({
+          totalPacientes: pacientes.length,
+          totalAgendamentos: agendamentos.length,
+          totalFechamentos: fechamentos.filter(f => f.aprovado !== 'reprovado').length,
+          valorTotalFechamentos: fechamentos.filter(f => f.aprovado !== 'reprovado').reduce((acc, f) => acc + parseFloat(f.valor_fechado || 0), 0),
+          agendamentosHoje: agendamentos.filter(a => a.data_agendamento === new Date().toISOString().split('T')[0]).length
+        });
+        // Calcular comissões filtradas
+        let total = 0, mes = 0;
+        const hoje = new Date();
+        const mesAtual = hoje.getMonth();
+        const anoAtual = hoje.getFullYear();
+        fechamentos.filter(f => f.aprovado !== 'reprovado').forEach(f => {
+          const valor = parseFloat(f.valor_fechado || 0);
+          const comissao = calcularComissao(valor);
+          total += comissao;
+          const dataFechamento = new Date(f.data_fechamento);
+          if (dataFechamento.getMonth() === mesAtual && dataFechamento.getFullYear() === anoAtual) {
+            mes += comissao;
+          }
+        });
+        setComissoesFiltradas({ mes, total });
+        
+        // Calcular crescimentos filtrados
+        const mesAnterior = mesAtual === 0 ? 11 : mesAtual - 1;
+        const anoMesAnterior = mesAtual === 0 ? anoAtual - 1 : anoAtual;
+        
+        const isNoMesAtual = (data) => {
+          const dataObj = new Date(data);
+          return dataObj.getMonth() === mesAtual && dataObj.getFullYear() === anoAtual;
+        };
+        
+        const isNoMesAnterior = (data) => {
+          const dataObj = new Date(data);
+          return dataObj.getMonth() === mesAnterior && dataObj.getFullYear() === anoMesAnterior;
+        };
+        
+        // Calcular crescimento de pacientes filtrados
+        const pacientesNoMesAtual = pacientes.filter(p => isNoMesAtual(p.created_at)).length;
+        const pacientesNoMesAnterior = pacientes.filter(p => isNoMesAnterior(p.created_at)).length;
+        const crescimentoPacientes = pacientesNoMesAnterior > 0 
+          ? ((pacientesNoMesAtual - pacientesNoMesAnterior) / pacientesNoMesAnterior * 100)
+          : pacientesNoMesAtual > 0 ? 100 : 0;
+
+        // Calcular crescimento de fechamentos filtrados
+        const fechamentosNoMesAtual = fechamentos.filter(f => f.aprovado !== 'reprovado' && isNoMesAtual(f.data_fechamento)).length;
+        const fechamentosNoMesAnterior = fechamentos.filter(f => f.aprovado !== 'reprovado' && isNoMesAnterior(f.data_fechamento)).length;
+        const crescimentoFechamentos = fechamentosNoMesAnterior > 0 
+          ? ((fechamentosNoMesAtual - fechamentosNoMesAnterior) / fechamentosNoMesAnterior * 100)
+          : fechamentosNoMesAtual > 0 ? 100 : 0;
+
+        // Calcular crescimento de valor filtrado
+        const valorNoMesAtual = fechamentos
+          .filter(f => f.aprovado !== 'reprovado' && isNoMesAtual(f.data_fechamento))
+          .reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0);
+        const valorNoMesAnterior = fechamentos
+          .filter(f => f.aprovado !== 'reprovado' && isNoMesAnterior(f.data_fechamento))
+          .reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0);
+        const crescimentoValor = valorNoMesAnterior > 0 
+          ? ((valorNoMesAtual - valorNoMesAnterior) / valorNoMesAnterior * 100)
+          : valorNoMesAtual > 0 ? 100 : 0;
+        
+        setCrescimentosFiltrados({
+          crescimentoPacientes,
+          crescimentoFechamentos,
+          crescimentoValor
+        });
+        
+        // Calcular pipeline filtrado
+        const pipeline = pacientes.reduce((acc, p) => {
+          acc[p.status] = (acc[p.status] || 0) + 1;
+          return acc;
+        }, {});
+        setPipelineFiltrado(pipeline);
+      } catch (error) {
+        // fallback: não altera kpisPrincipais
+      }
+    };
+    fetchKPIsPrincipais();
     fetchStats();
     fetchRegioesDisponiveis();
   }, [periodo, subPeriodo, mesAno, semanaOpcao, filtroRegiao]);
@@ -77,9 +186,9 @@ const Dashboard = () => {
       if (filtroRegiao.cidade) clinicasParams.append('cidade', filtroRegiao.cidade);
       
       const [pacientesRes, agendamentosRes, fechamentosRes, consultoresRes, clinicasRes] = await Promise.all([
-        makeRequest('/pacientes'),
-        makeRequest('/agendamentos'),
-        makeRequest('/fechamentos'),
+        makeRequest('/dashboard/pacientes'),
+        makeRequest('/dashboard/agendamentos'),
+        makeRequest('/dashboard/fechamentos'),
         makeRequest('/consultores'),
         makeRequest(`/clinicas?${clinicasParams.toString()}`)
       ]);
@@ -868,10 +977,10 @@ const Dashboard = () => {
         <div className="stats-grid">
           <div className="stat-card">
             <div className="stat-label">Total de Pacientes</div>
-            <div className="stat-value">{stats.totalPacientes}</div>
-            <div className={`stat-change ${stats.crescimentoPacientes >= 0 ? 'positive' : 'negative'}`}>
+            <div className="stat-value">{kpisPrincipais.totalPacientes}</div>
+            <div className={`stat-change ${(isAdmin ? stats.crescimentoPacientes : crescimentosFiltrados.crescimentoPacientes) >= 0 ? 'positive' : 'negative'}`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                {stats.crescimentoPacientes >= 0 ? (
+                {(isAdmin ? stats.crescimentoPacientes : crescimentosFiltrados.crescimentoPacientes) >= 0 ? (
                   <>
                     <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
                     <polyline points="17 6 23 6 23 12"></polyline>
@@ -883,28 +992,19 @@ const Dashboard = () => {
                   </>
                 )}
               </svg>
-              {formatPercentage(stats.crescimentoPacientes)} este mês
+              {formatPercentage(isAdmin ? stats.crescimentoPacientes : crescimentosFiltrados.crescimentoPacientes)} este mês
             </div>
           </div>
-
           <div className="stat-card">
             <div className="stat-label">Agendamentos</div>
-            <div className="stat-value">{stats.totalAgendamentos}</div>
-            <div className="stat-change positive">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                <polyline points="17 6 23 6 23 12"></polyline>
-              </svg>
-              {stats.agendamentosHoje} hoje
-            </div>
+            <div className="stat-value">{kpisPrincipais.totalAgendamentos}</div>
           </div>
-
           <div className="stat-card">
             <div className="stat-label">Fechamentos</div>
-            <div className="stat-value">{stats.totalFechamentos}</div>
-            <div className={`stat-change ${stats.crescimentoFechamentos >= 0 ? 'positive' : 'negative'}`}>
+            <div className="stat-value">{kpisPrincipais.totalFechamentos}</div>
+            <div className={`stat-change ${(isAdmin ? stats.crescimentoFechamentos : crescimentosFiltrados.crescimentoFechamentos) >= 0 ? 'positive' : 'negative'}`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                {stats.crescimentoFechamentos >= 0 ? (
+                {(isAdmin ? stats.crescimentoFechamentos : crescimentosFiltrados.crescimentoFechamentos) >= 0 ? (
                   <>
                     <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
                     <polyline points="17 6 23 6 23 12"></polyline>
@@ -916,32 +1016,31 @@ const Dashboard = () => {
                   </>
                 )}
               </svg>
-              {formatPercentage(stats.crescimentoFechamentos)} este mês
+              {formatPercentage(isAdmin ? stats.crescimentoFechamentos : crescimentosFiltrados.crescimentoFechamentos)} este mês
             </div>
           </div>
-
           <div className="stat-card">
             <div className="stat-label">Valor Total</div>
-            <div className="stat-value">{formatCurrency(stats.valorTotalFechamentos)}</div>
-            {stats.crescimentoValor > 0 && (
+            <div className="stat-value">{formatCurrency(kpisPrincipais.valorTotalFechamentos)}</div>
+            {(isAdmin ? stats.crescimentoValor : crescimentosFiltrados.crescimentoValor) > 0 && (
               <div className="stat-change positive">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
                   <polyline points="17 6 23 6 23 12"></polyline>
                 </svg>
-                {formatPercentage(stats.crescimentoValor)} este mês
+                {formatPercentage(isAdmin ? stats.crescimentoValor : crescimentosFiltrados.crescimentoValor)} este mês
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Cards de Comissão */}
+      {/* Cards de Comissão (dados filtrados) */}
       <div className="stats-grid" style={{ marginTop: '2rem', gridTemplateColumns: 'repeat(2, 1fr)' }}>
         <div className="stat-card" style={{ backgroundColor: '#fef3c7' }}>
           <div className="stat-label">Comissão do Mês</div>
           <div className="stat-value" style={{ color: '#f59e0b' }}>
-            {formatCurrency(stats.comissaoTotalMes)}
+            {formatCurrency(comissoesFiltradas.mes)}
           </div>
           <div className="stat-subtitle" style={{ color: '#92400e' }}>
             Total de comissões este mês
@@ -951,7 +1050,7 @@ const Dashboard = () => {
         <div className="stat-card" style={{ backgroundColor: '#ede9fe' }}>
           <div className="stat-label">Comissão Total Geral</div>
           <div className="stat-value" style={{ color: '#8b5cf6' }}>
-            {formatCurrency(stats.comissaoTotalGeral)}
+            {formatCurrency(comissoesFiltradas.total)}
           </div>
           <div className="stat-subtitle" style={{ color: '#5b21b6' }}>
             Comissões acumuladas
@@ -1062,15 +1161,15 @@ const Dashboard = () => {
       )}
 
       <div className="grid grid-2" style={{ gap: '2rem' }}>
-        {/* Pipeline de Vendas */}
+        {/* Pipeline de Vendas (dados filtrados) */}
         <div className="card" style={{ minWidth: 0 }}>
           <div className="card-header">
             <h2 className="card-title">Pipeline de Vendas</h2>
           </div>
           <div className="card-body">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {Object.entries(stats.leadsPorStatus).map(([status, count]) => {
-                const total = stats.totalPacientes || 1;
+              {Object.entries(pipelineFiltrado).map(([status, count]) => {
+                const total = kpisPrincipais.totalPacientes || 1;
                 const percentage = (count / total) * 100;
                 return (
                   <div key={status}>
@@ -1116,7 +1215,16 @@ const Dashboard = () => {
               {(() => {
                 // Ordenar consultores e calcular posições
                 const consultoresOrdenados = [...stats.consultoresStats]
-                  .sort((a, b) => b.valorFechado - a.valorFechado);
+                  .sort((a, b) => {
+                    // 1. Maior valor em vendas (valorFechado)
+                    if (b.valorFechado !== a.valorFechado) return b.valorFechado - a.valorFechado;
+                    // 2. Maior número de fechamentos
+                    if (b.totalFechamentos !== a.totalFechamentos) return b.totalFechamentos - a.totalFechamentos;
+                    // 3. Maior número de agendamentos
+                    if (b.totalAgendamentos !== a.totalAgendamentos) return b.totalAgendamentos - a.totalAgendamentos;
+                    // 4. Maior número de pacientes
+                    return b.totalPacientes - a.totalPacientes;
+                  });
                 
                 let posicaoAtual = 0;
                 const consultoresComPosicao = consultoresOrdenados.map((consultor) => {
@@ -1388,7 +1496,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Gráfico de Conversão */}
+      {/* Gráfico de Conversão (dados filtrados) */}
       <div className="card" style={{ marginTop: '2rem' }}>
         <div className="card-header">
           <h2 className="card-title">Taxa de Conversão do Funil</h2>
@@ -1397,7 +1505,7 @@ const Dashboard = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '2rem' }}>
             <div style={{ flex: 1, textAlign: 'center' }}>
               <div style={{ fontSize: '2rem', fontWeight: '700', color: '#1a1d23' }}>
-                {stats.totalPacientes}
+                {kpisPrincipais.totalPacientes}
               </div>
               <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
                 Leads Totais
@@ -1410,7 +1518,7 @@ const Dashboard = () => {
 
             <div style={{ flex: 1, textAlign: 'center' }}>
               <div style={{ fontSize: '2rem', fontWeight: '700', color: '#1a1d23' }}>
-                {stats.leadsPorStatus.agendado || 0}
+                {pipelineFiltrado.agendado || 0}
               </div>
               <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
                 Agendados
@@ -1423,7 +1531,7 @@ const Dashboard = () => {
 
             <div style={{ flex: 1, textAlign: 'center' }}>
               <div style={{ fontSize: '2rem', fontWeight: '700', color: '#1a1d23' }}>
-                {stats.leadsPorStatus.compareceu || 0}
+                {pipelineFiltrado.compareceu || 0}
               </div>
               <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
                 Compareceram
@@ -1436,7 +1544,7 @@ const Dashboard = () => {
 
             <div style={{ flex: 1, textAlign: 'center' }}>
               <div style={{ fontSize: '2rem', fontWeight: '700', color: '#059669' }}>
-                {stats.leadsPorStatus.fechado || 0}
+                {pipelineFiltrado.fechado || 0}
               </div>
               <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
                 Fechados
@@ -1452,8 +1560,8 @@ const Dashboard = () => {
             textAlign: 'center' 
           }}>
             <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#059669' }}>
-              {stats.totalPacientes > 0 
-                ? ((stats.leadsPorStatus.fechado || 0) / stats.totalPacientes * 100).toFixed(1)
+              {kpisPrincipais.totalPacientes > 0 
+                ? ((pipelineFiltrado.fechado || 0) / kpisPrincipais.totalPacientes * 100).toFixed(1)
                 : 0}%
             </div>
             <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
