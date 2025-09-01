@@ -3018,6 +3018,9 @@ app.get('/api/meta-ads/advanced-metrics', authenticateToken, requireAdmin, async
     const totalFechamentos = fechamentosAprovados.length;
     const valorTotalFechamentos = fechamentosAprovados.reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0);
 
+    // Inicializar objeto para agrupar fechamentos por cidade
+    const fechamentosPorCidade = {};
+
     // Agrupar fechamentos por cidade para calcular CPA real por região
     if (fechamentosAprovados && fechamentosAprovados.length > 0) {
       fechamentosAprovados.forEach(fechamento => {
