@@ -31,42 +31,6 @@ function MetaAds() {
     return () => clearTimeout(timer);
   }, []);
 
-  const fetchCampaigns = async () => {
-    try {
-      const response = await makeRequest('/meta-ads/campaigns');
-      const data = await response.json();
-      
-      if (response.ok) {
-        setCampaigns(data.data || []);
-      } else {
-        console.error('Erro ao carregar campanhas:', data.error);
-        showErrorToast('Erro ao carregar campanhas: ' + (data.error || 'Erro desconhecido'));
-      }
-    } catch (error) {
-      console.error('Erro ao carregar campanhas:', error);
-      showErrorToast('Erro ao conectar com o servidor');
-    }
-  };
-
-  const syncCampaigns = async () => {
-    try {
-      setSyncing(true);
-      const response = await makeRequest('/meta-ads/sync-campaigns', {
-        method: 'POST'
-      });
-      const data = await response.json();
-      
-      if (response.ok) {
-        showSuccessToast(data.message);
-      } else {
-        showErrorToast('Erro ao sincronizar: ' + (data.error || 'Erro desconhecido'));
-      }
-    } catch (error) {
-      showErrorToast('Erro ao sincronizar campanhas: ' + (error.message || 'Erro desconhecido'));
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   // Função para buscar conjuntos de anúncios de uma campanha
   const fetchAdSets = async (campaignId) => {
@@ -117,17 +81,6 @@ function MetaAds() {
     } finally {
       setLoadingAdSets(false);
     }
-  };
-
-  const formatarPreco = (preco) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(preco);
-  };
-
-  const formatarData = (data) => {
-    return new Date(data).toLocaleDateString('pt-BR');
   };
 
   // Novo método para buscar dados em tempo real (apenas campanhas ativas)
@@ -340,7 +293,12 @@ function MetaAds() {
       </div>
 
       {/* Dashboard */}
-      <div className="dashboard-container">
+      <div 
+        className="dashboard-container"
+        style={{
+          zoom: 0.8
+        }}
+      >
         {/* Controls */}
         <div className="dashboard-controls">
           <div className="filters-group">
@@ -364,7 +322,7 @@ function MetaAds() {
           </div>
 
           <div className="refresh-controls">
-            <button 
+            <button
               className="btn btn-primary"
               onClick={fetchAdvancedMetrics}
               disabled={loading}

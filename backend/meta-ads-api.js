@@ -420,35 +420,46 @@ class MetaAdsAPI {
 
   // Gerar range de datas
   getDateRange(range) {
+    // Always return a range that matches Meta Ads panel (inclusive start, exclusive end)
+    // Meta/Facebook API expects 'since' and 'until' as inclusive, but the panel usually shows up to yesterday for 'last_30d'.
     const now = new Date();
-    const since = new Date();
-    
+    const until = new Date(now); // 'until' is exclusive, so we subtract 1 day for correct range
+    let since = new Date(now);
+
     switch (range) {
       case 'today':
-        // Para hoje, usar a data atual
-        since.setHours(0, 0, 0, 0); // Início do dia
-        const today = new Date();
-        today.setHours(23, 59, 59, 999); // Final do dia
+        since.setHours(0, 0, 0, 0);
+        until.setHours(23, 59, 59, 999);
         return {
           since: since.toISOString().split('T')[0],
-          until: today.toISOString().split('T')[0]
+          until: until.toISOString().split('T')[0]
         };
       case 'last_7d':
-        since.setDate(now.getDate() - 7);
+        // Last 7 full days, ending yesterday
+        until.setDate(now.getDate() - 1);
+        since = new Date(until);
+        since.setDate(until.getDate() - 6);
         break;
       case 'last_30d':
-        since.setDate(now.getDate() - 30);
+        // Last 30 full days, ending yesterday
+        until.setDate(now.getDate() - 1);
+        since = new Date(until);
+        since.setDate(until.getDate() - 29);
         break;
       case 'this_month':
-        since.setDate(1);
+        since = new Date(now.getFullYear(), now.getMonth(), 1);
+        until.setDate(now.getDate() - 1);
         break;
       default:
-        since.setDate(now.getDate() - 30);
+        // Default to last 30 days, ending yesterday
+        until.setDate(now.getDate() - 1);
+        since = new Date(until);
+        since.setDate(until.getDate() - 29);
     }
 
     return {
       since: since.toISOString().split('T')[0],
-      until: now.toISOString().split('T')[0]
+      until: until.toISOString().split('T')[0]
     };
   }
 
