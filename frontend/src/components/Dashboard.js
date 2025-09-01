@@ -1002,22 +1002,6 @@ const Dashboard = () => {
           <div className="stat-card">
             <div className="stat-label">Fechamentos</div>
             <div className="stat-value">{kpisPrincipais.totalFechamentos}</div>
-            <div className={`stat-change ${(isAdmin ? stats.crescimentoFechamentos : crescimentosFiltrados.crescimentoFechamentos) >= 0 ? 'positive' : 'negative'}`}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                {(isAdmin ? stats.crescimentoFechamentos : crescimentosFiltrados.crescimentoFechamentos) >= 0 ? (
-                  <>
-                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                    <polyline points="17 6 23 6 23 12"></polyline>
-                  </>
-                ) : (
-                  <>
-                    <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
-                    <polyline points="17 18 23 18 23 12"></polyline>
-                  </>
-                )}
-              </svg>
-              {formatPercentage(isAdmin ? stats.crescimentoFechamentos : crescimentosFiltrados.crescimentoFechamentos)} este mês
-            </div>
           </div>
           <div className="stat-card">
             <div className="stat-label">Valor Total</div>
