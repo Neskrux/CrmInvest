@@ -399,43 +399,38 @@ app.post('/api/login', async (req, res) => {
     }
 
     // Atualizar último login (apenas para admin)
-    if (tipoLogin === 'admin') {
-      await supabase
-        .from('usuarios')
-        .update({ ultimo_login: new Date().toISOString() })
-        .eq('id', usuario.id);
+    try {
+      if (tipoLogin === 'admin') {
+        await supabase
+          .from('usuarios')
+          .update({ ultimo_login: new Date().toISOString() })
+          .eq('id', usuario.id);
+      }
+    } catch (error) {
+      console.log('Erro ao atualizar ultimo_login:', error);
     }
 
-    // Gerar token JWT
-    const tokenData = {
+    // Padronizar payload e resposta para compatibilidade com Meta Ads
+    const payload = {
       id: usuario.id,
       nome: usuario.nome,
-      tipo: tipoLogin
+      email: usuario.email,
+      tipo: tipoLogin === 'admin' ? 'admin' : 'consultor', // Garante que o tipo seja definido corretamente
+      consultor_id: usuario.consultor_id !== undefined ? usuario.consultor_id : (tipoLogin === 'consultor' ? usuario.id : null)
     };
 
-    // Adicionar dados específicos baseado no tipo
-    if (tipoLogin === 'admin') {
-      tokenData.email = usuario.email;
-      tokenData.consultor_id = usuario.consultor_id;
-    } else {
-      tokenData.consultor_id = usuario.id; // Para consultores, o ID deles é o consultor_id
-      tokenData.email = null;
-    }
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
 
-    const token = jwt.sign(tokenData, JWT_SECRET, { expiresIn: '8h' });
+    // Remover senha do objeto antes de enviar para o front
+    delete usuario.senha;
 
-    // Retornar dados do usuário (sem a senha)
-    const { senha: _, ...dadosUsuario } = usuario;
+    // Garante que usuario.consultor_id também esteja presente no objeto de resposta
+    usuario.consultor_id = payload.consultor_id;
+    
+    // Garante que o tipo seja definido corretamente no objeto de resposta
+    usuario.tipo = tipoLogin === 'admin' ? 'admin' : 'consultor';
 
-    res.json({
-      message: 'Login realizado com sucesso',
-      token,
-      usuario: {
-        ...dadosUsuario,
-        tipo: tipoLogin,
-        consultor_nome: tipoLogin === 'admin' ? usuario.consultores?.nome || null : usuario.nome
-      }
-    });
+    res.json({ token, usuario });
 
   } catch (error) {
     console.error('Erro no login:', error);
@@ -450,19 +445,38 @@ app.post('/api/logout', authenticateToken, (req, res) => {
 
 app.get('/api/verify-token', authenticateToken, async (req, res) => {
   try {
-    // Buscar dados atualizados do usuário
-    const { data: usuario, error } = await supabase
-      .from('usuarios')
-      .select(`
-        *,
-        consultores(nome, telefone)
-      `)
-      .eq('id', req.user.id)
-      .eq('ativo', true)
-      .single();
+    let usuario = null;
+    
+    // Se é admin, buscar na tabela usuarios
+    if (req.user.tipo === 'admin') {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select(`
+          *,
+          consultores(nome, telefone)
+        `)
+        .eq('id', req.user.id)
+        .eq('ativo', true)
+        .single();
 
-    if (error || !usuario) {
-      return res.status(401).json({ error: 'Usuário não encontrado' });
+      if (error || !data) {
+        return res.status(401).json({ error: 'Usuário não encontrado' });
+      }
+      
+      usuario = data;
+    } else {
+      // Se é consultor, buscar na tabela consultores
+      const { data, error } = await supabase
+        .from('consultores')
+        .select('*')
+        .eq('id', req.user.id)
+        .single();
+
+      if (error || !data) {
+        return res.status(401).json({ error: 'Consultor não encontrado' });
+      }
+      
+      usuario = data;
     }
 
     const { senha: _, ...dadosUsuario } = usuario;
@@ -470,7 +484,8 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
     res.json({
       usuario: {
         ...dadosUsuario,
-        consultor_nome: usuario.consultores?.nome || null
+        tipo: req.user.tipo, // Usar o tipo do token
+        consultor_nome: usuario.consultores?.nome || usuario.nome || null
       }
     });
   } catch (error) {
@@ -2377,6 +2392,103 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
       totalFechamentos: fechamentos.filter(f => f.aprovado !== 'reprovado').length,
       estatisticasConsultores
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === ROTAS DASHBOARD ESPECÍFICAS ===
+// Estas rotas retornam dados formatados especificamente para o dashboard
+
+// Dashboard Pacientes - sem filtragem por consultor (admin vê tudo, consultor vê tudo também por enquanto)
+app.get('/api/dashboard/pacientes', authenticateToken, async (req, res) => {
+  try {
+    let query = supabase
+      .from('pacientes')
+      .select(`
+        *,
+        consultores(nome)
+      `)
+      .order('created_at', { ascending: false });
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+    
+    // Reformatar dados para compatibilidade com frontend
+    const formattedData = data.map(paciente => ({
+      ...paciente,
+      consultor_nome: paciente.consultores?.nome
+    }));
+
+    res.json(formattedData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Dashboard Agendamentos - sem filtragem por consultor
+app.get('/api/dashboard/agendamentos', authenticateToken, async (req, res) => {
+  try {
+    let query = supabase
+      .from('agendamentos')
+      .select(`
+        *,
+        pacientes(nome, telefone),
+        consultores(nome),
+        clinicas(nome)
+      `)
+      .order('data_agendamento', { ascending: false })
+      .order('horario');
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    // Reformatar dados para compatibilidade com frontend
+    const formattedData = data.map(agendamento => ({
+      ...agendamento,
+      paciente_nome: agendamento.pacientes?.nome,
+      paciente_telefone: agendamento.pacientes?.telefone,
+      consultor_nome: agendamento.consultores?.nome,
+      clinica_nome: agendamento.clinicas?.nome
+    }));
+
+    res.json(formattedData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Dashboard Fechamentos - sem filtragem por consultor
+app.get('/api/dashboard/fechamentos', authenticateToken, async (req, res) => {
+  try {
+    let query = supabase
+      .from('fechamentos')
+      .select(`
+        *,
+        pacientes(nome, telefone, cpf),
+        consultores(nome),
+        clinicas(nome)
+      `)
+      .order('data_fechamento', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    // Reformatar dados para compatibilidade com frontend
+    const formattedData = data.map(fechamento => ({
+      ...fechamento,
+      paciente_nome: fechamento.pacientes?.nome,
+      paciente_telefone: fechamento.pacientes?.telefone,
+      paciente_cpf: fechamento.pacientes?.cpf,
+      consultor_nome: fechamento.consultores?.nome,
+      clinica_nome: fechamento.clinicas?.nome
+    }));
+
+    res.json(formattedData);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
