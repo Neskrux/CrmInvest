@@ -2698,17 +2698,29 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
   }
 });
 
-// Configurar Socket.IO
+// Configurar Socket.IO com configurações otimizadas para Vercel
 const io = new Server(server, {
   cors: {
     origin: [
       'http://localhost:3000',
       'https://localhost:3000',
       process.env.FRONTEND_URL,
-      /\.vercel\.app$/
+      /\.vercel\.app$/,
+      'https://crm-invest.vercel.app'
     ],
-    methods: ['GET', 'POST']
-  }
+    methods: ['GET', 'POST'],
+    credentials: true
+  },
+  // Configurações para funcionar melhor em serverless
+  transports: ['polling', 'websocket'], // Priorizar polling
+  allowEIO3: true,
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  upgradeTimeout: 30000,
+  maxHttpBufferSize: 1e6,
+  // Configurações específicas para Vercel
+  httpCompression: false,
+  serveClient: false
 });
 
 // Inicializar WhatsApp Service
@@ -2716,15 +2728,24 @@ let whatsappService = null;
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
-  console.log('🔌 Cliente conectado:', socket.id);
+  console.log('🔌 Cliente conectado:', socket.id, 'Transport:', socket.conn.transport.name);
   
   // Enviar status atual do WhatsApp
   if (whatsappService) {
     socket.emit('whatsapp:status', whatsappService.getStatus());
   }
   
-  socket.on('disconnect', () => {
-    console.log('🔌 Cliente desconectado:', socket.id);
+  // Log de upgrade de transport
+  socket.conn.on('upgrade', () => {
+    console.log('📡 Transport upgrade para:', socket.conn.transport.name);
+  });
+  
+  socket.on('disconnect', (reason) => {
+    console.log('🔌 Cliente desconectado:', socket.id, 'Razão:', reason);
+  });
+  
+  socket.on('error', (error) => {
+    console.error('❌ Erro no socket:', error);
   });
 });
 
@@ -2734,6 +2755,24 @@ app.get('/api/whatsapp/status', authenticateToken, (req, res) => {
     return res.json({ status: 'not_initialized', isConnected: false });
   }
   res.json(whatsappService.getStatus());
+});
+
+// Rota de polling para substituir WebSocket quando necessário
+app.get('/api/whatsapp/status-polling', authenticateToken, (req, res) => {
+  if (!whatsappService) {
+    return res.json({ 
+      status: 'not_initialized', 
+      isConnected: false,
+      qrCode: null,
+      timestamp: Date.now()
+    });
+  }
+  
+  const status = whatsappService.getStatus();
+  res.json({
+    ...status,
+    timestamp: Date.now()
+  });
 });
 
 app.post('/api/whatsapp/connect', authenticateToken, requireAdmin, async (req, res) => {

@@ -14,17 +14,54 @@ const WhatsApp = () => {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const socketRef = useRef(null);
+  const pollingIntervalRef = useRef(null);
+  const [usePolling, setUsePolling] = useState(false);
+
+  // Sistema de polling como fallback
+  const startPolling = () => {
+    if (pollingIntervalRef.current) return;
+    
+    console.log('🔄 Iniciando polling para status do WhatsApp');
+    setUsePolling(true);
+    
+    pollingIntervalRef.current = setInterval(async () => {
+      try {
+        const response = await makeRequest('/whatsapp/status-polling');
+        const data = await response.json();
+        
+        if (response.ok) {
+          setConnectionStatus(data.status);
+          setQrCode(data.qrCode);
+        }
+      } catch (error) {
+        console.error('❌ Erro no polling:', error);
+      }
+    }, 2000); // Poll a cada 2 segundos
+  };
+
+  const stopPolling = () => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+      setUsePolling(false);
+      console.log('⏹️ Polling parado');
+    }
+  };
 
   useEffect(() => {
-    // Conectar ao Socket.IO
+    // Conectar ao Socket.IO com configurações otimizadas
     const socketUrl = process.env.NODE_ENV === 'production'
       ? window.location.origin
       : 'http://localhost:5000';
 
     socketRef.current = io(socketUrl, {
-      transports: ['websocket', 'polling'],
-      timeout: 20000,
-      forceNew: true
+      transports: ['polling', 'websocket'], // Priorizar polling
+      timeout: 30000,
+      forceNew: true,
+      autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 3,
+      reconnectionDelay: 1000
     });
 
     // Listeners do Socket.IO
@@ -75,7 +112,32 @@ const WhatsApp = () => {
       showSuccessToast(`Novo lead criado automaticamente: ${leadData.nome}`);
     });
 
+    // Handlers de conexão e erro
+    socketRef.current.on('connect', () => {
+      console.log('✅ Socket.IO conectado');
+      stopPolling(); // Parar polling se socket conectou
+    });
+
+    socketRef.current.on('disconnect', (reason) => {
+      console.log('❌ Socket.IO desconectado:', reason);
+      startPolling(); // Iniciar polling como fallback
+    });
+
+    socketRef.current.on('connect_error', (error) => {
+      console.error('❌ Erro de conexão Socket.IO:', error);
+      startPolling(); // Usar polling como fallback
+    });
+
+    // Verificar conexão inicial
+    setTimeout(() => {
+      if (!socketRef.current.connected) {
+        console.log('⚠️ Socket.IO não conectou, usando polling');
+        startPolling();
+      }
+    }, 5000);
+
     return () => {
+      stopPolling();
       if (socketRef.current) {
         socketRef.current.disconnect();
       }
@@ -256,6 +318,18 @@ const WhatsApp = () => {
             <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
               {getStatusText()}
             </span>
+            {usePolling && (
+              <span style={{ 
+                fontSize: '0.75rem', 
+                color: '#f59e0b', 
+                background: '#fef3c7', 
+                padding: '2px 6px', 
+                borderRadius: '4px',
+                marginLeft: '0.5rem'
+              }}>
+                Polling
+              </span>
+            )}
           </div>
           {connectionStatus === 'connected' ? (
             <button 
