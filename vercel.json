@@ -21,7 +21,8 @@
   "env": {
     "NODE_ENV": "production",
     "DISABLE_ESLINT_PLUGIN": "true",
-    "CI": "false"
+    "CI": "false",
+    "VERCEL": "1"
   },
   "regions": ["gru1"]
 } 
