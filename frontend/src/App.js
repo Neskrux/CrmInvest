@@ -46,6 +46,29 @@ function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+
+  // Função para fechar sidebar ao navegar no mobile
+  const handleMobileNavigation = () => {
+    if (isMobile) {
+      setShowMobileSidebar(false);
+    }
+  };
+  
+  // Hook para detectar mudanças no tamanho da tela
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+      // Fechar sidebar mobile quando mudança para desktop
+      if (window.innerWidth > 768) {
+        setShowMobileSidebar(false);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   // Determinar aba ativa baseada na rota atual
   const getActiveTab = () => {
@@ -130,18 +153,62 @@ function AppContent() {
 
   return (
     <div className="App">
-      <aside className="sidebar">
+      {/* Overlay para mobile */}
+      {isMobile && showMobileSidebar && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 998
+          }}
+          onClick={() => setShowMobileSidebar(false)}
+        />
+      )}
+      
+      <aside 
+        className="sidebar" 
+        style={isMobile ? {
+          transform: showMobileSidebar ? 'translateX(0)' : 'translateX(-100%)',
+          transition: 'transform 0.3s ease-in-out',
+          position: 'fixed',
+          zIndex: 999
+        } : {}}
+      >
         <div className="sidebar-header">
-          <img 
-            src={logoBrasao} 
-            alt="CRM System" 
-            style={{ 
-              width: '60px', 
-              height: '60px', 
-              marginBottom: '0.75rem',
-              objectFit: 'contain'
-            }} 
-          />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+            <img 
+              src={logoBrasao} 
+              alt="CRM System" 
+              style={{ 
+                width: '60px', 
+                height: '60px', 
+                marginBottom: '0.75rem',
+                objectFit: 'contain'
+              }} 
+            />
+            {isMobile && (
+              <button
+                onClick={() => setShowMobileSidebar(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  color: '#6b7280',
+                  borderRadius: '0.25rem'
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         <nav className="sidebar-nav">
@@ -149,6 +216,7 @@ function AppContent() {
             <Link
               to="/dashboard"
               className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`}
+              onClick={handleMobileNavigation}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="3" y="3" width="7" height="7" />
@@ -164,6 +232,7 @@ function AppContent() {
             <Link
               to="/pacientes"
               className={`nav-link ${activeTab === 'pacientes' ? 'active' : ''}`}
+              onClick={handleMobileNavigation}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -179,6 +248,7 @@ function AppContent() {
             <Link
               to="/agendamentos"
               className={`nav-link ${activeTab === 'agendamentos' ? 'active' : ''}`}
+              onClick={handleMobileNavigation}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -194,6 +264,7 @@ function AppContent() {
             <Link
               to="/fechamentos"
               className={`nav-link ${activeTab === 'fechamentos' ? 'active' : ''}`}
+              onClick={handleMobileNavigation}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="12" y1="1" x2="12" y2="23" />
@@ -207,6 +278,7 @@ function AppContent() {
             <Link
               to="/clinicas"
               className={`nav-link ${activeTab === 'clinicas' ? 'active' : ''}`}
+              onClick={handleMobileNavigation}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -221,6 +293,7 @@ function AppContent() {
               <Link
                 to="/consultores"
                 className={`nav-link ${activeTab === 'consultores' ? 'active' : ''}`}
+                onClick={handleMobileNavigation}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -236,6 +309,7 @@ function AppContent() {
               <Link
                 to="/meta-ads"
                 className={`nav-link ${activeTab === 'meta-ads' ? 'active' : ''}`}
+                onClick={handleMobileNavigation}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
@@ -249,6 +323,7 @@ function AppContent() {
             <Link
               to="/whatsapp"
               className={`nav-link ${activeTab === 'whatsapp' ? 'active' : ''}`}
+              onClick={handleMobileNavigation}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
@@ -271,6 +346,7 @@ function AppContent() {
           <Link
             to="/perfil"
             className={`nav-link-profile ${activeTab === 'perfil' ? 'active' : ''}`}
+            onClick={handleMobileNavigation}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -295,7 +371,42 @@ function AppContent() {
 
       <main className="main-content">
         <header className="main-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '7.5rem' : '1.5rem' }}>
+            {isMobile && (
+              <button
+                onClick={() => setShowMobileSidebar(!showMobileSidebar)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '0.5rem',
+                  transition: 'background-color 0.2s',
+                  ':hover': {
+                    backgroundColor: '#f3f4f6'
+                  }
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+              >
+                <svg 
+                  width="24" 
+                  height="24" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2"
+                  style={{ color: '#374151' }}
+                >
+                  <line x1="3" y1="6" x2="21" y2="6"></line>
+                  <line x1="3" y1="12" x2="21" y2="12"></line>
+                  <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+              </button>
+            )}
             <img 
               src={logoHorizontalPreto} 
               alt="CRM System" 
@@ -306,39 +417,42 @@ function AppContent() {
             />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-              {new Date().toLocaleDateString('pt-BR', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
-            </div>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '0.75rem',
-              padding: '0.5rem 1rem',
-              backgroundColor: '#f9fafb',
-              borderRadius: '8px',
-              border: '1px solid #e5e7eb',
-              cursor: 'pointer',
-              position: 'relative'
-            }}
-            onClick={() => setShowUserDropdown(!showUserDropdown)}
-            data-user-dropdown
-            >
+            {!isMobile && (
+              <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                {new Date().toLocaleDateString('pt-BR', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
+              </div>
+            )}
+            {!isMobile && (
               <div style={{ 
-                width: '32px', 
-                height: '32px',
-                backgroundColor: '#e5e7eb',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: '#4b5563'
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.75rem',
+                padding: '0.5rem 1rem',
+                backgroundColor: '#f9fafb',
+                borderRadius: '8px',
+                border: '1px solid #e5e7eb',
+                cursor: 'pointer',
+                position: 'relative'
+              }}
+              onClick={() => setShowUserDropdown(!showUserDropdown)}
+              data-user-dropdown
+              >
+                <div style={{ 
+                  width: '32px', 
+                  height: '32px',
+                  backgroundColor: '#e5e7eb',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#4b5563'
               }}>
                 {getUserInitials()}
               </div>
@@ -446,7 +560,8 @@ function AppContent() {
                   </div>
                 </div>
               )}
-            </div>
+              </div>
+            )}
           </div>
         </header>
 

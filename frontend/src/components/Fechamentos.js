@@ -31,10 +31,21 @@ const Fechamentos = () => {
   const [salvando, setSalvando] = useState(false);
   const [showObservacoesModal, setShowObservacoesModal] = useState(false);
   const [observacoesAtual, setObservacoesAtual] = useState('');
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const { error: showErrorToast, success: showSuccessToast, warning: showWarningToast, info: showInfoToast } = useToast();
 
   useEffect(() => {
     carregarDados();
+  }, []);
+
+  // Detectar mudanças de tamanho da tela
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   // Atualização automática dos dados a cada 30 segundos
@@ -649,7 +660,7 @@ const Fechamentos = () => {
       {/* Filtros e Ações */}
       <div className="card">
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 className="card-title">Lista de Fechamentos</h2>
+          <h2 style={{ display: window.innerWidth <= 768 ? 'none' : 'flex' }} className="card-title">Lista de Fechamentos</h2>
           <div style={{ display: 'flex', gap: '1rem' }}>
             <button 
               className="btn btn-secondary"
@@ -738,13 +749,13 @@ const Fechamentos = () => {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Data</th>
+                    <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Data</th>
                     <th>Paciente</th>
-                    <th>Consultor</th>
-                    <th>Clínica</th>
-                    <th>Tipo</th>
-                    <th style={{ textAlign: 'right' }}>Valor</th>
-                    <th>Status</th>
+                    <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
+                    <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Clínica</th>
+                    <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Tipo</th>
+                    <th style={{ textAlign: 'right', display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Valor</th>
+                    <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Status</th>
                     <th style={{ width: '180px' }}>Ações</th>
                   </tr>
                 </thead>
@@ -756,7 +767,7 @@ const Fechamentos = () => {
 
                     return (
                       <tr key={fechamento.id}>
-                        <td>{formatarData(fechamento.data_fechamento)}</td>
+                        <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarData(fechamento.data_fechamento)}</td>
                         <td>
                           <div>
                             <div style={{ fontWeight: '500' }}>{paciente?.nome || 'N/A'}</div>
@@ -786,19 +797,19 @@ const Fechamentos = () => {
                             )}
                           </div>
                         </td>
-                        <td>{consultor?.nome || 'N/A'}</td>
-                        <td>{clinica?.nome || 'N/A'}</td>
-                        <td>
+                        <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{consultor?.nome || 'N/A'}</td>
+                        <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{clinica?.nome || 'N/A'}</td>
+                        <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                           {fechamento.tipo_tratamento && (
                             <span className="badge badge-info">
                               {fechamento.tipo_tratamento}
                             </span>
                           )}
                         </td>
-                        <td style={{ textAlign: 'right', fontWeight: '600' }}>
+                        <td style={{ textAlign: 'right', fontWeight: '600', display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                           {formatarMoeda(fechamento.valor_fechado)}
                         </td>
-                        <td>
+                        <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                           {/* Campo select para alterar status (apenas admin) */}
                           {isAdmin ? (
                             <select 

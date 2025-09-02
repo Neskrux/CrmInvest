@@ -697,10 +697,10 @@ const Agendamentos = () => {
               <thead>
                 <tr>
                   <th>Paciente</th>
-                  <th>Consultor</th>
-                  <th>Clínica</th>
-                  <th>Data</th>
-                  <th>Horário</th>
+                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
+                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Clínica</th>
+                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Data</th>
+                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Horário</th>
                   <th>Status</th>
                   <th>Ações</th>
                 </tr>
@@ -741,9 +741,9 @@ const Agendamentos = () => {
                           )}
                         </div>
                       </td>
-                      <td>{agendamento.consultor_nome}</td>
-                      <td>{agendamento.clinica_nome}</td>
-                      <td>
+                      <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{agendamento.consultor_nome}</td>
+                      <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{agendamento.clinica_nome}</td>
+                      <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                         <span style={{
                           fontWeight: ehHoje(agendamento.data_agendamento) ? 'bold' : 'normal',
                           color: ehHoje(agendamento.data_agendamento) ? '#f59e0b' : 'inherit'
@@ -756,7 +756,7 @@ const Agendamentos = () => {
                           )}
                         </span>
                       </td>
-                      <td>
+                      <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                         <strong style={{ color: '#2563eb' }}>
                           {formatarHorario(agendamento.horario)}
                         </strong>

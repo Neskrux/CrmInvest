@@ -13,6 +13,9 @@ const Consultores = () => {
   const [consultorSenha, setConsultorSenha] = useState(null);
   const [showPixModal, setShowPixModal] = useState(false);
   const [pixSelecionado, setPixSelecionado] = useState('');
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewingConsultor, setViewingConsultor] = useState(null);
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
@@ -43,6 +46,16 @@ const Consultores = () => {
   useEffect(() => {
     fetchConsultores();
   }, [fetchConsultores]);
+
+  // Detectar mudanças de tamanho da tela
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -93,6 +106,16 @@ const Consultores = () => {
       pix: consultor.pix || ''
     });
     setShowModal(true);
+  };
+
+  const handleView = (consultor) => {
+    setViewingConsultor(consultor);
+    setShowViewModal(true);
+  };
+
+  const closeViewModal = () => {
+    setShowViewModal(false);
+    setViewingConsultor(null);
   };
 
   const handleInputChange = (e) => {
@@ -268,10 +291,10 @@ const Consultores = () => {
               <thead>
                 <tr>
                   <th>Nome</th>
-                  <th>Email de Acesso</th>
-                  <th>Telefone</th>
-                  <th>PIX</th>
-                  <th>Data de Cadastro</th>
+                  <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Email de Acesso</th>
+                  <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Telefone</th>
+                  <th style={{ display: isMobile ? 'none' : 'table-cell' }}>PIX</th>
+                  <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Data de Cadastro</th>
                   <th>Ações</th>
                 </tr>
               </thead>
@@ -281,15 +304,15 @@ const Consultores = () => {
                     <td>
                       <strong>{consultor.nome}</strong>
                     </td>
-                    <td className="text-wrap">
+                    <td className="text-wrap" style={{ display: isMobile ? 'none' : 'table-cell' }}>
                       <span className="email-cell">
                         {formatarEmail(consultor)}
                       </span>
                     </td>
-                    <td>
+                    <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                       {consultor.telefone ? formatarTelefone(consultor.telefone) : '-'}
                     </td>
-                    <td>
+                    <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                       {consultor.pix ? (
                         <div className="pix-container">
                           <span 
@@ -330,11 +353,21 @@ const Consultores = () => {
                         '-'
                       )}
                     </td>
-                    <td>
+                    <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                       {formatarData(consultor.created_at)}
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          onClick={() => handleView(consultor)}
+                          className="btn-action"
+                          title="Visualizar informações"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        </button>
                         <button
                           onClick={() => handleEdit(consultor)}
                           className="btn-action"
@@ -366,6 +399,96 @@ const Consultores = () => {
           </div>
         )}
       </div>
+
+      {/* Modal de Visualização */}
+      {showViewModal && viewingConsultor && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">
+                Detalhes do Consultor
+              </h2>
+              <button 
+                className="close-btn"
+                onClick={closeViewModal}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                <div>
+                  <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Nome</label>
+                  <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingConsultor.nome}</p>
+                </div>
+                
+                {viewingConsultor.email && (
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Email de Acesso</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{formatarEmail(viewingConsultor)}</p>
+                  </div>
+                )}
+                
+                {viewingConsultor.telefone && (
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Telefone</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{formatarTelefone(viewingConsultor.telefone)}</p>
+                  </div>
+                )}
+                
+                {viewingConsultor.pix && (
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>PIX</label>
+                    <div style={{ margin: '0.25rem 0 0 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <p style={{ margin: '0', color: '#1f2937', fontFamily: 'monospace', fontSize: '0.875rem' }}>
+                        {formatarPixExibicao(viewingConsultor.pix)}
+                      </p>
+                      <button
+                        onClick={() => mostrarPixCompleto(viewingConsultor.pix)}
+                        className="btn-action"
+                        title="Ver PIX completo"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                          <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => copiarPix(viewingConsultor.pix)}
+                        className="btn-action"
+                        title="Copiar PIX"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {viewingConsultor.created_at && (
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Data de Cadastro</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>{formatarData(viewingConsultor.created_at)}</p>
+                  </div>
+                )}
+              </div>
+              
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem' }}>
+                <button 
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={closeViewModal}
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Cadastro/Edição */}
       {showModal && (

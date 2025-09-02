@@ -22,6 +22,8 @@ const Clinicas = () => {
   const [filtroStatus, setFiltroStatus] = useState('');
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewingClinica, setViewingClinica] = useState(null);
+  const [viewNovaClinicaModalOpen, setViewNovaClinicaModalOpen] = useState(false);
+  const [viewingNovaClinica, setViewingNovaClinica] = useState(null);
   const [clinicasGeo, setClinicasGeo] = useState([]);
   const [novasClinicasGeo, setNovasClinicasGeo] = useState([]);
   const [geocoding, setGeocoding] = useState(false);
@@ -50,6 +52,7 @@ const Clinicas = () => {
     observacoes: ''
   });
   const [cidadeCustomizadaNova, setCidadeCustomizadaNova] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
   // Status disponíveis para novas clínicas
   const statusNovaClinicaOptions = [
@@ -125,6 +128,16 @@ const Clinicas = () => {
   useEffect(() => {
     fetchClinicas();
     fetchNovasClinicas(); // Sempre carregar novas clínicas
+  }, []);
+
+  // Detectar mudanças de tamanho da tela
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   // Regeocodificar quando filtros/dados mudarem e a aba for mapa
@@ -411,6 +424,16 @@ const Clinicas = () => {
     setViewingClinica(null);
   };
 
+  const handleViewNovaClinica = (clinica) => {
+    setViewingNovaClinica(clinica);
+    setViewNovaClinicaModalOpen(true);
+  };
+
+  const closeViewNovaClinicaModal = () => {
+    setViewNovaClinicaModalOpen(false);
+    setViewingNovaClinica(null);
+  };
+
   const formatarData = (data) => {
     return new Date(data).toLocaleDateString('pt-BR');
   };
@@ -655,7 +678,8 @@ const Clinicas = () => {
           padding: 0, 
           overflow: 'hidden',
           boxShadow: '0 10px 40px rgba(0, 0, 0, 0.1)',
-          borderRadius: '12px'
+          borderRadius: '12px',
+          zoom: window.innerWidth <= 768 ? '0.75' : '1.00'
         }}>
           {/* Header Moderno */}
           <div style={{ 
@@ -1159,12 +1183,12 @@ const Clinicas = () => {
               <thead>
                 <tr>
                   <th>Nome</th>
-                  <th>Endereço</th>
-                  <th>Bairro</th>
-                  <th>Cidade/Estado</th>
-                  <th>Nicho</th>
-                  <th>Contato</th>
-                  <th>Status</th>
+                  <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Endereço</th>
+                  <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Bairro</th>
+                  <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Cidade/Estado</th>
+                  <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Nicho</th>
+                  <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Contato</th>
+                  <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Status</th>
                   <th>Ações</th>
                 </tr>
               </thead>
@@ -1174,21 +1198,21 @@ const Clinicas = () => {
                     <td>
                       <strong>{clinica.nome}</strong>
                     </td>
-                    <td>{clinica.endereco || '-'}</td>
-                    <td>{clinica.bairro || '-'}</td>
-                    <td>
+                    <td style={{ display: isMobile ? 'none' : 'table-cell' }}>{clinica.endereco || '-'}</td>
+                    <td style={{ display: isMobile ? 'none' : 'table-cell' }}>{clinica.bairro || '-'}</td>
+                    <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                       {clinica.cidade && clinica.estado ? (
                         <span>{clinica.cidade}/{clinica.estado}</span>
                       ) : '-'}
                     </td>
-                    <td>
+                    <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                       {clinica.nicho ? (
                         <span className="badge" style={{ backgroundColor: '#e5e7eb', color: '#374151' }}>
                           {clinica.nicho}
                         </span>
                       ) : '-'}
                     </td>
-                    <td>
+                    <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                       {clinica.telefone && (
                         <div>{formatarTelefone(clinica.telefone)}</div>
                       )}
@@ -1197,7 +1221,7 @@ const Clinicas = () => {
                       )}
                       {!clinica.telefone && !clinica.email && '-'}
                     </td>
-                    <td>
+                    <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                       <span className={`badge ${clinica.status === 'ativo' ? 'badge-success' : 'badge-danger'}`}>
                         {clinica.status === 'ativo' ? 'Desbloqueada' : 'Bloqueada'}
                       </span>
@@ -1304,13 +1328,13 @@ const Clinicas = () => {
                 <thead>
                   <tr>
                     <th>Nome</th>
-                    <th>Localização</th>
-                    <th>Nicho</th>
-                    <th>Telefone</th>
-                    <th>Email</th>
-                    <th>Status</th>
-                    <th>Cadastrado</th>
-                    <th style={{ width: '120px' }}>Ações</th>
+                    <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Localização</th>
+                    <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Nicho</th>
+                    <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Telefone</th>
+                    <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Email</th>
+                    <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Status</th>
+                    <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Cadastrado</th>
+                    <th style={{ width: '160px' }}>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1328,7 +1352,7 @@ const Clinicas = () => {
                             )}
                           </div>
                         </td>
-                        <td>
+                        <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                           <div style={{ fontSize: '0.875rem' }}>
                             {clinica.cidade && clinica.estado ? 
                               `${clinica.cidade}/${clinica.estado}` : 
@@ -1341,14 +1365,14 @@ const Clinicas = () => {
                             )}
                           </div>
                         </td>
-                        <td>{clinica.nicho || '-'}</td>
-                        <td>{formatarTelefone(clinica.telefone) || '-'}</td>
-                        <td>
+                        <td style={{ display: isMobile ? 'none' : 'table-cell' }}>{clinica.nicho || '-'}</td>
+                        <td style={{ display: isMobile ? 'none' : 'table-cell' }}>{formatarTelefone(clinica.telefone) || '-'}</td>
+                        <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                           {clinica.email ? (
                             <span style={{ fontSize: '0.875rem' }}>{clinica.email}</span>
                           ) : '-'}
                         </td>
-                        <td>
+                        <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                           <span 
                             className="badge"
                             style={{
@@ -1360,13 +1384,28 @@ const Clinicas = () => {
                             {statusInfo.label}
                           </span>
                         </td>
-                        <td>{formatarData(clinica.created_at)}</td>
+                        <td style={{ display: isMobile ? 'none' : 'table-cell' }}>{formatarData(clinica.created_at)}</td>
                         <td style={{
-                              padding: 0
+                              padding: '0.5rem',
+                              display: 'flex',
+                              gap: '0.5rem',
+                              alignItems: 'center',
+                              justifyContent: 'flex-start'
                             }}>
+                          <button
+                            onClick={() => handleViewNovaClinica(clinica)}
+                            className="btn-action"
+                            title="Visualizar informações"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          </button>
                           <button
                             onClick={() => pegarClinica(clinica.id)}
                             className="btn btn-primary"
+                            style={{ fontSize: '0.875rem', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap' }}
                           >
                             Pegar Clínica
                           </button>
@@ -1694,6 +1733,128 @@ const Clinicas = () => {
            </div>
          </div>
        )}
+
+      {/* Modal de Visualização de Nova Clínica */}
+      {viewNovaClinicaModalOpen && viewingNovaClinica && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">
+                Detalhes da Nova Clínica
+              </h2>
+              <button 
+                className="close-btn"
+                onClick={closeViewNovaClinicaModal}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                <div>
+                  <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Nome da Clínica</label>
+                  <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingNovaClinica.nome}</p>
+                </div>
+                
+                {viewingNovaClinica.endereco && (
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Endereço</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingNovaClinica.endereco}</p>
+                  </div>
+                )}
+                
+                {viewingNovaClinica.bairro && (
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Bairro</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingNovaClinica.bairro}</p>
+                  </div>
+                )}
+                
+                {(viewingNovaClinica.cidade || viewingNovaClinica.estado) && (
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Localização</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                      {viewingNovaClinica.cidade && viewingNovaClinica.estado 
+                        ? `${viewingNovaClinica.cidade}, ${viewingNovaClinica.estado}`
+                        : viewingNovaClinica.cidade || viewingNovaClinica.estado
+                      }
+                    </p>
+                  </div>
+                )}
+                
+                {viewingNovaClinica.nicho && (
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Nicho</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingNovaClinica.nicho}</p>
+                  </div>
+                )}
+                
+                {viewingNovaClinica.telefone && (
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Telefone</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{formatarTelefone(viewingNovaClinica.telefone)}</p>
+                  </div>
+                )}
+                
+                {viewingNovaClinica.email && (
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>E-mail</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingNovaClinica.email}</p>
+                  </div>
+                )}
+                
+                {viewingNovaClinica.status && (
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Status</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                      {(() => {
+                        const statusInfo = getStatusNovaClinicaInfo(viewingNovaClinica.status);
+                        return (
+                          <span 
+                            className="badge"
+                            style={{
+                              backgroundColor: statusInfo.color + '20',
+                              color: statusInfo.color,
+                              border: `1px solid ${statusInfo.color}`
+                            }}
+                          >
+                            {statusInfo.label}
+                          </span>
+                        );
+                      })()}
+                    </p>
+                  </div>
+                )}
+                
+                {viewingNovaClinica.observacoes && (
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Observações</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingNovaClinica.observacoes}</p>
+                  </div>
+                )}
+                
+                {viewingNovaClinica.created_at && (
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Data de Cadastro</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>{formatarData(viewingNovaClinica.created_at)}</p>
+                  </div>
+                )}
+              </div>
+              
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem' }}>
+                <button 
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={closeViewNovaClinicaModal}
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Cadastro de Nova Clínica */}
       {showNovaClinicaModal && (

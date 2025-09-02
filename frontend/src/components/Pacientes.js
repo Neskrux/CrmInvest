@@ -1123,13 +1123,13 @@ const Pacientes = () => {
                   <thead>
                     <tr>
                       <th>Nome</th>
-                      <th>Consultor</th>
-                      <th>Telefone</th>
-                      <th>CPF</th>
-                      <th>Cidade</th>
-                      <th>Tipo</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>CPF</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cidade</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Tipo</th>
                       <th>Status</th>
-                      <th>Cadastrado</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
                       <th style={{ width: '140px' }}>Ações</th>
                     </tr>
                   </thead>
@@ -1167,16 +1167,16 @@ const Pacientes = () => {
                               )}
                             </div>
                           </td>
-                          <td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                             {paciente.consultor_nome || (
                               <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
                                 Não atribuído
                               </span>
                             )}
                           </td>
-                          <td>{formatarTelefone(paciente.telefone)}</td>
-                          <td>{formatarCPF(paciente.cpf)}</td>
-                          <td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarTelefone(paciente.telefone)}</td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarCPF(paciente.cpf)}</td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                             {paciente.cidade || paciente.estado ? (
                               <>
                                 {paciente.cidade && <div>{paciente.cidade}</div>}
@@ -1184,7 +1184,7 @@ const Pacientes = () => {
                               </>
                             ) : '-'}
                           </td>
-                          <td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                             {paciente.tipo_tratamento && (
                               <span className={`badge badge-${paciente.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
                                 {paciente.tipo_tratamento}
@@ -1213,7 +1213,7 @@ const Pacientes = () => {
                               ))}
                             </select>
                           </td>
-                          <td>{formatarData(paciente.created_at)}</td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarData(paciente.created_at)}</td>
                           <td>
                             <button
                               onClick={() => handleEdit(paciente)}
@@ -1263,7 +1263,7 @@ const Pacientes = () => {
                   <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
                     Página {currentPage} de {totalPages} — exibindo {pacientesPaginados.length} de {pacientesFiltrados.length}
                   </div>
-                  <div>
+                  <div style={{ display: window.innerWidth <= 768 ? 'flex' : 'block' }}>
                     <button
                       className="btn"
                       disabled={currentPage === 1}
@@ -1312,12 +1312,12 @@ const Pacientes = () => {
                   <thead>
                     <tr>
                       <th>Nome</th>
-                      <th>Telefone</th>
-                      <th>CPF</th>
-                      <th>Cidade</th>
-                      <th>Tipo</th>
-                      <th>Status</th>
-                      <th>Cadastrado</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>CPF</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cidade</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Tipo</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Status</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
                       <th style={{ width: '120px' }}>Ações</th>
                     </tr>
                   </thead>
@@ -1355,9 +1355,9 @@ const Pacientes = () => {
                               )}
                             </div>
                           </td>
-                          <td>{formatarTelefone(lead.telefone)}</td>
-                          <td>{formatarCPF(lead.cpf)}</td>
-                          <td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarTelefone(lead.telefone)}</td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarCPF(lead.cpf)}</td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                             {lead.cidade || lead.estado ? (
                               <>
                                 {lead.cidade && <div>{lead.cidade}</div>}
@@ -1365,26 +1365,45 @@ const Pacientes = () => {
                               </>
                             ) : '-'}
                           </td>
-                          <td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                             {lead.tipo_tratamento && (
                               <span className={`badge badge-${lead.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
                                 {lead.tipo_tratamento}
                               </span>
                             )}
                           </td>
-                          <td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                             <span className="badge badge-warning">
                               {statusInfo.label}
                             </span>
                           </td>
-                          <td>{formatarData(lead.created_at)}</td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarData(lead.created_at)}</td>
                           <td style={{ padding: '0' }}>
-                            <button
-                              onClick={() => pegarLead(lead.id)}
-                              className="btn btn-primary"
-                            >
-                              Pegar Lead
-                            </button>
+                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                              {window.innerWidth <= 768 && (
+                                <button
+                                  onClick={() => handleView(lead)}
+                                  className="btn-action"
+                                  title="Visualizar"
+                                  style={{ padding: '0.5rem' }}
+                                >
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                    <circle cx="12" cy="12" r="3" />
+                                  </svg>
+                                </button>
+                              )}
+                              <button
+                                onClick={() => pegarLead(lead.id)}
+                                className="btn btn-primary"
+                                style={{ 
+                                  fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
+                                  padding: window.innerWidth <= 768 ? '0.5rem 0.75rem' : '0.75rem 1rem'
+                                }}
+                              >
+                                {window.innerWidth <= 768 ? 'Pegar' : 'Pegar Lead'}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );

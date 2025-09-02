@@ -13,7 +13,18 @@ const WhatsApp = () => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const socketRef = useRef(null);
+
+  useEffect(() => {
+    // Detectar mudanças de tamanho da tela
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     // Conectar ao Socket.IO
@@ -236,7 +247,13 @@ const WhatsApp = () => {
 
   return (
     <div style={{ padding: '2rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+      <div style={{ 
+        display: isMobile ? 'grid' : 'flex', 
+        gap: isMobile ? '1rem' : 'initial',
+        justifyContent: isMobile ? 'initial' : 'space-between', 
+        alignItems: isMobile ? 'initial' : 'center', 
+        marginBottom: '2rem' 
+      }}>
         <div>
           <h1 style={{ margin: 0, color: '#1f2937' }}>WhatsApp</h1>
           <p style={{ margin: '0.5rem 0 0 0', color: '#6b7280' }}>
@@ -286,7 +303,7 @@ const WhatsApp = () => {
               Abra o WhatsApp no seu celular e escaneie o código abaixo
             </p>
           </div>
-          <div style={{ padding: '2rem' }}>
+          <div>
             <img src={qrCode} alt="QR Code WhatsApp" style={{ maxWidth: '300px' }} />
           </div>
         </div>
