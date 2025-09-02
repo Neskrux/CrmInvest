@@ -447,6 +447,7 @@ const Dashboard = () => {
         });
 
       // Converter para array e ordenar por total (pacientes + agendamentos + fechamentos)
+      const limiteCidades = window.innerWidth <= 768 ? 3 : 10; // Limitar a 3 cidades em mobile, 10 em desktop
       const agendamentosPorCidadeArray = Object.values(dadosPorCidade)
         .map(item => ({
           ...item,
@@ -455,7 +456,7 @@ const Dashboard = () => {
           conversaoFechamento: item.agendamentos > 0 ? ((item.fechamentos / item.agendamentos) * 100).toFixed(1) : 0
         }))
         .sort((a, b) => b.total - a.total)
-        .slice(0, 10); // Mostrar apenas top 10 cidades
+        .slice(0, limiteCidades); // Mostrar top cidades baseado no dispositivo
 
       // Calcular comissões
       let comissaoTotalMes = 0;
@@ -730,7 +731,7 @@ const Dashboard = () => {
 
             {/* Filtrar por dia específico */}
             <div style={{ 
-              display: 'flex', 
+              display: window.innerWidth <= 768 ? 'none' : 'flex',
               gap: '0.5rem', 
               alignItems: 'center'
             }}>
@@ -872,7 +873,7 @@ const Dashboard = () => {
           </h3>
           <div style={{ 
             display: 'grid', 
-            gridTemplateColumns: 'repeat(7, 1fr)', 
+            gridTemplateColumns: window.innerWidth <= 768 ? 'repeat(4, 1fr)' : 'repeat(7, 1fr)',
             gap: '0.75rem' 
           }}>
             {Object.entries(stats.estatisticasPorDia).map(([dia, dados]) => (
@@ -1048,7 +1049,7 @@ const Dashboard = () => {
           <div className="card-header">
             <h2 className="card-title">Pacientes, Agendamentos e Fechamentos por Cidade</h2>
             <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-              Top 10 cidades com mais movimentação no funil de vendas
+              {window.innerWidth <= 768 ? 'Top 3' : 'Top 10'} cidades com mais movimentação no funil de vendas
             </p>
           </div>
           <div className="card-body">
@@ -1374,8 +1375,9 @@ const Dashboard = () => {
                                 </div>
                               </div>
 
+                              {/* Estatísticas - apenas em desktop */}
                               <div style={{ 
-                                display: 'flex', 
+                                display: window.innerWidth <= 768 ? 'none' : 'flex',
                                 gap: '2rem',
                                 fontSize: '0.875rem'
                               }}>
@@ -1486,9 +1488,9 @@ const Dashboard = () => {
           <h2 className="card-title">Taxa de Conversão do Funil</h2>
         </div>
         <div className="card-body">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: window.innerWidth <= 768 ? '0.4rem' : '2rem' }}>
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', fontWeight: '700', color: '#1a1d23' }}>
+              <div style={{ fontSize: window.innerWidth <= 768 ? '1rem' : '2rem', fontWeight: '700', color: '#1a1d23' }}>
                 {kpisPrincipais.totalPacientes}
               </div>
               <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
@@ -1501,7 +1503,7 @@ const Dashboard = () => {
             </svg>
 
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', fontWeight: '700', color: '#1a1d23' }}>
+              <div style={{ fontSize: window.innerWidth <= 768 ? '1rem' : '2rem', fontWeight: '700', color: '#1a1d23' }}>
                 {pipelineFiltrado.agendado || 0}
               </div>
               <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
@@ -1514,7 +1516,7 @@ const Dashboard = () => {
             </svg>
 
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', fontWeight: '700', color: '#1a1d23' }}>
+              <div style={{ fontSize: window.innerWidth <= 768 ? '1rem' : '2rem', fontWeight: '700', color: '#1a1d23' }}>
                 {pipelineFiltrado.compareceu || 0}
               </div>
               <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
@@ -1527,7 +1529,7 @@ const Dashboard = () => {
             </svg>
 
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', fontWeight: '700', color: '#059669' }}>
+              <div style={{ fontSize: window.innerWidth <= 768 ? '1rem' : '2rem', fontWeight: '700', color: '#059669' }}>
                 {pipelineFiltrado.fechado || 0}
               </div>
               <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
