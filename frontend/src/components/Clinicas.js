@@ -14,6 +14,8 @@ const Clinicas = () => {
   const [showNovaClinicaModal, setShowNovaClinicaModal] = useState(false);
   const [editingClinica, setEditingClinica] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false); // Estado para prevenir cliques duplos
+  const [submittingNovaClinica, setSubmittingNovaClinica] = useState(false); // Estado para nova clínica
   const [activeTab, setActiveTab] = useState('clinicas');
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroCity, setFiltroCity] = useState('');
@@ -283,6 +285,12 @@ const Clinicas = () => {
 
   const handleNovaClinicaSubmit = async (e) => {
     e.preventDefault();
+    
+    // Prevenir múltiplos cliques
+    if (submittingNovaClinica) return;
+    
+    setSubmittingNovaClinica(true);
+    
     try {
       const response = await makeRequest('/novas-clinicas', {
         method: 'POST',
@@ -314,11 +322,19 @@ const Clinicas = () => {
     } catch (error) {
       console.error('Erro ao cadastrar nova clínica:', error);
       showErrorToast('Erro ao cadastrar nova clínica');
+    } finally {
+      setSubmittingNovaClinica(false);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Prevenir múltiplos cliques
+    if (submitting) return;
+    
+    setSubmitting(true);
+    
     try {
       let response;
       if (editingClinica) {
@@ -358,6 +374,8 @@ const Clinicas = () => {
     } catch (error) {
       console.error('Erro ao salvar clínica:', error);
       showErrorToast('Erro ao salvar clínica');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -1549,14 +1567,24 @@ const Clinicas = () => {
                   type="button"
                   className="btn btn-secondary"
                   onClick={resetForm}
+                  disabled={submitting}
+                  style={{ 
+                    opacity: submitting ? 0.6 : 1,
+                    cursor: submitting ? 'not-allowed' : 'pointer'
+                  }}
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit"
                   className="btn btn-primary"
+                  disabled={submitting}
+                  style={{ 
+                    opacity: submitting ? 0.6 : 1,
+                    cursor: submitting ? 'not-allowed' : 'pointer'
+                  }}
                 >
-                  {editingClinica ? 'Atualizar Clínica' : 'Cadastrar Clínica'}
+                  {submitting ? 'Salvando...' : (editingClinica ? 'Atualizar Clínica' : 'Cadastrar Clínica')}
                 </button>
               </div>
             </form>
@@ -1877,21 +1905,28 @@ const Clinicas = () => {
                 <button 
                   type="button"
                   className="btn btn-secondary"
+                  disabled={submittingNovaClinica}
+                  style={{ 
+                    opacity: submittingNovaClinica ? 0.6 : 1,
+                    cursor: submittingNovaClinica ? 'not-allowed' : 'pointer'
+                  }}
                   onClick={() => {
-                    setShowNovaClinicaModal(false);
-                    setNovaClinicaFormData({ 
-                      nome: '',
-                      endereco: '',
-                      bairro: '',
-                      cidade: '',
-                      estado: '',
-                      nicho: '',
-                      telefone: '',
-                      email: '',
-                      status: 'tem_interesse',
-                      observacoes: ''
-                    });
-                    setCidadeCustomizadaNova(false);
+                    if (!submittingNovaClinica) {
+                      setShowNovaClinicaModal(false);
+                      setNovaClinicaFormData({ 
+                        nome: '',
+                        endereco: '',
+                        bairro: '',
+                        cidade: '',
+                        estado: '',
+                        nicho: '',
+                        telefone: '',
+                        email: '',
+                        status: 'tem_interesse',
+                        observacoes: ''
+                      });
+                      setCidadeCustomizadaNova(false);
+                    }
                   }}
                 >
                   Cancelar
@@ -1899,8 +1934,13 @@ const Clinicas = () => {
                 <button 
                   type="submit"
                   className="btn btn-primary"
+                  disabled={submittingNovaClinica}
+                  style={{ 
+                    opacity: submittingNovaClinica ? 0.6 : 1,
+                    cursor: submittingNovaClinica ? 'not-allowed' : 'pointer'
+                  }}
                 >
-                  Cadastrar Clínica
+                  {submittingNovaClinica ? 'Cadastrando...' : 'Cadastrar Clínica'}
                 </button>
               </div>
             </form>
