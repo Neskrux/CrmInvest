@@ -6,7 +6,7 @@ import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 const Clinicas = () => {
-  const { makeRequest, user } = useAuth();
+  const { makeRequest, user, isAdmin } = useAuth();
   const { showSuccessToast, showErrorToast } = useToast();
   const [clinicas, setClinicas] = useState([]);
   const [novasClinicas, setNovasClinicas] = useState([]);
@@ -274,7 +274,7 @@ const Clinicas = () => {
     }
   };
 
-  const pegarClinica = async (clinicaId) => {
+  const aprovarClinica = async (clinicaId) => {
     try {
       const response = await makeRequest(`/novas-clinicas/${clinicaId}/pegar`, {
         method: 'PUT'
@@ -283,14 +283,15 @@ const Clinicas = () => {
       const data = await response.json();
       
       if (response.ok) {
-        showSuccessToast('Clínica atribuída com sucesso!');
+        showSuccessToast('Clínica aprovada e movida para clínicas parceiras com sucesso!');
         fetchNovasClinicas();
+        fetchClinicas(); // Atualizar também a lista de clínicas gerais
       } else {
-        showErrorToast('Erro ao pegar clínica: ' + data.error);
+        showErrorToast('Erro ao aprovar clínica: ' + data.error);
       }
     } catch (error) {
-      console.error('Erro ao pegar clínica:', error);
-      showErrorToast('Erro ao pegar clínica');
+      console.error('Erro ao aprovar clínica:', error);
+      showErrorToast('Erro ao aprovar clínica');
     }
   };
 
@@ -1170,6 +1171,7 @@ const Clinicas = () => {
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Cidade/Estado</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Nicho</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Contato</th>
+                  <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Proprietário</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Status</th>
                   <th>Ações</th>
                 </tr>
@@ -1202,6 +1204,23 @@ const Clinicas = () => {
                         <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>{clinica.email}</div>
                       )}
                       {!clinica.telefone && !clinica.email && '-'}
+                    </td>
+                    <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                      {clinica.consultor_id ? (
+                        isAdmin ? (
+                          <span className="badge" style={{ backgroundColor: '#3b82f6', color: 'white' }}>
+                            Exclusiva
+                          </span>
+                        ) : (
+                          <span className="badge" style={{ backgroundColor: '#3b82f6', color: 'white' }}>
+                            Você
+                          </span>
+                        )
+                      ) : (
+                        <span className="badge" style={{ backgroundColor: '#10b981', color: 'white' }}>
+                          Pública
+                        </span>
+                      )}
                     </td>
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                       <span className={`badge ${clinica.status === 'ativo' ? 'badge-success' : 'badge-danger'}`}>
@@ -1314,6 +1333,7 @@ const Clinicas = () => {
                     <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Nicho</th>
                     <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Telefone</th>
                     <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Email</th>
+                    <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Proprietário</th>
                     <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Status</th>
                     <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Cadastrado</th>
                     <th style={{ width: '160px' }}>Ações</th>
@@ -1355,6 +1375,17 @@ const Clinicas = () => {
                           ) : '-'}
                         </td>
                         <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                          {clinica.criado_por_consultor_id ? (
+                            <span className="badge" style={{ backgroundColor: '#3b82f6', color: 'white' }}>
+                              Exclusiva
+                            </span>
+                          ) : (
+                            <span className="badge" style={{ backgroundColor: '#10b981', color: 'white' }}>
+                              Pública
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                           <span 
                             className="badge"
                             style={{
@@ -1384,13 +1415,15 @@ const Clinicas = () => {
                               <circle cx="12" cy="12" r="3" />
                             </svg>
                           </button>
-                          <button
-                            onClick={() => pegarClinica(clinica.id)}
-                            className="btn btn-primary"
-                            style={{ fontSize: '0.875rem', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap' }}
-                          >
-                            Pegar Clínica
-                          </button>
+                          {isAdmin && (
+                            <button
+                              onClick={() => aprovarClinica(clinica.id)}
+                              className="btn btn-primary"
+                              style={{ fontSize: '0.875rem', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap' }}
+                            >
+                              Aprovar
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
