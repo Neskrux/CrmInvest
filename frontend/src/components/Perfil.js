@@ -15,6 +15,8 @@ const Perfil = () => {
     nome: user?.nome || '',
     email: user?.email || '',
     tipo: user?.tipo || 'usuario',
+    telefone: user?.telefone || '',
+    pix: user?.pix || '',
     senhaAtual: '',
     novaSenha: '',
     confirmarSenha: ''
@@ -23,20 +25,28 @@ const Perfil = () => {
   useEffect(() => {
     const buscarPerfilCompleto = async () => {
       try {
-        const response = await makeRequest('/usuarios/perfil', {
+        // Determinar qual rota usar baseado no tipo de usuário
+        const endpoint = user?.tipo === 'consultor' ? '/consultores/perfil' : '/usuarios/perfil';
+        
+        const response = await makeRequest(endpoint, {
           method: 'GET'
         });
 
         if (response.ok) {
           const data = await response.json();
-          setPerfilCompleto(data.usuario);
+          // Usar a chave correta baseada no tipo de usuário
+          const perfilData = user?.tipo === 'consultor' ? data.consultor : data.usuario;
+          
+          setPerfilCompleto(perfilData);
           
           // Atualizar formData com dados do banco
           setFormData(prev => ({
             ...prev,
-            nome: data.usuario.nome || '',
-            email: data.usuario.email || '',
-            tipo: data.usuario.tipo || 'usuario'
+            nome: perfilData.nome || '',
+            email: perfilData.email || '',
+            tipo: perfilData.tipo || 'usuario',
+            telefone: perfilData.telefone || '',
+            pix: perfilData.pix || ''
           }));
         }
       } catch (error) {
@@ -141,13 +151,22 @@ const Perfil = () => {
         tipo: formData.tipo
       };
 
+      // Adicionar campos específicos de consultor se aplicável
+      if (user?.tipo === 'consultor') {
+        updateData.telefone = formData.telefone.trim() || null;
+        updateData.pix = formData.pix.trim() || null;
+      }
+
       // Incluir senhas se estiver alterando
       if (showPasswordFields) {
         updateData.senhaAtual = formData.senhaAtual;
         updateData.novaSenha = formData.novaSenha;
       }
 
-      const response = await makeRequest('/usuarios/perfil', {
+      // Determinar qual rota usar baseado no tipo de usuário
+      const endpoint = user?.tipo === 'consultor' ? '/consultores/perfil' : '/usuarios/perfil';
+      
+      const response = await makeRequest(endpoint, {
         method: 'PUT',
         body: JSON.stringify(updateData)
       });
@@ -162,7 +181,9 @@ const Perfil = () => {
           ...user, 
           nome: formData.nome.trim(), 
           email: formData.email.trim(),
-          tipo: formData.tipo 
+          tipo: formData.tipo,
+          telefone: formData.telefone.trim() || null,
+          pix: formData.pix.trim() || null
         };
         login(updatedUser, localStorage.getItem('token'));
         
@@ -174,6 +195,11 @@ const Perfil = () => {
           confirmarSenha: ''
         }));
         setShowPasswordFields(false);
+        
+        // Forçar refresh da página após atualização do perfil
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500); // Aguarda 1.5 segundos para mostrar o toast de sucesso
       } else {
         showErrorToast(data.error || 'Erro ao atualizar perfil');
       }
@@ -289,6 +315,35 @@ const Perfil = () => {
               required
             />
           </div>
+
+          {/* Campos específicos para consultores */}
+          {user?.tipo === 'consultor' && (
+            <>
+              <div className="form-group">
+                <label className="form-label">Telefone</label>
+                <input
+                  type="tel"
+                  name="telefone"
+                  className="form-input"
+                  value={formData.telefone}
+                  onChange={handleInputChange}
+                  placeholder="Digite seu telefone"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Chave PIX</label>
+                <input
+                  type="text"
+                  name="pix"
+                  className="form-input"
+                  value={formData.pix}
+                  onChange={handleInputChange}
+                  placeholder="Digite sua chave PIX"
+                />
+              </div>
+            </>
+          )}
 
           <div className="form-group">
             <label className="form-label">Tipo de Usuário</label>

@@ -471,6 +471,125 @@ app.get('/api/usuarios/perfil', authenticateToken, async (req, res) => {
   }
 });
 
+// Atualizar perfil do consultor
+app.put('/api/consultores/perfil', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { nome, telefone, email, senhaAtual, novaSenha, pix } = req.body;
+
+    // Validações básicas
+    if (!nome || !email) {
+      return res.status(400).json({ error: 'Nome e email são obrigatórios' });
+    }
+
+    // Verificar se o email já está sendo usado por outro consultor
+    const { data: emailExistente } = await supabase
+      .from('consultores')
+      .select('id')
+      .eq('email', email)
+      .neq('id', userId)
+      .single();
+
+    if (emailExistente) {
+      return res.status(400).json({ error: 'Este email já está sendo usado por outro consultor' });
+    }
+
+    // Se foi fornecida nova senha, verificar senha atual
+    if (novaSenha && novaSenha.trim() !== '') {
+      if (!senhaAtual) {
+        return res.status(400).json({ error: 'Senha atual é obrigatória para alterar a senha' });
+      }
+
+      // Buscar senha atual do consultor
+      const { data: consultor, error: userError } = await supabase
+        .from('consultores')
+        .select('senha')
+        .eq('id', userId)
+        .single();
+
+      if (userError || !consultor) {
+        return res.status(404).json({ error: 'Consultor não encontrado' });
+      }
+
+      // Verificar se senha atual está correta
+      const senhaCorreta = await bcrypt.compare(senhaAtual, consultor.senha);
+      if (!senhaCorreta) {
+        return res.status(400).json({ error: 'Senha atual incorreta' });
+      }
+    }
+
+    // Preparar dados para atualização
+    const updateData = {
+      nome,
+      email,
+      telefone: telefone || null,
+      pix: pix || null
+    };
+
+    // Se nova senha foi fornecida, incluir na atualização
+    if (novaSenha && novaSenha.trim() !== '') {
+      const hashedPassword = await bcrypt.hash(novaSenha, 10);
+      updateData.senha = hashedPassword;
+    }
+
+    // Executar atualização
+    const { error: updateError } = await supabase
+      .from('consultores')
+      .update(updateData)
+      .eq('id', userId);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    // Buscar dados atualizados do consultor
+    const { data: consultorAtualizado, error: fetchError } = await supabase
+      .from('consultores')
+      .select('id, nome, email, telefone, pix, ativo, created_at')
+      .eq('id', userId)
+      .single();
+
+    if (fetchError) {
+      throw fetchError;
+    }
+
+    res.json({
+      message: 'Perfil atualizado com sucesso',
+      consultor: consultorAtualizado
+    });
+
+  } catch (error) {
+    console.error('Erro ao atualizar perfil do consultor:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Buscar informações completas do perfil do consultor
+app.get('/api/consultores/perfil', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Buscar dados completos do consultor
+    const { data: consultor, error } = await supabase
+      .from('consultores')
+      .select('id, nome, email, telefone, pix, ativo, created_at')
+      .eq('id', userId)
+      .single();
+
+    if (error || !consultor) {
+      return res.status(404).json({ error: 'Consultor não encontrado' });
+    }
+
+    res.json({
+      consultor: consultor
+    });
+
+  } catch (error) {
+    console.error('Erro ao buscar perfil do consultor:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 app.get('/api/verify-token', authenticateToken, async (req, res) => {
   try {
     // Buscar dados atualizados do usuário na tabela usuarios
@@ -527,7 +646,7 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
 
 // ROTAS DA API
 
-// === CLÍNICAS === (Apenas Admin)
+// === CLÍNICAS === (Admin vê todas, Consultores vêem apenas públicas ou suas próprias)
 app.get('/api/clinicas', authenticateToken, async (req, res) => {
   try {
     const { cidade, estado } = req.query;
@@ -545,6 +664,11 @@ app.get('/api/clinicas', authenticateToken, async (req, res) => {
     // Filtrar por cidade se especificado
     if (cidade) {
       query = query.ilike('cidade', `%${cidade}%`);
+    }
+
+    // Se for consultor, mostrar apenas clínicas públicas (sem proprietário) ou suas próprias
+    if (req.user.tipo === 'consultor') {
+      query = query.or(`consultor_id.is.null,consultor_id.eq.${req.user.id}`);
     }
 
     const { data, error } = await query;
@@ -1428,11 +1552,18 @@ app.put('/api/novos-leads/:id/pegar', authenticateToken, async (req, res) => {
 // === NOVAS CLÍNICAS === (Funcionalidade para pegar clínicas encontradas nas missões)
 app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('novas_clinicas')
       .select('*')
-      .is('consultor_id', null)
       .order('created_at', { ascending: false });
+
+    // Se for consultor, mostrar apenas clínicas disponíveis (sem proprietário) ou suas próprias
+    if (req.user.tipo === 'consultor') {
+      query = query.or(`consultor_id.is.null,consultor_id.eq.${req.user.id}`);
+    }
+    // Admin vê todas as novas clínicas (com ou sem consultor_id)
+
+    const { data, error } = await query;
 
     if (error) throw error;
     res.json(data);
@@ -1488,22 +1619,26 @@ app.post('/api/novas-clinicas', authenticateToken, async (req, res) => {
       }
     }
     
+    // Preparar dados para inserção
+    const clinicaData = {
+      nome, 
+      endereco,
+      bairro,
+      cidade,
+      estado,
+      nicho,
+      telefone: telefoneNumeros,
+      email,
+      status: status || 'tem_interesse',
+      observacoes,
+      latitude,
+      longitude,
+      criado_por_consultor_id: req.user.tipo === 'consultor' ? req.user.id : null
+    };
+    
     const { data, error } = await supabase
       .from('novas_clinicas')
-      .insert([{ 
-        nome, 
-        endereco,
-        bairro,
-        cidade,
-        estado,
-        nicho,
-        telefone: telefoneNumeros,
-        email,
-        status: status || 'tem_interesse',
-        observacoes,
-        latitude,
-        longitude
-      }])
+      .insert([clinicaData])
       .select();
 
     if (error) throw error;
@@ -1520,24 +1655,55 @@ app.put('/api/novas-clinicas/:id/pegar', authenticateToken, async (req, res) => 
     // Verificar se a clínica ainda está disponível
     const { data: clinicaAtual, error: checkError } = await supabase
       .from('novas_clinicas')
-      .select('consultor_id')
+      .select('*')
       .eq('id', id)
       .single();
 
     if (checkError) throw checkError;
 
     if (clinicaAtual.consultor_id !== null) {
-      return res.status(400).json({ error: 'Esta clínica já foi atribuída a outro consultor!' });
+      return res.status(400).json({ error: 'Esta clínica já foi aprovada!' });
     }
 
-    // Atribuir a clínica ao consultor atual
-    const { error } = await supabase
+    // Apenas admins podem aprovar clínicas
+    if (req.user.tipo !== 'admin') {
+      return res.status(403).json({ error: 'Apenas administradores podem aprovar clínicas!' });
+    }
+
+    // Mover a clínica da tabela novas_clinicas para clinicas
+    const clinicaParaMover = {
+      nome: clinicaAtual.nome,
+      endereco: clinicaAtual.endereco,
+      bairro: clinicaAtual.bairro,
+      cidade: clinicaAtual.cidade,
+      estado: clinicaAtual.estado,
+      nicho: clinicaAtual.nicho,
+      telefone: clinicaAtual.telefone,
+      email: clinicaAtual.email,
+      status: 'ativo',
+      consultor_id: clinicaAtual.criado_por_consultor_id // Definir consultor_id baseado em quem criou
+    };
+
+    // Excluir o campo id para evitar conflitos de chave primária
+    delete clinicaParaMover.id;
+
+    // Inserir na tabela clinicas
+    const { data: clinicaInserida, error: insertError } = await supabase
+      .from('clinicas')
+      .insert([clinicaParaMover])
+      .select();
+
+    if (insertError) throw insertError;
+
+    // Remover da tabela novas_clinicas
+    const { error: deleteError } = await supabase
       .from('novas_clinicas')
-      .update({ consultor_id: req.user.consultor_id })
+      .delete()
       .eq('id', id);
 
-    if (error) throw error;
-    res.json({ message: 'Clínica atribuída com sucesso!' });
+    if (deleteError) throw deleteError;
+
+    res.json({ message: 'Clínica aprovada e movida para clínicas parceiras com sucesso!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1558,7 +1724,7 @@ app.get('/api/agendamentos', authenticateToken, async (req, res) => {
 
     // Se for consultor, filtrar apenas seus agendamentos
     if (req.user.tipo === 'consultor') {
-      query = query.eq('consultor_id', req.user.consultor_id);
+      query = query.eq('consultor_id', req.user.id);
     }
 
     const { data, error } = await query;
