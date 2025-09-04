@@ -2901,11 +2901,15 @@ io.on('connection', (socket) => {
 
 // === ROTAS DO WHATSAPP ===
 app.get('/api/whatsapp/status', authenticateToken, async (req, res) => {
+  console.log('📊 Endpoint /api/whatsapp/status chamado');
+  
   if (!whatsappService) {
+    console.log('⚠️ WhatsApp Service não inicializado');
     return res.json({ status: 'not_initialized', isConnected: false });
   }
   
   const status = whatsappService.getStatus();
+  console.log('📊 Status retornado:', status);
   
   // Se estiver conectado, incluir chats recentes
   if (status.status === 'connected') {
@@ -2923,13 +2927,22 @@ app.get('/api/whatsapp/status', authenticateToken, async (req, res) => {
 
 app.post('/api/whatsapp/connect', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    console.log('🚀 Endpoint /api/whatsapp/connect chamado');
     const forceReset = req.body?.forceReset || false;
+    console.log('🔄 Force reset:', forceReset);
+    
     if (!whatsappService) {
+      console.log('🆕 Criando novo WhatsApp Service...');
       whatsappService = new WhatsAppService(io, supabase);
     }
+    
+    console.log('🔌 Iniciando conexão WhatsApp...');
     await whatsappService.connectToWhatsApp(forceReset);
+    console.log('✅ Conexão WhatsApp iniciada');
+    
     res.json({ message: 'Conexão iniciada' });
   } catch (error) {
+    console.error('❌ Erro no endpoint /api/whatsapp/connect:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -3025,6 +3038,9 @@ server.listen(PORT, async () => {
   console.log(`🌐 Acesse: http://localhost:${PORT}`);
   console.log(`🗄️ Usando Supabase como banco de dados`);
   console.log(`📱 WhatsApp Service inicializado`);
+  console.log(`🔧 Ambiente: ${process.env.NODE_ENV}`);
+  console.log(`🔧 Vercel: ${process.env.VERCEL}`);
+  console.log(`🔧 Disable WebSocket: ${process.env.DISABLE_WEBSOCKET}`);
   
   // Verificar conexão com Supabase
   try {

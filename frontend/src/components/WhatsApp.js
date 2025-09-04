@@ -29,13 +29,28 @@ const WhatsApp = () => {
   useEffect(() => {
     // Verificar se estamos em produção (Vercel)
     const isProduction = process.env.NODE_ENV === 'production';
+    console.log('🔍 WhatsApp useEffect - Ambiente:', {
+      NODE_ENV: process.env.NODE_ENV,
+      isProduction,
+      location: window.location.hostname
+    });
     
     if (isProduction) {
+      console.log('🚀 Iniciando polling em produção...');
       // Em produção, usar polling ao invés de WebSocket
       const pollWhatsAppStatus = async () => {
         try {
+          console.log('🔄 Fazendo polling do status WhatsApp...');
           const response = await makeRequest('/whatsapp/status');
+          console.log('📡 Resposta do status:', response.status, response.ok);
+          
           const data = await response.json();
+          console.log('📊 Dados recebidos:', {
+            status: data.status,
+            isConnected: data.isConnected,
+            hasQrCode: !!data.qrCode,
+            qrCodeLength: data.qrCode ? data.qrCode.length : 0
+          });
           
           if (response.ok) {
             setConnectionStatus(data.status);
@@ -43,16 +58,20 @@ const WhatsApp = () => {
             
             // Se estiver conectado, buscar chats
             if (data.status === 'connected') {
+              console.log('🔗 Status conectado, buscando chats...');
               const chatsResponse = await makeRequest('/whatsapp/chats');
               const chatsData = await chatsResponse.json();
               
               if (chatsResponse.ok) {
                 setChats(chatsData);
+                console.log('💬 Chats carregados:', chatsData.length);
               }
             }
+          } else {
+            console.error('❌ Erro na resposta do status:', data);
           }
         } catch (error) {
-          console.error('Erro ao verificar status do WhatsApp:', error);
+          console.error('❌ Erro ao verificar status do WhatsApp:', error);
         }
       };
 
@@ -136,6 +155,7 @@ const WhatsApp = () => {
 
   const connectWhatsApp = async () => {
     try {
+      console.log('🚀 Iniciando conexão WhatsApp...');
       setLoading(true);
 
       const response = await makeRequest('/whatsapp/connect', {
@@ -144,11 +164,14 @@ const WhatsApp = () => {
         body: JSON.stringify({ forceReset: true })
       });
 
+      console.log('📡 Resposta da conexão:', response.status, response.ok);
       const data = await response.json();
+      console.log('📊 Dados da conexão:', data);
 
       if (response.ok) {
         showSuccessToast('Conexão iniciada! Aguardando QR Code...');
         setConnectionStatus('connecting');
+        console.log('✅ Conexão iniciada com sucesso');
       } else {
         showErrorToast('Erro ao conectar: ' + data.error);
         console.error('❌ Erro na resposta:', data.error);
