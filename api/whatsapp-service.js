@@ -47,30 +47,47 @@ class WhatsAppService {
 
   // Sistema de autenticação customizado para ambientes serverless
   async createServerlessAuthState() {
+    console.log('🔐 Iniciando createServerlessAuthState...');
+    
     const writeData = async (file, data) => {
       try {
-        await this.supabase
+        console.log(`💾 Salvando dados de auth: ${file}`);
+        const result = await this.supabase
           .from('whatsapp_auth')
           .upsert({ 
             key: file, 
             data: JSON.stringify(data),
             updated_at: new Date().toISOString()
           });
+        console.log(`✅ Dados salvos: ${file}`, result);
       } catch (error) {
         console.error('❌ Erro ao salvar dados de auth:', error);
+        throw error;
       }
     };
 
     const readData = async (file) => {
       try {
+        console.log(`📖 Lendo dados de auth: ${file}`);
         const { data, error } = await this.supabase
           .from('whatsapp_auth')
           .select('data')
           .eq('key', file)
           .single();
         
-        if (error || !data) return null;
-        return JSON.parse(data.data);
+        if (error) {
+          console.log(`⚠️ Nenhum dado encontrado para ${file}:`, error.message);
+          return null;
+        }
+        
+        if (!data) {
+          console.log(`⚠️ Nenhum dado retornado para ${file}`);
+          return null;
+        }
+        
+        const parsed = JSON.parse(data.data);
+        console.log(`✅ Dados lidos: ${file}`, Object.keys(parsed));
+        return parsed;
       } catch (error) {
         console.error('❌ Erro ao ler dados de auth:', error);
         return null;
@@ -79,17 +96,25 @@ class WhatsAppService {
 
     const removeData = async (file) => {
       try {
+        console.log(`🗑️ Removendo dados de auth: ${file}`);
         await this.supabase
           .from('whatsapp_auth')
           .delete()
           .eq('key', file);
+        console.log(`✅ Dados removidos: ${file}`);
       } catch (error) {
         console.error('❌ Erro ao remover dados de auth:', error);
       }
     };
 
+    console.log('📖 Lendo credenciais existentes...');
     const creds = await readData('creds.json') || {};
     const keys = await readData('app-state-sync-version.json') || {};
+    
+    console.log('🔐 Estado de autenticação criado:', {
+      hasCreds: Object.keys(creds).length > 0,
+      hasKeys: Object.keys(keys).length > 0
+    });
 
     return {
       state: {
@@ -97,22 +122,30 @@ class WhatsAppService {
         keys
       },
       saveCreds: async () => {
+        console.log('💾 Salvando credenciais...');
         await writeData('creds.json', creds);
         await writeData('app-state-sync-version.json', keys);
+        console.log('✅ Credenciais salvas');
       }
     };
   }
 
   async connectToWhatsApp(forceReset = false) {
     try {
+      console.log('🚀 Iniciando conexão WhatsApp...', { forceReset, isVercel: !!process.env.VERCEL });
+      
       if (forceReset) {
+        console.log('🔄 Resetando sessão...');
         await this.resetSession();
       }
       
       // Usar sistema de auth customizado para Vercel/Serverless
+      console.log('🔐 Criando estado de autenticação...');
       const { state, saveCreds } = await this.createServerlessAuthState();
-      const { version, isLatest } = await fetchLatestBaileysVersion();
+      console.log('✅ Estado de autenticação criado');
       
+      console.log('📱 Buscando versão do WhatsApp...');
+      const { version, isLatest } = await fetchLatestBaileysVersion();
       console.log(`📱 Usando WhatsApp v${version.join('.')}, isLatest: ${isLatest}`);
 
       const logger = {
@@ -125,20 +158,39 @@ class WhatsAppService {
         child: () => logger
       };
 
+      console.log('🔌 Criando socket WhatsApp...');
       this.sock = makeWASocket({
         version,
         auth: state,
         printQRInTerminal: false,
         logger,
         browser: ['CRM Invest', 'Chrome', '1.0.0'],
-        generateHighQualityLinkPreview: true
+        generateHighQualityLinkPreview: true,
+        // Configurações para ambiente serverless
+        connectTimeoutMs: 60000,
+        keepAliveIntervalMs: 30000,
+        retryRequestDelayMs: 250,
+        maxMsgRetryCount: 5,
+        defaultQueryTimeoutMs: 60000,
+        markOnlineOnConnect: false,
+        syncFullHistory: false,
+        fireInitQueries: false,
+        shouldSyncHistoryMessage: () => false,
+        shouldIgnoreJid: () => false,
+        getMessage: async () => undefined,
+        patchMessageBeforeSending: (message) => message,
+        connectCooldownMs: 4000,
+        qrMaxRetries: 3
       });
+      console.log('✅ Socket WhatsApp criado');
 
       // Eventos do socket
+      console.log('📡 Configurando eventos do socket...');
       this.sock.ev.on('connection.update', (update) => this.handleConnectionUpdate(update));
       this.sock.ev.on('creds.update', saveCreds);
       this.sock.ev.on('messages.upsert', (m) => this.handleMessages(m));
       this.sock.ev.on('contacts.update', (contacts) => this.handleContactsUpdate(contacts));
+      console.log('✅ Eventos do socket configurados');
 
       console.log('🚀 WhatsApp Service inicializado com sucesso!');
     } catch (error) {
@@ -151,17 +203,26 @@ class WhatsAppService {
   async handleConnectionUpdate(update) {
     const { connection, lastDisconnect, qr } = update;
     
-    console.log('🔄 Connection update:', { connection, qr: !!qr, lastDisconnect: lastDisconnect?.error?.message });
+    console.log('🔄 Connection update:', { 
+      connection, 
+      qr: !!qr, 
+      qrLength: qr ? qr.length : 0,
+      lastDisconnect: lastDisconnect?.error?.message,
+      timestamp: new Date().toISOString()
+    });
     
     if (qr) {
       console.log('📱 QR Code gerado - convertendo para base64...');
+      console.log('📱 QR Code length:', qr.length);
       try {
         this.qrCodeData = await QRCode.toDataURL(qr);
         this.connectionStatus = 'qr';
-        console.log('✅ QR Code convertido com sucesso');
+        console.log('✅ QR Code convertido com sucesso, length:', this.qrCodeData.length);
         this.emitStatusUpdate();
       } catch (error) {
         console.error('❌ Erro ao gerar QR Code:', error);
+        this.connectionStatus = 'error';
+        this.emitStatusUpdate();
       }
     }
 
@@ -438,21 +499,40 @@ class WhatsAppService {
   }
 
   emitStatusUpdate() {
+    console.log('📡 Emitindo status update:', {
+      status: this.connectionStatus,
+      isConnected: this.isConnected,
+      hasQrCode: !!this.qrCodeData,
+      hasIo: !!this.io
+    });
+    
     if (this.io) {
       this.io.emit('whatsapp:status', {
         status: this.connectionStatus,
         isConnected: this.isConnected,
         qrCode: this.qrCodeData
       });
+      console.log('✅ Status emitido via Socket.IO');
+    } else {
+      console.log('⚠️ Socket.IO não disponível - status não será emitido em tempo real');
     }
   }
 
   getStatus() {
-    return {
+    const status = {
       status: this.connectionStatus,
       isConnected: this.isConnected,
       qrCode: this.qrCodeData
     };
+    
+    console.log('📊 Status atual:', {
+      status: status.status,
+      isConnected: status.isConnected,
+      hasQrCode: !!status.qrCode,
+      qrCodeLength: status.qrCode ? status.qrCode.length : 0
+    });
+    
+    return status;
   }
 
   async disconnect() {
