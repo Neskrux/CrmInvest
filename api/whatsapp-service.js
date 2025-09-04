@@ -2,7 +2,6 @@ const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLat
 const QRCode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
-const { createClient } = require('@supabase/supabase-js');
 
 class WhatsAppService {
   constructor(io, supabase) {
@@ -12,16 +11,24 @@ class WhatsAppService {
     this.qrCodeData = null;
     this.isConnected = false;
     this.connectionStatus = 'disconnected'; // disconnected, connecting, connected, qr
-    
-    // Usar diretório temporário no Vercel (/tmp é o único diretório gravável)
-    this.authDir = process.env.VERCEL 
-      ? path.join('/tmp', 'whatsapp_auth') 
-      : path.join(__dirname, 'whatsapp_auth');
+    this.authDir = path.join(__dirname, 'whatsapp_auth');
     
     // Garantir que o diretório de autenticação existe
     if (!fs.existsSync(this.authDir)) {
       fs.mkdirSync(this.authDir, { recursive: true });
     }
+  }
+
+
+  async resetSession() {
+    // Apaga a pasta de autenticação para forçar novo QR code
+    if (fs.existsSync(this.authDir)) {
+      fs.rmSync(this.authDir, { recursive: true, force: true });
+    }
+    this.sock = null;
+    this.isConnected = false;
+    this.connectionStatus = 'disconnected';
+    this.qrCodeData = null;
   }
 
   async initialize() {
@@ -35,68 +42,12 @@ class WhatsAppService {
     }
   }
 
-  // Sistema de autenticação customizado para ambientes serverless
-  async createServerlessAuthState() {
-    const writeData = async (file, data) => {
-      try {
-        await this.supabase
-          .from('whatsapp_auth')
-          .upsert({ 
-            key: file, 
-            data: JSON.stringify(data),
-            updated_at: new Date().toISOString()
-          });
-      } catch (error) {
-        console.error('❌ Erro ao salvar dados de auth:', error);
-      }
-    };
-
-    const readData = async (file) => {
-      try {
-        const { data, error } = await this.supabase
-          .from('whatsapp_auth')
-          .select('data')
-          .eq('key', file)
-          .single();
-        
-        if (error || !data) return null;
-        return JSON.parse(data.data);
-      } catch (error) {
-        console.error('❌ Erro ao ler dados de auth:', error);
-        return null;
-      }
-    };
-
-    const removeData = async (file) => {
-      try {
-        await this.supabase
-          .from('whatsapp_auth')
-          .delete()
-          .eq('key', file);
-      } catch (error) {
-        console.error('❌ Erro ao remover dados de auth:', error);
-      }
-    };
-
-    const creds = await readData('creds.json') || {};
-    const keys = await readData('app-state-sync-version.json') || {};
-
-    return {
-      state: {
-        creds,
-        keys
-      },
-      saveCreds: async () => {
-        await writeData('creds.json', creds);
-        await writeData('app-state-sync-version.json', keys);
-      }
-    };
-  }
-
-  async connectToWhatsApp() {
+  async connectToWhatsApp(forceReset = false) {
     try {
-      // Usar sistema de auth customizado para Vercel/Serverless
-      const { state, saveCreds } = await this.createServerlessAuthState();
+      if (forceReset) {
+        await this.resetSession();
+      }
+      const { state, saveCreds } = await useMultiFileAuthState(this.authDir);
       const { version, isLatest } = await fetchLatestBaileysVersion();
       
       console.log(`📱 Usando WhatsApp v${version.join('.')}, isLatest: ${isLatest}`);
@@ -165,7 +116,7 @@ class WhatsAppService {
         console.log('🔄 Aguardando 5 segundos para reconectar...');
         setTimeout(() => {
           this.connectToWhatsApp();
-        }, 5000);
+        }, 50000);
       }
     } else if (connection === 'open') {
       console.log('✅ WhatsApp conectado com sucesso!');
@@ -259,7 +210,7 @@ class WhatsAppService {
       return { jid };
     }
   }
-
+  
   async saveMessage(messageData) {
     try {
       const { error } = await this.supabase
@@ -451,18 +402,7 @@ class WhatsAppService {
       this.connectionStatus = 'disconnected';
       this.qrCodeData = null;
       
-      // Limpar dados de autenticação do Supabase
-      try {
-        await this.supabase
-          .from('whatsapp_auth')
-          .delete()
-          .in('key', ['creds.json', 'app-state-sync-version.json']);
-        console.log('🗑️ Dados de autenticação removidos do Supabase');
-      } catch (error) {
-        console.error('❌ Erro ao limpar dados de auth do Supabase:', error);
-      }
-      
-      // Limpar diretório temporário (fallback)
+      // Limpar arquivos de autenticação
       if (fs.existsSync(this.authDir)) {
         fs.rmSync(this.authDir, { recursive: true, force: true });
       }
@@ -476,473 +416,3 @@ class WhatsAppService {
 }
 
 module.exports = WhatsAppService;
-
-      id: message.key.id,
-
-      remoteJid,
-
-      contactName: contact.name || contact.notify || remoteJid.split('@')[0],
-
-      contactNumber: remoteJid.split('@')[0],
-
-      message: messageText,
-
-      messageType,
-
-      timestamp: message.messageTimestamp ? new Date(message.messageTimestamp * 1000) : new Date(),
-
-      isFromMe: message.key.fromMe,
-
-      mediaUrl
-
-    };
-
-  }
-
-
-
-  async getContactInfo(jid) {
-
-    try {
-
-      if (this.sock) {
-
-        const contact = await this.sock.onWhatsApp(jid);
-
-        return contact[0] || { jid };
-
-      }
-
-      return { jid };
-
-    } catch (error) {
-
-      return { jid };
-
-    }
-
-  }
-
-
-
-  async saveMessage(messageData) {
-
-    try {
-
-      const { error } = await this.supabase
-
-        .from('whatsapp_messages')
-
-        .upsert([{
-
-          message_id: messageData.id,
-
-          remote_jid: messageData.remoteJid,
-
-          contact_name: messageData.contactName,
-
-          contact_number: messageData.contactNumber,
-
-          message: messageData.message,
-
-          message_type: messageData.messageType,
-
-          timestamp: messageData.timestamp.toISOString(),
-
-          is_from_me: messageData.isFromMe,
-
-          media_url: messageData.mediaUrl
-
-        }], { onConflict: 'message_id' });
-
-
-
-      if (error) throw error;
-
-    } catch (error) {
-
-      console.error('❌ Erro ao salvar mensagem:', error);
-
-    }
-
-  }
-
-
-
-  async checkAndCreateLead(messageData) {
-
-    try {
-
-      if (messageData.isFromMe) return; // Ignorar mensagens próprias
-
-
-
-      const phoneNumber = messageData.contactNumber;
-
-      
-
-      // Verificar se já existe um paciente com este telefone
-
-      const { data: existingPatient } = await this.supabase
-
-        .from('pacientes')
-
-        .select('id, nome')
-
-        .eq('telefone', phoneNumber)
-
-        .single();
-
-
-
-      if (existingPatient) {
-
-        console.log(`📋 Mensagem de paciente existente: ${existingPatient.nome}`);
-
-        return;
-
-      }
-
-
-
-      // Criar novo lead
-
-      const { data: newLead, error } = await this.supabase
-
-        .from('pacientes')
-
-        .insert([{
-
-          nome: messageData.contactName,
-
-          telefone: phoneNumber,
-
-          status: 'lead',
-
-          observacoes: `Lead criado automaticamente via WhatsApp. Primeira mensagem: "${messageData.message}"`
-
-        }])
-
-        .select()
-
-        .single();
-
-
-
-      if (error) throw error;
-
-
-
-      console.log(`🆕 Novo lead criado: ${newLead.nome} (${phoneNumber})`);
-
-      
-
-      // Emitir evento de novo lead
-
-      this.io.emit('whatsapp:new-lead', newLead);
-
-
-
-    } catch (error) {
-
-      console.error('❌ Erro ao criar lead:', error);
-
-    }
-
-  }
-
-
-
-  async loadRecentChats() {
-
-    try {
-
-      // Buscar conversas recentes do banco
-
-      const { data: recentChats, error } = await this.supabase
-
-        .from('whatsapp_messages')
-
-        .select('remote_jid, contact_name, contact_number, message, timestamp, is_from_me')
-
-        .order('timestamp', { ascending: false })
-
-        .limit(100);
-
-
-
-      if (error) throw error;
-
-
-
-      // Agrupar por contato
-
-      const chatsMap = new Map();
-
-      recentChats.forEach(msg => {
-
-        if (!chatsMap.has(msg.remote_jid)) {
-
-          chatsMap.set(msg.remote_jid, {
-
-            jid: msg.remote_jid,
-
-            name: msg.contact_name,
-
-            number: msg.contact_number,
-
-            lastMessage: msg.message,
-
-            timestamp: msg.timestamp,
-
-            unread: !msg.is_from_me ? 1 : 0
-
-          });
-
-        }
-
-      });
-
-
-
-      const chats = Array.from(chatsMap.values());
-
-      this.io.emit('whatsapp:chats-loaded', chats);
-
-
-
-    } catch (error) {
-
-      console.error('❌ Erro ao carregar conversas:', error);
-
-    }
-
-  }
-
-
-
-  async sendMessage(jid, message) {
-
-    try {
-
-      if (!this.isConnected) {
-
-        throw new Error('WhatsApp não está conectado');
-
-      }
-
-
-
-      const sent = await this.sock.sendMessage(jid, { text: message });
-
-      
-
-      // Salvar mensagem enviada
-
-      const messageData = {
-
-        id: sent.key.id,
-
-        remoteJid: jid,
-
-        contactName: jid.split('@')[0],
-
-        contactNumber: jid.split('@')[0],
-
-        message,
-
-        messageType: 'text',
-
-        timestamp: new Date(),
-
-        isFromMe: true,
-
-        mediaUrl: null
-
-      };
-
-
-
-      await this.saveMessage(messageData);
-
-      
-
-      return { success: true, messageData };
-
-    } catch (error) {
-
-      console.error('❌ Erro ao enviar mensagem:', error);
-
-      return { success: false, error: error.message };
-
-    }
-
-  }
-
-
-
-  async getMessages(jid, limit = 50) {
-
-    try {
-
-      console.log('🔍 WhatsAppService.getMessages - JID:', jid, 'Limit:', limit);
-
-      
-
-      const { data: messages, error } = await this.supabase
-
-        .from('whatsapp_messages')
-
-        .select('*')
-
-        .eq('remote_jid', jid)
-
-        .order('timestamp', { ascending: true })
-
-        .limit(limit);
-
-
-
-      if (error) {
-
-        console.error('❌ Erro na query do Supabase:', error);
-
-        throw error;
-
-      }
-
-      
-
-      console.log('📨 Mensagens do banco:', messages?.length || 0);
-
-      console.log('📨 Primeiras mensagens:', messages?.slice(0, 2));
-
-      
-
-      return messages || [];
-
-    } catch (error) {
-
-      console.error('❌ Erro ao buscar mensagens:', error);
-
-      return [];
-
-    }
-
-  }
-
-
-
-  handleContactsUpdate(contacts) {
-
-    // Atualizar informações de contatos se necessário
-
-    console.log('📞 Contatos atualizados:', contacts.length);
-
-  }
-
-
-
-  emitStatusUpdate() {
-
-    this.io.emit('whatsapp:status', {
-
-      status: this.connectionStatus,
-
-      isConnected: this.isConnected,
-
-      qrCode: this.qrCodeData
-
-    });
-
-  }
-
-
-
-  getStatus() {
-
-    return {
-
-      status: this.connectionStatus,
-
-      isConnected: this.isConnected,
-
-      qrCode: this.qrCodeData
-
-    };
-
-  }
-
-
-
-  async disconnect() {
-
-    try {
-
-      if (this.sock) {
-
-        await this.sock.logout();
-
-        this.sock = null;
-
-      }
-
-      this.isConnected = false;
-
-      this.connectionStatus = 'disconnected';
-
-      this.qrCodeData = null;
-
-      
-
-      // Limpar dados de autenticação do Supabase
-
-      try {
-
-        await this.supabase
-
-          .from('whatsapp_auth')
-
-          .delete()
-
-          .in('key', ['creds.json', 'app-state-sync-version.json']);
-
-        console.log('🗑️ Dados de autenticação removidos do Supabase');
-
-      } catch (error) {
-
-        console.error('❌ Erro ao limpar dados de auth do Supabase:', error);
-
-      }
-
-      
-
-      // Limpar diretório temporário (fallback)
-
-      if (fs.existsSync(this.authDir)) {
-
-        fs.rmSync(this.authDir, { recursive: true, force: true });
-
-      }
-
-      
-
-      this.emitStatusUpdate();
-
-      console.log('🔌 WhatsApp desconectado');
-
-    } catch (error) {
-
-      console.error('❌ Erro ao desconectar:', error);
-
-    }
-
-  }
-
-}
-
-
-
-module.exports = WhatsAppService;
-
-
