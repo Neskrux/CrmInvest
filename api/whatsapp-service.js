@@ -11,10 +11,13 @@ class WhatsAppService {
     this.qrCodeData = null;
     this.isConnected = false;
     this.connectionStatus = 'disconnected'; // disconnected, connecting, connected, qr
-    this.authDir = path.join(__dirname, 'whatsapp_auth');
+    // Usar diretório temporário no Vercel (/tmp é o único diretório gravável)
+    this.authDir = process.env.VERCEL 
+      ? path.join('/tmp', 'whatsapp_auth') 
+      : path.join(__dirname, 'whatsapp_auth');
     
-    // Garantir que o diretório de autenticação existe
-    if (!fs.existsSync(this.authDir)) {
+    // Garantir que o diretório de autenticação existe (apenas em desenvolvimento)
+    if (!process.env.VERCEL && !fs.existsSync(this.authDir)) {
       fs.mkdirSync(this.authDir, { recursive: true });
     }
   }
@@ -42,12 +45,72 @@ class WhatsAppService {
     }
   }
 
+  // Sistema de autenticação customizado para ambientes serverless
+  async createServerlessAuthState() {
+    const writeData = async (file, data) => {
+      try {
+        await this.supabase
+          .from('whatsapp_auth')
+          .upsert({ 
+            key: file, 
+            data: JSON.stringify(data),
+            updated_at: new Date().toISOString()
+          });
+      } catch (error) {
+        console.error('❌ Erro ao salvar dados de auth:', error);
+      }
+    };
+
+    const readData = async (file) => {
+      try {
+        const { data, error } = await this.supabase
+          .from('whatsapp_auth')
+          .select('data')
+          .eq('key', file)
+          .single();
+        
+        if (error || !data) return null;
+        return JSON.parse(data.data);
+      } catch (error) {
+        console.error('❌ Erro ao ler dados de auth:', error);
+        return null;
+      }
+    };
+
+    const removeData = async (file) => {
+      try {
+        await this.supabase
+          .from('whatsapp_auth')
+          .delete()
+          .eq('key', file);
+      } catch (error) {
+        console.error('❌ Erro ao remover dados de auth:', error);
+      }
+    };
+
+    const creds = await readData('creds.json') || {};
+    const keys = await readData('app-state-sync-version.json') || {};
+
+    return {
+      state: {
+        creds,
+        keys
+      },
+      saveCreds: async () => {
+        await writeData('creds.json', creds);
+        await writeData('app-state-sync-version.json', keys);
+      }
+    };
+  }
+
   async connectToWhatsApp(forceReset = false) {
     try {
       if (forceReset) {
         await this.resetSession();
       }
-      const { state, saveCreds } = await useMultiFileAuthState(this.authDir);
+      
+      // Usar sistema de auth customizado para Vercel/Serverless
+      const { state, saveCreds } = await this.createServerlessAuthState();
       const { version, isLatest } = await fetchLatestBaileysVersion();
       
       console.log(`📱 Usando WhatsApp v${version.join('.')}, isLatest: ${isLatest}`);
@@ -402,7 +465,18 @@ class WhatsAppService {
       this.connectionStatus = 'disconnected';
       this.qrCodeData = null;
       
-      // Limpar arquivos de autenticação
+      // Limpar dados de autenticação do Supabase
+      try {
+        await this.supabase
+          .from('whatsapp_auth')
+          .delete()
+          .in('key', ['creds.json', 'app-state-sync-version.json']);
+        console.log('🗑️ Dados de autenticação removidos do Supabase');
+      } catch (error) {
+        console.error('❌ Erro ao limpar dados de auth do Supabase:', error);
+      }
+      
+      // Limpar diretório temporário (fallback)
       if (fs.existsSync(this.authDir)) {
         fs.rmSync(this.authDir, { recursive: true, force: true });
       }
