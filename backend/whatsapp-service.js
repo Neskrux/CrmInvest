@@ -148,8 +148,10 @@ class WhatsAppService {
         // Salvar mensagem no banco
         await this.saveMessage(messageData);
         
-        // Emitir mensagem para o frontend
-        this.io.emit('whatsapp:new-message', messageData);
+        // Emitir mensagem para o frontend (apenas se Socket.IO estiver disponível)
+        if (this.io) {
+          this.io.emit('whatsapp:new-message', messageData);
+        }
         
         // Verificar se é um novo lead
         await this.checkAndCreateLead(messageData);
@@ -265,8 +267,10 @@ class WhatsAppService {
 
       console.log(`🆕 Novo lead criado: ${newLead.nome} (${phoneNumber})`);
       
-      // Emitir evento de novo lead
-      this.io.emit('whatsapp:new-lead', newLead);
+      // Emitir evento de novo lead (apenas se Socket.IO estiver disponível)
+      if (this.io) {
+        this.io.emit('whatsapp:new-lead', newLead);
+      }
 
     } catch (error) {
       console.error('❌ Erro ao criar lead:', error);
@@ -300,7 +304,9 @@ class WhatsAppService {
       });
 
       const chats = Array.from(chatsMap.values());
-      this.io.emit('whatsapp:chats-loaded', chats);
+      if (this.io) {
+        this.io.emit('whatsapp:chats-loaded', chats);
+      }
 
     } catch (error) {
       console.error('❌ Erro ao carregar conversas:', error);
@@ -369,11 +375,13 @@ class WhatsAppService {
   }
 
   emitStatusUpdate() {
-    this.io.emit('whatsapp:status', {
-      status: this.connectionStatus,
-      isConnected: this.isConnected,
-      qrCode: this.qrCodeData
-    });
+    if (this.io) {
+      this.io.emit('whatsapp:status', {
+        status: this.connectionStatus,
+        isConnected: this.isConnected,
+        qrCode: this.qrCodeData
+      });
+    }
   }
 
   getStatus() {

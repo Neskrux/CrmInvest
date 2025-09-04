@@ -2864,8 +2864,10 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
   }
 });
 
-// Configurar Socket.IO
-const io = new Server(server, {
+// Configurar Socket.IO apenas se não estiver no Vercel
+let io = null;
+if (!process.env.VERCEL && !process.env.DISABLE_WEBSOCKET) {
+  io = new Server(server, {
   cors: {
     origin: [
       'http://localhost:3000',
@@ -2876,11 +2878,13 @@ const io = new Server(server, {
     methods: ['GET', 'POST']
   }
 });
+}
 
 // Inicializar WhatsApp Service
 let whatsappService = null;
 
-// Socket.IO connection handling
+// Socket.IO connection handling (apenas se Socket.IO estiver habilitado)
+if (io) {
 io.on('connection', (socket) => {
   console.log('🔌 Cliente conectado:', socket.id);
   
@@ -2893,13 +2897,28 @@ io.on('connection', (socket) => {
     console.log('🔌 Cliente desconectado:', socket.id);
   });
 });
+}
 
 // === ROTAS DO WHATSAPP ===
-app.get('/api/whatsapp/status', authenticateToken, (req, res) => {
+app.get('/api/whatsapp/status', authenticateToken, async (req, res) => {
   if (!whatsappService) {
     return res.json({ status: 'not_initialized', isConnected: false });
   }
-  res.json(whatsappService.getStatus());
+  
+  const status = whatsappService.getStatus();
+  
+  // Se estiver conectado, incluir chats recentes
+  if (status.status === 'connected') {
+    try {
+      await whatsappService.loadRecentChats();
+      // Os chats serão enviados via Socket.IO, mas para produção vamos retornar vazio
+      // pois o polling vai buscar os chats separadamente se necessário
+    } catch (error) {
+      console.error('Erro ao carregar chats:', error);
+    }
+  }
+  
+  res.json(status);
 });
 
 app.post('/api/whatsapp/connect', authenticateToken, requireAdmin, async (req, res) => {
@@ -2938,6 +2957,44 @@ app.post('/api/whatsapp/send-message', authenticateToken, async (req, res) => {
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/whatsapp/chats', authenticateToken, async (req, res) => {
+  try {
+    if (!whatsappService || !whatsappService.isConnected) {
+      return res.json([]);
+    }
+    
+    // Buscar conversas recentes do banco
+    const { data: recentChats, error } = await supabase
+      .from('whatsapp_messages')
+      .select('remote_jid, contact_name, contact_number, message, timestamp, is_from_me')
+      .order('timestamp', { ascending: false })
+      .limit(100);
+
+    if (error) throw error;
+
+    // Agrupar por contato
+    const chatsMap = new Map();
+    recentChats.forEach(msg => {
+      if (!chatsMap.has(msg.remote_jid)) {
+        chatsMap.set(msg.remote_jid, {
+          jid: msg.remote_jid,
+          name: msg.contact_name,
+          number: msg.contact_number,
+          lastMessage: msg.message,
+          timestamp: msg.timestamp,
+          unread: !msg.is_from_me ? 1 : 0
+        });
+      }
+    });
+
+    const chats = Array.from(chatsMap.values());
+    res.json(chats);
+  } catch (error) {
+    console.error('❌ Erro ao buscar chats:', error);
+    res.status(500).json({ error: 'Erro ao buscar chats' });
   }
 });
 
