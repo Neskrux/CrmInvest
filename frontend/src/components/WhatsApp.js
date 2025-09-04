@@ -27,15 +27,55 @@ const WhatsApp = () => {
   }, []);
 
   useEffect(() => {
-    // Conectar ao Socket.IO
-    const socketUrl = process.env.NODE_ENV === 'production'
-      ? window.location.origin
-      : 'http://localhost:5000';
+    // Verificar se estamos em produção (Vercel)
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    if (isProduction) {
+      // Em produção, usar polling ao invés de WebSocket
+      const pollWhatsAppStatus = async () => {
+        try {
+          const response = await makeRequest('/whatsapp/status');
+          const data = await response.json();
+          
+          if (response.ok) {
+            setConnectionStatus(data.status);
+            setQrCode(data.qrCode);
+            
+            // Se estiver conectado, buscar chats
+            if (data.status === 'connected') {
+              const chatsResponse = await makeRequest('/whatsapp/chats');
+              const chatsData = await chatsResponse.json();
+              
+              if (chatsResponse.ok) {
+                setChats(chatsData);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao verificar status do WhatsApp:', error);
+        }
+      };
+
+      // Polling inicial
+      pollWhatsAppStatus();
+      
+      // Polling a cada 3 segundos
+      const interval = setInterval(pollWhatsAppStatus, 3000);
+      
+      return () => clearInterval(interval);
+    } else {
+      // Em desenvolvimento, usar Socket.IO
+      const socketUrl = 'http://localhost:5000';
 
     socketRef.current = io(socketUrl, {
-      transports: ['websocket', 'polling'],
+        transports: ['polling', 'websocket'],
       timeout: 20000,
-      forceNew: true
+        forceNew: true,
+        autoConnect: true,
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000
     });
 
     // Listeners do Socket.IO
@@ -91,7 +131,8 @@ const WhatsApp = () => {
         socketRef.current.disconnect();
       }
     };
-  }, []);
+    }
+  }, [makeRequest]);
 
   const connectWhatsApp = async () => {
     try {

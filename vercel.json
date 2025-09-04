@@ -22,7 +22,8 @@
     "NODE_ENV": "production",
     "DISABLE_ESLINT_PLUGIN": "true",
     "CI": "false",
-    "VERCEL": "1"
+    "VERCEL": "1",
+    "DISABLE_WEBSOCKET": "true"
   },
   "regions": ["gru1"]
 } 

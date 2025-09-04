@@ -197,8 +197,10 @@ class WhatsAppService {
         // Salvar mensagem no banco
         await this.saveMessage(messageData);
         
-        // Emitir mensagem para o frontend
-        this.io.emit('whatsapp:new-message', messageData);
+        // Emitir mensagem para o frontend (apenas se Socket.IO estiver disponível)
+        if (this.io) {
+          this.io.emit('whatsapp:new-message', messageData);
+        }
         
         // Verificar se é um novo lead
         await this.checkAndCreateLead(messageData);
@@ -314,8 +316,10 @@ class WhatsAppService {
 
       console.log(`🆕 Novo lead criado: ${newLead.nome} (${phoneNumber})`);
       
-      // Emitir evento de novo lead
-      this.io.emit('whatsapp:new-lead', newLead);
+      // Emitir evento de novo lead (apenas se Socket.IO estiver disponível)
+      if (this.io) {
+        this.io.emit('whatsapp:new-lead', newLead);
+      }
 
     } catch (error) {
       console.error('❌ Erro ao criar lead:', error);
@@ -349,7 +353,9 @@ class WhatsAppService {
       });
 
       const chats = Array.from(chatsMap.values());
-      this.io.emit('whatsapp:chats-loaded', chats);
+      if (this.io) {
+        this.io.emit('whatsapp:chats-loaded', chats);
+      }
 
     } catch (error) {
       console.error('❌ Erro ao carregar conversas:', error);
@@ -418,11 +424,13 @@ class WhatsAppService {
   }
 
   emitStatusUpdate() {
-    this.io.emit('whatsapp:status', {
-      status: this.connectionStatus,
-      isConnected: this.isConnected,
-      qrCode: this.qrCodeData
-    });
+    if (this.io) {
+      this.io.emit('whatsapp:status', {
+        status: this.connectionStatus,
+        isConnected: this.isConnected,
+        qrCode: this.qrCodeData
+      });
+    }
   }
 
   getStatus() {
@@ -468,3 +476,473 @@ class WhatsAppService {
 }
 
 module.exports = WhatsAppService;
+
+      id: message.key.id,
+
+      remoteJid,
+
+      contactName: contact.name || contact.notify || remoteJid.split('@')[0],
+
+      contactNumber: remoteJid.split('@')[0],
+
+      message: messageText,
+
+      messageType,
+
+      timestamp: message.messageTimestamp ? new Date(message.messageTimestamp * 1000) : new Date(),
+
+      isFromMe: message.key.fromMe,
+
+      mediaUrl
+
+    };
+
+  }
+
+
+
+  async getContactInfo(jid) {
+
+    try {
+
+      if (this.sock) {
+
+        const contact = await this.sock.onWhatsApp(jid);
+
+        return contact[0] || { jid };
+
+      }
+
+      return { jid };
+
+    } catch (error) {
+
+      return { jid };
+
+    }
+
+  }
+
+
+
+  async saveMessage(messageData) {
+
+    try {
+
+      const { error } = await this.supabase
+
+        .from('whatsapp_messages')
+
+        .upsert([{
+
+          message_id: messageData.id,
+
+          remote_jid: messageData.remoteJid,
+
+          contact_name: messageData.contactName,
+
+          contact_number: messageData.contactNumber,
+
+          message: messageData.message,
+
+          message_type: messageData.messageType,
+
+          timestamp: messageData.timestamp.toISOString(),
+
+          is_from_me: messageData.isFromMe,
+
+          media_url: messageData.mediaUrl
+
+        }], { onConflict: 'message_id' });
+
+
+
+      if (error) throw error;
+
+    } catch (error) {
+
+      console.error('❌ Erro ao salvar mensagem:', error);
+
+    }
+
+  }
+
+
+
+  async checkAndCreateLead(messageData) {
+
+    try {
+
+      if (messageData.isFromMe) return; // Ignorar mensagens próprias
+
+
+
+      const phoneNumber = messageData.contactNumber;
+
+      
+
+      // Verificar se já existe um paciente com este telefone
+
+      const { data: existingPatient } = await this.supabase
+
+        .from('pacientes')
+
+        .select('id, nome')
+
+        .eq('telefone', phoneNumber)
+
+        .single();
+
+
+
+      if (existingPatient) {
+
+        console.log(`📋 Mensagem de paciente existente: ${existingPatient.nome}`);
+
+        return;
+
+      }
+
+
+
+      // Criar novo lead
+
+      const { data: newLead, error } = await this.supabase
+
+        .from('pacientes')
+
+        .insert([{
+
+          nome: messageData.contactName,
+
+          telefone: phoneNumber,
+
+          status: 'lead',
+
+          observacoes: `Lead criado automaticamente via WhatsApp. Primeira mensagem: "${messageData.message}"`
+
+        }])
+
+        .select()
+
+        .single();
+
+
+
+      if (error) throw error;
+
+
+
+      console.log(`🆕 Novo lead criado: ${newLead.nome} (${phoneNumber})`);
+
+      
+
+      // Emitir evento de novo lead
+
+      this.io.emit('whatsapp:new-lead', newLead);
+
+
+
+    } catch (error) {
+
+      console.error('❌ Erro ao criar lead:', error);
+
+    }
+
+  }
+
+
+
+  async loadRecentChats() {
+
+    try {
+
+      // Buscar conversas recentes do banco
+
+      const { data: recentChats, error } = await this.supabase
+
+        .from('whatsapp_messages')
+
+        .select('remote_jid, contact_name, contact_number, message, timestamp, is_from_me')
+
+        .order('timestamp', { ascending: false })
+
+        .limit(100);
+
+
+
+      if (error) throw error;
+
+
+
+      // Agrupar por contato
+
+      const chatsMap = new Map();
+
+      recentChats.forEach(msg => {
+
+        if (!chatsMap.has(msg.remote_jid)) {
+
+          chatsMap.set(msg.remote_jid, {
+
+            jid: msg.remote_jid,
+
+            name: msg.contact_name,
+
+            number: msg.contact_number,
+
+            lastMessage: msg.message,
+
+            timestamp: msg.timestamp,
+
+            unread: !msg.is_from_me ? 1 : 0
+
+          });
+
+        }
+
+      });
+
+
+
+      const chats = Array.from(chatsMap.values());
+
+      this.io.emit('whatsapp:chats-loaded', chats);
+
+
+
+    } catch (error) {
+
+      console.error('❌ Erro ao carregar conversas:', error);
+
+    }
+
+  }
+
+
+
+  async sendMessage(jid, message) {
+
+    try {
+
+      if (!this.isConnected) {
+
+        throw new Error('WhatsApp não está conectado');
+
+      }
+
+
+
+      const sent = await this.sock.sendMessage(jid, { text: message });
+
+      
+
+      // Salvar mensagem enviada
+
+      const messageData = {
+
+        id: sent.key.id,
+
+        remoteJid: jid,
+
+        contactName: jid.split('@')[0],
+
+        contactNumber: jid.split('@')[0],
+
+        message,
+
+        messageType: 'text',
+
+        timestamp: new Date(),
+
+        isFromMe: true,
+
+        mediaUrl: null
+
+      };
+
+
+
+      await this.saveMessage(messageData);
+
+      
+
+      return { success: true, messageData };
+
+    } catch (error) {
+
+      console.error('❌ Erro ao enviar mensagem:', error);
+
+      return { success: false, error: error.message };
+
+    }
+
+  }
+
+
+
+  async getMessages(jid, limit = 50) {
+
+    try {
+
+      console.log('🔍 WhatsAppService.getMessages - JID:', jid, 'Limit:', limit);
+
+      
+
+      const { data: messages, error } = await this.supabase
+
+        .from('whatsapp_messages')
+
+        .select('*')
+
+        .eq('remote_jid', jid)
+
+        .order('timestamp', { ascending: true })
+
+        .limit(limit);
+
+
+
+      if (error) {
+
+        console.error('❌ Erro na query do Supabase:', error);
+
+        throw error;
+
+      }
+
+      
+
+      console.log('📨 Mensagens do banco:', messages?.length || 0);
+
+      console.log('📨 Primeiras mensagens:', messages?.slice(0, 2));
+
+      
+
+      return messages || [];
+
+    } catch (error) {
+
+      console.error('❌ Erro ao buscar mensagens:', error);
+
+      return [];
+
+    }
+
+  }
+
+
+
+  handleContactsUpdate(contacts) {
+
+    // Atualizar informações de contatos se necessário
+
+    console.log('📞 Contatos atualizados:', contacts.length);
+
+  }
+
+
+
+  emitStatusUpdate() {
+
+    this.io.emit('whatsapp:status', {
+
+      status: this.connectionStatus,
+
+      isConnected: this.isConnected,
+
+      qrCode: this.qrCodeData
+
+    });
+
+  }
+
+
+
+  getStatus() {
+
+    return {
+
+      status: this.connectionStatus,
+
+      isConnected: this.isConnected,
+
+      qrCode: this.qrCodeData
+
+    };
+
+  }
+
+
+
+  async disconnect() {
+
+    try {
+
+      if (this.sock) {
+
+        await this.sock.logout();
+
+        this.sock = null;
+
+      }
+
+      this.isConnected = false;
+
+      this.connectionStatus = 'disconnected';
+
+      this.qrCodeData = null;
+
+      
+
+      // Limpar dados de autenticação do Supabase
+
+      try {
+
+        await this.supabase
+
+          .from('whatsapp_auth')
+
+          .delete()
+
+          .in('key', ['creds.json', 'app-state-sync-version.json']);
+
+        console.log('🗑️ Dados de autenticação removidos do Supabase');
+
+      } catch (error) {
+
+        console.error('❌ Erro ao limpar dados de auth do Supabase:', error);
+
+      }
+
+      
+
+      // Limpar diretório temporário (fallback)
+
+      if (fs.existsSync(this.authDir)) {
+
+        fs.rmSync(this.authDir, { recursive: true, force: true });
+
+      }
+
+      
+
+      this.emitStatusUpdate();
+
+      console.log('🔌 WhatsApp desconectado');
+
+    } catch (error) {
+
+      console.error('❌ Erro ao desconectar:', error);
+
+    }
+
+  }
+
+}
+
+
+
+module.exports = WhatsAppService;
+
+
