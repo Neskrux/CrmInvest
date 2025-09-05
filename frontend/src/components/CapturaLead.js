@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Sparkles, Trophy, Gem, Lock, Check, Star } from 'lucide-react';
 import logoBrasao from '../images/logobrasao.png';
 import config from '../config';
 
@@ -262,28 +263,34 @@ const CapturaLead = () => {
           <div className="captura-header">
             <img src={logoBrasao} alt="Logo" className="captura-logo" />
             <h1 className="captura-title">
-              Transforme seu <span className="highlight">Sorriso</span>
+              Transforme sua <span className="highlight">autoestima</span>
             </h1>
             <p className="captura-subtitle">
-              Agende sua consulta gratuita e descubra como podemos te ajudar a conquistar o sorriso dos seus sonhos
+              Agende sua consulta gratuita aqui e garanta o procedimento dos seus sonhos parcelado no boleto.
             </p>
           </div>
 
           {/* Benefícios */}
-          <div className="captura-benefits">
-            <div className="benefit-item">
-              <div className="benefit-icon">✨</div>
-              <span>Consulta Gratuita</span>
-            </div>
-            <div className="benefit-item">
-              <div className="benefit-icon">🏆</div>
-              <span>Profissionais Qualificados</span>
-            </div>
-            <div className="benefit-item">
-              <div className="benefit-icon">💎</div>
-              <span>Tecnologia Avançada</span>
-            </div>
-          </div>
+                     <div className="captura-benefits">
+             <div className="benefit-item">
+               <div className="benefit-icon">
+                 <Sparkles size={20} />
+               </div>
+               <span>Consulta Gratuita</span>
+             </div>
+             <div className="benefit-item">
+               <div className="benefit-icon">
+                 <Trophy size={20} />
+               </div>
+               <span>Profissionais Qualificados</span>
+             </div>
+             <div className="benefit-item">
+               <div className="benefit-icon">
+                 <Gem size={20} />
+               </div>
+               <span>Tecnologia Avançada</span>
+             </div>
+           </div>
 
           {/* Formulário */}
           <div className="captura-form-container">
@@ -543,7 +550,6 @@ const CapturaLead = () => {
                 ) : (
                   <>
                     <span>Agendar Consulta Gratuita</span>
-                    <div className="btn-icon">🚀</div>
                   </>
                 )}
               </button>
@@ -554,35 +560,51 @@ const CapturaLead = () => {
           <div className="captura-testimonials">
             <h3 className="testimonials-title">O que nossos pacientes dizem</h3>
             <div className="testimonials-grid">
-              <div className="testimonial-card">
-                <div className="testimonial-stars">⭐⭐⭐⭐⭐</div>
-                <p className="testimonial-text">
-                  "Profissionais incríveis! Mudaram completamente meu sorriso e minha autoestima."
-                </p>
-                <div className="testimonial-author">- Maria Silva</div>
-              </div>
-              <div className="testimonial-card">
-                <div className="testimonial-stars">⭐⭐⭐⭐⭐</div>
-                <p className="testimonial-text">
-                  "Atendimento excepcional e resultados que superaram minhas expectativas."
-                </p>
-                <div className="testimonial-author">- João Santos</div>
-              </div>
+                             <div className="testimonial-card">
+                 <div className="testimonial-stars">
+                   <Star size={16} fill="#ffde34" />
+                   <Star size={16} fill="#ffde34" />
+                   <Star size={16} fill="#ffde34" />
+                   <Star size={16} fill="#ffde34" />
+                   <Star size={16} fill="#ffde34" />
+                 </div>
+                 <p className="testimonial-text">
+                   "Profissionais incríveis! Mudaram completamente meu sorriso e minha autoestima."
+                 </p>
+                 <div className="testimonial-author">- Maria Silva</div>
+               </div>
+               <div className="testimonial-card">
+                 <div className="testimonial-stars">
+                   <Star size={16} fill="#ffde34" />
+                   <Star size={16} fill="#ffde34" />
+                   <Star size={16} fill="#ffde34" />
+                   <Star size={16} fill="#ffde34" />
+                   <Star size={16} fill="#ffde34" />
+                 </div>
+                 <p className="testimonial-text">
+                   "Atendimento excepcional e resultados que superaram minhas expectativas."
+                 </p>
+                 <div className="testimonial-author">- João Santos</div>
+               </div>
             </div>
           </div>
 
           {/* Footer */}
           <div className="captura-footer">
-            <div className="security-badges">
-              <div className="security-badge">
-                <span className="security-icon">🔒</span>
-                <span>Dados Protegidos</span>
-              </div>
-              <div className="security-badge">
-                <span className="security-icon">✅</span>
-                <span>Sem Compromisso</span>
-              </div>
-            </div>
+                         <div className="security-badges">
+               <div className="security-badge">
+                 <span className="security-icon">
+                   <Lock size={16} />
+                 </span>
+                 <span>Dados Protegidos</span>
+               </div>
+               <div className="security-badge">
+                 <span className="security-icon">
+                   <Check size={16} />
+                 </span>
+                 <span>Sem Compromisso</span>
+               </div>
+             </div>
             <p className="footer-text">
               Seus dados estão seguros conosco. Não fazemos spam.
             </p>
@@ -593,7 +615,7 @@ const CapturaLead = () => {
       <style jsx>{`
         .captura-lead-container {
           min-height: 100vh;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: linear-gradient(135deg, #1a1d23 0%, #0f1114 100%);
           position: relative;
           overflow-x: hidden;
         }
@@ -646,7 +668,7 @@ const CapturaLead = () => {
         }
 
         .highlight {
-          background: linear-gradient(45deg, #ffd700, #ffed4a);
+          background: #ffde34;
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
@@ -773,10 +795,11 @@ const CapturaLead = () => {
         .form-textarea {
           resize: vertical;
           min-height: 80px;
+          font-family: inherit;
         }
 
         .captura-submit-btn {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: linear-gradient(135deg, #1a1d23 0%, #0f1114 100%);
           color: white;
           border: none;
           padding: 18px 30px;
@@ -843,10 +866,11 @@ const CapturaLead = () => {
           border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
-        .testimonial-stars {
-          font-size: 1.2rem;
-          margin-bottom: 10px;
-        }
+                 .testimonial-stars {
+           display: flex;
+           gap: 4px;
+           margin-bottom: 10px;
+         }
 
         .testimonial-text {
           color: white;

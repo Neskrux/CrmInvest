@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { CheckCircle, ArrowRight, Clock, Gift, Star, MessageCircle, Users, DollarSign, Target } from 'lucide-react';
 import logoBrasao from '../images/logobrasao.png';
 
 const CapturaSucesso = () => {
@@ -9,7 +10,7 @@ const CapturaSucesso = () => {
 
   const handleWhatsApp = () => {
     const phoneNumber = '5541997233138'; // Número do WhatsApp da clínica
-    const text = `Olá! Acabei de me cadastrar no site para agendar uma consulta. Meu nome é ${nome || 'Não informado'}.`;
+    const text = `Olá! Acabei de me cadastrar no site para agendar uma consulta.`;
     const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
@@ -22,18 +23,18 @@ const CapturaSucesso = () => {
     <div className="sucesso-container">
       <div className="sucesso-content">
         <div className="sucesso-header">
-          <div className="success-icon">✅</div>
           <img src={logoBrasao} alt="Logo" className="sucesso-logo" />
-          <h1 className="sucesso-title">Cadastro Realizado com Sucesso!</h1>
+          <h1 className="sucesso-title">
+            Cadastro Realizado com <span className="highlight">Sucesso!</span>
+          </h1>
           <p className="sucesso-subtitle">
             {message || 'Entraremos em contato em breve!'}
           </p>
         </div>
 
         <div className="sucesso-card">
-          <div className="card-icon">🎉</div>
           <h2 className="card-title">
-            Obrigado{nome ? `, ${nome.split(' ')[0]}` : ''}!
+            Obrigado por se cadastrar!
           </h2>
           <p className="card-text">
             Sua solicitação foi enviada com sucesso. Nossa equipe entrará em contato 
@@ -41,24 +42,32 @@ const CapturaSucesso = () => {
           </p>
           
           <div className="next-steps">
-            <h3 className="steps-title">Próximos Passos:</h3>
+            <h3 className="steps-title">
+              Próximos Passos:
+            </h3>
             <div className="steps-list">
               <div className="step-item">
-                <div className="step-number">1</div>
+                <div className="step-icon">
+                  <MessageCircle size={20} color="#ffffff" />
+                </div>
                 <div className="step-content">
                   <strong>Aguarde nosso contato</strong>
                   <p>Entraremos em contato via WhatsApp</p>
                 </div>
               </div>
               <div className="step-item">
-                <div className="step-number">2</div>
+                <div className="step-icon">
+                  <Clock size={20} color="#ffffff" />
+                </div>
                 <div className="step-content">
                   <strong>Agende sua consulta</strong>
                   <p>Escolha o melhor horário para você</p>
                 </div>
               </div>
               <div className="step-item">
-                <div className="step-number">3</div>
+                <div className="step-icon">
+                  <Users size={20} color="#ffffff" />
+                </div>
                 <div className="step-content">
                   <strong>Realize sua consulta</strong>
                   <p>Avaliação gratuita com nossos especialistas</p>
@@ -72,13 +81,14 @@ const CapturaSucesso = () => {
               onClick={handleWhatsApp}
               className="whatsapp-btn"
             >
-              <span className="btn-icon">📱</span>
+              <MessageCircle size={20} />
               Falar no WhatsApp Agora
             </button>
             <button 
               onClick={handleVoltar}
               className="secondary-btn"
             >
+              <ArrowRight size={20} />
               Fazer Novo Cadastro
             </button>
           </div>
@@ -87,37 +97,25 @@ const CapturaSucesso = () => {
         <div className="additional-info">
           <div className="info-cards">
             <div className="info-card">
-              <div className="info-icon">🕐</div>
+              <div className="info-icon">
+                <Clock size={32} color="#ffde34" />
+              </div>
               <h4>Resposta Rápida</h4>
               <p>Respondemos em até 2 horas</p>
             </div>
             <div className="info-card">
-              <div className="info-icon">🆓</div>
+              <div className="info-icon">
+                <Gift size={32} color="#ffde34" />
+              </div>
               <h4>Consulta Gratuita</h4>
               <p>Primeira consulta sem custo</p>
             </div>
             <div className="info-card">
-              <div className="info-icon">⭐</div>
+              <div className="info-icon">
+                <Star size={32} color="#ffde34" />
+              </div>
               <h4>Atendimento Premium</h4>
               <p>Profissionais qualificados</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="social-proof">
-          <h3 className="social-title">Junte-se a milhares de pacientes satisfeitos</h3>
-          <div className="social-stats">
-            <div className="stat-item">
-              <div className="stat-number">1000+</div>
-              <div className="stat-label">Sorrisos Transformados</div>
-            </div>
-            <div className="stat-item">
-              <div className="stat-number">5⭐</div>
-              <div className="stat-label">Avaliação Média</div>
-            </div>
-            <div className="stat-item">
-              <div className="stat-number">98%</div>
-              <div className="stat-label">Satisfação</div>
             </div>
           </div>
         </div>
@@ -126,16 +124,32 @@ const CapturaSucesso = () => {
       <style jsx>{`
         .sucesso-container {
           min-height: 100vh;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: linear-gradient(135deg, #1a1d23 0%, #0f1114 100%);
           padding: 20px;
           display: flex;
           align-items: center;
           justify-content: center;
+          position: relative;
+        }
+
+        .sucesso-container::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: 
+            radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+          pointer-events: none;
         }
 
         .sucesso-content {
           max-width: 700px;
           width: 100%;
+          position: relative;
+          z-index: 1;
         }
 
         .sucesso-header {
@@ -144,7 +158,6 @@ const CapturaSucesso = () => {
         }
 
         .success-icon {
-          font-size: 4rem;
           margin-bottom: 20px;
           animation: bounce 2s infinite;
         }
@@ -176,6 +189,13 @@ const CapturaSucesso = () => {
           text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
 
+        .highlight {
+          background: #ffde34;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+
         .sucesso-subtitle {
           font-size: 1.2rem;
           color: rgba(255, 255, 255, 0.9);
@@ -194,7 +214,6 @@ const CapturaSucesso = () => {
         }
 
         .card-icon {
-          font-size: 3rem;
           margin-bottom: 20px;
         }
 
@@ -223,6 +242,9 @@ const CapturaSucesso = () => {
           color: #2d3748;
           margin-bottom: 20px;
           text-align: center;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .steps-list {
@@ -237,18 +259,17 @@ const CapturaSucesso = () => {
           gap: 15px;
         }
 
-        .step-number {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        .step-icon {
+          background: linear-gradient(135deg, #059669 0%, #047857 100%);
           color: white;
-          width: 30px;
-          height: 30px;
+          width: 40px;
+          height: 40px;
           border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-weight: 700;
-          font-size: 0.9rem;
           flex-shrink: 0;
+          box-shadow: 0 4px 15px rgba(5, 150, 105, 0.3);
         }
 
         .step-content strong {
@@ -272,7 +293,7 @@ const CapturaSucesso = () => {
         }
 
         .whatsapp-btn {
-          background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
+          background: linear-gradient(135deg, #1a1d23 0%, #0f1114 100%);
           color: white;
           border: none;
           padding: 15px 25px;
@@ -284,29 +305,34 @@ const CapturaSucesso = () => {
           display: flex;
           align-items: center;
           gap: 10px;
-          box-shadow: 0 4px 15px rgba(37, 211, 102, 0.4);
+          box-shadow: 0 4px 15px rgba(26, 29, 35, 0.4);
+          justify-content: center;
         }
 
         .whatsapp-btn:hover {
           transform: translateY(-2px);
-          box-shadow: 0 6px 20px rgba(37, 211, 102, 0.5);
+          box-shadow: 0 6px 20px rgba(26, 29, 35, 0.5);
         }
 
         .secondary-btn {
           background: transparent;
-          color: #667eea;
-          border: 2px solid #667eea;
+          color: #000000;
+          border: 2px solid #000000;
           padding: 15px 25px;
           border-radius: 12px;
           font-size: 1rem;
           font-weight: 600;
           cursor: pointer;
           transition: all 0.3s ease;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          justify-content: center;
         }
 
         .secondary-btn:hover {
-          background: #667eea;
-          color: white;
+          background: #ffde34;
+          color: #1a1d23;
           transform: translateY(-2px);
         }
 
@@ -334,7 +360,6 @@ const CapturaSucesso = () => {
         }
 
         .info-icon {
-          font-size: 2rem;
           margin-bottom: 10px;
         }
 
