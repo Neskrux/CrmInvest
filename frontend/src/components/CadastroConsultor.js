@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logoBrasaoPreto from '../images/logobrasaopreto.png';
+import config from '../config';
 
 const CadastroConsultor = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState({ 
     nome: '',
     telefone: '',
     email: '',
@@ -158,7 +159,7 @@ const CadastroConsultor = () => {
     setLoading(true);
     
     try {
-      const response = await fetch('/api/consultores/cadastro', {
+      const response = await fetch(`${config.API_BASE_URL}/consultores/cadastro`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

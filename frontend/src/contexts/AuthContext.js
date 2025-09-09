@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }) => {
   // Configurar URL base da API
   const API_BASE_URL = process.env.REACT_APP_API_URL || 
     (process.env.NODE_ENV === 'production' 
-      ? '/api' 
+      ? 'https://crm-backend-production-1c76.up.railway.app/api' 
       : 'http://localhost:5000/api');
   
 
