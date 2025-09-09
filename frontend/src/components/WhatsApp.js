@@ -70,9 +70,7 @@ const WhatsApp = () => {
       return () => clearInterval(interval);
     } else {
       // Em desenvolvimento, usar Socket.IO
-      const socketUrl = process.env.NODE_ENV === 'production' 
-        ? 'https://crm-backend-production-1c76.up.railway.app' 
-        : 'http://localhost:5000';
+      const socketUrl = 'http://localhost:5000';
 
     socketRef.current = io(socketUrl, {
         transports: ['polling', 'websocket'],

@@ -1,8 +1,10 @@
 // Configuração da API
 const config = {
-  API_BASE_URL: process.env.NODE_ENV === 'production' 
-    ? 'https://crm-backend-production-1c76.up.railway.app/api'  // URL do Railway
-    : 'http://localhost:5000/api',
+  // URL base da API - usando variável de ambiente ou fallback seguro
+  API_BASE_URL: process.env.REACT_APP_API_URL || 
+    (process.env.NODE_ENV === 'production' 
+      ? '/api' 
+      : 'http://localhost:5000/api'),
   
   // Configurações do Supabase (se necessário no frontend)
   SUPABASE_URL: process.env.REACT_APP_SUPABASE_URL,
