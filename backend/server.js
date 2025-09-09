@@ -89,7 +89,6 @@ const uploadToSupabase = async (file, retryCount = 0) => {
     const randomId = Math.round(Math.random() * 1E9);
     const fileName = `contrato-${timestamp}-${randomId}.pdf`;
     
-    console.log(`📤 Tentando upload ${retryCount + 1}/${MAX_RETRIES + 1} - Arquivo: ${file.originalname} (${file.size} bytes)`);
     
     // Fazer upload para o Supabase Storage usando cliente admin com timeout
     const uploadPromise = supabaseAdmin.storage
@@ -109,7 +108,6 @@ const uploadToSupabase = async (file, retryCount = 0) => {
 
     if (error) throw error;
     
-    console.log(`✅ Upload concluído com sucesso: ${fileName}`);
     
     // Retornar informações do arquivo
     return {
@@ -123,7 +121,6 @@ const uploadToSupabase = async (file, retryCount = 0) => {
     
     // Se não atingiu o máximo de tentativas e é um erro de conexão, tenta novamente
     if (retryCount < MAX_RETRIES && isRetryableError(error)) {
-      console.log(`🔄 Tentando novamente em ${RETRY_DELAY}ms...`);
       await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
       return uploadToSupabase(file, retryCount + 1);
     }
@@ -170,9 +167,6 @@ const authenticateUpload = (req, res, next) => {
   const authHeader = req.headers['authorization'] || req.headers['Authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
-  console.log('📤 Upload - Todos os headers:', req.headers);
-  console.log('📤 Upload - Authorization:', authHeader);
-  console.log('📤 Upload - Token:', token ? 'presente' : 'ausente');
 
   if (!token) {
     return res.status(401).json({ error: 'Token de acesso requerido' });
@@ -180,7 +174,6 @@ const authenticateUpload = (req, res, next) => {
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
-      console.log('📤 Erro ao verificar token no upload:', err.message);
       return res.status(403).json({ error: 'Token inválido' });
     }
     req.user = user;
@@ -193,10 +186,6 @@ const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
-  // Log para debug
-  console.log('🔐 Autenticação - Headers recebidos:', Object.keys(req.headers));
-  console.log('🔐 Authorization header:', authHeader);
-  console.log('🔐 Token extraído:', token ? 'presente' : 'ausente');
 
   if (!token) {
     return res.status(401).json({ error: 'Token de acesso requerido' });
@@ -204,7 +193,6 @@ const authenticateToken = (req, res, next) => {
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
-      console.log('🔐 Erro ao verificar token:', err.message);
       return res.status(403).json({ error: 'Token inválido' });
     }
     req.user = user;
@@ -273,7 +261,6 @@ app.post('/api/login', async (req, res) => {
   if (!usuario && typeof email === 'string' && email.includes('@')) {
       // Normalizar email para busca
       const emailNormalizado = normalizarEmail(email);
-      console.log('🔍 Buscando consultor por email:', emailNormalizado);
       
       const { data: consultores, error } = await supabase
         .from('consultores')
@@ -281,16 +268,13 @@ app.post('/api/login', async (req, res) => {
         .eq('email', emailNormalizado)
         .limit(1);
 
-      console.log('📊 Resultado da busca:', { consultores, error });
 
       if (error) throw error;
 
       if (consultores && consultores.length > 0) {
         usuario = consultores[0];
         tipoLogin = 'consultor';
-        console.log('✅ Consultor encontrado:', usuario.nome);
       } else {
-        console.log('❌ Nenhum consultor encontrado com email:', emailNormalizado);
       }
     }
 
@@ -299,18 +283,13 @@ app.post('/api/login', async (req, res) => {
     }
 
     // Verificar senha
-    console.log('🔐 Verificando senha para usuário:', usuario.nome || usuario.email);
-    console.log('🔐 Senha digitada:', senha);
-    console.log('🔐 Hash no banco:', usuario.senha);
     
     const senhaValida = await bcrypt.compare(senha, usuario.senha);
-    console.log('🔐 Senha válida?', senhaValida);
     
     // TEMPORÁRIO: Aceitar senha admin123 para admin
     const senhaTemporaria = senha === 'admin123' && usuario.email === 'admin@crm.com';
     
     if (!senhaValida && !senhaTemporaria) {
-      console.log('❌ Login falhou: senha inválida');
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
@@ -890,7 +869,6 @@ app.post('/api/consultores', authenticateToken, requireAdmin, async (req, res) =
 // === CADASTRO PÚBLICO DE CONSULTORES === (Sem autenticação)
 app.post('/api/consultores/cadastro', async (req, res) => {
   try {
-    console.log('📝 Cadastro de consultor recebido:', req.body);
     const { nome, telefone, email, senha, cpf, pix } = req.body;
     
     // Validar campos obrigatórios
@@ -938,7 +916,6 @@ app.post('/api/consultores/cadastro', async (req, res) => {
     const senhaHash = await bcrypt.hash(senha, saltRounds);
     
     // Inserir consultor
-    console.log('💾 Tentando inserir consultor no Supabase...');
     const { data, error } = await supabase
       .from('consultores')
       .insert([{ 
@@ -958,7 +935,6 @@ app.post('/api/consultores/cadastro', async (req, res) => {
       throw error;
     }
     
-    console.log('✅ Consultor inserido com sucesso:', data[0]);
     
     res.json({ 
       id: data[0].id, 
@@ -974,7 +950,6 @@ app.post('/api/consultores/cadastro', async (req, res) => {
 // === CADASTRO PÚBLICO DE PACIENTES/LEADS === (Sem autenticação)
 app.post('/api/leads/cadastro', async (req, res) => {
   try {
-    console.log('📝 Cadastro de lead recebido:', req.body);
     const { nome, telefone, tipo_tratamento, cpf, observacoes, cidade, estado } = req.body;
     
     // Validar campos obrigatórios
@@ -1003,7 +978,6 @@ app.post('/api/leads/cadastro', async (req, res) => {
     const telefoneNumeros = telefone.replace(/\D/g, '');
     
     // Verificar se telefone já existe
-    console.log('🔍 Verificando se telefone já existe:', telefoneNumeros);
     const { data: telefoneExistente, error: telefoneError } = await supabase
       .from('pacientes')
       .select('id, nome, created_at')
@@ -1028,10 +1002,8 @@ app.post('/api/leads/cadastro', async (req, res) => {
       });
     }
     
-    console.log('✅ Telefone disponível para cadastro');
     
     // Verificar se CPF já existe
-    console.log('🔍 Verificando se CPF já existe:', cpfNumeros);
     const { data: cpfExistente, error: cpfError } = await supabase
       .from('pacientes')
       .select('id, nome, created_at')
@@ -1056,11 +1028,8 @@ app.post('/api/leads/cadastro', async (req, res) => {
       });
     }
     
-    console.log('✅ CPF disponível para cadastro');
     
     // Inserir lead/paciente
-    console.log('💾 Tentando inserir lead no Supabase...');
-    console.log('📍 Dados de localização:', { cidade, estado });
     
     const { data, error } = await supabase
       .from('pacientes')
@@ -1082,7 +1051,6 @@ app.post('/api/leads/cadastro', async (req, res) => {
       throw error;
     }
     
-    console.log('✅ Lead inserido com sucesso:', data[0]);
     
     res.json({ 
       id: data[0].id, 
@@ -2102,10 +2070,6 @@ app.put('/api/fechamentos/:id', authenticateUpload, upload.single('contrato'), a
     const { id } = req.params;
     
     // Debug: Log completo do que está chegando
-    console.log('PUT /api/fechamentos/:id - req.body:', req.body);
-    console.log('PUT /api/fechamentos/:id - Content-Type:', req.headers['content-type']);
-    console.log('PUT /api/fechamentos/:id - typeof valor_fechado:', typeof req.body.valor_fechado);
-    console.log('PUT /api/fechamentos/:id - valor_fechado raw:', req.body.valor_fechado);
     
     const { 
       paciente_id, 
@@ -2124,19 +2088,15 @@ app.put('/api/fechamentos/:id', authenticateUpload, upload.single('contrato'), a
       (typeof clinica_id === 'number' ? clinica_id : parseInt(clinica_id)) : null;
     
     // Validar valor_fechado para garantir que não seja null/NaN
-    console.log('Antes da validação - valor_fechado:', valor_fechado, 'typeof:', typeof valor_fechado);
     
     let valorFechado;
     if (valor_fechado === null || valor_fechado === undefined || valor_fechado === '') {
-      console.log('Valor fechado é null/undefined/vazio');
       return res.status(400).json({ error: 'Valor de fechamento é obrigatório' });
     }
     
     valorFechado = parseFloat(valor_fechado);
-    console.log('Após parseFloat - valorFechado:', valorFechado, 'isNaN:', isNaN(valorFechado));
     
     if (isNaN(valorFechado) || valorFechado < 0) {
-      console.log('Valor inválido - NaN ou negativo');
       return res.status(400).json({ 
         error: 'Valor de fechamento deve ser um número válido maior ou igual a zero',
         debug: { valorOriginal: valor_fechado, valorParsed: valorFechado }

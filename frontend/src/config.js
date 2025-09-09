@@ -21,11 +21,5 @@ const config = {
   TOKEN_EXPIRY: 8 * 60 * 60 * 1000, // 8 horas em millisegundos
 };
 
-// Log para debug
-console.log('🔧 Config carregada:', {
-  API_BASE_URL: config.API_BASE_URL,
-  NODE_ENV: config.NODE_ENV,
-  REACT_APP_API_URL: process.env.REACT_APP_API_URL
-});
 
 export default config; 

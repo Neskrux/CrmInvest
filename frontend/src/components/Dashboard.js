@@ -134,11 +134,16 @@ const Dashboard = () => {
           crescimentoValor
         });
         
-        // Calcular pipeline filtrado
+        // Calcular pipeline filtrado baseado nos dados reais
         const pipeline = pacientes.reduce((acc, p) => {
           acc[p.status] = (acc[p.status] || 0) + 1;
           return acc;
         }, {});
+        
+        // Corrigir o número de fechados para usar a mesma fonte de dados
+        const fechadosReais = fechamentos.filter(f => f.aprovado !== 'reprovado').length;
+        pipeline.fechado = fechadosReais;
+        
         setPipelineFiltrado(pipeline);
       } catch (error) {
         // fallback: não altera kpisPrincipais

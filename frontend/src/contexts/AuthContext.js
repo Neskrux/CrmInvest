@@ -25,8 +25,6 @@ export const AuthProvider = ({ children }) => {
       ? '/api' 
       : 'http://localhost:5000/api');
   
-  // Log para debug
-  console.log('🔧 AuthContext - API_BASE_URL:', API_BASE_URL);
 
   const clearAllData = () => {
     setUser(null);
@@ -38,13 +36,6 @@ export const AuthProvider = ({ children }) => {
   const makeRequest = async (url, options = {}) => {
     const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
     
-    console.log('🌐 Fazendo requisição:', {
-      url: fullUrl,
-      method: options.method || 'GET',
-      hasToken: !!localStorage.getItem('token'),
-      API_BASE_URL: API_BASE_URL,
-      originalUrl: url
-    });
     
     const headers = {
       'Content-Type': 'application/json',
@@ -62,12 +53,6 @@ export const AuthProvider = ({ children }) => {
       headers
     });
 
-    console.log('📡 Resposta recebida:', {
-      url: fullUrl,
-      status: response.status,
-      ok: response.ok,
-      statusText: response.statusText
-    });
 
     if (response.status === 401) {
       // Token expirado ou inválido

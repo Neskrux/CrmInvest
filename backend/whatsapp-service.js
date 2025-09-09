@@ -33,7 +33,6 @@ class WhatsAppService {
 
   async initialize() {
     try {
-      console.log('🔄 Inicializando WhatsApp Service...');
       await this.connectToWhatsApp();
     } catch (error) {
       console.error('❌ Erro ao inicializar WhatsApp Service:', error);
@@ -50,7 +49,6 @@ class WhatsAppService {
       const { state, saveCreds } = await useMultiFileAuthState(this.authDir);
       const { version, isLatest } = await fetchLatestBaileysVersion();
       
-      console.log(`📱 Usando WhatsApp v${version.join('.')}, isLatest: ${isLatest}`);
 
       const logger = {
         level: 'silent',
@@ -77,7 +75,6 @@ class WhatsAppService {
       this.sock.ev.on('messages.upsert', (m) => this.handleMessages(m));
       this.sock.ev.on('contacts.update', (contacts) => this.handleContactsUpdate(contacts));
 
-      console.log('🚀 WhatsApp Service inicializado com sucesso!');
     } catch (error) {
       console.error('❌ Erro ao conectar ao WhatsApp:', error);
       this.connectionStatus = 'error';
@@ -88,14 +85,11 @@ class WhatsAppService {
   async handleConnectionUpdate(update) {
     const { connection, lastDisconnect, qr } = update;
     
-    console.log('🔄 Connection update:', { connection, qr: !!qr, lastDisconnect: lastDisconnect?.error?.message });
     
     if (qr) {
-      console.log('📱 QR Code gerado - convertendo para base64...');
       try {
         this.qrCodeData = await QRCode.toDataURL(qr);
         this.connectionStatus = 'qr';
-        console.log('✅ QR Code convertido com sucesso');
         this.emitStatusUpdate();
       } catch (error) {
         console.error('❌ Erro ao gerar QR Code:', error);
@@ -104,7 +98,6 @@ class WhatsAppService {
 
     if (connection === 'close') {
       const shouldReconnect = (lastDisconnect?.error?.output?.statusCode) !== DisconnectReason.loggedOut;
-      console.log('🔌 Conexão fechada devido a:', lastDisconnect?.error?.message, ', reconectando:', shouldReconnect);
       
       this.isConnected = false;
       this.connectionStatus = 'disconnected';
@@ -113,13 +106,11 @@ class WhatsAppService {
 
       // Não reconectar automaticamente - deixar o usuário clicar novamente
       if (shouldReconnect && lastDisconnect?.error?.output?.statusCode !== 401) {
-        console.log('🔄 Aguardando 5 segundos para reconectar...');
         setTimeout(() => {
           this.connectToWhatsApp();
         }, 50000);
       }
     } else if (connection === 'open') {
-      console.log('✅ WhatsApp conectado com sucesso!');
       this.isConnected = true;
       this.connectionStatus = 'connected';
       this.qrCodeData = null;
@@ -132,7 +123,6 @@ class WhatsAppService {
         console.warn('⚠️ Erro ao carregar conversas (normal se tabela não existir):', error.message);
       }
     } else if (connection === 'connecting') {
-      console.log('🔄 Conectando ao WhatsApp...');
       this.connectionStatus = 'connecting';
       this.emitStatusUpdate();
     }
@@ -247,7 +237,6 @@ class WhatsAppService {
         .single();
 
       if (existingPatient) {
-        console.log(`📋 Mensagem de paciente existente: ${existingPatient.nome}`);
         return;
       }
 
@@ -265,7 +254,6 @@ class WhatsAppService {
 
       if (error) throw error;
 
-      console.log(`🆕 Novo lead criado: ${newLead.nome} (${phoneNumber})`);
       
       // Emitir evento de novo lead (apenas se Socket.IO estiver disponível)
       if (this.io) {
@@ -345,7 +333,6 @@ class WhatsAppService {
 
   async getMessages(jid, limit = 50) {
     try {
-      console.log('🔍 WhatsAppService.getMessages - JID:', jid, 'Limit:', limit);
       
       const { data: messages, error } = await this.supabase
         .from('whatsapp_messages')
@@ -359,8 +346,6 @@ class WhatsAppService {
         throw error;
       }
       
-      console.log('📨 Mensagens do banco:', messages?.length || 0);
-      console.log('📨 Primeiras mensagens:', messages?.slice(0, 2));
       
       return messages || [];
     } catch (error) {
@@ -371,7 +356,6 @@ class WhatsAppService {
 
   handleContactsUpdate(contacts) {
     // Atualizar informações de contatos se necessário
-    console.log('📞 Contatos atualizados:', contacts.length);
   }
 
   emitStatusUpdate() {
@@ -408,7 +392,6 @@ class WhatsAppService {
       }
       
       this.emitStatusUpdate();
-      console.log('🔌 WhatsApp desconectado');
     } catch (error) {
       console.error('❌ Erro ao desconectar:', error);
     }
