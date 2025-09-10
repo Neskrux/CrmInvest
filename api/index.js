@@ -3264,8 +3264,8 @@ app.get('/api/meta-ads/advanced-metrics', authenticateToken, requireAdmin, async
 }); 
 
 // ===== ROTAS WHATSAPP =====
-// Importar as rotas do WhatsApp
-const whatsappRoutes = require('./whatsapp');
+// Importar as rotas do WhatsApp do backend
+const whatsappRoutes = require('../backend/api/whatsapp');
 app.use('/api/whatsapp', whatsappRoutes);
 
 // Exportar o app para a Vercel
