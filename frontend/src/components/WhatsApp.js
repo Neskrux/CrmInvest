@@ -111,7 +111,6 @@ const WhatsApp = () => {
       setConversas(response.data.conversas || []);
     } catch (error) {
       console.error('Erro ao buscar conversas:', error);
-      showError('Erro ao carregar conversas');
     }
   };
 
@@ -130,7 +129,6 @@ const WhatsApp = () => {
       }
     } catch (error) {
       console.error('Erro ao buscar mensagens:', error);
-      showError('Erro ao carregar mensagens');
     }
   };
 
@@ -157,7 +155,6 @@ const WhatsApp = () => {
       setAutomatizacoes(response.data || []);
     } catch (error) {
       console.error('Erro ao buscar automações:', error);
-      showError('Erro ao carregar automações');
     }
   };
 
