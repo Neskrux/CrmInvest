@@ -84,7 +84,7 @@ const WhatsApp = () => {
       });
       setPacientes(response.data);
     } catch (error) {
-      console.error('Erro ao buscar pacientes:', error);
+      // Erro silencioso - não exibe toast nem console
     }
   };
 
@@ -97,7 +97,7 @@ const WhatsApp = () => {
       });
       setConsultores(response.data);
     } catch (error) {
-      console.error('Erro ao buscar consultores:', error);
+      // Erro silencioso - não exibe toast nem console
     }
   };
 
@@ -110,7 +110,7 @@ const WhatsApp = () => {
       });
       setConversas(response.data.conversas || []);
     } catch (error) {
-      console.error('Erro ao buscar conversas:', error);
+      // Erro silencioso - não exibe toast nem console
     }
   };
 
@@ -128,7 +128,7 @@ const WhatsApp = () => {
         setTimeout(scrollToBottom, 100);
       }
     } catch (error) {
-      console.error('Erro ao buscar mensagens:', error);
+      // Erro silencioso - não exibe toast nem console
     }
   };
 
@@ -141,7 +141,7 @@ const WhatsApp = () => {
       });
       setConfiguracao(response.data);
     } catch (error) {
-      console.error('Erro ao buscar configuração:', error);
+      // Erro silencioso - não exibe toast nem console
     }
   };
 
@@ -154,7 +154,7 @@ const WhatsApp = () => {
       });
       setAutomatizacoes(response.data || []);
     } catch (error) {
-      console.error('Erro ao buscar automações:', error);
+      // Erro silencioso - não exibe toast nem console
     }
   };
 

@@ -3262,3 +3262,11 @@ app.get('/api/meta-ads/advanced-metrics', authenticateToken, requireAdmin, async
     });
   }
 }); 
+
+// ===== ROTAS WHATSAPP =====
+// Importar as rotas do WhatsApp
+const whatsappRoutes = require('./whatsapp');
+app.use('/api/whatsapp', whatsappRoutes);
+
+// Exportar o app para a Vercel
+module.exports = app;
