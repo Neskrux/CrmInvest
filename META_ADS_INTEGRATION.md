@@ -185,7 +185,6 @@ app.post('/api/meta-ads/webhook', async (req, res) => {
 ### **3. Otimizações**
 - [ ] Cache de preços
 - [ ] Notificações de leads
-- [ ] Integração com WhatsApp
 
 ## 📞 **Suporte**
 

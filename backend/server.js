@@ -10,7 +10,6 @@ const { createClient } = require('@supabase/supabase-js');
 const MetaAdsAPI = require('./meta-ads-api');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
-const WhatsAppService = require('./whatsapp-service');
 require('dotenv').config();
 
 const app = express();
@@ -1261,6 +1260,9 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
     const consultorId = consultor_id && consultor_id !== '' ? 
       (typeof consultor_id === 'number' ? consultor_id : parseInt(consultor_id)) : null;
     
+    // Lógica de diferenciação: se tem consultor = paciente, se não tem = lead
+    const statusFinal = status || (consultorId ? 'paciente' : 'lead');
+    
     const { data, error } = await supabase
       .from('pacientes')
       .insert([{ 
@@ -1268,7 +1270,7 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
         telefone: telefoneNumeros, // Usar telefone normalizado
         cpf: cpfNumeros, // Usar CPF normalizado
         tipo_tratamento, 
-        status: status || 'lead', 
+        status: statusFinal, // Usar status diferenciado
         observacoes,
         consultor_id: consultorId,
         cidade,
@@ -1336,6 +1338,10 @@ app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
     const consultorId = consultor_id && consultor_id !== '' ? 
       (typeof consultor_id === 'number' ? consultor_id : parseInt(consultor_id)) : null;
     
+    // Lógica de diferenciação: se tem consultor = paciente, se não tem = lead
+    // Mas só aplica se o status não foi explicitamente definido
+    const statusFinal = status || (consultorId ? 'paciente' : 'lead');
+    
     const { data, error } = await supabase
       .from('pacientes')
       .update({ 
@@ -1343,7 +1349,7 @@ app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
         telefone: telefoneNumeros, // Usar telefone normalizado
         cpf: cpfNumeros, // Usar CPF normalizado
         tipo_tratamento, 
-        status, 
+        status: statusFinal, // Usar status diferenciado
         observacoes,
         consultor_id: consultorId,
         cidade,
@@ -2840,18 +2846,12 @@ if (!process.env.VERCEL && !process.env.DISABLE_WEBSOCKET) {
   });
 }
 
-// Inicializar WhatsApp Service
-let whatsappService = null;
 
 // Socket.IO connection handling (apenas se Socket.IO estiver habilitado)
 if (io) {
   io.on('connection', (socket) => {
     console.log('🔌 Cliente conectado:', socket.id);
     
-    // Enviar status atual do WhatsApp
-    if (whatsappService) {
-      socket.emit('whatsapp:status', whatsappService.getStatus());
-    }
     
     socket.on('disconnect', () => {
       console.log('🔌 Cliente desconectado:', socket.id);
@@ -2859,132 +2859,14 @@ if (io) {
   });
 }
 
-// === ROTAS DO WHATSAPP ===
-app.get('/api/whatsapp/status', authenticateToken, async (req, res) => {
-  if (!whatsappService) {
-    return res.json({ status: 'not_initialized', isConnected: false });
-  }
-  
-  const status = whatsappService.getStatus();
-  
-  // Se estiver conectado, incluir chats recentes
-  if (status.status === 'connected') {
-    try {
-      await whatsappService.loadRecentChats();
-      // Os chats serão enviados via Socket.IO, mas para produção vamos retornar vazio
-      // pois o polling vai buscar os chats separadamente se necessário
-    } catch (error) {
-      console.error('Erro ao carregar chats:', error);
-    }
-  }
-  
-  res.json(status);
-});
-
-app.post('/api/whatsapp/connect', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const forceReset = req.body?.forceReset || false;
-    if (!whatsappService) {
-      whatsappService = new WhatsAppService(io, supabase);
-    }
-    await whatsappService.connectToWhatsApp(forceReset);
-    res.json({ message: 'Conexão iniciada' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/whatsapp/disconnect', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    if (whatsappService) {
-      await whatsappService.disconnect();
-    }
-    res.json({ message: 'WhatsApp desconectado com sucesso!' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/whatsapp/send-message', authenticateToken, async (req, res) => {
-  try {
-    const { jid, message } = req.body;
-    
-    if (!whatsappService || !whatsappService.isConnected) {
-      return res.status(400).json({ error: 'WhatsApp não está conectado' });
-    }
-    
-    const result = await whatsappService.sendMessage(jid, message);
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/whatsapp/chats', authenticateToken, async (req, res) => {
-  try {
-    if (!whatsappService || !whatsappService.isConnected) {
-      return res.json([]);
-    }
-    
-    // Buscar conversas recentes do banco
-    const { data: recentChats, error } = await supabase
-      .from('whatsapp_messages')
-      .select('remote_jid, contact_name, contact_number, message, timestamp, is_from_me')
-      .order('timestamp', { ascending: false })
-      .limit(100);
-
-    if (error) throw error;
-
-    // Agrupar por contato
-    const chatsMap = new Map();
-    recentChats.forEach(msg => {
-      if (!chatsMap.has(msg.remote_jid)) {
-        chatsMap.set(msg.remote_jid, {
-          jid: msg.remote_jid,
-          name: msg.contact_name,
-          number: msg.contact_number,
-          lastMessage: msg.message,
-          timestamp: msg.timestamp,
-          unread: !msg.is_from_me ? 1 : 0
-        });
-      }
-    });
-
-    const chats = Array.from(chatsMap.values());
-    res.json(chats);
-  } catch (error) {
-    console.error('❌ Erro ao buscar chats:', error);
-    res.status(500).json({ error: 'Erro ao buscar chats' });
-  }
-});
-
-app.get('/api/whatsapp/messages/:jid', authenticateToken, async (req, res) => {
-  try {
-    const { jid } = req.params;
-    const { limit = 50 } = req.query;
-    
-    console.log('🔍 Buscando mensagens para JID:', jid);
-    
-    if (!whatsappService) {
-      console.log('❌ WhatsApp Service não inicializado');
-      return res.json([]);
-    }
-    
-    const messages = await whatsappService.getMessages(jid, parseInt(limit));
-    console.log('📨 Mensagens encontradas:', messages.length);
-    res.json(messages);
-  } catch (error) {
-    console.error('❌ Erro ao buscar mensagens:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
 
 // Inicializar servidor
 server.listen(PORT, async () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
   console.log(`🌐 Acesse: http://localhost:${PORT}`);
+  console.log(`📱 WhatsApp API: http://localhost:${PORT}/api/whatsapp`);
+  console.log(`🔗 Webhook WhatsApp: http://localhost:${PORT}/api/whatsapp/webhook`);
   console.log(`🗄️ Usando Supabase como banco de dados`);
-  console.log(`📱 WhatsApp Service inicializado`);
   
   // Verificar conexão com Supabase
   try {
@@ -3346,3 +3228,10 @@ app.get('/api/meta-ads/advanced-metrics', authenticateToken, requireAdmin, async
     });
   }
 }); 
+
+// ===== SERVIR ARQUIVOS DE UPLOAD =====
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// ===== ROTAS WHATSAPP =====
+const whatsappRoutes = require('./api/whatsapp');
+app.use('/api/whatsapp', whatsappRoutes);
