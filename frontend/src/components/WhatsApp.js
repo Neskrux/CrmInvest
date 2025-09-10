@@ -1019,7 +1019,7 @@ const WhatsApp = () => {
                   </div>
                 </div>
 
-                <div className="mensagens-list" ref={mensagensListRef}>
+                <div className="mensagens-container" ref={mensagensListRef}>
                   {mensagens.map((mensagem) => {
                     // Debug para verificar dados de reply
                     if (mensagem.mensagem_pai_conteudo) {
