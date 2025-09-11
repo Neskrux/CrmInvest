@@ -80,7 +80,7 @@ const WhatsApp = () => {
   const buscarPacientes = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/api/pacientes', {
+      const response = await axios.get(`${config.API_BASE_URL}/pacientes`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setPacientes(response.data);
@@ -93,7 +93,7 @@ const WhatsApp = () => {
   const buscarConsultores = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/api/consultores', {
+      const response = await axios.get(`${config.API_BASE_URL}/consultores`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setConsultores(response.data);
@@ -279,7 +279,7 @@ const WhatsApp = () => {
 
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`/api/whatsapp/conversas/${conversaSelecionada.id}`, {
+      await axios.delete(`${config.API_BASE_URL}/whatsapp/conversas/${conversaSelecionada.id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -639,7 +639,7 @@ const WhatsApp = () => {
       };
       
       // Criar paciente
-      const response = await axios.post('/api/pacientes', dadosParaEnviar, {
+      const response = await axios.post(`${config.API_BASE_URL}/pacientes`, dadosParaEnviar, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -1749,7 +1749,7 @@ const WhatsApp = () => {
                     onChange={handleInputChange}
                   >
                     <option value="">Selecione (opcional)</option>
-                    {consultores.map(consultor => (
+                    {Array.isArray(consultores) && consultores.map(consultor => (
                       <option key={consultor.id} value={consultor.id}>
                         {consultor.nome}
                       </option>
