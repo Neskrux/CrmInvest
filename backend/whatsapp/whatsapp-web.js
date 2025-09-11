@@ -582,10 +582,20 @@ class WhatsAppWebService {
               .single();
 
             if (mensagemOriginal) {
-              mensagemPaiId = mensagemOriginal.id;
-              mensagemPaiConteudo = mensagemOriginal.conteudo;
-              mensagemPaiAutor = mensagemOriginal.direcao === 'outbound' ? 'Você' : (conversa.nome_contato || 'Contato');
-              console.log(`📤 Mensagem enviada em resposta a: "${mensagemPaiConteudo?.substring(0, 50)}..."`);
+              // Verificar se a mensagem original já é um reply (evitar aninhamento infinito)
+              if (mensagemOriginal.mensagem_pai_id) {
+                // Se a mensagem original já é um reply, usar a mensagem pai original
+                mensagemPaiId = mensagemOriginal.mensagem_pai_id;
+                mensagemPaiConteudo = mensagemOriginal.mensagem_pai_conteudo;
+                mensagemPaiAutor = mensagemOriginal.mensagem_pai_autor;
+                console.log(`📤 Mensagem enviada em resposta (via reply) a: "${mensagemPaiConteudo?.substring(0, 50)}..."`);
+              } else {
+                // Mensagem original não é um reply, usar ela como pai
+                mensagemPaiId = mensagemOriginal.id;
+                mensagemPaiConteudo = mensagemOriginal.conteudo;
+                mensagemPaiAutor = mensagemOriginal.direcao === 'outbound' ? 'Você' : (conversa.nome_contato || 'Contato');
+                console.log(`📤 Mensagem enviada em resposta a: "${mensagemPaiConteudo?.substring(0, 50)}..."`);
+              }
             }
           }
         } catch (error) {
@@ -763,10 +773,20 @@ class WhatsAppWebService {
               .single();
 
             if (mensagemOriginal) {
-              mensagemPaiId = mensagemOriginal.id;
-              mensagemPaiConteudo = mensagemOriginal.conteudo;
-              mensagemPaiAutor = mensagemOriginal.direcao === 'outbound' ? 'Você' : contact.name || 'Contato';
-              console.log(`📨 Mensagem em resposta a: "${mensagemPaiConteudo?.substring(0, 50)}..."`);
+              // Verificar se a mensagem original já é um reply (evitar aninhamento infinito)
+              if (mensagemOriginal.mensagem_pai_id) {
+                // Se a mensagem original já é um reply, usar a mensagem pai original
+                mensagemPaiId = mensagemOriginal.mensagem_pai_id;
+                mensagemPaiConteudo = mensagemOriginal.mensagem_pai_conteudo;
+                mensagemPaiAutor = mensagemOriginal.mensagem_pai_autor;
+                console.log(`📨 Mensagem em resposta (via reply) a: "${mensagemPaiConteudo?.substring(0, 50)}..."`);
+              } else {
+                // Mensagem original não é um reply, usar ela como pai
+                mensagemPaiId = mensagemOriginal.id;
+                mensagemPaiConteudo = mensagemOriginal.conteudo;
+                mensagemPaiAutor = mensagemOriginal.direcao === 'outbound' ? 'Você' : contact.name || 'Contato';
+                console.log(`📨 Mensagem em resposta a: "${mensagemPaiConteudo?.substring(0, 50)}..."`);
+              }
             }
           }
         } catch (error) {
@@ -846,8 +866,13 @@ class WhatsAppWebService {
         .update({ ultima_mensagem_at: new Date(Date.now() - (3 * 60 * 60 * 1000)).toISOString() }) // UTC-3
         .eq('id', conversa.id);
 
-      // Executar automações
-      await this.executeAutomations(conversa, mensagem);
+      // Executar automações (com proteção contra crash)
+      try {
+        await this.executeAutomations(conversa, mensagem);
+      } catch (automationError) {
+        console.error('Erro crítico nas automações (não deve afetar o processamento da mensagem):', automationError);
+        // Não re-lançar o erro para não quebrar o processamento da mensagem
+      }
 
       console.log(`📨 Mensagem recebida de ${contact.name}: ${message.body}`);
       console.log('✅ Mensagem processada e salva no banco com sucesso');
@@ -1037,19 +1062,38 @@ class WhatsAppWebService {
       // Buscar o chat do WhatsApp
       const chat = await this.client.getChatById(chatId);
       
-      // Buscar mensagens no chat para encontrar a mensagem original
-      const messages = await chat.fetchMessages({ limit: 100 });
-      const originalMessage = messages.find(msg => msg.id._serialized === mensagemOriginal.mensagem_id);
+      // Buscar mensagens no chat para encontrar a mensagem original (limitado para evitar timeout)
+      let originalMessage = null;
+      try {
+        const messages = await chat.fetchMessages({ limit: 50 }); // Reduzido de 100 para 50
+        originalMessage = messages.find(msg => msg.id._serialized === mensagemOriginal.mensagem_id);
+      } catch (fetchError) {
+        console.error('Erro ao buscar mensagens do chat:', fetchError);
+        // Se falhar ao buscar mensagens, enviar como mensagem normal
+        console.log('Falha ao buscar mensagens, enviando como mensagem normal');
+        return await this.sendMessage(number, content);
+      }
 
       let message;
       if (originalMessage) {
         // Enviar como reply se encontrou a mensagem original
         console.log(`🔄 Enviando reply para mensagem: ${originalMessage.id._serialized}`);
         
-        // Usar a API correta do whatsapp-web.js para reply
-        message = await originalMessage.reply(content);
-        
-        console.log(`✅ Reply enviado com sucesso: ${message.id._serialized}`);
+        try {
+          // Usar a API correta do whatsapp-web.js para reply com timeout
+          const replyPromise = originalMessage.reply(content);
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout ao enviar reply')), 30000) // 30 segundos
+          );
+          
+          message = await Promise.race([replyPromise, timeoutPromise]);
+          console.log(`✅ Reply enviado com sucesso: ${message.id._serialized}`);
+        } catch (replyError) {
+          console.error('Erro ao enviar reply:', replyError);
+          // Se falhar o reply, enviar como mensagem normal
+          console.log('Falha no reply, enviando como mensagem normal');
+          message = await this.client.sendMessage(chatId, content);
+        }
       } else {
         // Se não encontrou a mensagem no WhatsApp, enviar como mensagem normal
         console.log('Mensagem original não encontrada no WhatsApp, enviando como mensagem normal');
@@ -1074,10 +1118,26 @@ class WhatsAppWebService {
 
       // Adicionar dados do reply se a mensagem original foi encontrada
       if (originalMessage) {
-        mensagemData.mensagem_pai_id = replyMessageId;
-        mensagemData.mensagem_pai_conteudo = replyData.content;
-        mensagemData.mensagem_pai_autor = replyData.author;
-        console.log(`💬 Reply salvo com pai_id: ${replyMessageId}, conteúdo: "${replyData.content?.substring(0, 30)}..."`);
+        // Verificar se a mensagem original já é um reply (evitar aninhamento infinito)
+        const { data: mensagemOriginal } = await supabase
+          .from('whatsapp_mensagens')
+          .select('mensagem_pai_id, mensagem_pai_conteudo, mensagem_pai_autor')
+          .eq('id', replyMessageId)
+          .single();
+
+        if (mensagemOriginal && mensagemOriginal.mensagem_pai_id) {
+          // Se a mensagem original já é um reply, usar a mensagem pai original
+          mensagemData.mensagem_pai_id = mensagemOriginal.mensagem_pai_id;
+          mensagemData.mensagem_pai_conteudo = mensagemOriginal.mensagem_pai_conteudo;
+          mensagemData.mensagem_pai_autor = mensagemOriginal.mensagem_pai_autor;
+          console.log(`💬 Reply salvo (via reply) com pai_id: ${mensagemOriginal.mensagem_pai_id}, conteúdo: "${mensagemOriginal.mensagem_pai_conteudo?.substring(0, 30)}..."`);
+        } else {
+          // Mensagem original não é um reply, usar ela como pai
+          mensagemData.mensagem_pai_id = replyMessageId;
+          mensagemData.mensagem_pai_conteudo = replyData.content;
+          mensagemData.mensagem_pai_autor = replyData.author;
+          console.log(`💬 Reply salvo com pai_id: ${replyMessageId}, conteúdo: "${replyData.content?.substring(0, 30)}..."`);
+        }
       }
 
       await supabase
