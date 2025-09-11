@@ -629,14 +629,15 @@ const WhatsApp = () => {
     }
 
     setSalvandoPaciente(true);
+    
+    // Preparar dados com telefone limpo (apenas números)
+    const dadosParaEnviar = {
+      ...formData,
+      telefone: formData.telefone.replace(/\D/g, '') // Remove formatação para enviar apenas números
+    };
+    
     try {
       const token = localStorage.getItem('token');
-      
-      // Preparar dados com telefone limpo (apenas números)
-      const dadosParaEnviar = {
-        ...formData,
-        telefone: formData.telefone.replace(/\D/g, '') // Remove formatação para enviar apenas números
-      };
       
       // Criar paciente
       const response = await axios.post(`${config.API_BASE_URL}/pacientes`, dadosParaEnviar, {
