@@ -3255,11 +3255,3 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // ===== ROTAS WHATSAPP =====
 const whatsappRoutes = require('./api/whatsapp');
 app.use('/api/whatsapp', whatsappRoutes);
-
-// ===== INICIAR SERVIDOR =====
-server.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT}`);
-  console.log(`📱 Ambiente: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🌐 URL: http://localhost:${PORT}`);
-  console.log(`❤️  Health check: http://localhost:${PORT}/health`);
-});
