@@ -17,6 +17,25 @@ const app = express();
 const server = createServer(app);
 const PORT = process.env.PORT || 5000;
 
+// Health check endpoint para Railway
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// Rota raiz para Railway
+app.get('/', (req, res) => {
+  res.status(200).json({ 
+    message: 'CrmInvest Backend API', 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: '/health',
+      api: '/api',
+      whatsapp: '/api/whatsapp'
+    }
+  });
+});
+
 // Configuração CORS para Vercel
 const corsOptions = {
   origin: [
@@ -3236,3 +3255,11 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // ===== ROTAS WHATSAPP =====
 const whatsappRoutes = require('./api/whatsapp');
 app.use('/api/whatsapp', whatsappRoutes);
+
+// ===== INICIAR SERVIDOR =====
+server.listen(PORT, () => {
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
+  console.log(`📱 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🌐 URL: http://localhost:${PORT}`);
+  console.log(`❤️  Health check: http://localhost:${PORT}/health`);
+});

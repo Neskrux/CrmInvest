@@ -3,7 +3,7 @@ const config = {
   // URL base da API - usando variável de ambiente ou fallback seguro
   API_BASE_URL: process.env.REACT_APP_API_URL || 
     (process.env.NODE_ENV === 'production' 
-      ? '/api' 
+      ? 'https://crminvest-production.up.railway.app/api'
       : 'http://localhost:5000/api'),
   
   // Configurações do Supabase (se necessário no frontend)
