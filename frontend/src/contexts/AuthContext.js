@@ -25,6 +25,10 @@ export const AuthProvider = ({ children }) => {
       ? 'https://crminvest-production.up.railway.app/api'
       : 'http://localhost:5000/api');
   
+  // Debug: Log da URL sendo usada
+  console.log('🔗 API_BASE_URL:', API_BASE_URL);
+  console.log('🌍 NODE_ENV:', process.env.NODE_ENV);
+  
 
   const clearAllData = () => {
     setUser(null);
