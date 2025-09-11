@@ -38,13 +38,7 @@ app.get('/', (req, res) => {
 
 // Configuração CORS para Vercel
 const corsOptions = {
-  origin: [
-    'http://localhost:3000',
-    'https://localhost:3000',
-    process.env.FRONTEND_URL,
-    /\.vercel\.app$/,
-    'https://crm.investmoneysa.com.br'  // ← Adicionar seu domínio
-  ],
+  origin: true,  // ← Temporariamente permitir todos os domínios
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
