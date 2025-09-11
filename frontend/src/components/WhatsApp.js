@@ -119,7 +119,7 @@ const WhatsApp = () => {
   const buscarMensagens = async (conversaId, shouldScroll = false) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`/api/whatsapp/conversas/${conversaId}/mensagens`, {
+      const response = await axios.get(`${config.API_BASE_URL}/whatsapp/conversas/${conversaId}/mensagens`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setMensagens(response.data.mensagens || []);
