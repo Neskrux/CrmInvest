@@ -108,10 +108,8 @@ class WhatsAppWebService {
     const maxRetries = 3;
     
     try {
-      // Executar scripts de limpeza apenas na primeira tentativa
-      if (retryCount === 0) {
-        await this.runCleanupScripts();
-      }
+      // Não executar limpeza automática para permitir reconexão
+      // A limpeza só deve ser feita manualmente quando necessário
       
       // Limpar cliente anterior se existir
       if (this.client) {
@@ -575,13 +573,16 @@ class WhatsAppWebService {
           const quotedMsg = await message.getQuotedMessage();
           if (quotedMsg) {
             // Buscar a mensagem original no banco
-            const { data: mensagemOriginal } = await supabase
+            const { data: mensagemOriginal, error: mensagemError } = await supabase
               .from('whatsapp_mensagens')
               .select('*')
               .eq('mensagem_id', quotedMsg.id._serialized)
               .single();
 
-            if (mensagemOriginal) {
+            if (mensagemError) {
+              console.error('Erro ao buscar mensagem original para reply enviado:', mensagemError);
+              // Continuar sem dados de reply
+            } else if (mensagemOriginal) {
               // Verificar se a mensagem original já é um reply (evitar aninhamento infinito)
               if (mensagemOriginal.mensagem_pai_id) {
                 // Se a mensagem original já é um reply, usar a mensagem pai original
@@ -766,13 +767,16 @@ class WhatsAppWebService {
           const quotedMsg = await message.getQuotedMessage();
           if (quotedMsg) {
             // Buscar a mensagem original no banco
-            const { data: mensagemOriginal } = await supabase
+            const { data: mensagemOriginal, error: mensagemError } = await supabase
               .from('whatsapp_mensagens')
               .select('*')
               .eq('mensagem_id', quotedMsg.id._serialized)
               .single();
 
-            if (mensagemOriginal) {
+            if (mensagemError) {
+              console.error('Erro ao buscar mensagem original para reply:', mensagemError);
+              // Continuar sem dados de reply
+            } else if (mensagemOriginal) {
               // Verificar se a mensagem original já é um reply (evitar aninhamento infinito)
               if (mensagemOriginal.mensagem_pai_id) {
                 // Se a mensagem original já é um reply, usar a mensagem pai original
@@ -1118,25 +1122,41 @@ class WhatsAppWebService {
 
       // Adicionar dados do reply se a mensagem original foi encontrada
       if (originalMessage) {
-        // Verificar se a mensagem original já é um reply (evitar aninhamento infinito)
-        const { data: mensagemOriginal } = await supabase
-          .from('whatsapp_mensagens')
-          .select('mensagem_pai_id, mensagem_pai_conteudo, mensagem_pai_autor')
-          .eq('id', replyMessageId)
-          .single();
+        try {
+          // Verificar se a mensagem original já é um reply (evitar aninhamento infinito)
+          const { data: mensagemOriginal, error: mensagemError } = await supabase
+            .from('whatsapp_mensagens')
+            .select('mensagem_pai_id, mensagem_pai_conteudo, mensagem_pai_autor')
+            .eq('id', replyMessageId)
+            .single();
 
-        if (mensagemOriginal && mensagemOriginal.mensagem_pai_id) {
-          // Se a mensagem original já é um reply, usar a mensagem pai original
-          mensagemData.mensagem_pai_id = mensagemOriginal.mensagem_pai_id;
-          mensagemData.mensagem_pai_conteudo = mensagemOriginal.mensagem_pai_conteudo;
-          mensagemData.mensagem_pai_autor = mensagemOriginal.mensagem_pai_autor;
-          console.log(`💬 Reply salvo (via reply) com pai_id: ${mensagemOriginal.mensagem_pai_id}, conteúdo: "${mensagemOriginal.mensagem_pai_conteudo?.substring(0, 30)}..."`);
-        } else {
-          // Mensagem original não é um reply, usar ela como pai
+          if (mensagemError) {
+            console.error('Erro ao buscar mensagem original:', mensagemError);
+            // Fallback: usar dados básicos do reply
+            mensagemData.mensagem_pai_id = replyMessageId;
+            mensagemData.mensagem_pai_conteudo = replyData.content;
+            mensagemData.mensagem_pai_autor = replyData.author;
+            console.log(`💬 Reply salvo (fallback) com pai_id: ${replyMessageId}, conteúdo: "${replyData.content?.substring(0, 30)}..."`);
+          } else if (mensagemOriginal && mensagemOriginal.mensagem_pai_id) {
+            // Se a mensagem original já é um reply, usar a mensagem pai original
+            mensagemData.mensagem_pai_id = mensagemOriginal.mensagem_pai_id;
+            mensagemData.mensagem_pai_conteudo = mensagemOriginal.mensagem_pai_conteudo;
+            mensagemData.mensagem_pai_autor = mensagemOriginal.mensagem_pai_autor;
+            console.log(`💬 Reply salvo (via reply) com pai_id: ${mensagemOriginal.mensagem_pai_id}, conteúdo: "${mensagemOriginal.mensagem_pai_conteudo?.substring(0, 30)}..."`);
+          } else {
+            // Mensagem original não é um reply, usar ela como pai
+            mensagemData.mensagem_pai_id = replyMessageId;
+            mensagemData.mensagem_pai_conteudo = replyData.content;
+            mensagemData.mensagem_pai_autor = replyData.author;
+            console.log(`💬 Reply salvo com pai_id: ${replyMessageId}, conteúdo: "${replyData.content?.substring(0, 30)}..."`);
+          }
+        } catch (error) {
+          console.error('Erro crítico ao processar reply:', error);
+          // Fallback: usar dados básicos do reply
           mensagemData.mensagem_pai_id = replyMessageId;
           mensagemData.mensagem_pai_conteudo = replyData.content;
           mensagemData.mensagem_pai_autor = replyData.author;
-          console.log(`💬 Reply salvo com pai_id: ${replyMessageId}, conteúdo: "${replyData.content?.substring(0, 30)}..."`);
+          console.log(`💬 Reply salvo (fallback crítico) com pai_id: ${replyMessageId}, conteúdo: "${replyData.content?.substring(0, 30)}..."`);
         }
       }
 
@@ -1189,6 +1209,19 @@ class WhatsAppWebService {
     
     await this.updateConnectionStatus('disconnected');
     console.log('✅ WhatsApp Web desconectado');
+  }
+
+  // Desconectar e limpar sessão (para reconexão forçada)
+  async disconnectAndClean() {
+    console.log('🔌 Desconectando e limpando sessão WhatsApp...');
+    
+    // Desconectar normalmente
+    await this.disconnect();
+    
+    // Executar limpeza de sessão
+    await this.runCleanupScripts();
+    
+    console.log('✅ WhatsApp Web desconectado e sessão limpa');
   }
 
   // ===== MÉTODOS DE ENVIO DE MÍDIA =====
