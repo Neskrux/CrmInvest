@@ -646,7 +646,7 @@ const WhatsApp = () => {
       const paciente = response.data;
 
       // Vincular lead à conversa
-      await axios.put(`/api/whatsapp/conversas/${conversaSelecionada.id}`, {
+      await axios.put(`${config.API_BASE_URL}/whatsapp/conversas/${conversaSelecionada.id}`, {
         paciente_id: paciente.id
       }, {
         headers: { Authorization: `Bearer ${token}` }
@@ -661,7 +661,12 @@ const WhatsApp = () => {
       buscarConversas(); // Atualizar lista de conversas
     } catch (error) {
       console.error('Erro ao salvar paciente:', error);
-      showError('Erro ao salvar paciente');
+      console.error('Dados enviados:', dadosParaEnviar);
+      console.error('Resposta do servidor:', error.response?.data);
+      
+      // Mostrar erro específico se disponível
+      const errorMessage = error.response?.data?.error || 'Erro ao salvar paciente';
+      showError(errorMessage);
     } finally {
       setSalvandoPaciente(false);
     }
