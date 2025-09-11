@@ -228,28 +228,55 @@ class WhatsAppWebService {
 
       // Evento: Mensagem recebida
       this.client.on('message', async (message) => {
-        console.log('📨 Evento message disparado:', {
-          id: message.id._serialized,
-          from: message.from,
-          body: message.body?.substring(0, 50),
-          hasMedia: message.hasMedia,
-          timestamp: new Date(message.timestamp * 1000).toISOString()
-        });
-        await this.handleIncomingMessage(message);
+        try {
+          console.log('📨 Evento message disparado:', {
+            id: message.id._serialized,
+            from: message.from,
+            body: message.body?.substring(0, 50),
+            hasMedia: message.hasMedia,
+            timestamp: new Date(message.timestamp * 1000).toISOString()
+          });
+          await this.handleIncomingMessage(message);
+        } catch (error) {
+          console.error('❌ ERRO CRÍTICO no processamento de mensagem recebida:', error);
+          console.error('🔍 Stack trace:', error.stack);
+          console.error('📨 Dados da mensagem que causou erro:', {
+            id: message.id._serialized,
+            from: message.from,
+            body: message.body?.substring(0, 100),
+            hasMedia: message.hasMedia,
+            hasQuotedMsg: message.hasQuotedMsg
+          });
+          // NÃO re-lançar o erro para não quebrar a conexão
+        }
       });
 
       // Evento: Mensagem enviada (para sincronizar mensagens do celular)
       this.client.on('message_create', async (message) => {
-        console.log('📤 Evento message_create disparado:', {
-          id: message.id._serialized,
-          from: message.from,
-          to: message.to,
-          body: message.body?.substring(0, 50),
-          fromMe: message.fromMe,
-          hasMedia: message.hasMedia,
-          timestamp: new Date(message.timestamp * 1000).toISOString()
-        });
-        await this.handleOutgoingMessage(message);
+        try {
+          console.log('📤 Evento message_create disparado:', {
+            id: message.id._serialized,
+            from: message.from,
+            to: message.to,
+            body: message.body?.substring(0, 50),
+            fromMe: message.fromMe,
+            hasMedia: message.hasMedia,
+            timestamp: new Date(message.timestamp * 1000).toISOString()
+          });
+          await this.handleOutgoingMessage(message);
+        } catch (error) {
+          console.error('❌ ERRO CRÍTICO no processamento de mensagem enviada:', error);
+          console.error('🔍 Stack trace:', error.stack);
+          console.error('📤 Dados da mensagem que causou erro:', {
+            id: message.id._serialized,
+            from: message.from,
+            to: message.to,
+            body: message.body?.substring(0, 100),
+            fromMe: message.fromMe,
+            hasMedia: message.hasMedia
+          });
+          // NÃO re-lançar o erro para não quebrar a conexão
+        }
       });
 
       // Evento: Cliente desconectado
@@ -572,24 +599,47 @@ class WhatsAppWebService {
 
       if (message.hasQuotedMsg) {
         try {
+          console.log('🔄 Processando mensagem enviada com reply...');
           const quotedMsg = await message.getQuotedMessage();
+          
           if (quotedMsg) {
+            console.log('📎 Mensagem quotada encontrada (enviada):', {
+              id: quotedMsg.id._serialized,
+              body: quotedMsg.body?.substring(0, 50)
+            });
+            
             // Buscar a mensagem original no banco
-            const { data: mensagemOriginal } = await supabase
+            const { data: mensagemOriginal, error: mensagemError } = await supabase
               .from('whatsapp_mensagens')
               .select('*')
               .eq('mensagem_id', quotedMsg.id._serialized)
               .single();
 
-            if (mensagemOriginal) {
+            if (mensagemError) {
+              console.error('Erro ao buscar mensagem original no banco (enviada):', mensagemError);
+              // Continuar sem dados de reply
+            } else if (mensagemOriginal) {
               mensagemPaiId = mensagemOriginal.id;
               mensagemPaiConteudo = mensagemOriginal.conteudo;
               mensagemPaiAutor = mensagemOriginal.direcao === 'outbound' ? 'Você' : (conversa.nome_contato || 'Contato');
               console.log(`📤 Mensagem enviada em resposta a: "${mensagemPaiConteudo?.substring(0, 50)}..."`);
+            } else {
+              console.log('⚠️ Mensagem original não encontrada no banco de dados (enviada)');
             }
+          } else {
+            console.log('⚠️ getQuotedMessage() retornou null (enviada)');
           }
         } catch (error) {
-          console.error('Erro ao processar mensagem quotada enviada:', error);
+          console.error('❌ ERRO CRÍTICO ao processar mensagem quotada enviada:', error);
+          console.error('🔍 Stack trace:', error.stack);
+          console.error('📤 Dados da mensagem:', {
+            id: message.id._serialized,
+            from: message.from,
+            to: message.to,
+            body: message.body?.substring(0, 100),
+            hasQuotedMsg: message.hasQuotedMsg
+          });
+          // Continuar sem dados de reply para não quebrar o processamento
         }
       }
 
@@ -753,24 +803,46 @@ class WhatsAppWebService {
 
       if (message.hasQuotedMsg) {
         try {
+          console.log('🔄 Processando mensagem com reply...');
           const quotedMsg = await message.getQuotedMessage();
+          
           if (quotedMsg) {
+            console.log('📎 Mensagem quotada encontrada:', {
+              id: quotedMsg.id._serialized,
+              body: quotedMsg.body?.substring(0, 50)
+            });
+            
             // Buscar a mensagem original no banco
-            const { data: mensagemOriginal } = await supabase
+            const { data: mensagemOriginal, error: mensagemError } = await supabase
               .from('whatsapp_mensagens')
               .select('*')
               .eq('mensagem_id', quotedMsg.id._serialized)
               .single();
 
-            if (mensagemOriginal) {
+            if (mensagemError) {
+              console.error('Erro ao buscar mensagem original no banco:', mensagemError);
+              // Continuar sem dados de reply
+            } else if (mensagemOriginal) {
               mensagemPaiId = mensagemOriginal.id;
               mensagemPaiConteudo = mensagemOriginal.conteudo;
               mensagemPaiAutor = mensagemOriginal.direcao === 'outbound' ? 'Você' : contact.name || 'Contato';
               console.log(`📨 Mensagem em resposta a: "${mensagemPaiConteudo?.substring(0, 50)}..."`);
+            } else {
+              console.log('⚠️ Mensagem original não encontrada no banco de dados');
             }
+          } else {
+            console.log('⚠️ getQuotedMessage() retornou null');
           }
         } catch (error) {
-          console.error('Erro ao processar mensagem quotada:', error);
+          console.error('❌ ERRO CRÍTICO ao processar mensagem quotada:', error);
+          console.error('🔍 Stack trace:', error.stack);
+          console.error('📨 Dados da mensagem:', {
+            id: message.id._serialized,
+            from: message.from,
+            body: message.body?.substring(0, 100),
+            hasQuotedMsg: message.hasQuotedMsg
+          });
+          // Continuar sem dados de reply para não quebrar o processamento
         }
       }
 
