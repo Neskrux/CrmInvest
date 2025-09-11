@@ -122,10 +122,18 @@ class WhatsAppWebService {
         }
         this.client = null;
       }
+      // Configuração para ambiente de produção (Railway)
+      const authStrategy = process.env.NODE_ENV === 'production' 
+        ? new LocalAuth({
+            clientId: "crm-whatsapp",
+            dataPath: "/tmp/.wwebjs_auth" // Usar diretório temporário no Railway
+          })
+        : new LocalAuth({
+            clientId: "crm-whatsapp"
+          });
+
       this.client = new Client({
-        authStrategy: new LocalAuth({
-          clientId: "crm-whatsapp"
-        }),
+        authStrategy: authStrategy,
         puppeteer: {
           headless: true,
           args: [
@@ -220,11 +228,27 @@ class WhatsAppWebService {
 
       // Evento: Mensagem recebida
       this.client.on('message', async (message) => {
+        console.log('📨 Evento message disparado:', {
+          id: message.id._serialized,
+          from: message.from,
+          body: message.body?.substring(0, 50),
+          hasMedia: message.hasMedia,
+          timestamp: new Date(message.timestamp * 1000).toISOString()
+        });
         await this.handleIncomingMessage(message);
       });
 
       // Evento: Mensagem enviada (para sincronizar mensagens do celular)
       this.client.on('message_create', async (message) => {
+        console.log('📤 Evento message_create disparado:', {
+          id: message.id._serialized,
+          from: message.from,
+          to: message.to,
+          body: message.body?.substring(0, 50),
+          fromMe: message.fromMe,
+          hasMedia: message.hasMedia,
+          timestamp: new Date(message.timestamp * 1000).toISOString()
+        });
         await this.handleOutgoingMessage(message);
       });
 
@@ -651,8 +675,23 @@ class WhatsAppWebService {
   // Processar mensagem recebida
   async handleIncomingMessage(message) {
     try {
+      console.log('🔄 Processando mensagem recebida:', {
+        id: message.id._serialized,
+        from: message.from,
+        body: message.body?.substring(0, 50),
+        hasMedia: message.hasMedia,
+        timestamp: new Date(message.timestamp * 1000).toISOString()
+      });
+      
       const contact = await message.getContact();
       const chat = await message.getChat();
+      
+      console.log('📞 Dados do contato e chat:', {
+        contactName: contact.name,
+        contactNumber: contact.number,
+        chatId: chat.id._serialized,
+        isGroup: chat.isGroup
+      });
       
       // Verificar se é um grupo ou comunidade (ignorar por enquanto)
       if (chat.isGroup || !contact.number) {
@@ -811,9 +850,11 @@ class WhatsAppWebService {
       await this.executeAutomations(conversa, mensagem);
 
       console.log(`📨 Mensagem recebida de ${contact.name}: ${message.body}`);
+      console.log('✅ Mensagem processada e salva no banco com sucesso');
 
     } catch (error) {
-      console.error('Erro ao processar mensagem:', error);
+      console.error('❌ Erro ao processar mensagem:', error);
+      console.error('Stack trace:', error.stack);
     }
   }
 
@@ -900,7 +941,19 @@ class WhatsAppWebService {
       }
 
       const chatId = number.includes('@c.us') ? number : `${number}@c.us`;
+      console.log('📤 Enviando mensagem via API:', {
+        chatId,
+        content: content.substring(0, 100),
+        timestamp: new Date().toISOString()
+      });
+      
       const message = await this.client.sendMessage(chatId, content);
+      
+      console.log('✅ Mensagem enviada com sucesso:', {
+        messageId: message.id._serialized,
+        chatId,
+        timestamp: new Date().toISOString()
+      });
 
       // Marcar mensagem como enviada via API para evitar duplicação
       this.sentMessages.add(message.id._serialized);
