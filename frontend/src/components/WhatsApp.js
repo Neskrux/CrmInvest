@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useToast } from '../hooks/useToast';
+import config from '../config';
 
 const WhatsApp = () => {
   const [conversas, setConversas] = useState([]);
@@ -105,7 +106,7 @@ const WhatsApp = () => {
   const buscarConversas = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/api/whatsapp/conversas', {
+      const response = await axios.get(`${config.API_BASE_URL}/whatsapp/conversas`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setConversas(response.data.conversas || []);
@@ -136,7 +137,7 @@ const WhatsApp = () => {
   const buscarConfiguracao = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/api/whatsapp/configuracoes', {
+      const response = await axios.get(`${config.API_BASE_URL}/whatsapp/configuracoes`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setConfiguracao(response.data);
@@ -149,7 +150,7 @@ const WhatsApp = () => {
   const buscarAutomatizacoes = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/api/whatsapp/automatizacoes', {
+      const response = await axios.get(`${config.API_BASE_URL}/whatsapp/automatizacoes`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setAutomatizacoes(response.data || []);
@@ -165,7 +166,7 @@ const WhatsApp = () => {
       info('Executando limpeza automática antes de conectar...');
       
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/whatsapp/connect', {}, {
+      const response = await axios.post(`${config.API_BASE_URL}/whatsapp/connect`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -186,7 +187,7 @@ const WhatsApp = () => {
   const verificarStatusWhatsApp = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/api/whatsapp/status', {
+      const response = await axios.get(`${config.API_BASE_URL}/whatsapp/status`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -205,7 +206,7 @@ const WhatsApp = () => {
   const desconectarWhatsApp = async () => {
     try {
       const token = localStorage.getItem('token');
-      await axios.post('/api/whatsapp/disconnect', {}, {
+      await axios.post(`${config.API_BASE_URL}/whatsapp/disconnect`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -236,7 +237,7 @@ const WhatsApp = () => {
         payload.replyAuthor = mensagemReply.direcao === 'inbound' ? conversaSelecionada.nome_contato || 'Contato' : 'Você';
       }
 
-      await axios.post('/api/whatsapp/enviar-mensagem', payload, {
+      await axios.post(`${config.API_BASE_URL}/whatsapp/enviar-mensagem`, payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -377,7 +378,7 @@ const WhatsApp = () => {
         acao_tipo: 'enviar_mensagem'
       };
       
-      await axios.post('/api/whatsapp/automatizacoes', formData, {
+      await axios.post(`${config.API_BASE_URL}/whatsapp/automatizacoes`, formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -767,7 +768,7 @@ const WhatsApp = () => {
         formData.append('replyMessageId', mensagemReply.id);
       }
 
-      await axios.post('/api/whatsapp/enviar-midia', formData, {
+      await axios.post(`${config.API_BASE_URL}/whatsapp/enviar-midia`, formData, {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
