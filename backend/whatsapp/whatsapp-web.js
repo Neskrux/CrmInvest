@@ -226,33 +226,46 @@ class WhatsAppWebService {
 
       // Evento: Mensagem recebida
       this.client.on('message', async (message) => {
-        console.log('📨 Evento message disparado:', {
-          id: message.id._serialized,
-          from: message.from,
-          body: message.body?.substring(0, 50),
-          hasMedia: message.hasMedia,
-          timestamp: new Date(message.timestamp * 1000).toISOString()
-        });
-        await this.handleIncomingMessage(message);
+        try {
+          console.log('📨 Evento message disparado:', {
+            id: message.id._serialized,
+            from: message.from,
+            body: message.body?.substring(0, 50),
+            hasMedia: message.hasMedia,
+            timestamp: new Date(message.timestamp * 1000).toISOString()
+          });
+          await this.handleIncomingMessage(message);
+        } catch (error) {
+          console.error('❌ Erro crítico no evento message:', error);
+          console.error('🔍 Stack trace:', error.stack);
+          // Não re-lançar o erro para não quebrar a conexão
+        }
       });
 
       // Evento: Mensagem enviada (para sincronizar mensagens do celular)
       this.client.on('message_create', async (message) => {
-        console.log('📤 Evento message_create disparado:', {
-          id: message.id._serialized,
-          from: message.from,
-          to: message.to,
-          body: message.body?.substring(0, 50),
-          fromMe: message.fromMe,
-          hasMedia: message.hasMedia,
-          timestamp: new Date(message.timestamp * 1000).toISOString()
-        });
-        await this.handleOutgoingMessage(message);
+        try {
+          console.log('📤 Evento message_create disparado:', {
+            id: message.id._serialized,
+            from: message.from,
+            to: message.to,
+            body: message.body?.substring(0, 50),
+            fromMe: message.fromMe,
+            hasMedia: message.hasMedia,
+            timestamp: new Date(message.timestamp * 1000).toISOString()
+          });
+          await this.handleOutgoingMessage(message);
+        } catch (error) {
+          console.error('❌ Erro crítico no evento message_create:', error);
+          console.error('🔍 Stack trace:', error.stack);
+          // Não re-lançar o erro para não quebrar a conexão
+        }
       });
 
       // Evento: Cliente desconectado
       this.client.on('disconnected', async (reason) => {
         console.log('❌ WhatsApp Web desconectado:', reason);
+        console.log('🔍 Stack trace da desconexão:', new Error().stack);
         this.isConnected = false;
         this.connectionStatus = 'disconnected';
         await this.updateConnectionStatus('disconnected');
@@ -457,6 +470,8 @@ class WhatsAppWebService {
   // Processar mensagem enviada (do celular)
   async handleOutgoingMessage(message) {
     try {
+      console.log('🔄 Iniciando processamento de mensagem enviada:', message.id._serialized);
+      
       // Verificar se a mensagem já foi processada via API (sendReplyMessage ou sendMessage)
       if (this.sentMessages.has(message.id._serialized)) {
         console.log(`📤 Mensagem já processada via API, ignorando: ${message.id._serialized}`);
@@ -677,9 +692,11 @@ class WhatsAppWebService {
         .eq('id', conversa.id);
 
       console.log(`📤 Mensagem enviada sincronizada para ${conversa.nome_contato}: ${message.body}`);
+      console.log('✅ Processamento de mensagem enviada concluído com sucesso');
 
     } catch (error) {
-      console.error('Erro ao processar mensagem enviada:', error);
+      console.error('❌ Erro ao processar mensagem enviada:', error);
+      console.error('🔍 Stack trace do erro:', error.stack);
     }
   }
 
@@ -883,7 +900,14 @@ class WhatsAppWebService {
 
     } catch (error) {
       console.error('❌ Erro ao processar mensagem:', error);
-      console.error('Stack trace:', error.stack);
+      console.error('🔍 Stack trace do erro:', error.stack);
+      console.error('🔍 Dados da mensagem que causou erro:', {
+        id: message.id._serialized,
+        from: message.from,
+        body: message.body?.substring(0, 100),
+        hasMedia: message.hasMedia,
+        hasQuotedMsg: message.hasQuotedMsg
+      });
     }
   }
 
