@@ -1048,10 +1048,10 @@ const WhatsApp = () => {
                             {mensagem.tipo === 'image' && (
                               <div className="image-message">
                                 <img 
-                                  src={`http://localhost:5000${mensagem.midia_url}`} 
+                                  src={`${config.MEDIA_BASE_URL}${mensagem.midia_url}`} 
                                   alt="Imagem" 
                                   className="message-image"
-                                  onClick={() => window.open(`http://localhost:5000${mensagem.midia_url}`, '_blank')}
+                                  onClick={() => window.open(`${config.MEDIA_BASE_URL}${mensagem.midia_url}`, '_blank')}
                                 />
                                 {mensagem.conteudo && mensagem.conteudo !== `Mídia: ${mensagem.tipo}` && (
                                   <div className="image-caption">{mensagem.conteudo}</div>
@@ -1063,7 +1063,7 @@ const WhatsApp = () => {
                             {mensagem.tipo === 'video' && (
                               <div className="video-message">
                                 <video controls className="message-video">
-                                  <source src={`http://localhost:5000${mensagem.midia_url}`} type={mensagem.midia_tipo || 'video/mp4'} />
+                                  <source src={`${config.MEDIA_BASE_URL}${mensagem.midia_url}`} type={mensagem.midia_tipo || 'video/mp4'} />
                                   Seu navegador não suporta vídeo.
                                 </video>
                                 {mensagem.conteudo && mensagem.conteudo !== `Mídia: ${mensagem.tipo}` && (
@@ -1083,7 +1083,7 @@ const WhatsApp = () => {
                                   Áudio
                                 </div>
                                 <audio controls className="audio-player">
-                                  <source src={`http://localhost:5000${mensagem.midia_url}`} type={mensagem.midia_tipo || 'audio/ogg'} />
+                                  <source src={`${config.MEDIA_BASE_URL}${mensagem.midia_url}`} type={mensagem.midia_tipo || 'audio/ogg'} />
                                   Seu navegador não suporta áudio.
                                 </audio>
                               </div>
@@ -1108,7 +1108,7 @@ const WhatsApp = () => {
                                   </div>
                                 </div>
                                 <a 
-                                  href={`http://localhost:5000${mensagem.midia_url}`} 
+                                  href={`${config.MEDIA_BASE_URL}${mensagem.midia_url}`} 
                                   target="_blank" 
                                   rel="noopener noreferrer"
                                   className="btn btn-outline btn-sm"

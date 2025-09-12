@@ -6,6 +6,12 @@ const config = {
       ? 'https://crminvest-production.up.railway.app/api'
       : 'http://localhost:5000/api'),
   
+  // URL base para mídia - usando variável de ambiente ou fallback seguro
+  MEDIA_BASE_URL: process.env.REACT_APP_MEDIA_URL || 
+    (process.env.NODE_ENV === 'production' 
+      ? 'https://crminvest-production.up.railway.app'
+      : 'http://localhost:5000'),
+  
   // Configurações do Supabase (se necessário no frontend)
   SUPABASE_URL: process.env.REACT_APP_SUPABASE_URL,
   SUPABASE_ANON_KEY: process.env.REACT_APP_SUPABASE_ANON_KEY,
