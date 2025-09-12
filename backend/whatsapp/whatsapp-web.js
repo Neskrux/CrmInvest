@@ -240,12 +240,33 @@ class WhatsAppWebService {
       // Evento: Cliente pronto
       this.client.on('ready', async () => {
         console.log('✅ WhatsApp Web conectado com sucesso!');
-        this.isConnected = true;
-        this.connectionStatus = 'connected';
-        this.qrCode = null;
         
-        // Atualizar status no banco
-        await this.updateConnectionStatus('connected');
+        // Aguardar um pouco para garantir que a conexão está estável
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Fazer um teste de funcionalidade para garantir que está realmente pronto
+        try {
+          const state = await this.client.getState();
+          const info = await this.client.info;
+          
+          if (state === 'CONNECTED' && info) {
+            this.isConnected = true;
+            this.connectionStatus = 'connected';
+            this.qrCode = null;
+            
+            // Atualizar status no banco
+            await this.updateConnectionStatus('connected');
+            
+            // Iniciar monitoramento apenas quando realmente conectado
+            this.startConnectionMonitoring();
+            
+            console.log('🔥 WhatsApp Web totalmente funcional e pronto para uso!');
+          } else {
+            console.log('⚠️ WhatsApp conectado mas não totalmente funcional ainda');
+          }
+        } catch (error) {
+          console.error('Erro ao verificar funcionalidade:', error);
+        }
       });
 
       // Evento: Mensagem recebida
@@ -294,9 +315,6 @@ class WhatsAppWebService {
         console.error('❌ Falha na autenticação:', message);
         await this.updateConnectionStatus('auth_failure');
       });
-
-      // Monitoramento de conexão a cada 30 segundos
-      this.startConnectionMonitoring();
 
       // Evento: Autenticação falhou
       this.client.on('auth_failure', async (msg) => {
@@ -1108,20 +1126,6 @@ class WhatsAppWebService {
     };
   }
 
-  // Verificar se o cliente está realmente funcional
-  async isClientFunctional() {
-    try {
-      if (!this.client || !this.isConnected) {
-        return false;
-      }
-      
-      const state = await this.client.getState();
-      return state === 'CONNECTED';
-    } catch (error) {
-      console.error('Erro ao verificar estado do cliente:', error);
-      return false;
-    }
-  }
 
   // Desconectar
   async disconnect() {
@@ -1165,7 +1169,7 @@ class WhatsAppWebService {
   async sendMediaFile(number, file, caption = '') {
     try {
       // Verificar se está realmente conectado e funcional
-      if (!this.isClientFunctional()) {
+      if (!(await this.isClientFunctional())) {
         throw new Error('WhatsApp não está conectado ou não está funcional');
       }
 
@@ -1180,7 +1184,7 @@ class WhatsAppWebService {
       const chatId = `${cleanNumber}@c.us`;
 
       // 4. Verificar conexão novamente antes de enviar
-      if (!this.isClientFunctional()) {
+      if (!(await this.isClientFunctional())) {
         throw new Error('Conexão WhatsApp perdida durante o processamento');
       }
 
@@ -1215,7 +1219,7 @@ class WhatsAppWebService {
   async sendMediaReply(number, file, replyMessageId, caption = '') {
     try {
       // Verificar se está realmente conectado e funcional
-      if (!this.isClientFunctional()) {
+      if (!(await this.isClientFunctional())) {
         throw new Error('WhatsApp não está conectado ou não está funcional');
       }
 
@@ -1250,7 +1254,7 @@ class WhatsAppWebService {
       }
 
       // 6. Verificar conexão novamente antes de enviar
-      if (!this.isClientFunctional()) {
+      if (!(await this.isClientFunctional())) {
         throw new Error('Conexão WhatsApp perdida durante o processamento');
       }
 
@@ -1348,6 +1352,35 @@ class WhatsAppWebService {
     if (mimeType.startsWith('audio/')) return 'audio';
     if (mimeType === 'application/pdf') return 'document';
     return 'document';
+  }
+
+  /**
+   * Verifica se o cliente está realmente funcional
+   */
+  async isClientFunctional() {
+    try {
+      // Verificações básicas
+      if (!this.client || !this.isConnected) {
+        return false;
+      }
+
+      // Verificar estado do cliente
+      const state = await this.client.getState();
+      if (state !== 'CONNECTED') {
+        return false;
+      }
+
+      // Verificar se consegue obter informações do cliente
+      const info = await this.client.info;
+      if (!info || !info.wid) {
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.log('⚠️ Erro ao verificar funcionalidade do cliente:', error.message);
+      return false;
+    }
   }
 
   /**
