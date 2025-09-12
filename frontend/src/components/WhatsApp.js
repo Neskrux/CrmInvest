@@ -19,9 +19,6 @@ const WhatsApp = () => {
   const [pacientes, setPacientes] = useState([]);
   const [consultores, setConsultores] = useState([]);
   
-  // Estados para carregamento de mensagens
-  const [initialLoad, setInitialLoad] = useState(true);
-  
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
@@ -119,20 +116,16 @@ const WhatsApp = () => {
     }
   };
 
-  // Buscar mensagens de uma conversa (carregamento completo sob demanda)
+  // Buscar mensagens de uma conversa (todas as mensagens)
   const buscarMensagens = async (conversaId, shouldScroll = false) => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get(`${config.API_BASE_URL}/whatsapp/conversas/${conversaId}/mensagens`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { page: 1, limit: 1000 } // Carregar todas as mensagens de uma vez
+        headers: { Authorization: `Bearer ${token}` }
       });
       
-      const { mensagens: novasMensagens, pagination: paginationData } = response.data;
-      
-      // Substituir mensagens completamente (nova conversa)
-      setMensagens(novasMensagens || []);
-      setInitialLoad(false);
+      // Carregar todas as mensagens da conversa
+      setMensagens(response.data.mensagens || []);
       
       // Se shouldScroll for true, faz scroll para baixo após carregar
       if (shouldScroll) {
@@ -143,7 +136,6 @@ const WhatsApp = () => {
       showError('Erro ao carregar mensagens');
     }
   };
-
 
   // Buscar configurações
   const buscarConfiguracao = async () => {
@@ -255,12 +247,7 @@ const WhatsApp = () => {
 
         setNovaMensagem('');
         setMensagemReply(null); // Limpar reply após enviar
-        
-        // Recarregar mensagens da conversa atual
-        setTimeout(() => {
-          buscarMensagens(conversaSelecionada.id, true);
-        }, 500);
-        
+        buscarMensagens(conversaSelecionada.id, true); // Recarregar mensagens
         buscarConversas(); // Atualizar lista de conversas
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
@@ -275,8 +262,6 @@ const WhatsApp = () => {
     // Limpar mensagens da conversa anterior
     setMensagens([]);
     setConversaSelecionada(conversa);
-    setInitialLoad(true);
-    
     // Carregar todas as mensagens da nova conversa
     buscarMensagens(conversa.id, true); // true = fazer scroll para baixo
   };
@@ -803,12 +788,7 @@ const WhatsApp = () => {
       success('Mídia enviada com sucesso!');
       cancelarMidia();
       setMensagemReply(null); // Limpar reply após enviar
-      
-      // Recarregar mensagens da conversa atual
-      setTimeout(() => {
-        buscarMensagens(conversaSelecionada.id, true);
-      }, 500);
-      
+      buscarMensagens(conversaSelecionada.id, true); // Recarregar mensagens
       buscarConversas(); // Atualizar lista de conversas
     } catch (error) {
       console.error('Erro ao enviar mídia:', error);

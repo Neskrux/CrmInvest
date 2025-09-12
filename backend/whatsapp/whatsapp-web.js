@@ -361,46 +361,31 @@ class WhatsAppWebService {
     // Monitorar a cada 30 segundos
     this.connectionMonitorInterval = setInterval(async () => {
       try {
-        // Verificar se o cliente existe e está válido antes de usar
-        if (!this.client || !this.isConnected) {
-          return;
+        if (this.client && this.isConnected) {
+          // Verificar se o cliente ainda está respondendo
+          const state = await this.client.getState();
+          if (state !== 'CONNECTED') {
+            console.log('⚠️ Estado da conexão mudou:', state);
+            if (state === 'DISCONNECTED' || state === 'NAVIGATING') {
+              this.isConnected = false;
+              this.connectionStatus = 'disconnected';
+              this.qrCode = null;
+              await this.updateConnectionStatus('disconnected');
+              // NÃO reconectar automaticamente - apenas marcar como desconectado
+              console.log('ℹ️ Conexão perdida. Use o botão "Conectar" para reconectar.');
+            }
+          }
         }
-
-        // Verificar se o cliente ainda está respondendo de forma segura
-        let state;
-        try {
-          state = await this.client.getState();
-        } catch (stateError) {
-          // Se não conseguir obter o estado, assumir desconectado
-          console.log('⚠️ Não foi possível verificar o estado da conexão');
+      } catch (error) {
+        console.error('Erro no monitoramento de conexão:', error);
+        // Se não conseguir verificar o estado, assumir desconectado
+        if (this.isConnected) {
           this.isConnected = false;
           this.connectionStatus = 'disconnected';
           this.qrCode = null;
           await this.updateConnectionStatus('disconnected');
-          this.stopConnectionMonitoring();
-          return;
+          console.log('ℹ️ Erro na verificação de conexão. Use o botão "Conectar" para reconectar.');
         }
-
-        if (state !== 'CONNECTED') {
-          console.log('⚠️ Estado da conexão mudou:', state);
-          if (state === 'DISCONNECTED' || state === 'NAVIGATING') {
-            this.isConnected = false;
-            this.connectionStatus = 'disconnected';
-            this.qrCode = null;
-            await this.updateConnectionStatus('disconnected');
-            this.stopConnectionMonitoring();
-            console.log('ℹ️ Conexão perdida. Use o botão "Conectar" para reconectar.');
-          }
-        }
-      } catch (error) {
-        // Se houver qualquer erro, parar o monitoramento e marcar como desconectado
-        console.error('Erro no monitoramento de conexão:', error);
-        this.isConnected = false;
-        this.connectionStatus = 'disconnected';
-        this.qrCode = null;
-        await this.updateConnectionStatus('disconnected');
-        this.stopConnectionMonitoring();
-        console.log('ℹ️ Erro na verificação de conexão. Use o botão "Conectar" para reconectar.');
       }
     }, 30000); // 30 segundos
     
@@ -514,6 +499,7 @@ class WhatsAppWebService {
       
       // Verificar se é um grupo ou comunidade (ignorar por enquanto)
       if (chat.isGroup) {
+        console.log(`📤 Mensagem de grupo/comunidade ignorada: ${chat.name || 'Grupo'}`);
         return;
       }
       
@@ -537,8 +523,11 @@ class WhatsAppWebService {
       // Obter o número do próprio WhatsApp conectado para evitar conversas consigo mesmo
       const meuNumero = this.client?.info?.wid?.user;
       
+      console.log(`📤 Mensagem enviada por mim - Destinatário: ${numeroDestinatario}, Meu número: ${meuNumero}`);
+      
       // Verificar se não é uma mensagem para si mesmo
       if (meuNumero && numeroDestinatario.includes(meuNumero)) {
+        console.log(`📤 Ignorando mensagem para si mesmo: ${numeroDestinatario}`);
         return;
       }
 
@@ -554,6 +543,8 @@ class WhatsAppWebService {
         return;
       }
       
+      console.log(`📤 Buscando conversa para destinatário: ${numeroDestinatario}`);
+      
       let { data: conversa } = await supabase
         .from('whatsapp_conversas')
         .select('*')
@@ -563,6 +554,8 @@ class WhatsAppWebService {
       if (!conversa) {
         // Obter informações do contato destinatário através do chat
         const contact = await chat.getContact();
+        
+        console.log(`📤 Criando nova conversa para ${numeroDestinatario} - Nome: ${contact?.name || contact?.pushname || 'Sem nome'}`);
         
         // Verificar novamente se não estamos criando conversa conosco mesmo
         if (meuNumero && (contact?.number?.includes(meuNumero) || numeroDestinatario.includes(meuNumero))) {
