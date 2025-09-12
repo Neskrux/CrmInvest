@@ -239,8 +239,6 @@ class WhatsAppWebService {
 
       // Evento: Cliente pronto
       this.client.on('ready', async () => {
-        console.log('✅ WhatsApp Web conectado com sucesso!');
-        
         // Aguardar um pouco para garantir que a conexão está estável
         await new Promise(resolve => setTimeout(resolve, 3000));
         
@@ -259,10 +257,6 @@ class WhatsAppWebService {
             
             // Iniciar monitoramento apenas quando realmente conectado
             this.startConnectionMonitoring();
-            
-            console.log('🔥 WhatsApp Web totalmente funcional e pronto para uso!');
-          } else {
-            console.log('⚠️ WhatsApp conectado mas não totalmente funcional ainda');
           }
         } catch (error) {
           console.error('Erro ao verificar funcionalidade:', error);
@@ -271,33 +265,19 @@ class WhatsAppWebService {
 
       // Evento: Mensagem recebida
       this.client.on('message', async (message) => {
-        console.log('📨 Evento message disparado:', {
-          id: message.id._serialized,
-          from: message.from,
-          body: message.body?.substring(0, 50),
-          hasMedia: message.hasMedia,
-          timestamp: new Date(message.timestamp * 1000).toISOString()
-        });
         await this.handleIncomingMessage(message);
       });
 
       // Evento: Mensagem enviada (para sincronizar mensagens do celular)
       this.client.on('message_create', async (message) => {
-        console.log('📤 Evento message_create disparado:', {
-          id: message.id._serialized,
-          from: message.from,
-          to: message.to,
-          body: message.body?.substring(0, 50),
-          fromMe: message.fromMe,
-          hasMedia: message.hasMedia,
-          timestamp: new Date(message.timestamp * 1000).toISOString()
-        });
-        await this.handleOutgoingMessage(message);
+        // Verificar se a mensagem é de/para si mesmo (evitar loops)
+        if (message.fromMe && !this.sentMessages.has(message.id._serialized)) {
+          await this.handleOutgoingMessage(message);
+        }
       });
 
       // Evento: Cliente desconectado
       this.client.on('disconnected', async (reason) => {
-        console.log('❌ WhatsApp Web desconectado:', reason);
         this.isConnected = false;
         this.connectionStatus = 'disconnected';
         this.qrCode = null;
@@ -305,22 +285,11 @@ class WhatsAppWebService {
         
         // Parar monitoramento para evitar loops
         this.stopConnectionMonitoring();
-        
-        // NÃO reconectar automaticamente - deixar para o usuário reconectar manualmente
-        console.log('ℹ️ Desconectado. Use o botão "Conectar" para reconectar manualmente.');
       });
 
       // Evento: Estado de autenticação mudou
       this.client.on('auth_failure', async (message) => {
-        console.error('❌ Falha na autenticação:', message);
         await this.updateConnectionStatus('auth_failure');
-      });
-
-      // Evento: Autenticação falhou
-      this.client.on('auth_failure', async (msg) => {
-        console.log('❌ Falha na autenticação WhatsApp:', msg);
-        this.connectionStatus = 'auth_failed';
-        await this.updateConnectionStatus('auth_failed');
       });
 
       // Inicializar cliente
@@ -383,31 +352,24 @@ class WhatsAppWebService {
           // Verificar se o cliente ainda está respondendo
           const state = await this.client.getState();
           if (state !== 'CONNECTED') {
-            console.log('⚠️ Estado da conexão mudou:', state);
             if (state === 'DISCONNECTED' || state === 'NAVIGATING') {
               this.isConnected = false;
               this.connectionStatus = 'disconnected';
               this.qrCode = null;
               await this.updateConnectionStatus('disconnected');
-              // NÃO reconectar automaticamente - apenas marcar como desconectado
-              console.log('ℹ️ Conexão perdida. Use o botão "Conectar" para reconectar.');
             }
           }
         }
       } catch (error) {
-        console.error('Erro no monitoramento de conexão:', error);
         // Se não conseguir verificar o estado, assumir desconectado
         if (this.isConnected) {
           this.isConnected = false;
           this.connectionStatus = 'disconnected';
           this.qrCode = null;
           await this.updateConnectionStatus('disconnected');
-          console.log('ℹ️ Erro na verificação de conexão. Use o botão "Conectar" para reconectar.');
         }
       }
     }, 15000); // 15 segundos
-    
-    console.log('📡 Monitoramento de conexão iniciado');
   }
 
   // Parar monitoramento
@@ -1204,7 +1166,6 @@ class WhatsAppWebService {
       // 8. Salvar no banco de dados
       await this.saveOutgoingMediaMessage(message, saveResult.metadata, caption);
 
-      console.log(`📤 Mídia enviada com sucesso: ${file.originalname}`);
       return message;
 
     } catch (error) {
@@ -1278,7 +1239,6 @@ class WhatsAppWebService {
         mensagem_pai_autor: mensagemOriginal.direcao === 'inbound' ? 'Contato' : 'Você'
       });
 
-      console.log(`📤 Mídia reply enviada com sucesso: ${file.originalname}`);
       return message;
 
     } catch (error) {
@@ -1334,8 +1294,6 @@ class WhatsAppWebService {
 
       if (saveError) {
         console.error('❌ Erro ao salvar mensagem de mídia:', saveError);
-      } else {
-        console.log('✅ Mensagem de mídia salva no banco');
       }
 
     } catch (error) {
@@ -1378,7 +1336,6 @@ class WhatsAppWebService {
 
       return true;
     } catch (error) {
-      console.log('⚠️ Erro ao verificar funcionalidade do cliente:', error.message);
       return false;
     }
   }
