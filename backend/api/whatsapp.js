@@ -103,24 +103,6 @@ router.get('/status', authenticateToken, async (req, res) => {
 
     const status = whatsappService.getStatus();
     
-    // Verificar se o cliente está realmente funcional
-    const isFunctional = await whatsappService.isClientFunctional();
-    
-    // Se não está funcional, atualizar status
-    if (status.isConnected && !isFunctional) {
-      console.log('⚠️ Cliente marcado como conectado mas não está funcional');
-      whatsappService.isConnected = false;
-      whatsappService.connectionStatus = 'disconnected';
-      await whatsappService.updateConnectionStatus('disconnected');
-      
-      return res.json({
-        success: true,
-        status: 'disconnected',
-        isConnected: false,
-        qrCode: null
-      });
-    }
-    
     // Buscar QR Code no banco se disponível
     let qrCode = null;
     if (status.status === 'qr_ready') {
@@ -136,7 +118,7 @@ router.get('/status', authenticateToken, async (req, res) => {
     res.json({
       success: true,
       status: status.status,
-      isConnected: status.isConnected && isFunctional,
+      isConnected: status.isConnected,
       qrCode: qrCode
     });
   } catch (error) {
