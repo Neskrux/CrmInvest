@@ -230,15 +230,11 @@ class WhatsAppWebService {
 
       // Evento: QR Code gerado
       this.client.on('qr', async (qr) => {
-        console.log('📱 QR Code gerado para WhatsApp Web');
         this.qrCode = qr;
         this.connectionStatus = 'qr_ready';
         
         // Salvar QR Code no banco para o frontend acessar
         await this.saveQRCode(qr);
-        
-        // Mostrar QR Code no terminal (opcional)
-        console.log('QR Code salvo no banco para exibição no frontend');
       });
 
       // Evento: Cliente pronto
@@ -658,7 +654,6 @@ class WhatsAppWebService {
             midiaUrl = `/uploads/${midiaNome}`;
             midiaTipo = media.mimetype;
             
-            console.log(`📤 Mídia enviada salva: ${midiaUrl}`);
           }
         } catch (error) {
           console.error('Erro ao processar mídia enviada:', error);
@@ -695,8 +690,6 @@ class WhatsAppWebService {
         .update({ ultima_mensagem_at: timestampBrasil.toISOString() })
         .eq('id', conversa.id);
 
-      console.log(`📤 Mensagem enviada sincronizada para ${conversa.nome_contato}: ${message.body}`);
-
     } catch (error) {
       console.error('Erro ao processar mensagem enviada:', error);
     }
@@ -705,40 +698,22 @@ class WhatsAppWebService {
   // Processar mensagem recebida
   async handleIncomingMessage(message) {
     try {
-      console.log('🔄 Processando mensagem recebida:', {
-        id: message.id._serialized,
-        from: message.from,
-        body: message.body?.substring(0, 50),
-        hasMedia: message.hasMedia,
-        timestamp: new Date(message.timestamp * 1000).toISOString()
-      });
-      
       const contact = await message.getContact();
       const chat = await message.getChat();
       
-      console.log('📞 Dados do contato e chat:', {
-        contactName: contact.name,
-        contactNumber: contact.number,
-        chatId: chat.id._serialized,
-        isGroup: chat.isGroup
-      });
-      
       // Verificar se é um grupo ou comunidade (ignorar por enquanto)
       if (chat.isGroup || !contact.number) {
-        console.log(`📨 Mensagem de grupo/comunidade ignorada: ${chat.name || 'Grupo'}`);
-        return;
+        return; // Sem log para reduzir taxa de logging
       }
       
       // Ignorar mensagens de sistema ou sem conteúdo (exceto se tiver mídia)
       if ((!message.body || message.body.trim() === '') && !message.hasMedia) {
-        console.log(`📨 Mensagem vazia ignorada de ${contact.name || contact.number}`);
-        return;
+        return; // Sem log para reduzir taxa de logging
       }
       
       // Buscar ou criar conversa
       // Normalizar número para busca (remover @c.us se presente)
       const numeroLimpo = contact.number.replace('@c.us', '');
-      console.log(`📨 Buscando conversa para número: ${numeroLimpo}`);
       
       let { data: conversa } = await supabase
         .from('whatsapp_conversas')
@@ -814,14 +789,10 @@ class WhatsAppWebService {
           const media = await message.downloadMedia();
           
           if (media) {
-            console.log(`📎 Processando mídia - Tipo: ${message.type}, MimeType: ${media.mimetype}, Tamanho: ${media.data.length} bytes`);
-            
             // Gerar nome único para o arquivo
             const timestamp = Date.now();
             const extensao = this.getFileExtension(message.type, media.mimetype);
             midiaNome = `${message.type}_${timestamp}${extensao}`;
-            
-            console.log(`📁 Arquivo será salvo como: ${midiaNome}`);
             
             // Salvar arquivo localmente (pasta uploads)
             const fs = require('fs');
@@ -838,8 +809,6 @@ class WhatsAppWebService {
             
             midiaUrl = `/uploads/${midiaNome}`;
             midiaTipo = media.mimetype;
-            
-            console.log(`📎 Mídia salva: ${midiaUrl}`);
           }
         } catch (error) {
           console.error('Erro ao processar mídia:', error);
@@ -878,9 +847,6 @@ class WhatsAppWebService {
 
       // Executar automações
       await this.executeAutomations(conversa, mensagem);
-
-      console.log(`📨 Mensagem recebida de ${contact.name}: ${message.body}`);
-      console.log('✅ Mensagem processada e salva no banco com sucesso');
 
     } catch (error) {
       console.error('❌ Erro ao processar mensagem:', error);
