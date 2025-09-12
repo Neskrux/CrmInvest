@@ -277,7 +277,7 @@ const WhatsApp = () => {
 
       setNovaMensagem('');
       setMensagemReply(null); // Limpar reply após enviar
-      buscarMensagens(conversaSelecionada.id);
+      buscarMensagens(conversaSelecionada.id, true, 1, false); // Recarregar primeira página
       buscarConversas(); // Atualizar lista de conversas
       
       // Scroll para o final após enviar mensagem
@@ -296,7 +296,7 @@ const WhatsApp = () => {
     // Resetar paginação ao selecionar nova conversa
     setPagination({ page: 1, limit: 50, total: 0, pages: 0 });
     setHasMoreMessages(true);
-    buscarMensagens(conversa.id, true); // true = fazer scroll para baixo
+    buscarMensagens(conversa.id, true, 1, false); // true = fazer scroll para baixo
   };
 
   // Abrir modal de confirmação de exclusão
@@ -821,7 +821,7 @@ const WhatsApp = () => {
       success('Mídia enviada com sucesso!');
       cancelarMidia();
       setMensagemReply(null); // Limpar reply após enviar
-      buscarMensagens(conversaSelecionada.id);
+      buscarMensagens(conversaSelecionada.id, true, 1, false); // Recarregar primeira página
       buscarConversas(); // Atualizar lista de conversas
       
       // Scroll para o final após enviar
@@ -1126,7 +1126,6 @@ const WhatsApp = () => {
                                   src={`${config.MEDIA_BASE_URL}${mensagem.midia_url}`} 
                                   alt="Imagem" 
                                   className="message-image"
-                                  loading="lazy"
                                   onClick={() => window.open(`${config.MEDIA_BASE_URL}${mensagem.midia_url}`, '_blank')}
                                 />
                                 {mensagem.conteudo && mensagem.conteudo !== `Mídia: ${mensagem.tipo}` && (
@@ -1138,7 +1137,7 @@ const WhatsApp = () => {
                             {/* Vídeo */}
                             {mensagem.tipo === 'video' && (
                               <div className="video-message">
-                                <video controls className="message-video" preload="metadata">
+                                <video controls className="message-video">
                                   <source src={`${config.MEDIA_BASE_URL}${mensagem.midia_url}`} type={mensagem.midia_tipo || 'video/mp4'} />
                                   Seu navegador não suporta vídeo.
                                 </video>
