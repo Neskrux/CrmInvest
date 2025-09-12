@@ -134,12 +134,20 @@ class WhatsAppWebService {
       // Limpar cliente anterior se existir
       if (this.client) {
         try {
+          // Remover todos os event listeners antes de destruir
+          this.client.removeAllListeners();
           await this.client.destroy();
         } catch (e) {
           console.log('Limpeza de cliente anterior...');
         }
         this.client = null;
       }
+      
+      // Resetar estados
+      this.isConnected = false;
+      this.connectionStatus = 'disconnected';
+      this.qrCode = null;
+      this.reconnecting = false;
       // Configuração para ambiente de produção (Railway)
       const authStrategy = process.env.NODE_ENV === 'production' 
         ? new LocalAuth({
@@ -275,13 +283,14 @@ class WhatsAppWebService {
         console.log('❌ WhatsApp Web desconectado:', reason);
         this.isConnected = false;
         this.connectionStatus = 'disconnected';
+        this.qrCode = null;
         await this.updateConnectionStatus('disconnected');
         
-        // Tentar reconectar automaticamente após 10 segundos
-        console.log('🔄 Tentando reconectar em 10 segundos...');
-        setTimeout(() => {
-          this.attemptReconnection();
-        }, 10000);
+        // Parar monitoramento para evitar loops
+        this.stopConnectionMonitoring();
+        
+        // NÃO reconectar automaticamente - deixar para o usuário reconectar manualmente
+        console.log('ℹ️ Desconectado. Use o botão "Conectar" para reconectar manualmente.');
       });
 
       // Evento: Estado de autenticação mudou
@@ -364,8 +373,10 @@ class WhatsAppWebService {
             if (state === 'DISCONNECTED' || state === 'NAVIGATING') {
               this.isConnected = false;
               this.connectionStatus = 'disconnected';
+              this.qrCode = null;
               await this.updateConnectionStatus('disconnected');
-              this.attemptReconnection();
+              // NÃO reconectar automaticamente - apenas marcar como desconectado
+              console.log('ℹ️ Conexão perdida. Use o botão "Conectar" para reconectar.');
             }
           }
         }
@@ -375,8 +386,9 @@ class WhatsAppWebService {
         if (this.isConnected) {
           this.isConnected = false;
           this.connectionStatus = 'disconnected';
+          this.qrCode = null;
           await this.updateConnectionStatus('disconnected');
-          this.attemptReconnection();
+          console.log('ℹ️ Erro na verificação de conexão. Use o botão "Conectar" para reconectar.');
         }
       }
     }, 30000); // 30 segundos
@@ -954,8 +966,19 @@ class WhatsAppWebService {
   // Enviar mensagem
   async sendMessage(number, content) {
     try {
+      // Verificar se está realmente conectado
       if (!this.isConnected || !this.client) {
         throw new Error('WhatsApp não está conectado');
+      }
+      
+      // Verificar estado real do cliente
+      const clientState = await this.client.getState();
+      if (clientState !== 'CONNECTED') {
+        console.log('⚠️ Cliente não está realmente conectado. Estado:', clientState);
+        this.isConnected = false;
+        this.connectionStatus = 'disconnected';
+        await this.updateConnectionStatus('disconnected');
+        throw new Error(`WhatsApp não está conectado. Estado: ${clientState}`);
       }
 
       const chatId = number.includes('@c.us') ? number : `${number}@c.us`;
@@ -1124,6 +1147,21 @@ class WhatsAppWebService {
     };
   }
 
+  // Verificar se o cliente está realmente funcional
+  async isClientFunctional() {
+    try {
+      if (!this.client || !this.isConnected) {
+        return false;
+      }
+      
+      const state = await this.client.getState();
+      return state === 'CONNECTED';
+    } catch (error) {
+      console.error('Erro ao verificar estado do cliente:', error);
+      return false;
+    }
+  }
+
   // Desconectar
   async disconnect() {
     console.log('🔌 Desconectando WhatsApp Web...');
@@ -1131,8 +1169,13 @@ class WhatsAppWebService {
     // Parar monitoramento
     this.stopConnectionMonitoring();
     
+    // Parar reconexão automática
+    this.reconnecting = false;
+    
     if (this.client) {
       try {
+        // Remover todos os event listeners antes de destruir
+        this.client.removeAllListeners();
         await this.client.destroy();
       } catch (error) {
         console.error('Erro ao destruir cliente:', error);
@@ -1140,6 +1183,7 @@ class WhatsAppWebService {
       this.client = null;
     }
     
+    // Resetar todos os estados
     this.isConnected = false;
     this.connectionStatus = 'disconnected';
     this.qrCode = null;
