@@ -296,11 +296,25 @@ const WhatsApp = () => {
 
         setNovaMensagem('');
         setMensagemReply(null); // Limpar reply após enviar
-        buscarMensagens(conversaSelecionada.id, true, 1, false); // Recarregar primeira página
+        
+        // Recarregar mensagens sem paginação para evitar conflitos
+        setTimeout(async () => {
+          try {
+            const token = localStorage.getItem('token');
+            const response = await axios.get(`${config.API_BASE_URL}/whatsapp/conversas/${conversaSelecionada.id}/mensagens`, {
+              headers: { Authorization: `Bearer ${token}` },
+              params: { page: 1, limit: 20 }
+            });
+            setMensagens(response.data.mensagens || []);
+            setPagination(response.data.pagination || { page: 1, limit: 20, total: 0, pages: 0 });
+            setHasMoreMessages(response.data.pagination?.page < response.data.pagination?.pages);
+            setTimeout(scrollToBottom, 100);
+          } catch (error) {
+            console.error('Erro ao recarregar mensagens:', error);
+          }
+        }, 500);
+        
         buscarConversas(); // Atualizar lista de conversas
-      
-      // Scroll para o final após enviar mensagem
-      setTimeout(scrollToBottom, 100);
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
       showError('Erro ao enviar mensagem');
@@ -841,11 +855,25 @@ const WhatsApp = () => {
       success('Mídia enviada com sucesso!');
       cancelarMidia();
       setMensagemReply(null); // Limpar reply após enviar
-      buscarMensagens(conversaSelecionada.id, true, 1, false); // Recarregar primeira página
-      buscarConversas(); // Atualizar lista de conversas
       
-      // Scroll para o final após enviar
-      setTimeout(scrollToBottom, 100);
+      // Recarregar mensagens sem paginação para evitar conflitos
+      setTimeout(async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const response = await axios.get(`${config.API_BASE_URL}/whatsapp/conversas/${conversaSelecionada.id}/mensagens`, {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { page: 1, limit: 20 }
+          });
+          setMensagens(response.data.mensagens || []);
+          setPagination(response.data.pagination || { page: 1, limit: 20, total: 0, pages: 0 });
+          setHasMoreMessages(response.data.pagination?.page < response.data.pagination?.pages);
+          setTimeout(scrollToBottom, 100);
+        } catch (error) {
+          console.error('Erro ao recarregar mensagens:', error);
+        }
+      }, 500);
+      
+      buscarConversas(); // Atualizar lista de conversas
     } catch (error) {
       console.error('Erro ao enviar mídia:', error);
       showError('Erro ao enviar mídia');

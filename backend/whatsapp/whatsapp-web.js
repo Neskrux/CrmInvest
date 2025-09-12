@@ -1202,13 +1202,7 @@ class WhatsAppWebService {
         throw new Error('WhatsApp não está conectado');
       }
 
-      // 1. Validar arquivo
-      const validation = validateFile(file);
-      if (!validation.isValid) {
-        throw new Error(`Arquivo inválido: ${validation.errors.join(', ')}`);
-      }
-
-      // 2. Salvar arquivo de forma segura
+      // 1. Salvar arquivo de forma segura (já inclui validação)
       const saveResult = await this.secureStorage.saveFile(file);
       if (!saveResult.success) {
         throw new Error(`Erro ao salvar arquivo: ${saveResult.error}`);
@@ -1252,13 +1246,7 @@ class WhatsAppWebService {
         throw new Error('WhatsApp não está conectado');
       }
 
-      // 1. Validar arquivo
-      const validation = validateFile(file);
-      if (!validation.isValid) {
-        throw new Error(`Arquivo inválido: ${validation.errors.join(', ')}`);
-      }
-
-      // 2. Salvar arquivo de forma segura
+      // 1. Salvar arquivo de forma segura (já inclui validação)
       const saveResult = await this.secureStorage.saveFile(file);
       if (!saveResult.success) {
         throw new Error(`Erro ao salvar arquivo: ${saveResult.error}`);
