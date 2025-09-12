@@ -613,9 +613,9 @@ class WhatsAppWebService {
 
             if (mensagemOriginal) {
               mensagemPaiId = mensagemOriginal.id;
+              // Evitar replies aninhados - usar apenas o conteúdo da mensagem original, não de outro reply
               mensagemPaiConteudo = mensagemOriginal.conteudo;
               mensagemPaiAutor = mensagemOriginal.direcao === 'outbound' ? 'Você' : (conversa.nome_contato || 'Contato');
-              console.log(`📤 Mensagem enviada em resposta a: "${mensagemPaiConteudo?.substring(0, 50)}..."`);
             }
           }
         } catch (error) {
@@ -794,9 +794,9 @@ class WhatsAppWebService {
 
             if (mensagemOriginal) {
               mensagemPaiId = mensagemOriginal.id;
+              // Evitar replies aninhados - usar apenas o conteúdo da mensagem original, não de outro reply
               mensagemPaiConteudo = mensagemOriginal.conteudo;
               mensagemPaiAutor = mensagemOriginal.direcao === 'outbound' ? 'Você' : contact.name || 'Contato';
-              console.log(`📨 Mensagem em resposta a: "${mensagemPaiConteudo?.substring(0, 50)}..."`);
             }
           }
         } catch (error) {
@@ -1085,12 +1085,8 @@ class WhatsAppWebService {
       let message;
       if (originalMessage) {
         // Enviar como reply se encontrou a mensagem original
-        console.log(`🔄 Enviando reply para mensagem: ${originalMessage.id._serialized}`);
-        
         // Usar a API correta do whatsapp-web.js para reply
         message = await originalMessage.reply(content);
-        
-        console.log(`✅ Reply enviado com sucesso: ${message.id._serialized}`);
       } else {
         // Se não encontrou a mensagem no WhatsApp, enviar como mensagem normal
         console.log('Mensagem original não encontrada no WhatsApp, enviando como mensagem normal');
@@ -1113,13 +1109,12 @@ class WhatsAppWebService {
         timestamp_whatsapp: timestampBrasil.toISOString()
       };
 
-      // Adicionar dados do reply se a mensagem original foi encontrada
-      if (originalMessage) {
-        mensagemData.mensagem_pai_id = replyMessageId;
-        mensagemData.mensagem_pai_conteudo = replyData.content;
-        mensagemData.mensagem_pai_autor = replyData.author;
-        console.log(`💬 Reply salvo com pai_id: ${replyMessageId}, conteúdo: "${replyData.content?.substring(0, 30)}..."`);
-      }
+        // Adicionar dados do reply se a mensagem original foi encontrada
+        if (originalMessage) {
+          mensagemData.mensagem_pai_id = replyMessageId;
+          mensagemData.mensagem_pai_conteudo = replyData.content;
+          mensagemData.mensagem_pai_autor = replyData.author;
+        }
 
       await supabase
         .from('whatsapp_mensagens')

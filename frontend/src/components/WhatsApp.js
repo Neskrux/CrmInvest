@@ -1025,17 +1025,6 @@ const WhatsApp = () => {
 
                 <div className="mensagens-container" ref={mensagensListRef}>
                   {mensagens.map((mensagem) => {
-                    // Debug para verificar dados de reply
-                    if (mensagem.mensagem_pai_conteudo) {
-                      console.log('Mensagem com reply encontrada:', {
-                        id: mensagem.id,
-                        conteudo: mensagem.conteudo,
-                        pai_id: mensagem.mensagem_pai_id,
-                        pai_conteudo: mensagem.mensagem_pai_conteudo,
-                        pai_autor: mensagem.mensagem_pai_autor
-                      });
-                    }
-                    
                     return (
                     <div
                       key={mensagem.id}
