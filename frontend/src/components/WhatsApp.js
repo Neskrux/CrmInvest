@@ -1108,9 +1108,6 @@ const WhatsApp = () => {
                                   </svg>
                                   <div className="document-details">
                                     <div className="document-name">{mensagem.midia_nome || 'Documento'}</div>
-                                    <div className="document-size">
-                                      {mensagem.midia_tamanho ? `${Math.round(mensagem.midia_tamanho / 1024)} KB` : ''}
-                                    </div>
                                   </div>
                                 </div>
                                 <a 

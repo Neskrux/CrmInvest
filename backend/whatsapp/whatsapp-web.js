@@ -358,7 +358,7 @@ class WhatsAppWebService {
 
   // Monitoramento periódico da conexão
   startConnectionMonitoring() {
-    // Monitorar a cada 30 segundos
+    // Monitorar a cada 15 segundos para detectar problemas mais rapidamente
     this.connectionMonitorInterval = setInterval(async () => {
       try {
         if (this.client && this.isConnected) {
@@ -387,7 +387,7 @@ class WhatsAppWebService {
           console.log('ℹ️ Erro na verificação de conexão. Use o botão "Conectar" para reconectar.');
         }
       }
-    }, 30000); // 30 segundos
+    }, 15000); // 15 segundos
     
     console.log('📡 Monitoramento de conexão iniciado');
   }
@@ -1164,8 +1164,9 @@ class WhatsAppWebService {
    */
   async sendMediaFile(number, file, caption = '') {
     try {
-      if (!this.isConnected || !this.client) {
-        throw new Error('WhatsApp não está conectado');
+      // Verificar se está realmente conectado e funcional
+      if (!this.isClientFunctional()) {
+        throw new Error('WhatsApp não está conectado ou não está funcional');
       }
 
       // 1. Salvar arquivo de forma segura (já inclui validação)
@@ -1178,20 +1179,25 @@ class WhatsAppWebService {
       const cleanNumber = number.replace(/\D/g, '');
       const chatId = `${cleanNumber}@c.us`;
 
-      // 4. Criar MessageMedia
+      // 4. Verificar conexão novamente antes de enviar
+      if (!this.isClientFunctional()) {
+        throw new Error('Conexão WhatsApp perdida durante o processamento');
+      }
+
+      // 5. Criar MessageMedia
       const media = new MessageMedia(
         file.mimetype,
         file.buffer.toString('base64'),
         file.originalname
       );
 
-      // 5. Enviar mensagem
+      // 6. Enviar mensagem
       const message = await this.client.sendMessage(chatId, media, { caption });
 
-      // 6. Marcar como enviada via API
+      // 7. Marcar como enviada via API
       this.sentMessages.add(message.id._serialized);
 
-      // 7. Salvar no banco de dados
+      // 8. Salvar no banco de dados
       await this.saveOutgoingMediaMessage(message, saveResult.metadata, caption);
 
       console.log(`📤 Mídia enviada com sucesso: ${file.originalname}`);
@@ -1208,8 +1214,9 @@ class WhatsAppWebService {
    */
   async sendMediaReply(number, file, replyMessageId, caption = '') {
     try {
-      if (!this.isConnected || !this.client) {
-        throw new Error('WhatsApp não está conectado');
+      // Verificar se está realmente conectado e funcional
+      if (!this.isClientFunctional()) {
+        throw new Error('WhatsApp não está conectado ou não está funcional');
       }
 
       // 1. Salvar arquivo de forma segura (já inclui validação)
@@ -1242,20 +1249,25 @@ class WhatsAppWebService {
         throw new Error('Mensagem original não encontrada no WhatsApp');
       }
 
-      // 6. Criar MessageMedia
+      // 6. Verificar conexão novamente antes de enviar
+      if (!this.isClientFunctional()) {
+        throw new Error('Conexão WhatsApp perdida durante o processamento');
+      }
+
+      // 7. Criar MessageMedia
       const media = new MessageMedia(
         file.mimetype,
         file.buffer.toString('base64'),
         file.originalname
       );
 
-      // 7. Enviar como resposta
+      // 8. Enviar como resposta
       const message = await originalMessage.reply(media, { caption });
 
-      // 8. Marcar como enviada via API
+      // 9. Marcar como enviada via API
       this.sentMessages.add(message.id._serialized);
 
-      // 9. Salvar no banco de dados
+      // 10. Salvar no banco de dados
       await this.saveOutgoingMediaMessage(message, saveResult.metadata, caption, {
         mensagem_pai_id: replyMessageId,
         mensagem_pai_conteudo: mensagemOriginal.conteudo,
@@ -1301,7 +1313,6 @@ class WhatsAppWebService {
         midia_url: mediaMetadata.url,
         midia_tipo: mediaMetadata.mimeType,
         midia_nome: mediaMetadata.originalName,
-        midia_tamanho: mediaMetadata.size,
         created_at: new Date(Date.now() - (3 * 60 * 60 * 1000)).toISOString()
       };
 
