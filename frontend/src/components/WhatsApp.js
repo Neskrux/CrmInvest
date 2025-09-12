@@ -163,7 +163,7 @@ const WhatsApp = () => {
   const conectarWhatsApp = async () => {
     setConectando(true);
     try {
-      info('Executando limpeza automática antes de conectar...');
+      info('Executando limpeza completa das sessões...');
       
       const token = localStorage.getItem('token');
       const response = await axios.post(`${config.API_BASE_URL}/whatsapp/connect`, {}, {
@@ -171,7 +171,7 @@ const WhatsApp = () => {
       });
       
       setWhatsappStatus(response.data);
-      success('WhatsApp inicializado! Aguarde o QR Code...');
+      success('WhatsApp inicializado com limpeza completa! Aguarde o QR Code...');
       
       // Verificar status periodicamente
       verificarStatusWhatsApp();

@@ -62,17 +62,20 @@ const authenticateToken = (req, res, next) => {
 // Inicializar WhatsApp Web
 router.post('/connect', authenticateToken, async (req, res) => {
   try {
-    if (!whatsappService) {
-      whatsappService = new WhatsAppWebService();
-      await whatsappService.initialize();
+    // Sempre criar nova instância e forçar limpeza para garantir QR Code limpo
+    if (whatsappService) {
+      await whatsappService.disconnect();
     }
+    
+    whatsappService = new WhatsAppWebService();
+    await whatsappService.initialize(0, true); // Forçar limpeza
 
     const status = whatsappService.getStatus();
     res.json({
       success: true,
       status: status.status,
       isConnected: status.isConnected,
-      message: 'WhatsApp Web inicializado'
+      message: 'WhatsApp Web inicializado com limpeza completa'
     });
   } catch (error) {
     console.error('Erro ao conectar WhatsApp:', error);

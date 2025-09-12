@@ -47,7 +47,25 @@ class WhatsAppWebService {
         console.log('ℹ️ Cache não encontrado (já limpo)');
       }
       
-      // 3. Limpar conversas inválidas do banco
+      // 3. Limpar pasta de sessão específica do cliente (se existir)
+      const clientAuthPath = path.join(__dirname, '..', '.wwebjs_auth', 'session-crm-whatsapp');
+      try {
+        await fs.rm(clientAuthPath, { recursive: true, force: true });
+        console.log('✅ Sessão específica do cliente limpa');
+      } catch (error) {
+        console.log('ℹ️ Sessão específica não encontrada (já limpa)');
+      }
+      
+      // 4. Limpar pasta de sessão em produção (Railway)
+      const prodAuthPath = '/tmp/.wwebjs_auth';
+      try {
+        await fs.rm(prodAuthPath, { recursive: true, force: true });
+        console.log('✅ Pasta de autenticação de produção limpa');
+      } catch (error) {
+        console.log('ℹ️ Pasta de produção não encontrada (já limpa)');
+      }
+      
+      // 5. Limpar conversas inválidas do banco
       console.log('🗄️ Limpando conversas inválidas do banco...');
       
       // Buscar conversas com numero_contato null ou vazio
@@ -76,7 +94,7 @@ class WhatsAppWebService {
         console.log('✅ Nenhuma conversa inválida encontrada');
       }
       
-      // 4. Limpar mensagens órfãs
+      // 6. Limpar mensagens órfãs
       const { data: conversasValidas } = await supabase
         .from('whatsapp_conversas')
         .select('id')
@@ -104,12 +122,12 @@ class WhatsAppWebService {
   }
 
   // Inicializar cliente WhatsApp
-  async initialize(retryCount = 0) {
+  async initialize(retryCount = 0, forceCleanup = false) {
     const maxRetries = 3;
     
     try {
-      // Executar scripts de limpeza apenas na primeira tentativa
-      if (retryCount === 0) {
+      // Executar scripts de limpeza na primeira tentativa ou quando forçado
+      if (retryCount === 0 || forceCleanup) {
         await this.runCleanupScripts();
       }
       
@@ -1127,8 +1145,11 @@ class WhatsAppWebService {
     this.qrCode = null;
     this.reconnecting = false;
     
+    // Executar limpeza completa das sessões
+    await this.runCleanupScripts();
+    
     await this.updateConnectionStatus('disconnected');
-    console.log('✅ WhatsApp Web desconectado');
+    console.log('✅ WhatsApp Web desconectado e sessões limpas');
   }
 
   // ===== MÉTODOS DE ENVIO DE MÍDIA =====
