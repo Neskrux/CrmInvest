@@ -406,6 +406,41 @@ router.get('/conversas/:conversaId/mensagens', authenticateToken, async (req, re
   }
 });
 
+// Buscar mensagens de uma conversa (com paginação)
+router.get('/conversas/:conversaId/mensagens', authenticateToken, async (req, res) => {
+  try {
+    const { conversaId } = req.params;
+    const { page = 1, limit = 50 } = req.query;
+    const offset = (page - 1) * limit;
+
+    // Buscar mensagens com paginação
+    const { data: mensagens, error: mensagensError, count } = await supabase
+      .from('whatsapp_mensagens')
+      .select('*', { count: 'exact' })
+      .eq('conversa_id', conversaId)
+      .order('timestamp_whatsapp', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (mensagensError) {
+      console.error('Erro ao buscar mensagens:', mensagensError);
+      return res.status(500).json({ error: 'Erro ao buscar mensagens' });
+    }
+
+    res.json({
+      mensagens: mensagens || [],
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: count || 0,
+        pages: Math.ceil((count || 0) / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao buscar mensagens:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 // Enviar mensagem
 router.post('/conversas/:conversaId/mensagens', authenticateToken, async (req, res) => {
   try {

@@ -3788,3 +3788,35 @@ select::placeholder {
         }
     }
 }
+
+/* =====================================================
+   ANIMAÇÕES E LOADING
+   ===================================================== */
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Estilos para paginação */
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  padding: 10px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.conversa-stats {
+  margin-top: 4px;
+  color: var(--gray-500);
+  font-size: 0.75rem;
+}
+
+.conversa-stats small {
+  display: block;
+  line-height: 1.2;
+}

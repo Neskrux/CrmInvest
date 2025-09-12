@@ -18,6 +18,11 @@ const WhatsApp = () => {
   const [showLinkPatientModal, setShowLinkPatientModal] = useState(false);
   const [pacientes, setPacientes] = useState([]);
   const [consultores, setConsultores] = useState([]);
+  
+  // Estados para paginação
+  const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 0 });
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
@@ -115,14 +120,27 @@ const WhatsApp = () => {
     }
   };
 
-  // Buscar mensagens de uma conversa
-  const buscarMensagens = async (conversaId, shouldScroll = false) => {
+  // Buscar mensagens de uma conversa (com paginação)
+  const buscarMensagens = async (conversaId, shouldScroll = false, page = 1, append = false) => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get(`${config.API_BASE_URL}/whatsapp/conversas/${conversaId}/mensagens`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        params: { page, limit: 50 }
       });
-      setMensagens(response.data.mensagens || []);
+      
+      const { mensagens: novasMensagens, pagination: paginationData } = response.data;
+      
+      if (append) {
+        // Adicionar mensagens ao final da lista (para carregar mensagens mais antigas)
+        setMensagens(prev => [...prev, ...(novasMensagens || [])]);
+      } else {
+        // Substituir mensagens (primeira carga ou nova conversa)
+        setMensagens(novasMensagens || []);
+      }
+      
+      setPagination(paginationData);
+      setHasMoreMessages(paginationData.page < paginationData.pages);
       
       // Se shouldScroll for true, faz scroll para baixo após carregar
       if (shouldScroll) {
@@ -130,6 +148,22 @@ const WhatsApp = () => {
       }
     } catch (error) {
       console.error('Erro ao buscar mensagens:', error);
+      showError('Erro ao carregar mensagens');
+    }
+  };
+
+  // Carregar mais mensagens (scroll infinito)
+  const carregarMaisMensagens = async () => {
+    if (!conversaSelecionada || loadingMore || !hasMoreMessages) return;
+    
+    setLoadingMore(true);
+    try {
+      await buscarMensagens(conversaSelecionada.id, false, pagination.page + 1, true);
+    } catch (error) {
+      console.error('Erro ao carregar mais mensagens:', error);
+      showError('Erro ao carregar mais mensagens');
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -259,6 +293,9 @@ const WhatsApp = () => {
   // Selecionar conversa
   const selecionarConversa = (conversa) => {
     setConversaSelecionada(conversa);
+    // Resetar paginação ao selecionar nova conversa
+    setPagination({ page: 1, limit: 50, total: 0, pages: 0 });
+    setHasMoreMessages(true);
     buscarMensagens(conversa.id, true); // true = fazer scroll para baixo
   };
 
@@ -987,6 +1024,14 @@ const WhatsApp = () => {
                   <div className="contato-info">
                     <h3>{conversaSelecionada.nome_contato || formatarTelefone(conversaSelecionada.numero_contato)}</h3>
                     <p>{formatarTelefone(conversaSelecionada.numero_contato)}</p>
+                    {pagination.total > 0 && (
+                      <div className="conversa-stats">
+                        <small>
+                          {mensagens.length} de {pagination.total} mensagens
+                          {pagination.pages > 1 && ` (página ${pagination.page}/${pagination.pages})`}
+                        </small>
+                      </div>
+                    )}
                   </div>
                   <div className="contato-actions">
                     {conversaSelecionada.pacientes ? (
@@ -1024,6 +1069,36 @@ const WhatsApp = () => {
                 </div>
 
                 <div className="mensagens-container" ref={mensagensListRef}>
+                  {/* Botão para carregar mais mensagens */}
+                  {hasMoreMessages && (
+                    <div className="load-more-container">
+                      <button 
+                        className="btn btn-outline btn-sm"
+                        onClick={carregarMaisMensagens}
+                        disabled={loadingMore}
+                        style={{ margin: '10px auto', display: 'block' }}
+                      >
+                        {loadingMore ? (
+                          <>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px', animation: 'spin 1s linear infinite' }}>
+                              <circle cx="12" cy="12" r="10"/>
+                              <polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                            Carregando...
+                          </>
+                        ) : (
+                          <>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px' }}>
+                              <path d="M7 13l3 3 7-7"/>
+                              <path d="M7 6l3 3 7-7"/>
+                            </svg>
+                            Carregar mensagens anteriores
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                  
                   {mensagens.map((mensagem) => {
                     return (
                     <div
@@ -1051,6 +1126,7 @@ const WhatsApp = () => {
                                   src={`${config.MEDIA_BASE_URL}${mensagem.midia_url}`} 
                                   alt="Imagem" 
                                   className="message-image"
+                                  loading="lazy"
                                   onClick={() => window.open(`${config.MEDIA_BASE_URL}${mensagem.midia_url}`, '_blank')}
                                 />
                                 {mensagem.conteudo && mensagem.conteudo !== `Mídia: ${mensagem.tipo}` && (
@@ -1062,7 +1138,7 @@ const WhatsApp = () => {
                             {/* Vídeo */}
                             {mensagem.tipo === 'video' && (
                               <div className="video-message">
-                                <video controls className="message-video">
+                                <video controls className="message-video" preload="metadata">
                                   <source src={`${config.MEDIA_BASE_URL}${mensagem.midia_url}`} type={mensagem.midia_tipo || 'video/mp4'} />
                                   Seu navegador não suporta vídeo.
                                 </video>
