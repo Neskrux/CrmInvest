@@ -230,54 +230,57 @@ class WhatsAppWebService {
 
       // Evento: QR Code gerado
       this.client.on('qr', async (qr) => {
+        console.log('📱 QR Code gerado para WhatsApp Web');
         this.qrCode = qr;
         this.connectionStatus = 'qr_ready';
         
         // Salvar QR Code no banco para o frontend acessar
         await this.saveQRCode(qr);
+        
+        // Mostrar QR Code no terminal (opcional)
+        console.log('QR Code salvo no banco para exibição no frontend');
       });
 
       // Evento: Cliente pronto
       this.client.on('ready', async () => {
-        // Aguardar um pouco para garantir que a conexão está estável
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        console.log('✅ WhatsApp Web conectado com sucesso!');
+        this.isConnected = true;
+        this.connectionStatus = 'connected';
+        this.qrCode = null;
         
-        // Fazer um teste de funcionalidade para garantir que está realmente pronto
-        try {
-          const state = await this.client.getState();
-          const info = await this.client.info;
-          
-          if (state === 'CONNECTED' && info) {
-            this.isConnected = true;
-            this.connectionStatus = 'connected';
-            this.qrCode = null;
-            
-            // Atualizar status no banco
-            await this.updateConnectionStatus('connected');
-            
-            // Iniciar monitoramento apenas quando realmente conectado
-            this.startConnectionMonitoring();
-          }
-        } catch (error) {
-          console.error('Erro ao verificar funcionalidade:', error);
-        }
+        // Atualizar status no banco
+        await this.updateConnectionStatus('connected');
       });
 
       // Evento: Mensagem recebida
       this.client.on('message', async (message) => {
+        console.log('📨 Evento message disparado:', {
+          id: message.id._serialized,
+          from: message.from,
+          body: message.body?.substring(0, 50),
+          hasMedia: message.hasMedia,
+          timestamp: new Date(message.timestamp * 1000).toISOString()
+        });
         await this.handleIncomingMessage(message);
       });
 
       // Evento: Mensagem enviada (para sincronizar mensagens do celular)
       this.client.on('message_create', async (message) => {
-        // Verificar se a mensagem é de/para si mesmo (evitar loops)
-        if (message.fromMe && !this.sentMessages.has(message.id._serialized)) {
-          await this.handleOutgoingMessage(message);
-        }
+        console.log('📤 Evento message_create disparado:', {
+          id: message.id._serialized,
+          from: message.from,
+          to: message.to,
+          body: message.body?.substring(0, 50),
+          fromMe: message.fromMe,
+          hasMedia: message.hasMedia,
+          timestamp: new Date(message.timestamp * 1000).toISOString()
+        });
+        await this.handleOutgoingMessage(message);
       });
 
       // Evento: Cliente desconectado
       this.client.on('disconnected', async (reason) => {
+        console.log('❌ WhatsApp Web desconectado:', reason);
         this.isConnected = false;
         this.connectionStatus = 'disconnected';
         this.qrCode = null;
@@ -285,11 +288,25 @@ class WhatsAppWebService {
         
         // Parar monitoramento para evitar loops
         this.stopConnectionMonitoring();
+        
+        // NÃO reconectar automaticamente - deixar para o usuário reconectar manualmente
+        console.log('ℹ️ Desconectado. Use o botão "Conectar" para reconectar manualmente.');
       });
 
       // Evento: Estado de autenticação mudou
       this.client.on('auth_failure', async (message) => {
+        console.error('❌ Falha na autenticação:', message);
         await this.updateConnectionStatus('auth_failure');
+      });
+
+      // Monitoramento de conexão a cada 30 segundos
+      this.startConnectionMonitoring();
+
+      // Evento: Autenticação falhou
+      this.client.on('auth_failure', async (msg) => {
+        console.log('❌ Falha na autenticação WhatsApp:', msg);
+        this.connectionStatus = 'auth_failed';
+        await this.updateConnectionStatus('auth_failed');
       });
 
       // Inicializar cliente
@@ -345,31 +362,38 @@ class WhatsAppWebService {
 
   // Monitoramento periódico da conexão
   startConnectionMonitoring() {
-    // Monitorar a cada 15 segundos para detectar problemas mais rapidamente
+    // Monitorar a cada 30 segundos
     this.connectionMonitorInterval = setInterval(async () => {
       try {
         if (this.client && this.isConnected) {
           // Verificar se o cliente ainda está respondendo
           const state = await this.client.getState();
           if (state !== 'CONNECTED') {
+            console.log('⚠️ Estado da conexão mudou:', state);
             if (state === 'DISCONNECTED' || state === 'NAVIGATING') {
               this.isConnected = false;
               this.connectionStatus = 'disconnected';
               this.qrCode = null;
               await this.updateConnectionStatus('disconnected');
+              // NÃO reconectar automaticamente - apenas marcar como desconectado
+              console.log('ℹ️ Conexão perdida. Use o botão "Conectar" para reconectar.');
             }
           }
         }
       } catch (error) {
+        console.error('Erro no monitoramento de conexão:', error);
         // Se não conseguir verificar o estado, assumir desconectado
         if (this.isConnected) {
           this.isConnected = false;
           this.connectionStatus = 'disconnected';
           this.qrCode = null;
           await this.updateConnectionStatus('disconnected');
+          console.log('ℹ️ Erro na verificação de conexão. Use o botão "Conectar" para reconectar.');
         }
       }
-    }, 15000); // 15 segundos
+    }, 30000); // 30 segundos
+    
+    console.log('📡 Monitoramento de conexão iniciado');
   }
 
   // Parar monitoramento
@@ -634,6 +658,7 @@ class WhatsAppWebService {
             midiaUrl = `/uploads/${midiaNome}`;
             midiaTipo = media.mimetype;
             
+            console.log(`📤 Mídia enviada salva: ${midiaUrl}`);
           }
         } catch (error) {
           console.error('Erro ao processar mídia enviada:', error);
@@ -670,6 +695,8 @@ class WhatsAppWebService {
         .update({ ultima_mensagem_at: timestampBrasil.toISOString() })
         .eq('id', conversa.id);
 
+      console.log(`📤 Mensagem enviada sincronizada para ${conversa.nome_contato}: ${message.body}`);
+
     } catch (error) {
       console.error('Erro ao processar mensagem enviada:', error);
     }
@@ -678,22 +705,40 @@ class WhatsAppWebService {
   // Processar mensagem recebida
   async handleIncomingMessage(message) {
     try {
+      console.log('🔄 Processando mensagem recebida:', {
+        id: message.id._serialized,
+        from: message.from,
+        body: message.body?.substring(0, 50),
+        hasMedia: message.hasMedia,
+        timestamp: new Date(message.timestamp * 1000).toISOString()
+      });
+      
       const contact = await message.getContact();
       const chat = await message.getChat();
       
+      console.log('📞 Dados do contato e chat:', {
+        contactName: contact.name,
+        contactNumber: contact.number,
+        chatId: chat.id._serialized,
+        isGroup: chat.isGroup
+      });
+      
       // Verificar se é um grupo ou comunidade (ignorar por enquanto)
       if (chat.isGroup || !contact.number) {
-        return; // Sem log para reduzir taxa de logging
+        console.log(`📨 Mensagem de grupo/comunidade ignorada: ${chat.name || 'Grupo'}`);
+        return;
       }
       
       // Ignorar mensagens de sistema ou sem conteúdo (exceto se tiver mídia)
       if ((!message.body || message.body.trim() === '') && !message.hasMedia) {
-        return; // Sem log para reduzir taxa de logging
+        console.log(`📨 Mensagem vazia ignorada de ${contact.name || contact.number}`);
+        return;
       }
       
       // Buscar ou criar conversa
       // Normalizar número para busca (remover @c.us se presente)
       const numeroLimpo = contact.number.replace('@c.us', '');
+      console.log(`📨 Buscando conversa para número: ${numeroLimpo}`);
       
       let { data: conversa } = await supabase
         .from('whatsapp_conversas')
@@ -769,10 +814,14 @@ class WhatsAppWebService {
           const media = await message.downloadMedia();
           
           if (media) {
+            console.log(`📎 Processando mídia - Tipo: ${message.type}, MimeType: ${media.mimetype}, Tamanho: ${media.data.length} bytes`);
+            
             // Gerar nome único para o arquivo
             const timestamp = Date.now();
             const extensao = this.getFileExtension(message.type, media.mimetype);
             midiaNome = `${message.type}_${timestamp}${extensao}`;
+            
+            console.log(`📁 Arquivo será salvo como: ${midiaNome}`);
             
             // Salvar arquivo localmente (pasta uploads)
             const fs = require('fs');
@@ -789,6 +838,8 @@ class WhatsAppWebService {
             
             midiaUrl = `/uploads/${midiaNome}`;
             midiaTipo = media.mimetype;
+            
+            console.log(`📎 Mídia salva: ${midiaUrl}`);
           }
         } catch (error) {
           console.error('Erro ao processar mídia:', error);
@@ -827,6 +878,9 @@ class WhatsAppWebService {
 
       // Executar automações
       await this.executeAutomations(conversa, mensagem);
+
+      console.log(`📨 Mensagem recebida de ${contact.name}: ${message.body}`);
+      console.log('✅ Mensagem processada e salva no banco com sucesso');
 
     } catch (error) {
       console.error('❌ Erro ao processar mensagem:', error);
@@ -1088,6 +1142,20 @@ class WhatsAppWebService {
     };
   }
 
+  // Verificar se o cliente está realmente funcional
+  async isClientFunctional() {
+    try {
+      if (!this.client || !this.isConnected) {
+        return false;
+      }
+      
+      const state = await this.client.getState();
+      return state === 'CONNECTED';
+    } catch (error) {
+      console.error('Erro ao verificar estado do cliente:', error);
+      return false;
+    }
+  }
 
   // Desconectar
   async disconnect() {
@@ -1130,12 +1198,17 @@ class WhatsAppWebService {
    */
   async sendMediaFile(number, file, caption = '') {
     try {
-      // Verificar se está realmente conectado e funcional
-      if (!(await this.isClientFunctional())) {
-        throw new Error('WhatsApp não está conectado ou não está funcional');
+      if (!this.isConnected || !this.client) {
+        throw new Error('WhatsApp não está conectado');
       }
 
-      // 1. Salvar arquivo de forma segura (já inclui validação)
+      // 1. Validar arquivo
+      const validation = validateFile(file);
+      if (!validation.isValid) {
+        throw new Error(`Arquivo inválido: ${validation.errors.join(', ')}`);
+      }
+
+      // 2. Salvar arquivo de forma segura
       const saveResult = await this.secureStorage.saveFile(file);
       if (!saveResult.success) {
         throw new Error(`Erro ao salvar arquivo: ${saveResult.error}`);
@@ -1145,27 +1218,23 @@ class WhatsAppWebService {
       const cleanNumber = number.replace(/\D/g, '');
       const chatId = `${cleanNumber}@c.us`;
 
-      // 4. Verificar conexão novamente antes de enviar
-      if (!(await this.isClientFunctional())) {
-        throw new Error('Conexão WhatsApp perdida durante o processamento');
-      }
-
-      // 5. Criar MessageMedia
+      // 4. Criar MessageMedia
       const media = new MessageMedia(
         file.mimetype,
         file.buffer.toString('base64'),
         file.originalname
       );
 
-      // 6. Enviar mensagem
+      // 5. Enviar mensagem
       const message = await this.client.sendMessage(chatId, media, { caption });
 
-      // 7. Marcar como enviada via API
+      // 6. Marcar como enviada via API
       this.sentMessages.add(message.id._serialized);
 
-      // 8. Salvar no banco de dados
+      // 7. Salvar no banco de dados
       await this.saveOutgoingMediaMessage(message, saveResult.metadata, caption);
 
+      console.log(`📤 Mídia enviada com sucesso: ${file.originalname}`);
       return message;
 
     } catch (error) {
@@ -1179,12 +1248,17 @@ class WhatsAppWebService {
    */
   async sendMediaReply(number, file, replyMessageId, caption = '') {
     try {
-      // Verificar se está realmente conectado e funcional
-      if (!(await this.isClientFunctional())) {
-        throw new Error('WhatsApp não está conectado ou não está funcional');
+      if (!this.isConnected || !this.client) {
+        throw new Error('WhatsApp não está conectado');
       }
 
-      // 1. Salvar arquivo de forma segura (já inclui validação)
+      // 1. Validar arquivo
+      const validation = validateFile(file);
+      if (!validation.isValid) {
+        throw new Error(`Arquivo inválido: ${validation.errors.join(', ')}`);
+      }
+
+      // 2. Salvar arquivo de forma segura
       const saveResult = await this.secureStorage.saveFile(file);
       if (!saveResult.success) {
         throw new Error(`Erro ao salvar arquivo: ${saveResult.error}`);
@@ -1214,31 +1288,27 @@ class WhatsAppWebService {
         throw new Error('Mensagem original não encontrada no WhatsApp');
       }
 
-      // 6. Verificar conexão novamente antes de enviar
-      if (!(await this.isClientFunctional())) {
-        throw new Error('Conexão WhatsApp perdida durante o processamento');
-      }
-
-      // 7. Criar MessageMedia
+      // 6. Criar MessageMedia
       const media = new MessageMedia(
         file.mimetype,
         file.buffer.toString('base64'),
         file.originalname
       );
 
-      // 8. Enviar como resposta
+      // 7. Enviar como resposta
       const message = await originalMessage.reply(media, { caption });
 
-      // 9. Marcar como enviada via API
+      // 8. Marcar como enviada via API
       this.sentMessages.add(message.id._serialized);
 
-      // 10. Salvar no banco de dados
+      // 9. Salvar no banco de dados
       await this.saveOutgoingMediaMessage(message, saveResult.metadata, caption, {
         mensagem_pai_id: replyMessageId,
         mensagem_pai_conteudo: mensagemOriginal.conteudo,
         mensagem_pai_autor: mensagemOriginal.direcao === 'inbound' ? 'Contato' : 'Você'
       });
 
+      console.log(`📤 Mídia reply enviada com sucesso: ${file.originalname}`);
       return message;
 
     } catch (error) {
@@ -1277,6 +1347,7 @@ class WhatsAppWebService {
         midia_url: mediaMetadata.url,
         midia_tipo: mediaMetadata.mimeType,
         midia_nome: mediaMetadata.originalName,
+        midia_tamanho: mediaMetadata.size,
         created_at: new Date(Date.now() - (3 * 60 * 60 * 1000)).toISOString()
       };
 
@@ -1294,6 +1365,8 @@ class WhatsAppWebService {
 
       if (saveError) {
         console.error('❌ Erro ao salvar mensagem de mídia:', saveError);
+      } else {
+        console.log('✅ Mensagem de mídia salva no banco');
       }
 
     } catch (error) {
@@ -1310,34 +1383,6 @@ class WhatsAppWebService {
     if (mimeType.startsWith('audio/')) return 'audio';
     if (mimeType === 'application/pdf') return 'document';
     return 'document';
-  }
-
-  /**
-   * Verifica se o cliente está realmente funcional
-   */
-  async isClientFunctional() {
-    try {
-      // Verificações básicas
-      if (!this.client || !this.isConnected) {
-        return false;
-      }
-
-      // Verificar estado do cliente
-      const state = await this.client.getState();
-      if (state !== 'CONNECTED') {
-        return false;
-      }
-
-      // Verificar se consegue obter informações do cliente
-      const info = await this.client.info;
-      if (!info || !info.wid) {
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      return false;
-    }
   }
 
   /**

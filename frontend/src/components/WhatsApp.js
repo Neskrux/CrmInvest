@@ -18,7 +18,6 @@ const WhatsApp = () => {
   const [showLinkPatientModal, setShowLinkPatientModal] = useState(false);
   const [pacientes, setPacientes] = useState([]);
   const [consultores, setConsultores] = useState([]);
-  
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
@@ -116,15 +115,13 @@ const WhatsApp = () => {
     }
   };
 
-  // Buscar mensagens de uma conversa (todas as mensagens)
+  // Buscar mensagens de uma conversa
   const buscarMensagens = async (conversaId, shouldScroll = false) => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get(`${config.API_BASE_URL}/whatsapp/conversas/${conversaId}/mensagens`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      // Carregar todas as mensagens da conversa
       setMensagens(response.data.mensagens || []);
       
       // Se shouldScroll for true, faz scroll para baixo após carregar
@@ -133,7 +130,6 @@ const WhatsApp = () => {
       }
     } catch (error) {
       console.error('Erro ao buscar mensagens:', error);
-      showError('Erro ao carregar mensagens');
     }
   };
 
@@ -245,10 +241,13 @@ const WhatsApp = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-        setNovaMensagem('');
-        setMensagemReply(null); // Limpar reply após enviar
-        buscarMensagens(conversaSelecionada.id, true); // Recarregar mensagens
-        buscarConversas(); // Atualizar lista de conversas
+      setNovaMensagem('');
+      setMensagemReply(null); // Limpar reply após enviar
+      buscarMensagens(conversaSelecionada.id);
+      buscarConversas(); // Atualizar lista de conversas
+      
+      // Scroll para o final após enviar mensagem
+      setTimeout(scrollToBottom, 100);
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
       showError('Erro ao enviar mensagem');
@@ -259,10 +258,7 @@ const WhatsApp = () => {
 
   // Selecionar conversa
   const selecionarConversa = (conversa) => {
-    // Limpar mensagens da conversa anterior
-    setMensagens([]);
     setConversaSelecionada(conversa);
-    // Carregar todas as mensagens da nova conversa
     buscarMensagens(conversa.id, true); // true = fazer scroll para baixo
   };
 
@@ -788,8 +784,11 @@ const WhatsApp = () => {
       success('Mídia enviada com sucesso!');
       cancelarMidia();
       setMensagemReply(null); // Limpar reply após enviar
-      buscarMensagens(conversaSelecionada.id, true); // Recarregar mensagens
+      buscarMensagens(conversaSelecionada.id);
       buscarConversas(); // Atualizar lista de conversas
+      
+      // Scroll para o final após enviar
+      setTimeout(scrollToBottom, 100);
     } catch (error) {
       console.error('Erro ao enviar mídia:', error);
       showError('Erro ao enviar mídia');
@@ -988,11 +987,6 @@ const WhatsApp = () => {
                   <div className="contato-info">
                     <h3>{conversaSelecionada.nome_contato || formatarTelefone(conversaSelecionada.numero_contato)}</h3>
                     <p>{formatarTelefone(conversaSelecionada.numero_contato)}</p>
-                    {mensagens.length > 0 && (
-                      <div className="conversa-stats">
-                        <small>{mensagens.length} mensagens</small>
-                      </div>
-                    )}
                   </div>
                   <div className="contato-actions">
                     {conversaSelecionada.pacientes ? (
@@ -1054,10 +1048,10 @@ const WhatsApp = () => {
                             {mensagem.tipo === 'image' && (
                               <div className="image-message">
                                 <img 
-                                  src={`${config.MEDIA_BASE_URL}${mensagem.midia_url}`} 
+                                  src={`http://localhost:5000${mensagem.midia_url}`} 
                                   alt="Imagem" 
                                   className="message-image"
-                                  onClick={() => window.open(`${config.MEDIA_BASE_URL}${mensagem.midia_url}`, '_blank')}
+                                  onClick={() => window.open(`http://localhost:5000${mensagem.midia_url}`, '_blank')}
                                 />
                                 {mensagem.conteudo && mensagem.conteudo !== `Mídia: ${mensagem.tipo}` && (
                                   <div className="image-caption">{mensagem.conteudo}</div>
@@ -1069,7 +1063,7 @@ const WhatsApp = () => {
                             {mensagem.tipo === 'video' && (
                               <div className="video-message">
                                 <video controls className="message-video">
-                                  <source src={`${config.MEDIA_BASE_URL}${mensagem.midia_url}`} type={mensagem.midia_tipo || 'video/mp4'} />
+                                  <source src={`http://localhost:5000${mensagem.midia_url}`} type={mensagem.midia_tipo || 'video/mp4'} />
                                   Seu navegador não suporta vídeo.
                                 </video>
                                 {mensagem.conteudo && mensagem.conteudo !== `Mídia: ${mensagem.tipo}` && (
@@ -1089,7 +1083,7 @@ const WhatsApp = () => {
                                   Áudio
                                 </div>
                                 <audio controls className="audio-player">
-                                  <source src={`${config.MEDIA_BASE_URL}${mensagem.midia_url}`} type={mensagem.midia_tipo || 'audio/ogg'} />
+                                  <source src={`http://localhost:5000${mensagem.midia_url}`} type={mensagem.midia_tipo || 'audio/ogg'} />
                                   Seu navegador não suporta áudio.
                                 </audio>
                               </div>
@@ -1108,10 +1102,13 @@ const WhatsApp = () => {
                                   </svg>
                                   <div className="document-details">
                                     <div className="document-name">{mensagem.midia_nome || 'Documento'}</div>
+                                    <div className="document-size">
+                                      {mensagem.midia_tamanho ? `${Math.round(mensagem.midia_tamanho / 1024)} KB` : ''}
+                                    </div>
                                   </div>
                                 </div>
                                 <a 
-                                  href={`${config.MEDIA_BASE_URL}${mensagem.midia_url}`} 
+                                  href={`http://localhost:5000${mensagem.midia_url}`} 
                                   target="_blank" 
                                   rel="noopener noreferrer"
                                   className="btn btn-outline btn-sm"

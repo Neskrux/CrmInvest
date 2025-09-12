@@ -372,52 +372,35 @@ router.put('/conversas/:id', authenticateToken, async (req, res) => {
 router.get('/conversas/:conversaId/mensagens', authenticateToken, async (req, res) => {
   try {
     const { conversaId } = req.params;
-    const { page, limit } = req.query;
+    const { page = 1, limit = 50 } = req.query;
+    const offset = (page - 1) * limit;
 
-    let query = supabase
+    const { data, error } = await supabase
       .from('whatsapp_mensagens')
       .select('*')
       .eq('conversa_id', conversaId)
-      .order('timestamp_whatsapp', { ascending: true });
+      .order('timestamp_whatsapp', { ascending: true })
+      .range(offset, offset + limit - 1);
 
-    // Se page e limit estão definidos, usar paginação
-    if (page && limit) {
-      const offset = (page - 1) * limit;
-      query = query.range(offset, offset + limit - 1);
-
-      const { data, error } = await query;
-
-      if (error) {
-        return res.status(500).json({ error: 'Erro ao buscar mensagens' });
-      }
-
-      // Buscar total de mensagens para paginação
-      const { count } = await supabase
-        .from('whatsapp_mensagens')
-        .select('*', { count: 'exact', head: true })
-        .eq('conversa_id', conversaId);
-
-      res.json({
-        mensagens: data,
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total: count,
-          pages: Math.ceil(count / limit)
-        }
-      });
-    } else {
-      // Sem paginação - carregar todas as mensagens
-      const { data, error } = await query;
-
-      if (error) {
-        return res.status(500).json({ error: 'Erro ao buscar mensagens' });
-      }
-
-      res.json({
-        mensagens: data
-      });
+    if (error) {
+      return res.status(500).json({ error: 'Erro ao buscar mensagens' });
     }
+
+    // Buscar total de mensagens
+    const { count } = await supabase
+      .from('whatsapp_mensagens')
+      .select('*', { count: 'exact', head: true })
+      .eq('conversa_id', conversaId);
+
+    res.json({
+      mensagens: data,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: count,
+        pages: Math.ceil(count / limit)
+      }
+    });
   } catch (error) {
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
