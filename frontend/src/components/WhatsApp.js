@@ -19,10 +19,12 @@ const WhatsApp = () => {
   const [pacientes, setPacientes] = useState([]);
   const [consultores, setConsultores] = useState([]);
   
-  // Estados para paginação
-  const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 0 });
+  // Estados para paginação otimizada
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 0 });
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
+  
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
@@ -120,20 +122,20 @@ const WhatsApp = () => {
     }
   };
 
-  // Buscar mensagens de uma conversa (com paginação)
+  // Buscar mensagens de uma conversa (com paginação otimizada)
   const buscarMensagens = async (conversaId, shouldScroll = false, page = 1, append = false) => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get(`${config.API_BASE_URL}/whatsapp/conversas/${conversaId}/mensagens`, {
         headers: { Authorization: `Bearer ${token}` },
-        params: { page, limit: 50 }
+        params: { page, limit: 20 } // Limite reduzido para melhor performance
       });
       
       const { mensagens: novasMensagens, pagination: paginationData } = response.data;
       
       if (append) {
-        // Adicionar mensagens ao final da lista (para carregar mensagens mais antigas)
-        setMensagens(prev => [...prev, ...(novasMensagens || [])]);
+        // Adicionar mensagens antigas no início da lista
+        setMensagens(prev => [...(novasMensagens || []), ...prev]);
       } else {
         // Substituir mensagens (primeira carga ou nova conversa)
         setMensagens(novasMensagens || []);
@@ -141,9 +143,10 @@ const WhatsApp = () => {
       
       setPagination(paginationData);
       setHasMoreMessages(paginationData.page < paginationData.pages);
+      setInitialLoad(false);
       
       // Se shouldScroll for true, faz scroll para baixo após carregar
-      if (shouldScroll) {
+      if (shouldScroll && !append) {
         setTimeout(scrollToBottom, 100);
       }
     } catch (error) {
@@ -152,20 +155,36 @@ const WhatsApp = () => {
     }
   };
 
-  // Carregar mais mensagens (scroll infinito)
-  const carregarMaisMensagens = async () => {
-    if (!conversaSelecionada || loadingMore || !hasMoreMessages) return;
+  // Carregar mensagens antigas (scroll infinito otimizado)
+  const carregarMensagensAntigas = async () => {
+    if (!conversaSelecionada || loadingMore || !hasMoreMessages || initialLoad) return;
     
     setLoadingMore(true);
     try {
       await buscarMensagens(conversaSelecionada.id, false, pagination.page + 1, true);
     } catch (error) {
-      console.error('Erro ao carregar mais mensagens:', error);
-      showError('Erro ao carregar mais mensagens');
+      console.error('Erro ao carregar mensagens antigas:', error);
+      showError('Erro ao carregar mensagens antigas');
     } finally {
       setLoadingMore(false);
     }
   };
+
+  // Scroll infinito - detectar quando usuário faz scroll para o topo
+  useEffect(() => {
+    const container = mensagensListRef.current;
+    if (!container || !conversaSelecionada) return;
+
+    const handleScroll = () => {
+      // Se está próximo do topo (50px) e há mais mensagens
+      if (container.scrollTop < 50 && hasMoreMessages && !loadingMore && !initialLoad) {
+        carregarMensagensAntigas();
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [conversaSelecionada, hasMoreMessages, loadingMore, initialLoad]);
 
   // Buscar configurações
   const buscarConfiguracao = async () => {
@@ -275,10 +294,10 @@ const WhatsApp = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      setNovaMensagem('');
-      setMensagemReply(null); // Limpar reply após enviar
-      buscarMensagens(conversaSelecionada.id, true, 1, false); // Recarregar primeira página
-      buscarConversas(); // Atualizar lista de conversas
+        setNovaMensagem('');
+        setMensagemReply(null); // Limpar reply após enviar
+        buscarMensagens(conversaSelecionada.id, true, 1, false); // Recarregar primeira página
+        buscarConversas(); // Atualizar lista de conversas
       
       // Scroll para o final após enviar mensagem
       setTimeout(scrollToBottom, 100);
@@ -294,8 +313,9 @@ const WhatsApp = () => {
   const selecionarConversa = (conversa) => {
     setConversaSelecionada(conversa);
     // Resetar paginação ao selecionar nova conversa
-    setPagination({ page: 1, limit: 50, total: 0, pages: 0 });
+    setPagination({ page: 1, limit: 20, total: 0, pages: 0 });
     setHasMoreMessages(true);
+    setInitialLoad(true);
     buscarMensagens(conversa.id, true, 1, false); // true = fazer scroll para baixo
   };
 
@@ -1069,12 +1089,12 @@ const WhatsApp = () => {
                 </div>
 
                 <div className="mensagens-container" ref={mensagensListRef}>
-                  {/* Botão para carregar mais mensagens */}
-                  {hasMoreMessages && (
+                  {/* Botão para carregar mensagens antigas */}
+                  {hasMoreMessages && !initialLoad && (
                     <div className="load-more-container">
                       <button 
                         className="btn btn-outline btn-sm"
-                        onClick={carregarMaisMensagens}
+                        onClick={carregarMensagensAntigas}
                         disabled={loadingMore}
                         style={{ margin: '10px auto', display: 'block' }}
                       >
