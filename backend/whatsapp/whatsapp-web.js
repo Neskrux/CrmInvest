@@ -254,27 +254,11 @@ class WhatsAppWebService {
 
       // Evento: Mensagem recebida
       this.client.on('message', async (message) => {
-        console.log('📨 Evento message disparado:', {
-          id: message.id._serialized,
-          from: message.from,
-          body: message.body?.substring(0, 50),
-          hasMedia: message.hasMedia,
-          timestamp: new Date(message.timestamp * 1000).toISOString()
-        });
         await this.handleIncomingMessage(message);
       });
 
       // Evento: Mensagem enviada (para sincronizar mensagens do celular)
       this.client.on('message_create', async (message) => {
-        console.log('📤 Evento message_create disparado:', {
-          id: message.id._serialized,
-          from: message.from,
-          to: message.to,
-          body: message.body?.substring(0, 50),
-          fromMe: message.fromMe,
-          hasMedia: message.hasMedia,
-          timestamp: new Date(message.timestamp * 1000).toISOString()
-        });
         await this.handleOutgoingMessage(message);
       });
 
@@ -296,15 +280,6 @@ class WhatsAppWebService {
       // Evento: Estado de autenticação mudou
       this.client.on('auth_failure', async (message) => {
         console.error('❌ Falha na autenticação:', message);
-        await this.updateConnectionStatus('auth_failure');
-      });
-
-      // Monitoramento de conexão a cada 30 segundos
-      this.startConnectionMonitoring();
-
-      // Evento: Autenticação falhou
-      this.client.on('auth_failure', async (msg) => {
-        console.log('❌ Falha na autenticação WhatsApp:', msg);
         this.connectionStatus = 'auth_failed';
         await this.updateConnectionStatus('auth_failed');
       });
@@ -362,38 +337,31 @@ class WhatsAppWebService {
 
   // Monitoramento periódico da conexão
   startConnectionMonitoring() {
-    // Monitorar a cada 30 segundos
+    // Monitorar a cada 60 segundos (reduzido de 30s para 60s)
     this.connectionMonitorInterval = setInterval(async () => {
       try {
         if (this.client && this.isConnected) {
           // Verificar se o cliente ainda está respondendo
           const state = await this.client.getState();
           if (state !== 'CONNECTED') {
-            console.log('⚠️ Estado da conexão mudou:', state);
             if (state === 'DISCONNECTED' || state === 'NAVIGATING') {
               this.isConnected = false;
               this.connectionStatus = 'disconnected';
               this.qrCode = null;
               await this.updateConnectionStatus('disconnected');
-              // NÃO reconectar automaticamente - apenas marcar como desconectado
-              console.log('ℹ️ Conexão perdida. Use o botão "Conectar" para reconectar.');
             }
           }
         }
       } catch (error) {
-        console.error('Erro no monitoramento de conexão:', error);
         // Se não conseguir verificar o estado, assumir desconectado
         if (this.isConnected) {
           this.isConnected = false;
           this.connectionStatus = 'disconnected';
           this.qrCode = null;
           await this.updateConnectionStatus('disconnected');
-          console.log('ℹ️ Erro na verificação de conexão. Use o botão "Conectar" para reconectar.');
         }
       }
-    }, 30000); // 30 segundos
-    
-    console.log('📡 Monitoramento de conexão iniciado');
+    }, 60000); // 60 segundos
   }
 
   // Parar monitoramento
@@ -647,18 +615,21 @@ class WhatsAppWebService {
             const path = require('path');
             const uploadsDir = path.join(__dirname, '..', 'uploads');
             
-            // Criar diretório se não existir
-            if (!fs.existsSync(uploadsDir)) {
-              fs.mkdirSync(uploadsDir, { recursive: true });
+            try {
+              // Criar diretório se não existir
+              if (!fs.existsSync(uploadsDir)) {
+                fs.mkdirSync(uploadsDir, { recursive: true });
+              }
+              
+              const filePath = path.join(uploadsDir, midiaNome);
+              fs.writeFileSync(filePath, media.data, 'base64');
+            } catch (fileError) {
+              console.error('Erro ao salvar arquivo de mídia:', fileError);
+              throw fileError;
             }
-            
-            const filePath = path.join(uploadsDir, midiaNome);
-            fs.writeFileSync(filePath, media.data, 'base64');
             
             midiaUrl = `/uploads/${midiaNome}`;
             midiaTipo = media.mimetype;
-            
-            console.log(`📤 Mídia enviada salva: ${midiaUrl}`);
           }
         } catch (error) {
           console.error('Erro ao processar mídia enviada:', error);
@@ -695,8 +666,6 @@ class WhatsAppWebService {
         .update({ ultima_mensagem_at: timestampBrasil.toISOString() })
         .eq('id', conversa.id);
 
-      console.log(`📤 Mensagem enviada sincronizada para ${conversa.nome_contato}: ${message.body}`);
-
     } catch (error) {
       console.error('Erro ao processar mensagem enviada:', error);
     }
@@ -705,40 +674,22 @@ class WhatsAppWebService {
   // Processar mensagem recebida
   async handleIncomingMessage(message) {
     try {
-      console.log('🔄 Processando mensagem recebida:', {
-        id: message.id._serialized,
-        from: message.from,
-        body: message.body?.substring(0, 50),
-        hasMedia: message.hasMedia,
-        timestamp: new Date(message.timestamp * 1000).toISOString()
-      });
-      
       const contact = await message.getContact();
       const chat = await message.getChat();
       
-      console.log('📞 Dados do contato e chat:', {
-        contactName: contact.name,
-        contactNumber: contact.number,
-        chatId: chat.id._serialized,
-        isGroup: chat.isGroup
-      });
-      
       // Verificar se é um grupo ou comunidade (ignorar por enquanto)
       if (chat.isGroup || !contact.number) {
-        console.log(`📨 Mensagem de grupo/comunidade ignorada: ${chat.name || 'Grupo'}`);
         return;
       }
       
       // Ignorar mensagens de sistema ou sem conteúdo (exceto se tiver mídia)
       if ((!message.body || message.body.trim() === '') && !message.hasMedia) {
-        console.log(`📨 Mensagem vazia ignorada de ${contact.name || contact.number}`);
         return;
       }
       
       // Buscar ou criar conversa
       // Normalizar número para busca (remover @c.us se presente)
       const numeroLimpo = contact.number.replace('@c.us', '');
-      console.log(`📨 Buscando conversa para número: ${numeroLimpo}`);
       
       let { data: conversa } = await supabase
         .from('whatsapp_conversas')
@@ -814,32 +765,31 @@ class WhatsAppWebService {
           const media = await message.downloadMedia();
           
           if (media) {
-            console.log(`📎 Processando mídia - Tipo: ${message.type}, MimeType: ${media.mimetype}, Tamanho: ${media.data.length} bytes`);
-            
             // Gerar nome único para o arquivo
             const timestamp = Date.now();
             const extensao = this.getFileExtension(message.type, media.mimetype);
             midiaNome = `${message.type}_${timestamp}${extensao}`;
-            
-            console.log(`📁 Arquivo será salvo como: ${midiaNome}`);
             
             // Salvar arquivo localmente (pasta uploads)
             const fs = require('fs');
             const path = require('path');
             const uploadsDir = path.join(__dirname, '..', 'uploads');
             
-            // Criar diretório se não existir
-            if (!fs.existsSync(uploadsDir)) {
-              fs.mkdirSync(uploadsDir, { recursive: true });
+            try {
+              // Criar diretório se não existir
+              if (!fs.existsSync(uploadsDir)) {
+                fs.mkdirSync(uploadsDir, { recursive: true });
+              }
+              
+              const filePath = path.join(uploadsDir, midiaNome);
+              fs.writeFileSync(filePath, media.data, 'base64');
+            } catch (fileError) {
+              console.error('Erro ao salvar arquivo de mídia:', fileError);
+              throw fileError;
             }
-            
-            const filePath = path.join(uploadsDir, midiaNome);
-            fs.writeFileSync(filePath, media.data, 'base64');
             
             midiaUrl = `/uploads/${midiaNome}`;
             midiaTipo = media.mimetype;
-            
-            console.log(`📎 Mídia salva: ${midiaUrl}`);
           }
         } catch (error) {
           console.error('Erro ao processar mídia:', error);
@@ -878,9 +828,6 @@ class WhatsAppWebService {
 
       // Executar automações
       await this.executeAutomations(conversa, mensagem);
-
-      console.log(`📨 Mensagem recebida de ${contact.name}: ${message.body}`);
-      console.log('✅ Mensagem processada e salva no banco com sucesso');
 
     } catch (error) {
       console.error('❌ Erro ao processar mensagem:', error);
@@ -1234,7 +1181,6 @@ class WhatsAppWebService {
       // 7. Salvar no banco de dados
       await this.saveOutgoingMediaMessage(message, saveResult.metadata, caption);
 
-      console.log(`📤 Mídia enviada com sucesso: ${file.originalname}`);
       return message;
 
     } catch (error) {
@@ -1308,7 +1254,6 @@ class WhatsAppWebService {
         mensagem_pai_autor: mensagemOriginal.direcao === 'inbound' ? 'Contato' : 'Você'
       });
 
-      console.log(`📤 Mídia reply enviada com sucesso: ${file.originalname}`);
       return message;
 
     } catch (error) {
@@ -1363,11 +1308,9 @@ class WhatsAppWebService {
         .from('whatsapp_mensagens')
         .insert([messageData]);
 
-      if (saveError) {
-        console.error('❌ Erro ao salvar mensagem de mídia:', saveError);
-      } else {
-        console.log('✅ Mensagem de mídia salva no banco');
-      }
+        if (saveError) {
+          console.error('❌ Erro ao salvar mensagem de mídia:', saveError);
+        }
 
     } catch (error) {
       console.error('❌ Erro ao salvar mensagem de mídia:', error);

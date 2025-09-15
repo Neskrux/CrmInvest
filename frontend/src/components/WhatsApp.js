@@ -811,15 +811,21 @@ const WhatsApp = () => {
   useEffect(() => {
     const carregarDados = async () => {
       setLoading(true);
-      await Promise.all([
-        buscarConversas(),
-        buscarConfiguracao(),
-        buscarAutomatizacoes(),
-        buscarPacientes(),
-        buscarConsultores(),
-        verificarStatusWhatsApp()
-      ]);
-      setLoading(false);
+      try {
+        await Promise.all([
+          buscarConversas(),
+          buscarConfiguracao(),
+          buscarAutomatizacoes(),
+          buscarPacientes(),
+          buscarConsultores(),
+          verificarStatusWhatsApp()
+        ]);
+      } catch (error) {
+        console.error('Erro ao carregar dados iniciais:', error);
+        showError('Erro ao carregar dados iniciais');
+      } finally {
+        setLoading(false);
+      }
     };
 
     carregarDados();
@@ -827,15 +833,15 @@ const WhatsApp = () => {
 
   // Removido useEffect de scroll automático - agora controlado manualmente
 
-  // Atualização automática das mensagens da conversa selecionada
+  // Atualização automática das mensagens da conversa selecionada (REDUZIDO)
   useEffect(() => {
     let interval;
     
     if (conversaSelecionada && conversaSelecionada.id) {
-      // Atualizar mensagens a cada 1 segundo
+      // Atualizar mensagens a cada 5 segundos (reduzido de 1s para 5s)
       interval = setInterval(() => {
         buscarMensagens(conversaSelecionada.id);
-      }, 1000);
+      }, 5000);
     }
 
     // Cleanup do intervalo quando a conversa mudar ou componente desmontar
@@ -846,11 +852,11 @@ const WhatsApp = () => {
     };
   }, [conversaSelecionada?.id]);
 
-  // Atualização automática da lista de conversas
+  // Atualização automática da lista de conversas (REDUZIDO)
   useEffect(() => {
     const interval = setInterval(() => {
       buscarConversas();
-    }, 1000); // Atualizar lista de conversas a cada 1 segundo
+    }, 10000); // Atualizar lista de conversas a cada 10 segundos (reduzido de 1s para 10s)
 
     return () => clearInterval(interval);
   }, []);
