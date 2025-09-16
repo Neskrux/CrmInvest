@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import TutorialOverlay from './TutorialOverlay';
+import WelcomeModal from './WelcomeModal';
 
 const Dashboard = () => {
   // Estado separado para KPIs principais (dados filtrados)
@@ -22,6 +24,11 @@ const Dashboard = () => {
   const [rankingGeral, setRankingGeral] = useState([]);
   const [loadingRanking, setLoadingRanking] = useState(true);
   const [showConsultoresExtrasModal, setShowConsultoresExtrasModal] = useState(false); // Modal dos consultores do 4º em diante
+  // Estado para controlar o tutorial
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialCompleted, setTutorialCompleted] = useState(false);
+  // Estado para controlar o modal de boas-vindas
+  const [showWelcome, setShowWelcome] = useState(false);
   const [stats, setStats] = useState({
     totalPacientes: 0,
     totalAgendamentos: 0,
@@ -153,6 +160,60 @@ const Dashboard = () => {
     fetchStats();
     fetchRegioesDisponiveis();
   }, [periodo, subPeriodo, mesAno, semanaOpcao, filtroRegiao]);
+
+  // Verificar se deve mostrar modal de boas-vindas e tutorial
+  useEffect(() => {
+    if (!user) return; // Aguardar usuário estar logado
+    
+    const hasSeenWelcome = localStorage.getItem('welcome-completed');
+    const hasSeenTutorial = localStorage.getItem('tutorial-completed');
+    
+    // Mostrar boas-vindas se não viu nem boas-vindas nem tutorial
+    // Isso inclui usuários que se cadastraram antes da implementação
+    if (!hasSeenWelcome && !hasSeenTutorial) {
+      setShowWelcome(true);
+    }
+  }, [user]);
+
+  // Desabilitar overflow quando modal de boas-vindas estiver ativo
+  useEffect(() => {
+    if (showWelcome) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    // Cleanup: restaurar overflow quando componente for desmontado
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showWelcome]);
+
+  const handleWelcomeComplete = () => {
+    setShowWelcome(false);
+    localStorage.setItem('welcome-completed', 'true');
+    // Após fechar o modal de boas-vindas, abrir o tutorial
+    setShowTutorial(true);
+  };
+
+  const handleWelcomeClose = () => {
+    setShowWelcome(false);
+    localStorage.setItem('welcome-completed', 'true');
+  };
+
+  const handleTutorialComplete = () => {
+    setShowTutorial(false);
+    setTutorialCompleted(true);
+    localStorage.setItem('tutorial-completed', 'true');
+  };
+
+  const handleTutorialClose = () => {
+    setShowTutorial(false);
+  };
+
+  const startTutorial = () => {
+    setShowTutorial(true);
+  };
 
   // Buscar cidades quando estado for alterado
   useEffect(() => {
@@ -646,23 +707,55 @@ const Dashboard = () => {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Dashboard</h1>
-        <p className="page-subtitle">
-          Bem-vindo, {user?.nome}
-          {(filtroRegiao.cidade || filtroRegiao.estado) && (
-            <span style={{ 
-              marginLeft: '1rem',
-              padding: '0.25rem 0.5rem',
-              backgroundColor: '#dbeafe',
-              color: '#1e40af',
-              borderRadius: '12px',
-              fontSize: '0.75rem',
-              fontWeight: '500'
-            }}>
-              📍 Filtrado por região
-            </span>
-          )}
-        </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h1 className="page-title">Dashboard</h1>
+            <p className="page-subtitle">
+              Bem-vindo, {user?.nome}
+              {(filtroRegiao.cidade || filtroRegiao.estado) && (
+                <span style={{ 
+                  marginLeft: '1rem',
+                  padding: '0.25rem 0.5rem',
+                  backgroundColor: '#dbeafe',
+                  color: '#1e40af',
+                  borderRadius: '12px',
+                  fontSize: '0.75rem',
+                  fontWeight: '500'
+                }}>
+                  📍 Filtrado por região
+                </span>
+              )}
+            </p>
+          </div>
+          <button
+            onClick={startTutorial}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 16px',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              backgroundColor: 'white',
+              color: '#374151',
+              fontSize: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#f9fafb';
+              e.target.style.borderColor = '#9ca3af';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'white';
+              e.target.style.borderColor = '#d1d5db';
+            }}
+            title="Ver tutorial do dashboard"
+          >
+            Ver Tutorial
+          </button>
+        </div>
       </div>
 
       {/* Filtro de Período */}
@@ -682,6 +775,7 @@ const Dashboard = () => {
               onClick={() => { setPeriodo('total'); setSubPeriodo(null); }}
               className={`btn ${periodo === 'total' ? 'btn-primary' : 'btn-secondary'}`}
               style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+              data-tutorial="filter-total"
             >
               Total
             </button>
@@ -689,6 +783,7 @@ const Dashboard = () => {
               onClick={() => { setPeriodo('semanal'); setSubPeriodo(null); }}
               className={`btn ${periodo === 'semanal' ? 'btn-primary' : 'btn-secondary'}`}
               style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+              data-tutorial="filter-weekly"
             >
               Semanal
             </button>
@@ -696,6 +791,7 @@ const Dashboard = () => {
               onClick={() => { setPeriodo('mensal'); setSubPeriodo(null); }}
               className={`btn ${periodo === 'mensal' ? 'btn-primary' : 'btn-secondary'}`}
               style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+              data-tutorial="filter-monthly"
             >
               Mensal
             </button>
@@ -810,7 +906,7 @@ const Dashboard = () => {
           marginTop: '1rem',
           paddingTop: '1rem',
           borderTop: '1px solid #e5e7eb'
-        }}>
+        }} data-tutorial="region-filter">
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '600' }}>
               Filtrar por região:
@@ -976,7 +1072,7 @@ const Dashboard = () => {
       )}
 
       {/* KPIs Principais */}
-      <div style={{ marginBottom: '2rem' }}>
+      <div style={{ marginBottom: '2rem' }} data-tutorial="main-kpis">
         <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1a1d23', marginBottom: '1rem' }}>
           Totais Gerais
         </h3>
@@ -1050,7 +1146,7 @@ const Dashboard = () => {
 
       {/* Gráfico de Pacientes, Agendamentos e Fechamentos por Cidade */}
       {stats.agendamentosPorCidade.length > 0 && (
-        <div className="card" style={{ marginTop: '2rem' }}>
+        <div className="card" style={{ marginTop: '2rem' }} data-tutorial="cities-chart">
           <div className="card-header">
             <h2 className="card-title">Pacientes, Agendamentos e Fechamentos por Cidade</h2>
             <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
@@ -1152,7 +1248,7 @@ const Dashboard = () => {
 
       <div className="grid grid-2" style={{ gap: '2rem' }}>
         {/* Pipeline de Vendas (dados filtrados) */}
-        <div className="card" style={{ minWidth: 0 }}>
+        <div className="card" style={{ minWidth: 0 }} data-tutorial="sales-pipeline">
           <div className="card-header">
             <h2 className="card-title">Pipeline de Vendas</h2>
           </div>
@@ -1193,7 +1289,7 @@ const Dashboard = () => {
         </div>
 
         {/* Ranking dos Consultores */}
-        <div className="card" style={{ minWidth: 0 }}>
+        <div className="card" style={{ minWidth: 0 }} data-tutorial="ranking">
           <div className="card-header">
             <h2 className="card-title">🏆 Ranking dos Consultores</h2>
             <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
@@ -1488,7 +1584,7 @@ const Dashboard = () => {
       </div>
 
       {/* Gráfico de Conversão (dados filtrados) */}
-      <div className="card" style={{ marginTop: '2rem' }}>
+      <div className="card" style={{ marginTop: '2rem' }} data-tutorial="conversion-rate">
         <div className="card-header">
           <h2 className="card-title">Taxa de Conversão do Funil</h2>
         </div>
@@ -1691,6 +1787,20 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Welcome Modal */}
+      <WelcomeModal
+        isOpen={showWelcome}
+        onClose={handleWelcomeClose}
+        onStartTutorial={handleWelcomeComplete}
+      />
+
+      {/* Tutorial Overlay */}
+      <TutorialOverlay
+        isOpen={showTutorial}
+        onClose={handleTutorialClose}
+        onComplete={handleTutorialComplete}
+      />
     </div>
   );
 };

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
+import TutorialPacientes from './TutorialPacientes';
 
 const Pacientes = () => {
-  const { makeRequest, user, isAdmin } = useAuth();
+  const { makeRequest, user, isAdmin, podeAlterarStatus } = useAuth();
   const [pacientes, setPacientes] = useState([]);
   const [novosLeads, setNovosLeads] = useState([]);
   const [consultores, setConsultores] = useState([]);
@@ -38,6 +39,10 @@ const Pacientes = () => {
   const [viewPaciente, setViewPaciente] = useState(null);
   const [showObservacoesModal, setShowObservacoesModal] = useState(false);
   const [observacoesAtual, setObservacoesAtual] = useState('');
+
+  // Estados para controlar o tutorial
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialCompleted, setTutorialCompleted] = useState(false);
 
   // Estados para modal de fechamento
   const [showFechamentoModal, setShowFechamentoModal] = useState(false);
@@ -153,6 +158,10 @@ const Pacientes = () => {
     fetchConsultores();
     fetchClinicas();
     fetchNovosLeads(); // Sempre buscar novos leads para mostrar o badge
+    
+    // Verificar se tutorial foi completado
+    const completed = localStorage.getItem('tutorial-pacientes-completed');
+    setTutorialCompleted(!!completed);
   }, []);
 
   // Atualização automática dos dados a cada 30 segundos
@@ -487,6 +496,12 @@ const Pacientes = () => {
   };
 
   const updateStatus = async (pacienteId, newStatus) => {
+    // Verificar se o usuário tem permissão para alterar status
+    if (!podeAlterarStatus) {
+      showErrorToast('Você não tem permissão para alterar o status dos pacientes');
+      return;
+    }
+
     // Se o status for "agendado" ou "fechado", abrir modal primeiro sem atualizar status
     if (newStatus === 'agendado') {
       const paciente = pacientes.find(p => p.id === pacienteId);
@@ -923,6 +938,20 @@ const Pacientes = () => {
     return matchNome && matchTelefone && matchCPF && matchTipo && matchStatus && matchConsultor && matchData;
   });
 
+  const handleTutorialComplete = () => {
+    setShowTutorial(false);
+    setTutorialCompleted(true);
+    localStorage.setItem('tutorial-pacientes-completed', 'true');
+  };
+
+  const handleTutorialClose = () => {
+    setShowTutorial(false);
+  };
+
+  const startTutorial = () => {
+    setShowTutorial(true);
+  };
+
   // Paginação em memória
   const totalPages = Math.max(1, Math.ceil(pacientesFiltrados.length / PAGE_SIZE));
   const startIndex = (currentPage - 1) * PAGE_SIZE;
@@ -932,9 +961,41 @@ const Pacientes = () => {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Gestão de Pacientes</h1>
-        <p className="page-subtitle">Cadastre e acompanhe seus pacientes e leads</p>
-
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h1 className="page-title">Gestão de Pacientes</h1>
+            <p className="page-subtitle">Cadastre e acompanhe seus pacientes e leads</p>
+          </div>
+          <button
+            onClick={startTutorial}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 16px',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              backgroundColor: 'white',
+              color: '#374151',
+              fontSize: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#f9fafb';
+              e.target.style.borderColor = '#9ca3af';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'white';
+              e.target.style.borderColor = '#d1d5db';
+            }}
+            title="Ver tutorial da tela de pacientes"
+          >
+            Ver Tutorial
+          </button>
+        </div>
+        
         <div style={{
           backgroundColor: '#f0f9ff',
           border: '1px solid #bae6fd',
@@ -944,12 +1005,11 @@ const Pacientes = () => {
           fontSize: '0.875rem'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-            <span style={{ color: '#0284c7', fontSize: '1.25rem' }}>🔄</span>
-            <strong style={{ color: '#0c4a6e' }}>Pipeline Automático Ativo</strong>
+            <strong style={{ color: '#0c4a6e' }}>Ações</strong>
           </div>
           <div style={{ color: '#0c4a6e', lineHeight: '1.4' }}>
-            • Ao alterar status para <strong>"Agendado"</strong> → Abre modal para criar agendamento com dados específicos<br/>
-            • Ao alterar status para <strong>"Fechado"</strong> → Abre modal para criar fechamento com valor e contrato
+            • Na aba <strong>"Pacientes"</strong> → Você pode cadastrar novos pacientes ou leads<br/>
+            • Na aba <strong>"Novos Leads"</strong> → Você pode pegar novos os leads disponíveis para você	
           </div>
         </div>
       </div>
@@ -1195,14 +1255,16 @@ const Pacientes = () => {
                             <select
                               value={statusTemporario[paciente.id] || paciente.status}
                               onChange={(e) => updateStatus(paciente.id, e.target.value)}
+                              disabled={!podeAlterarStatus}
                               style={{
                                 padding: '0.25rem 0.5rem',
                                 borderRadius: '4px',
+                                opacity: podeAlterarStatus ? 1 : 0.5,
+                                cursor: podeAlterarStatus ? 'pointer' : 'not-allowed',
                                 fontSize: '0.75rem',
                                 backgroundColor: statusInfo.color + '10',
                                 color: statusInfo.color,
-                                border: `1px solid ${statusInfo.color}`,
-                                cursor: 'pointer'
+                                border: `1px solid ${statusInfo.color}`
                               }}
                               title={statusInfo.description || statusInfo.label}
                             >
@@ -1945,6 +2007,13 @@ const Pacientes = () => {
           </div>
         </div>
       )}
+
+      {/* Tutorial Overlay */}
+      <TutorialPacientes
+        isOpen={showTutorial}
+        onClose={handleTutorialClose}
+        onComplete={handleTutorialComplete}
+      />
     </div>
   );
 };
