@@ -136,7 +136,7 @@ const CadastroSucesso = () => {
           color: '#6b7280'
         }}>
           <p style={{ margin: 0 }}>
-            Bem-vindo à nossa equipe!
+            Boas-vindasà nossa equipe!
           </p>
           <p style={{ margin: '0.5rem 0 0 0' }}>
             Estamos ansiosos para vê-lo crescer conosco.

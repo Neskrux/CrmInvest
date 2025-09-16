@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useToast } from '../hooks/useToast';
 import config from '../config';
+import TutorialWhatsApp from './TutorialWhatsApp';
 
 const WhatsApp = () => {
   const [conversas, setConversas] = useState([]);
@@ -57,6 +58,10 @@ const WhatsApp = () => {
   const [mediaCaption, setMediaCaption] = useState('');
   const { success, error: showError, warning, info } = useToast();
   const mensagensListRef = useRef(null);
+
+  // Estados para controlar o tutorial
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialCompleted, setTutorialCompleted] = useState(false);
 
   // Função para scroll automático para o final das mensagens
   const scrollToBottom = () => {
@@ -829,6 +834,10 @@ const WhatsApp = () => {
     };
 
     carregarDados();
+    
+    // Verificar se tutorial foi completado
+    const completed = localStorage.getItem('tutorial-whatsapp-completed');
+    setTutorialCompleted(!!completed);
   }, []);
 
   // Removido useEffect de scroll automático - agora controlado manualmente
@@ -861,6 +870,20 @@ const WhatsApp = () => {
     return () => clearInterval(interval);
   }, []);
 
+  const handleTutorialComplete = () => {
+    setShowTutorial(false);
+    setTutorialCompleted(true);
+    localStorage.setItem('tutorial-whatsapp-completed', 'true');
+  };
+
+  const handleTutorialClose = () => {
+    setShowTutorial(false);
+  };
+
+  const startTutorial = () => {
+    setShowTutorial(true);
+  };
+
   if (loading) {
     return (
       <div className="loading">
@@ -872,13 +895,45 @@ const WhatsApp = () => {
   return (
     <div className="whatsapp-container">
       <div className="page-header">
-        <h1>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '8px', verticalAlign: 'middle' }}>
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-          </svg>
-          Investmoney Conversas
-        </h1>
-        <p>Gerencie suas conversas e mensagens automáticas</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h1>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '8px', verticalAlign: 'middle' }}>
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              Investmoney Conversas
+            </h1>
+            <p>Gerencie suas conversas e mensagens automáticas</p>
+          </div>
+          <button
+            onClick={startTutorial}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 16px',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              backgroundColor: 'white',
+              color: '#374151',
+              fontSize: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#f9fafb';
+              e.target.style.borderColor = '#9ca3af';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'white';
+              e.target.style.borderColor = '#d1d5db';
+            }}
+            title="Ver tutorial do WhatsApp Business"
+          >
+            Ver Tutorial
+          </button>
+        </div>
       </div>
 
       {/* Navegação por abas */}
@@ -2082,6 +2137,13 @@ const WhatsApp = () => {
           </div>
         </div>
       )}
+
+      {/* Tutorial Overlay */}
+      <TutorialWhatsApp
+        isOpen={showTutorial}
+        onClose={handleTutorialClose}
+        onComplete={handleTutorialComplete}
+      />
     </div>
   );
 };

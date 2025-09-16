@@ -98,6 +98,15 @@ const uploadToSupabase = async (file, retryCount = 0) => {
   const RETRY_DELAY = 1000; // 1 segundo
   
   try {
+    // Debug: verificar configuração do Supabase
+    console.log('🔍 Debug uploadToSupabase:', {
+      hasSupabaseAdmin: !!supabaseAdmin,
+      bucket: STORAGE_BUCKET,
+      fileSize: file.size,
+      supabaseUrl: supabaseUrl ? 'OK' : 'MISSING',
+      supabaseKey: supabaseServiceKey ? 'OK' : 'MISSING'
+    });
+
     // Gerar nome único para o arquivo
     const timestamp = Date.now();
     const randomId = Math.round(Math.random() * 1E9);
@@ -177,10 +186,15 @@ const normalizarEmail = (email) => {
 
 // Middleware especial para upload que preserva headers
 const authenticateUpload = (req, res, next) => {
-  // Para upload com FormData, o header pode vir em minúsculas
-  const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+  // Para upload com FormData, o header pode vir em minúsculas ou maiúsculas
+  const authHeader = req.headers.authorization || req.headers.Authorization;
   const token = authHeader && authHeader.split(' ')[1];
 
+  console.log('🔍 Debug authenticateUpload:', {
+    hasAuthHeader: !!authHeader,
+    hasToken: !!token,
+    headers: Object.keys(req.headers)
+  });
 
   if (!token) {
     return res.status(401).json({ error: 'Token de acesso requerido' });
@@ -188,6 +202,7 @@ const authenticateUpload = (req, res, next) => {
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
+      console.error('❌ JWT verify error:', err.message);
       return res.status(403).json({ error: 'Token inválido' });
     }
     req.user = user;
@@ -323,7 +338,8 @@ app.post('/api/login', async (req, res) => {
       nome: usuario.nome,
       email: usuario.email,
       tipo: usuario.tipo,
-      consultor_id: usuario.consultor_id !== undefined ? usuario.consultor_id : (tipoLogin === 'consultor' ? usuario.id : null)
+      consultor_id: usuario.consultor_id !== undefined ? usuario.consultor_id : (tipoLogin === 'consultor' ? usuario.id : null),
+      podeAlterarStatus: usuario.podeAlterarStatus || usuario.tipo === 'admin' || false
     };
 
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
@@ -331,8 +347,9 @@ app.post('/api/login', async (req, res) => {
     // Remover senha do objeto antes de enviar para o front
     delete usuario.senha;
 
-    // Garante que usuario.consultor_id também esteja presente no objeto de resposta
+    // Garante que usuario.consultor_id e podeAlterarStatus também estejam presentes no objeto de resposta
     usuario.consultor_id = payload.consultor_id;
+    usuario.podeAlterarStatus = payload.podeAlterarStatus;
 
     res.json({ token, usuario });
 
@@ -583,6 +600,49 @@ app.get('/api/consultores/perfil', authenticateToken, async (req, res) => {
   }
 });
 
+// Rota para atualizar permissões de consultor (apenas admin)
+app.put('/api/consultores/:id/permissao', authenticateToken, async (req, res) => {
+  try {
+    // Verificar se o usuário é admin
+    if (req.user.tipo !== 'admin') {
+      return res.status(403).json({ error: 'Apenas administradores podem alterar permissões' });
+    }
+
+    const { id } = req.params;
+    const { podeAlterarStatus } = req.body;
+
+    if (typeof podeAlterarStatus !== 'boolean') {
+      return res.status(400).json({ error: 'podeAlterarStatus deve ser true ou false' });
+    }
+
+    // Atualizar permissão na tabela consultores
+    const { data, error } = await supabase
+      .from('consultores')
+      .update({ podeAlterarStatus })
+      .eq('id', id)
+      .select();
+
+    if (error) {
+      console.error('Erro ao atualizar permissão:', error);
+      return res.status(500).json({ error: 'Erro ao atualizar permissão' });
+    }
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({ error: 'Consultor não encontrado' });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Permissão atualizada com sucesso',
+      consultor: data[0]
+    });
+
+  } catch (error) {
+    console.error('Erro na rota de permissão:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 app.get('/api/verify-token', authenticateToken, async (req, res) => {
   try {
     // Buscar dados atualizados do usuário na tabela usuarios
@@ -629,7 +689,8 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
       usuario: {
         ...dadosUsuario,
         tipo,
-        consultor_id
+        consultor_id,
+        podeAlterarStatus: usuario.podeAlterarStatus || tipo === 'admin' || false
       }
     });
   } catch (error) {

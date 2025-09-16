@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
+import TutorialAgendamentos from './TutorialAgendamentos';
 
 const Agendamentos = () => {
-  const { makeRequest, user, isAdmin } = useAuth();
+  const { makeRequest, user, isAdmin, podeAlterarStatus } = useAuth();
   const { showSuccessToast, showErrorToast } = useToast();
   const [agendamentos, setAgendamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
@@ -33,6 +34,8 @@ const Agendamentos = () => {
   const [showDetalhesModal, setShowDetalhesModal] = useState(false);
   const [detalhesAtual, setDetalhesAtual] = useState({ telefone: '', observacoes: '' });
 
+  const isConsultor = user?.tipo === 'consultor';
+
   // Estados para modal de valor de fechamento
   const [showValorModal, setShowValorModal] = useState(false);
   const [agendamentoParaFechar, setAgendamentoParaFechar] = useState(null);
@@ -43,6 +46,10 @@ const Agendamentos = () => {
   const [tipoTratamentoFechamento, setTipoTratamentoFechamento] = useState('');
   const [observacoesFechamento, setObservacoesFechamento] = useState('');
   const [dataFechamento, setDataFechamento] = useState(new Date().toISOString().split('T')[0]);
+
+  // Estados para controlar o tutorial
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialCompleted, setTutorialCompleted] = useState(false);
 
   // Status disponíveis para agendamentos
   const statusOptions = [
@@ -64,6 +71,10 @@ const Agendamentos = () => {
     fetchPacientes();
     fetchConsultores();
     fetchClinicas();
+    
+    // Verificar se tutorial foi completado
+    const completed = localStorage.getItem('tutorial-agendamentos-completed');
+    setTutorialCompleted(!!completed);
   }, []);
 
   // Atualização automática dos dados a cada 30 segundos
@@ -266,6 +277,12 @@ const Agendamentos = () => {
   };
 
   const updateStatus = async (agendamentoId, newStatus) => {
+    // Verificar se o usuário tem permissão para alterar status
+    if (!podeAlterarStatus) {
+      showErrorToast('Você não tem permissão para alterar o status dos agendamentos');
+      return;
+    }
+
     // Se o status for "fechado", abrir modal para inserir valor
     if (newStatus === 'fechado') {
       const agendamento = agendamentos.find(a => a.id === agendamentoId);
@@ -525,28 +542,56 @@ const Agendamentos = () => {
   // Verificar se há filtros ativos
   const temFiltrosAtivos = filtroConsultor || filtroClinica || filtroDataInicio || filtroDataFim || filtroStatus;
 
+  const handleTutorialComplete = () => {
+    setShowTutorial(false);
+    setTutorialCompleted(true);
+    localStorage.setItem('tutorial-agendamentos-completed', 'true');
+  };
+
+  const handleTutorialClose = () => {
+    setShowTutorial(false);
+  };
+
+  const startTutorial = () => {
+    setShowTutorial(true);
+  };
+
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Gerenciar Agendamentos</h1>
-        <p className="page-subtitle">Gerencie consultas e acompanhe o pipeline de vendas</p>
-        
-        {/* Aviso sobre automação do pipeline */}
-        <div style={{
-          backgroundColor: '#f0f9ff',
-          border: '1px solid #bae6fd',
-          borderRadius: '8px',
-          padding: '1rem',
-          marginTop: '1rem',
-          fontSize: '0.875rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-            <span style={{ color: '#0284c7', fontSize: '1.25rem' }}>🔄</span>
-            <strong style={{ color: '#0c4a6e' }}>Pipeline Automático Ativo</strong>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h1 className="page-title">{isConsultor ? 'Visualizar Agendamentos' : 'Gerenciar Agendamentos'}</h1>
+            <p className="page-subtitle">{isConsultor ? 'Visualize os agendamentos dos seus pacientes' : 'Gerencie os agendamentos dos pacientes'}</p>
           </div>
-          <div style={{ color: '#0c4a6e', lineHeight: '1.4' }}>
-            • Ao alterar status para <strong>"Fechado"</strong> → Abre modal para criar fechamento com valor e contrato
-          </div>
+          <button
+            onClick={startTutorial}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 16px',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              backgroundColor: 'white',
+              color: '#374151',
+              fontSize: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#f9fafb';
+              e.target.style.borderColor = '#9ca3af';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'white';
+              e.target.style.borderColor = '#d1d5db';
+            }}
+            title="Ver tutorial da tela de agendamentos"
+          >
+            Ver Tutorial
+          </button>
         </div>
       </div>
 
@@ -673,13 +718,15 @@ const Agendamentos = () => {
       <div className="card">
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 className="card-title">Lista de Agendamentos</h2>
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            Novo Agendamento
-          </button>
+          {isAdmin && (
+            <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              Novo Agendamento
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -688,7 +735,7 @@ const Agendamentos = () => {
           <p style={{ textAlign: 'center', color: '#718096', padding: '2rem' }}>
             {temFiltrosAtivos 
               ? 'Nenhum agendamento encontrado com os filtros aplicados.'
-              : 'Nenhum agendamento cadastrado ainda. Clique em "Novo Agendamento" para começar.'
+              : 'Nenhum agendamento cadastrado ainda.'
             }
           </p>
         ) : (
@@ -765,6 +812,7 @@ const Agendamentos = () => {
                         <select
                           value={agendamento.status}
                           onChange={(e) => updateStatus(agendamento.id, e.target.value)}
+                          disabled={!podeAlterarStatus}
                           className="status-select"
                           style={{
                                 padding: '0.25rem 0.5rem',
@@ -773,7 +821,8 @@ const Agendamentos = () => {
                                 backgroundColor: statusInfo.color + '10',
                                 color: statusInfo.color,
                                 border: `1px solid ${statusInfo.color}`,
-                                cursor: 'pointer'
+                                cursor: podeAlterarStatus ? 'pointer' : 'not-allowed',
+                                opacity: podeAlterarStatus ? 1 : 0.5
                           }}
                           title={statusInfo.description || statusInfo.label}
                         >
@@ -1162,6 +1211,13 @@ const Agendamentos = () => {
           </div>
         </div>
       )}
+
+      {/* Tutorial Overlay */}
+      <TutorialAgendamentos
+        isOpen={showTutorial}
+        onClose={handleTutorialClose}
+        onComplete={handleTutorialComplete}
+      />
     </div>
   );
 };

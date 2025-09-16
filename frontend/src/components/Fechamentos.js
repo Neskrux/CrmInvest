@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
+import TutorialFechamentos from './TutorialFechamentos';
 
 const Fechamentos = () => {
-  const { makeRequest, isAdmin } = useAuth();
+  const { makeRequest, isAdmin, user, podeAlterarStatus } = useAuth();
   const [fechamentos, setFechamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [consultores, setConsultores] = useState([]);
@@ -34,8 +35,18 @@ const Fechamentos = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const { error: showErrorToast, success: showSuccessToast, warning: showWarningToast, info: showInfoToast } = useToast();
 
+  // Estados para controlar o tutorial
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialCompleted, setTutorialCompleted] = useState(false);
+
+  const isConsultor = user?.tipo === 'consultor';
+
   useEffect(() => {
     carregarDados();
+    
+    // Verificar se tutorial foi completado
+    const completed = localStorage.getItem('tutorial-fechamentos-completed');
+    setTutorialCompleted(!!completed);
   }, []);
 
   // Detectar mudanças de tamanho da tela
@@ -447,6 +458,12 @@ const Fechamentos = () => {
 
   // Função para alterar status de aprovação
   const alterarStatusAprovacao = async (fechamentoId, novoStatus) => {
+    // Verificar se o usuário tem permissão para alterar status
+    if (!podeAlterarStatus) {
+      showErrorToast('Você não tem permissão para alterar o status dos fechamentos');
+      return;
+    }
+
     try {
       
       const endpoint = novoStatus === 'aprovado' ? 'aprovar' : 'reprovar';
@@ -596,6 +613,20 @@ const Fechamentos = () => {
     }
   };
 
+  const handleTutorialComplete = () => {
+    setShowTutorial(false);
+    setTutorialCompleted(true);
+    localStorage.setItem('tutorial-fechamentos-completed', 'true');
+  };
+
+  const handleTutorialClose = () => {
+    setShowTutorial(false);
+  };
+
+  const startTutorial = () => {
+    setShowTutorial(true);
+  };
+
   if (carregando) {
     return (
       <div className="loading">
@@ -625,8 +656,40 @@ const Fechamentos = () => {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Gerenciar Fechamentos</h1>
-        <p className="page-subtitle">Gerencie os fechamentos de vendas</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h1 className="page-title">{isConsultor ? 'Visualizar Fechamentos' : 'Gerenciar Fechamentos'}</h1>
+            <p className="page-subtitle">{isConsultor ? 'Visualize os fechamentos dos tratamentos dos seus pacientes' : 'Gerencie os fechamentos dos tratamentos dos pacientes'}</p>
+          </div>
+          <button
+            onClick={startTutorial}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 16px',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              backgroundColor: 'white',
+              color: '#374151',
+              fontSize: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#f9fafb';
+              e.target.style.borderColor = '#9ca3af';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'white';
+              e.target.style.borderColor = '#d1d5db';
+            }}
+            title="Ver tutorial da tela de fechamentos"
+          >
+            Ver Tutorial
+          </button>
+        </div>
       </div>
 
       {/* KPIs */}
@@ -671,13 +734,15 @@ const Fechamentos = () => {
               </svg>
               Filtros {filtrosAtivos > 0 && `(${filtrosAtivos})`}
             </button>
-            <button className="btn btn-primary" onClick={() => abrirModal()}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-              Novo Fechamento
-            </button>
+            {isAdmin && (
+              <button className="btn btn-primary" onClick={() => abrirModal()}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Novo Fechamento
+              </button>
+            )}
           </div>
         </div>
 
@@ -810,8 +875,8 @@ const Fechamentos = () => {
                           {formatarMoeda(fechamento.valor_fechado)}
                         </td>
                         <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                          {/* Campo select para alterar status (apenas admin) */}
-                          {isAdmin ? (
+                          {/* Campo select para alterar status (apenas com permissão) */}
+                          {podeAlterarStatus ? (
                             <select 
                               value={fechamento.aprovado || 'pendente'} 
                               onChange={(e) => alterarStatusAprovacao(fechamento.id, e.target.value)}
@@ -1074,6 +1139,13 @@ const Fechamentos = () => {
           </div>
         </div>
       )}
+
+      {/* Tutorial Overlay */}
+      <TutorialFechamentos
+        isOpen={showTutorial}
+        onClose={handleTutorialClose}
+        onComplete={handleTutorialComplete}
+      />
     </div>
   );
 };

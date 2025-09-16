@@ -173,7 +173,8 @@ export const AuthProvider = ({ children }) => {
     makeRequest,
     isAuthenticated: !!user && !!token,
     isAdmin: user?.tipo === 'admin',
-    isConsultor: user?.tipo === 'consultor'
+    isConsultor: user?.tipo === 'consultor',
+    podeAlterarStatus: user?.podeAlterarStatus === true || user?.tipo === 'admin'
   };
 
   return (

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
+import TutorialClinicas from './TutorialClinicas';
 // Mapa (Leaflet)
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -53,6 +54,10 @@ const Clinicas = () => {
   });
   const [cidadeCustomizadaNova, setCidadeCustomizadaNova] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  // Estados para controlar o tutorial
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialCompleted, setTutorialCompleted] = useState(false);
 
   // Status disponíveis para novas clínicas
   const statusNovaClinicaOptions = [
@@ -128,6 +133,10 @@ const Clinicas = () => {
   useEffect(() => {
     fetchClinicas();
     fetchNovasClinicas(); // Sempre carregar novas clínicas
+    
+    // Verificar se tutorial foi completado
+    const completed = localStorage.getItem('tutorial-clinicas-completed');
+    setTutorialCompleted(!!completed);
   }, []);
 
   // Detectar mudanças de tamanho da tela
@@ -640,11 +649,75 @@ const Clinicas = () => {
   // Obter cidades sugeridas baseadas no estado selecionado
   const cidadesSugeridas = formData.estado ? (cidadesPorEstado[formData.estado] || []) : [];
 
+  const handleTutorialComplete = () => {
+    setShowTutorial(false);
+    setTutorialCompleted(true);
+    localStorage.setItem('tutorial-clinicas-completed', 'true');
+  };
+
+  const handleTutorialClose = () => {
+    setShowTutorial(false);
+  };
+
+  const startTutorial = () => {
+    setShowTutorial(true);
+  };
+
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">{isConsultor ? 'Visualizar Clínicas' : 'Gerenciar Clínicas'}</h1>
-        <p className="page-subtitle">{isConsultor ? 'Visualize as clínicas parceiras' : 'Gerencie as clínicas parceiras'}</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h1 className="page-title">{isConsultor ? 'Visualizar Clínicas' : 'Gerenciar Clínicas'}</h1>
+            <p className="page-subtitle">{isConsultor ? 'Visualize as clínicas parceiras' : 'Gerencie as clínicas parceiras'}</p>
+          </div>
+          <button
+            onClick={startTutorial}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 16px',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              backgroundColor: 'white',
+              color: '#374151',
+              fontSize: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#f9fafb';
+              e.target.style.borderColor = '#9ca3af';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'white';
+              e.target.style.borderColor = '#d1d5db';
+            }}
+            title="Ver tutorial da tela de clínicas"
+          >
+            Ver Tutorial
+          </button>
+        </div>
+
+        <div style={{
+          backgroundColor: '#f0f9ff',
+          border: '1px solid #bae6fd',
+          borderRadius: '8px',
+          padding: '1rem',
+          marginTop: '1rem',
+          fontSize: '0.875rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <strong style={{ color: '#0c4a6e' }}>Ações</strong>
+          </div>
+          <div style={{ color: '#0c4a6e', lineHeight: '1.4' }}>
+            • Na aba <strong>"Clínicas"</strong> → Você pode visualizar todas as clínicas disponíveis para você<br/>
+            • Na aba <strong>"Novas Clínicas"</strong> → Você pode cadastrar novas clínicas, que se aprovadas, não poderão ser visualizadas por outros consultores freelancers<br/>
+            • Na aba <strong>"Mapa"</strong> → Você pode visualizar todas as clínicas disponíveis e novas clínicas, que serão exibidas no mapa
+          </div>
+        </div>
       </div>
 
       {/* Navegação por abas */}
@@ -2141,6 +2214,13 @@ const Clinicas = () => {
           </div>
         </div>
       )}
+
+      {/* Tutorial Overlay */}
+      <TutorialClinicas
+        isOpen={showTutorial}
+        onClose={handleTutorialClose}
+        onComplete={handleTutorialComplete}
+      />
     </div>
   );
 };
