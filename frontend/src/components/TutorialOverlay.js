@@ -8,34 +8,6 @@ const tutorialSteps = [
     position: 'center'
   },
   {
-    id: 'filters-total',
-    title: 'Filtro por Período - Total',
-    content: 'Com essa opção ativa você verá as informações de todo o período desde que você começou a ser consultor freelancer.',
-    targetSelector: '[data-tutorial="filter-total"]',
-    position: 'left'
-  },
-  {
-    id: 'filters-weekly',
-    title: 'Filtro por Período - Semanal',
-    content: 'Ou visualize apenas os dados da semana atual.',
-    targetSelector: '[data-tutorial="filter-weekly"]',
-    position: 'left'
-  },
-  {
-    id: 'filters-monthly',
-    title: 'Filtro por Período - Mensal',
-    content: 'E também pode visualizar os dados do mês atual.',
-    targetSelector: '[data-tutorial="filter-monthly"]',
-    position: 'left'
-  },
-  {
-    id: 'region-filter',
-    title: 'Filtro por Região',
-    content: 'Você pode filtrar seus dados por região, selecionando o Estado a ser visualizado e depois a cidade se necessário.',
-    targetSelector: '[data-tutorial="region-filter"]',
-    position: 'bottom'
-  },
-  {
     id: 'main-kpis',
     title: 'KPIs Principais',
     content: 'Aqui você visualiza seus dados principais: o total de pacientes que você possui em sua conta e seu crescimento comparado ao mês anterior, quantos desses pacientes tiveram agendamentos marcados com clínicas, quantos fechamentos após agendamento e também o valor total gerado por seus fechamentos. Logo abaixo você também pode ver a sua comissão adquirida no mês atual e também o total geral ao lado.',

@@ -5,6 +5,9 @@ import TutorialPacientes from './TutorialPacientes';
 
 const Pacientes = () => {
   const { makeRequest, user, isAdmin, podeAlterarStatus } = useAuth();
+  
+  // Verificar se usuário é consultor
+  const isConsultor = user?.tipo === 'consultor';
   const [pacientes, setPacientes] = useState([]);
   const [novosLeads, setNovosLeads] = useState([]);
   const [consultores, setConsultores] = useState([]);
@@ -1277,16 +1280,18 @@ const Pacientes = () => {
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarData(paciente.created_at)}</td>
                           <td>
-                            <button
-                              onClick={() => handleEdit(paciente)}
-                              className="btn-action"
-                              title="Editar"
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                              </svg>
-                            </button>
+                            {!isConsultor && (
+                              <button
+                                onClick={() => handleEdit(paciente)}
+                                className="btn-action"
+                                title="Editar"
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                  <path d="M18.5 2.5a2.121 2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                </svg>
+                              </button>
+                            )}
                             <button
                               onClick={() => handleView(paciente)}
                               className="btn-action"
@@ -1507,7 +1512,7 @@ const Pacientes = () => {
 
               <div className="grid grid-2">
                 <div className="form-group">
-                  <label className="form-label">Telefone</label>
+                  <label className="form-label">Telefone *</label>
                   <input
                     type="tel"
                     name="telefone"
@@ -1515,11 +1520,12 @@ const Pacientes = () => {
                     value={formData.telefone}
                     onChange={handleInputChange}
                     placeholder="(11) 99999-9999"
+                    required
                   />
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">CPF</label>
+                  <label className="form-label">CPF *</label>
                   <input
                     type="text"
                     name="cpf"
@@ -1528,18 +1534,20 @@ const Pacientes = () => {
                     onChange={handleInputChange}
                     placeholder="000.000.000-00"
                     maxLength="14"
+                    required
                   />
                 </div>
               </div>
 
               <div className="grid grid-2">
                 <div className="form-group">
-                  <label className="form-label">Estado</label>
+                  <label className="form-label">Estado *</label>
                   <select
                     name="estado"
                     className="form-select"
                     value={formData.estado}
                     onChange={handleInputChange}
+                    required
                   >
                     <option value="">Selecione o estado</option>
                     {estadosBrasileiros.map(estado => (
@@ -1551,7 +1559,7 @@ const Pacientes = () => {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Cidade</label>
+                  <label className="form-label">Cidade *</label>
                   {formData.estado && cidadesPorEstado[formData.estado] && !cidadeCustomizada ? (
                     <select
                       name="cidade"
@@ -1565,6 +1573,7 @@ const Pacientes = () => {
                           handleInputChange(e);
                         }
                       }}
+                      required
                     >
                       <option value="">Selecione a cidade</option>
                       {cidadesPorEstado[formData.estado].map(cidade => (
@@ -1582,6 +1591,7 @@ const Pacientes = () => {
                         onChange={handleInputChange}
                         placeholder="Digite o nome da cidade"
                         disabled={!formData.estado}
+                        required
                       />
                       {formData.estado && cidadesPorEstado[formData.estado] && cidadeCustomizada && (
                         <button
@@ -1605,12 +1615,13 @@ const Pacientes = () => {
 
               <div className="grid grid-2">
                 <div className="form-group">
-                  <label className="form-label">Tipo de Tratamento</label>
+                  <label className="form-label">Tipo de Tratamento *</label>
                   <select
                     name="tipo_tratamento"
                     className="form-select"
                     value={formData.tipo_tratamento}
                     onChange={handleInputChange}
+                    required
                   >
                     <option value="">Selecione</option>
                     <option value="Estético">Estético</option>

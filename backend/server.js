@@ -237,6 +237,34 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+// Função auxiliar para aplicar filtro de permissões nas clínicas
+async function aplicarFiltroPermissoes(query, req, supabase) {
+  if (req.user.tipo === 'admin') {
+    // Admin vê todas as clínicas
+    return query;
+  } else if (req.user.tipo === 'consultor') {
+    // Buscar dados do consultor para verificar permissões
+    const { data: consultorData, error: consultorError } = await supabase
+      .from('consultores')
+      .select('pode_ver_todas_novas_clinicas')
+      .eq('id', req.user.id)
+      .single();
+
+    if (consultorError) throw consultorError;
+
+    // Se o consultor tem permissão especial, vê todas as clínicas
+    if (consultorData && consultorData.pode_ver_todas_novas_clinicas) {
+      return query; // Não aplicar filtro - vê todas
+    } else {
+      // Consultor sem permissão especial - vê apenas clínicas públicas ou suas próprias
+      return query.or(`consultor_id.is.null,consultor_id.eq.${req.user.id}`);
+    }
+  } else {
+    // Outros tipos de usuário veem apenas clínicas públicas
+    return query.is('consultor_id', null);
+  }
+}
+
 // Middleware para verificar se é o próprio consultor ou admin
 const requireOwnerOrAdmin = (req, res, next) => {
   const consultorId = req.params.consultorId || req.query.consultor_id || req.body.consultor_id;
@@ -690,7 +718,8 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
         ...dadosUsuario,
         tipo,
         consultor_id,
-        podeAlterarStatus: usuario.podeAlterarStatus || tipo === 'admin' || false
+        podeAlterarStatus: usuario.podeAlterarStatus || tipo === 'admin' || false,
+        pode_ver_todas_novas_clinicas: usuario.pode_ver_todas_novas_clinicas || tipo === 'admin' || false
       }
     });
   } catch (error) {
@@ -720,10 +749,8 @@ app.get('/api/clinicas', authenticateToken, async (req, res) => {
       query = query.ilike('cidade', `%${cidade}%`);
     }
 
-    // Se for consultor, mostrar apenas clínicas públicas (sem proprietário) ou suas próprias
-    if (req.user.tipo === 'consultor') {
-      query = query.or(`consultor_id.is.null,consultor_id.eq.${req.user.id}`);
-    }
+    // Aplicar filtro de permissões
+    query = await aplicarFiltroPermissoes(query, req, supabase);
 
     const { data, error } = await query;
 
@@ -749,6 +776,9 @@ app.get('/api/clinicas/cidades', authenticateToken, async (req, res) => {
       query = query.eq('estado', estado);
     }
 
+    // Aplicar filtro de permissões
+    query = await aplicarFiltroPermissoes(query, req, supabase);
+
     const { data, error } = await query;
 
     if (error) throw error;
@@ -763,11 +793,16 @@ app.get('/api/clinicas/cidades', authenticateToken, async (req, res) => {
 
 app.get('/api/clinicas/estados', authenticateToken, async (req, res) => {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('clinicas')
       .select('estado')
       .not('estado', 'is', null)
       .not('estado', 'eq', '');
+
+    // Aplicar filtro de permissões
+    query = await aplicarFiltroPermissoes(query, req, supabase);
+
+    const { data, error } = await query;
 
     if (error) throw error;
     
@@ -782,6 +817,26 @@ app.get('/api/clinicas/estados', authenticateToken, async (req, res) => {
 app.post('/api/clinicas', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { nome, endereco, bairro, cidade, estado, nicho, telefone, email, status } = req.body;
+    
+    // Validar campos obrigatórios
+    if (!nome || nome.trim() === '') {
+      return res.status(400).json({ error: 'Nome da clínica é obrigatório!' });
+    }
+    if (!endereco || endereco.trim() === '') {
+      return res.status(400).json({ error: 'Endereço é obrigatório!' });
+    }
+    if (!telefone || telefone.trim() === '') {
+      return res.status(400).json({ error: 'Telefone é obrigatório!' });
+    }
+    if (!email || email.trim() === '') {
+      return res.status(400).json({ error: 'Email é obrigatório!' });
+    }
+    
+    // Validar formato do email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Email deve ter um formato válido!' });
+    }
     
     // Geocodificar endereço se tiver cidade e estado
     let latitude = null;
@@ -835,6 +890,28 @@ app.put('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) =
     console.log('🔧 ID da clínica:', id);
     console.log('🔧 Body recebido:', req.body);
     console.log('🔧 Usuário autenticado:', req.user);
+    
+    // Validar campos obrigatórios se estiverem sendo atualizados
+    if (req.body.nome !== undefined && (!req.body.nome || req.body.nome.trim() === '')) {
+      return res.status(400).json({ error: 'Nome da clínica é obrigatório!' });
+    }
+    if (req.body.endereco !== undefined && (!req.body.endereco || req.body.endereco.trim() === '')) {
+      return res.status(400).json({ error: 'Endereço é obrigatório!' });
+    }
+    if (req.body.telefone !== undefined && (!req.body.telefone || req.body.telefone.trim() === '')) {
+      return res.status(400).json({ error: 'Telefone é obrigatório!' });
+    }
+    if (req.body.email !== undefined && (!req.body.email || req.body.email.trim() === '')) {
+      return res.status(400).json({ error: 'Email é obrigatório!' });
+    }
+    
+    // Validar formato do email se estiver sendo atualizado
+    if (req.body.email !== undefined) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(req.body.email)) {
+        return res.status(400).json({ error: 'Email deve ter um formato válido!' });
+      }
+    }
     
     // Permitir atualização parcial: só atualiza os campos enviados
     const camposPermitidos = ['nome', 'endereco', 'bairro', 'cidade', 'estado', 'nicho', 'telefone', 'email', 'status'];
@@ -1290,9 +1367,39 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
   try {
     const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado } = req.body;
     
+    // Validar campos obrigatórios
+    if (!nome || nome.trim() === '') {
+      return res.status(400).json({ error: 'Nome é obrigatório!' });
+    }
+    if (!telefone || telefone.trim() === '') {
+      return res.status(400).json({ error: 'Telefone é obrigatório!' });
+    }
+    if (!cpf || cpf.trim() === '') {
+      return res.status(400).json({ error: 'CPF é obrigatório!' });
+    }
+    if (!estado || estado.trim() === '') {
+      return res.status(400).json({ error: 'Estado é obrigatório!' });
+    }
+    if (!cidade || cidade.trim() === '') {
+      return res.status(400).json({ error: 'Cidade é obrigatória!' });
+    }
+    if (!tipo_tratamento || tipo_tratamento.trim() === '') {
+      return res.status(400).json({ error: 'Tipo de tratamento é obrigatório!' });
+    }
+    
     // Normalizar telefone e CPF (remover formatação)
     const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
     const cpfNumeros = cpf ? cpf.replace(/\D/g, '') : '';
+    
+    // Validar formato do telefone (deve ter 10 ou 11 dígitos)
+    if (telefoneNumeros.length < 10 || telefoneNumeros.length > 11) {
+      return res.status(400).json({ error: 'Telefone deve ter 10 ou 11 dígitos!' });
+    }
+    
+    // Validar formato do CPF (deve ter 11 dígitos)
+    if (cpfNumeros.length !== 11) {
+      return res.status(400).json({ error: 'CPF deve ter 11 dígitos!' });
+    }
     
     // Verificar se telefone já existe
     if (telefoneNumeros) {
@@ -1361,7 +1468,7 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
   }
 });
 
-app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
+app.put('/api/pacientes/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado } = req.body;
@@ -1441,7 +1548,7 @@ app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
   }
 });
 
-app.put('/api/pacientes/:id/status', authenticateToken, async (req, res) => {
+app.put('/api/pacientes/:id/status', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -1607,11 +1714,31 @@ app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
       .select('*')
       .order('created_at', { ascending: false });
 
-    // Se for consultor, mostrar apenas clínicas disponíveis (sem proprietário) ou suas próprias
-    if (req.user.tipo === 'consultor') {
-      query = query.or(`consultor_id.is.null,consultor_id.eq.${req.user.id}`);
+    // Lógica de filtro baseada no tipo de usuário e permissões
+    if (req.user.tipo === 'admin') {
+      // Admin vê todas as novas clínicas
+      // Não aplicar filtro
+    } else if (req.user.tipo === 'consultor') {
+      // Buscar dados do consultor para verificar permissões
+      const { data: consultorData, error: consultorError } = await supabase
+        .from('consultores')
+        .select('pode_ver_todas_novas_clinicas')
+        .eq('id', req.user.id)
+        .single();
+
+      if (consultorError) throw consultorError;
+
+      // Se o consultor tem permissão especial, vê todas
+      if (consultorData && consultorData.pode_ver_todas_novas_clinicas) {
+        // Não aplicar filtro - vê todas
+      } else {
+        // Consultor sem permissão especial - vê apenas as suas próprias
+        query = query.eq('criado_por_consultor_id', req.user.id);
+      }
+    } else {
+      // Outros tipos de usuário não veem nenhuma
+      return res.json([]);
     }
-    // Admin vê todas as novas clínicas (com ou sem consultor_id)
 
     const { data, error } = await query;
 
@@ -1625,6 +1752,26 @@ app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
 app.post('/api/novas-clinicas', authenticateToken, async (req, res) => {
   try {
     const { nome, endereco, bairro, cidade, estado, nicho, telefone, email, status, observacoes } = req.body;
+    
+    // Validar campos obrigatórios
+    if (!nome || nome.trim() === '') {
+      return res.status(400).json({ error: 'Nome da clínica é obrigatório!' });
+    }
+    if (!endereco || endereco.trim() === '') {
+      return res.status(400).json({ error: 'Endereço é obrigatório!' });
+    }
+    if (!telefone || telefone.trim() === '') {
+      return res.status(400).json({ error: 'Telefone é obrigatório!' });
+    }
+    if (!email || email.trim() === '') {
+      return res.status(400).json({ error: 'Email é obrigatório!' });
+    }
+    
+    // Validar formato do email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Email deve ter um formato válido!' });
+    }
     
     // Normalizar telefone (remover formatação)
     const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
