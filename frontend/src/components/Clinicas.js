@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import TutorialClinicas from './TutorialClinicas';
-// Mapa (Leaflet)
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -714,7 +713,7 @@ const Clinicas = () => {
           </div>
           <div style={{ color: '#0c4a6e', lineHeight: '1.4' }}>
             • Na aba <strong>"Clínicas"</strong> → Você pode visualizar todas as clínicas disponíveis para você<br/>
-            • Na aba <strong>"Novas Clínicas"</strong> → Você pode cadastrar novas clínicas, que se aprovadas, não poderão ser visualizadas por outros consultores freelancers<br/>
+            • Na aba <strong>"{isAdmin ? 'Novas Clínicas' : 'Indicar Clínicas'}"</strong> → Você pode cadastrar novas clínicas, que se aprovadas, não poderão ser visualizadas por outros consultores freelancers<br/>
             • Na aba <strong>"Mapa"</strong> → Você pode visualizar todas as clínicas disponíveis e novas clínicas, que serão exibidas no mapa
           </div>
         </div>
@@ -733,7 +732,7 @@ const Clinicas = () => {
           onClick={() => setActiveTab('novas-clinicas')}
           style={{ position: 'relative' }}
         >
-          Novas Clínicas
+          {isAdmin ? 'Novas Clínicas' : 'Indicar Clínicas'}
           {novasClinicas.length > 0 && (
             <span className="tab-badge">{novasClinicas.length}</span>
           )}
@@ -1557,7 +1556,7 @@ const Clinicas = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Endereço (Rua e Número)</label>
+                <label className="form-label">Endereço (Rua e Número) *</label>
                 <input
                   type="text"
                   name="endereco"
@@ -1565,6 +1564,7 @@ const Clinicas = () => {
                   value={formData.endereco}
                   onChange={handleInputChange}
                   placeholder="Ex: Rua das Flores, 123"
+                  required
                 />
               </div>
 
@@ -1670,7 +1670,7 @@ const Clinicas = () => {
 
               <div className="grid grid-2">
                 <div className="form-group">
-                  <label className="form-label">Telefone</label>
+                  <label className="form-label">Telefone *</label>
                   <input
                     type="tel"
                     name="telefone"
@@ -1678,11 +1678,12 @@ const Clinicas = () => {
                     value={formData.telefone}
                     onChange={handleInputChange}
                     placeholder="(11) 99999-9999"
+                    required
                   />
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Email</label>
+                  <label className="form-label">Email *</label>
                   <input
                     type="email"
                     name="email"
@@ -1690,6 +1691,7 @@ const Clinicas = () => {
                     value={formData.email}
                     onChange={handleInputChange}
                     placeholder="contato@clinica.com"
+                    required
                   />
                 </div>
               </div>
@@ -2006,7 +2008,7 @@ const Clinicas = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Endereço (Rua e Número)</label>
+                <label className="form-label">Endereço (Rua e Número) *</label>
                 <input
                   type="text"
                   name="endereco"
@@ -2014,6 +2016,7 @@ const Clinicas = () => {
                   value={novaClinicaFormData.endereco}
                   onChange={handleNovaClinicaInputChange}
                   placeholder="Ex: Rua das Flores, 123"
+                  required
                 />
               </div>
 
@@ -2104,18 +2107,21 @@ const Clinicas = () => {
               <div className="grid grid-2">
                 <div className="form-group">
                   <label className="form-label">Nicho</label>
-                  <input
-                    type="text"
+                  <select
                     name="nicho"
-                    className="form-input"
+                    className="form-select"
                     value={novaClinicaFormData.nicho}
                     onChange={handleNovaClinicaInputChange}
-                    placeholder="Ex: Odontologia, Estética"
-                  />
+                  >
+                    <option value="">Selecione o nicho</option>
+                    <option value="Estético">Estético</option>
+                    <option value="Odontológico">Odontológico</option>
+                    <option value="Ambos">Ambos</option>
+                  </select>
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Telefone</label>
+                  <label className="form-label">Telefone *</label>
                   <input
                     type="tel"
                     name="telefone"
@@ -2123,12 +2129,13 @@ const Clinicas = () => {
                     value={novaClinicaFormData.telefone}
                     onChange={handleNovaClinicaInputChange}
                     placeholder="(11) 99999-9999"
+                    required
                   />
                 </div>
               </div>
 
               <div className="form-group">
-                <label className="form-label">E-mail</label>
+                <label className="form-label">E-mail *</label>
                 <input
                   type="email"
                   name="email"
@@ -2136,6 +2143,7 @@ const Clinicas = () => {
                   value={novaClinicaFormData.email}
                   onChange={handleNovaClinicaInputChange}
                   placeholder="email@clinica.com.br"
+                  required
                 />
               </div>
 
