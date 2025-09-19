@@ -198,6 +198,7 @@ const Pacientes = () => {
       const newLeadsIds = [...currentLeadsIds].filter(id => !previousIds.has(id));
       
       if (newLeadsIds.length > 0) {
+        console.log('🚨 NOVO LEAD DETECTADO! Iniciando som e notificação...');
         playNotificationSound();
       }
       
