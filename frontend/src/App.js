@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Link, us
 import './App.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './components/Toast';
+import { LeadNotificationProvider, useLeadNotification } from './components/LeadNotificationProvider';
+import { AudioProvider } from './contexts/AudioContext';
 import LandingPage from './components/LandingPage';
 import CadastroConsultor from './components/CadastroConsultor';
 import CadastroSucesso from './components/CadastroSucesso';
@@ -41,7 +43,8 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
-function AppContent() {
+// Componente interno que usa o hook de notificação
+const AppContentWithNotifications = () => {
   const { user, logout, loading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -592,16 +595,20 @@ function App() {
   return (
     <ToastProvider>
       <AuthProvider>
-        <Router>
-          <Routes>
-            {/* Rotas públicas - Captura de leads */}
-            <Route path="/captura-lead" element={<CapturaLead />} />
-            <Route path="/captura-sucesso" element={<CapturaSucesso />} />
-            
-            {/* Rotas da aplicação principal */}
-            <Route path="/*" element={<AppContent />} />
-          </Routes>
-        </Router>
+        <AudioProvider>
+          <LeadNotificationProvider>
+            <Router>
+              <Routes>
+                {/* Rotas públicas - Captura de leads */}
+                <Route path="/captura-lead" element={<CapturaLead />} />
+                <Route path="/captura-sucesso" element={<CapturaSucesso />} />
+                
+                {/* Rotas da aplicação principal */}
+                <Route path="/*" element={<AppContentWithNotifications />} />
+              </Routes>
+            </Router>
+          </LeadNotificationProvider>
+        </AudioProvider>
       </AuthProvider>
     </ToastProvider>
   );

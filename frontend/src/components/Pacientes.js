@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import TutorialPacientes from './TutorialPacientes';
+import { useAudio } from '../contexts/AudioContext';
 
 const Pacientes = () => {
   const { makeRequest, user, isAdmin, podeAlterarStatus } = useAuth();
@@ -10,6 +11,9 @@ const Pacientes = () => {
   const isConsultor = user?.tipo === 'consultor';
   const [pacientes, setPacientes] = useState([]);
   const [novosLeads, setNovosLeads] = useState([]);
+  const { playNotificationSound } = useAudio();
+  const previousLeadsCountRef = useRef(0);
+  const previousLeadsIdsRef = useRef(new Set());
   const [consultores, setConsultores] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingPaciente, setEditingPaciente] = useState(null);
@@ -183,6 +187,29 @@ const Pacientes = () => {
       fetchNovosLeads(); // Atualizar quando entrar na aba
     }
   }, [activeTab]);
+
+  // Detectar novos leads e tocar som
+  useEffect(() => {
+    if (novosLeads.length > 0) {
+      const currentLeadsIds = new Set(novosLeads.map(lead => lead.id));
+      const previousIds = previousLeadsIdsRef.current;
+      
+      // Verificar se há leads novos (que não estavam na lista anterior)
+      const newLeadsIds = [...currentLeadsIds].filter(id => !previousIds.has(id));
+      
+      if (newLeadsIds.length > 0) {
+        playNotificationSound();
+      }
+      
+      // Atualizar as referências
+      previousLeadsIdsRef.current = currentLeadsIds;
+      previousLeadsCountRef.current = novosLeads.length;
+    } else {
+      // Se não há leads, limpar as referências
+      previousLeadsIdsRef.current.clear();
+      previousLeadsCountRef.current = 0;
+    }
+  }, [novosLeads, playNotificationSound]);
 
   // Controlar scroll do body quando modal estiver aberto
   useEffect(() => {
@@ -2025,6 +2052,7 @@ const Pacientes = () => {
         onClose={handleTutorialClose}
         onComplete={handleTutorialComplete}
       />
+      
     </div>
   );
 };

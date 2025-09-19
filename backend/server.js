@@ -1462,6 +1462,20 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
       .select();
 
     if (error) throw error;
+    
+    // Notificar sobre novo lead se não tiver consultor atribuído
+    if (!consultorId) {
+      await notifyNewLead({
+        id: data[0].id,
+        nome,
+        telefone: telefoneNumeros,
+        tipo_tratamento,
+        cidade,
+        estado,
+        created_at: data[0].created_at
+      });
+    }
+    
     res.json({ id: data[0].id, message: 'Paciente cadastrado com sucesso!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -2659,6 +2673,20 @@ app.post('/api/meta-ads/leads', authenticateToken, async (req, res) => {
       .select();
 
     if (error) throw error;
+    
+    // Notificar sobre novo lead do Meta Ads
+    await notifyNewLead({
+      id: data[0].id,
+      tipo: 'meta_ads',
+      campanha_nome,
+      adset_nome,
+      ad_nome,
+      custo_lead,
+      cidade_lead,
+      estado_lead,
+      created_at: data[0].created_at
+    });
+    
     res.json({ id: data[0].id, message: 'Lead do Meta Ads registrado com sucesso!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -3070,14 +3098,86 @@ if (!process.env.VERCEL && !process.env.DISABLE_WEBSOCKET) {
 }
 
 
+// Função para notificar novos leads
+const notifyNewLead = async (leadData) => {
+  if (!io) return;
+  
+  try {
+    const { data: connectedUsers } = await io.fetchSockets();
+    
+    // Filtrar apenas usuários administradores
+    const adminUsers = connectedUsers.filter(socket => {
+      const userData = connectedUsers.get(socket.id);
+      return userData && userData.userType === 'admin';
+    });
+    
+    adminUsers.forEach(socket => {
+      socket.emit('new-lead', {
+        lead: leadData,
+        timestamp: new Date().toISOString()
+      });
+    });
+    
+    console.log('🔔 Notificação de novo lead enviada para', adminUsers.length, 'administradores conectados');
+  } catch (error) {
+    console.log('Erro ao notificar novo lead:', error);
+  }
+};
+
 // Socket.IO connection handling (apenas se Socket.IO estiver habilitado)
 if (io) {
+  const connectedUsers = new Map();
+  
   io.on('connection', (socket) => {
     console.log('🔌 Cliente conectado:', socket.id);
     
+    socket.on('join-lead-notifications', (data) => {
+      console.log('👤 Usuário entrou nas notificações de leads:', data);
+      connectedUsers.set(socket.id, {
+        userId: data.userId,
+        userType: data.userType,
+        socketId: socket.id
+      });
+    });
+    
+    socket.on('request-lead-count', async (data) => {
+      try {
+        let query = supabase
+          .from('pacientes')
+          .select('count', { count: 'exact' })
+          .is('consultor_id', null);
+        
+        if (data.userType === 'consultor') {
+          const { data: pacientesConsultor } = await supabase
+            .from('pacientes')
+            .select('id')
+            .eq('consultor_id', data.userId);
+          
+          if (pacientesConsultor && pacientesConsultor.length > 0) {
+            const pacienteIds = pacientesConsultor.map(p => p.id);
+            query = supabase
+              .from('pacientes')
+              .select('count', { count: 'exact' })
+              .in('id', pacienteIds)
+              .is('consultor_id', null);
+          } else {
+            socket.emit('lead-count-update', { count: 0 });
+            return;
+          }
+        }
+        
+        const { count, error } = await query;
+        if (!error) {
+          socket.emit('lead-count-update', { count: count || 0 });
+        }
+      } catch (error) {
+        console.log('Erro ao buscar contagem de leads:', error);
+      }
+    });
     
     socket.on('disconnect', () => {
       console.log('🔌 Cliente desconectado:', socket.id);
+      connectedUsers.delete(socket.id);
     });
   });
 }
