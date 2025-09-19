@@ -16,18 +16,18 @@ const tutorialSteps = [
     scrollTo: true
   },
   {
-    id: 'cities-chart',
-    title: 'Gráfico de Cidades',
-    content: 'Aqui você pode visualizar as cidades com maior movimentação, pra facilitar ainda mais sua prospecção de novos leads. Você poderá ver o número de pacientes, agendamentos e fechamentos em cada cidade com base nos dados de outros consultores que também utilizam a plataforma. Embaixo do gráfico você também pode visualizar a taxa de conversão por cada cidade que aparece no gráfico.',
-    targetSelector: '[data-tutorial="cities-chart"]',
-    position: 'bottom',
-    scrollTo: true
-  },
-  {
     id: 'sales-pipeline',
     title: 'Pipeline de Vendas',
     content: 'Aqui no Pipeline de Vendas você poderá ter outra visualização sobre o estado de todos os seus pacientes mostrando o número e a porcentagem de seus pacientes que estão naquele status específico.',
     targetSelector: '[data-tutorial="sales-pipeline"]',
+    position: 'bottom',
+    scrollTo: true
+  },
+  {
+    id: 'cities-chart',
+    title: 'Gráfico de Cidades',
+    content: 'Aqui você pode visualizar as cidades com maior movimentação, pra facilitar ainda mais sua prospecção de novos leads. Você poderá ver o número de pacientes, agendamentos e fechamentos em cada cidade com base nos dados de outros consultores que também utilizam a plataforma. Embaixo do gráfico você também pode visualizar a taxa de conversão por cada cidade que aparece no gráfico.',
+    targetSelector: '[data-tutorial="cities-chart"]',
     position: 'bottom',
     scrollTo: true
   },
@@ -62,31 +62,32 @@ const TutorialOverlay = ({ isOpen, onClose, onComplete }) => {
 
   const currentTutorialStep = tutorialSteps[currentStep];
 
+
   // Função para rolar até o elemento
   const scrollToElement = (selector) => {
     const element = document.querySelector(selector);
     if (element) {
-      // Para os KPIs principais (step 6), fazer scroll mais para baixo
-      if (currentStep === 5) { // Step 6 - KPIs principais
+      // Para os KPIs principais (step 2), fazer scroll mais para baixo
+      if (currentStep === 1) { // Step 2 - KPIs principais
         element.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } 
-      // Para cidades (step 7), fazer scroll menos para baixo
-      else if (currentStep === 6) { // Step 7 - cidades
-        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        // Scroll adicional menor para cima para não ir tão para baixo
-        setTimeout(() => {
-          window.scrollBy(0, -100);
-        }, 500);
-      }
-      // Para pipeline de vendas (step 8), fazer scroll menos para baixo
-      else if (currentStep === 7) { // Step 8 - pipeline de vendas
+      // Para pipeline de vendas (step 3), fazer scroll menos para baixo
+      else if (currentStep === 2) { // Step 3 - pipeline de vendas
         element.scrollIntoView({ behavior: 'smooth', block: 'start' });
         // Scroll adicional para cima para não ir tão para baixo
         setTimeout(() => {
           window.scrollBy(0, -150);
         }, 500);
       }
-      else if (currentStep === 8) { // Step 9 - ranking
+      // Para cidades (step 4), fazer scroll menos para baixo
+      else if (currentStep === 3) { // Step 4 - cidades
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Scroll adicional menor para cima para não ir tão para baixo
+        setTimeout(() => {
+          window.scrollBy(0, -100);
+        }, 500);
+      }
+      else if (currentStep === 4) { // Step 5 - ranking
         element.scrollIntoView({ behavior: 'smooth', block: 'start' });
         // Scroll adicional para cima para não ir tão para baixo
         setTimeout(() => {
@@ -114,18 +115,13 @@ const TutorialOverlay = ({ isOpen, onClose, onComplete }) => {
 
     let top, left;
 
-    // Para mobile, centralizar filtros de período (steps 2, 3, 4)
-    if (isMobile && (currentStep === 1 || currentStep === 2 || currentStep === 3)) {
+    // Para mobile, centralizar todos os passos
+    if (isMobile) {
       return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
     }
 
-    // Para mobile, centralizar KPIs principais, gráfico de cidades, pipeline e ranking (steps 6, 7, 8, 9)
-    if (isMobile && (currentStep === 5 || currentStep === 6 || currentStep === 7 || currentStep === 8)) {
-      return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
-    }
-
-    // Posicionamento especial para KPIs principais (step 6) - apenas desktop
-    if (!isMobile && currentStep === 5) { // Step 6 - KPIs principais
+    // Posicionamento especial para KPIs principais (step 2) - apenas desktop
+    if (!isMobile && currentStep === 1) { // Step 2 - KPIs principais
       top = Math.max(rect.top - tooltipHeight - 200, 200);
       left = Math.max(rect.left + (rect.width / 2) - (tooltipWidth / 2), 20);
       if (left + tooltipWidth > window.innerWidth - 20) {
@@ -138,22 +134,8 @@ const TutorialOverlay = ({ isOpen, onClose, onComplete }) => {
       };
     }
 
-    // Posicionamento especial para cidades (step 7) - apenas desktop
-    if (!isMobile && currentStep === 6) { // Step 7 - cidades
-      top = Math.max(rect.top - tooltipHeight - 200, 200);
-      left = Math.max(rect.left + (rect.width / 2) - (tooltipWidth / 2), 20);
-      if (left + tooltipWidth > window.innerWidth - 20) {
-        left = window.innerWidth - tooltipWidth - 20;
-      }
-      return {
-        top: `${top}px`,
-        left: `${left}px`,
-        transform: 'none'
-      };
-    }
-
-    // Posicionamento especial para pipeline de vendas (step 8) - apenas desktop
-    if (!isMobile && currentStep === 7) { // Step 8 - pipeline de vendas
+    // Posicionamento especial para pipeline de vendas (step 3) - apenas desktop
+    if (!isMobile && currentStep === 2) { // Step 3 - pipeline de vendas
       top = Math.max(rect.top - tooltipHeight - 480, 480);
       left = Math.max(rect.left + (rect.width / 2) - (tooltipWidth / 2), 20);
       if (left + tooltipWidth > window.innerWidth - 20) {
@@ -166,8 +148,22 @@ const TutorialOverlay = ({ isOpen, onClose, onComplete }) => {
       };
     }
 
-    // Posicionamento especial para ranking (step 9) - apenas desktop
-    if (!isMobile && currentStep === 8) { // Step 9 - ranking
+    // Posicionamento especial para cidades (step 4) - apenas desktop
+    if (!isMobile && currentStep === 3) { // Step 4 - cidades
+      top = Math.max(rect.top - tooltipHeight - 200, 200);
+      left = Math.max(rect.left + (rect.width / 2) - (tooltipWidth / 2), 20);
+      if (left + tooltipWidth > window.innerWidth - 20) {
+        left = window.innerWidth - tooltipWidth - 20;
+      }
+      return {
+        top: `${top}px`,
+        left: `${left}px`,
+        transform: 'none'
+      };
+    }
+
+    // Posicionamento especial para ranking (step 5) - apenas desktop
+    if (!isMobile && currentStep === 4) { // Step 5 - ranking
       top = Math.max(rect.top - tooltipHeight - 400, 400);
       left = Math.max(rect.left + (rect.width / 2) - (tooltipWidth / 2), 20);
       if (left + tooltipWidth > window.innerWidth - 20) {
@@ -230,7 +226,6 @@ const TutorialOverlay = ({ isOpen, onClose, onComplete }) => {
   const skipTutorial = () => {
     onComplete();
   };
-
 
   // Efeito para rolar até o elemento quando o step muda
   useEffect(() => {
@@ -312,7 +307,7 @@ const TutorialOverlay = ({ isOpen, onClose, onComplete }) => {
       >
         {/* Arrow */}
         {currentTutorialStep?.targetSelector && currentTutorialStep?.position !== 'center' && 
-         !(window.innerWidth <= 768 && (currentStep === 1 || currentStep === 2 || currentStep === 3)) && (
+         !(window.innerWidth <= 768) && (
           <div
             style={{
               position: 'absolute',
