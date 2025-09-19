@@ -360,14 +360,25 @@ app.post('/api/login', async (req, res) => {
       console.log('Erro ao atualizar ultimo_login:', error);
     }
 
+    // Debug: verificar dados do usuário
+    console.log('🔍 Debug Login - usuario:', {
+      id: usuario.id,
+      nome: usuario.nome,
+      email: usuario.email,
+      tipo: usuario.tipo,
+      tipoLogin: tipoLogin,
+      podeAlterarStatus: usuario.podeAlterarStatus,
+      podealterarstatus: usuario.podealterarstatus
+    });
+
     // Padronizar payload e resposta para compatibilidade com Meta Ads
     const payload = {
       id: usuario.id,
       nome: usuario.nome,
       email: usuario.email,
-      tipo: usuario.tipo,
+      tipo: tipoLogin, // Usar tipoLogin ao invés de usuario.tipo
       consultor_id: usuario.consultor_id !== undefined ? usuario.consultor_id : (tipoLogin === 'consultor' ? usuario.id : null),
-      podeAlterarStatus: usuario.podeAlterarStatus || usuario.tipo === 'admin' || false
+      podeAlterarStatus: usuario.podeAlterarStatus || usuario.podealterarstatus || tipoLogin === 'admin' || false
     };
 
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
@@ -710,6 +721,16 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
       return res.status(401).json({ error: 'Usuário não encontrado' });
     }
 
+    // Debug: verificar dados do usuário no verify-token
+    console.log('🔍 Debug Verify-Token - usuario:', {
+      id: usuario.id,
+      nome: usuario.nome,
+      email: usuario.email,
+      tipo: tipo,
+      podeAlterarStatus: usuario.podeAlterarStatus,
+      podealterarstatus: usuario.podealterarstatus
+    });
+
     // Remover senha do objeto antes de enviar para o front
     const { senha: _, ...dadosUsuario } = usuario;
 
@@ -718,7 +739,7 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
         ...dadosUsuario,
         tipo,
         consultor_id,
-        podeAlterarStatus: usuario.podeAlterarStatus || tipo === 'admin' || false,
+        podeAlterarStatus: usuario.podeAlterarStatus || usuario.podealterarstatus || tipo === 'admin' || false,
         pode_ver_todas_novas_clinicas: usuario.pode_ver_todas_novas_clinicas || tipo === 'admin' || false
       }
     });
@@ -883,8 +904,23 @@ app.post('/api/clinicas', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
-app.put('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.put('/api/clinicas/:id', authenticateToken, async (req, res) => {
   try {
+    // Debug: verificar dados do usuário na requisição
+    console.log('🔍 Debug PUT Clinicas - req.user:', {
+      id: req.user.id,
+      tipo: req.user.tipo,
+      podeAlterarStatus: req.user.podeAlterarStatus
+    });
+
+    // Verificar se o usuário tem permissão para alterar status de clínicas
+    const podeAlterar = req.user.tipo === 'admin' || req.user.podeAlterarStatus === true;
+    console.log('🔍 Debug PUT Clinicas - podeAlterar:', podeAlterar);
+    
+    if (!podeAlterar) {
+      return res.status(403).json({ error: 'Você não tem permissão para alterar clínicas' });
+    }
+
     const { id } = req.params;
     console.log('🔧 PUT /api/clinicas/:id recebido');
     console.log('🔧 ID da clínica:', id);
@@ -913,6 +949,14 @@ app.put('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) =
       }
     }
     
+    // Validar status se estiver sendo atualizado
+    if (req.body.status !== undefined) {
+      const statusValidos = ['ativa', 'inativa', 'em_contato', 'nao_fechou'];
+      if (!statusValidos.includes(req.body.status)) {
+        return res.status(400).json({ error: 'Status inválido. Valores permitidos: ativa, inativa, em_contato, nao_fechou' });
+      }
+    }
+
     // Permitir atualização parcial: só atualiza os campos enviados
     const camposPermitidos = ['nome', 'endereco', 'bairro', 'cidade', 'estado', 'nicho', 'telefone', 'email', 'status'];
     const updateData = {};
@@ -1859,6 +1903,51 @@ app.post('/api/novas-clinicas', authenticateToken, async (req, res) => {
   }
 });
 
+// Rota para atualizar status de nova clínica
+app.put('/api/novas-clinicas/:id/status', authenticateToken, async (req, res) => {
+  try {
+    // Debug: verificar dados do usuário na requisição
+    console.log('🔍 Debug PUT Novas Clinicas Status - req.user:', {
+      id: req.user.id,
+      tipo: req.user.tipo,
+      podeAlterarStatus: req.user.podeAlterarStatus
+    });
+
+    // Verificar se o usuário tem permissão para alterar status
+    const podeAlterar = req.user.tipo === 'admin' || req.user.podeAlterarStatus === true;
+    console.log('🔍 Debug PUT Novas Clinicas Status - podeAlterar:', podeAlterar);
+    
+    if (!podeAlterar) {
+      return res.status(403).json({ error: 'Você não tem permissão para alterar status de clínicas' });
+    }
+
+    const { id } = req.params;
+    const { status } = req.body;
+
+    // Validar status
+    const statusValidos = ['tem_interesse', 'nao_tem_interesse', 'em_contato', 'nao_fechou'];
+    if (!status || !statusValidos.includes(status)) {
+      return res.status(400).json({ error: 'Status inválido. Valores permitidos: tem_interesse, nao_tem_interesse, em_contato, nao_fechou' });
+    }
+
+    const { data, error } = await supabase
+      .from('novas_clinicas')
+      .update({ status })
+      .eq('id', id)
+      .select();
+
+    if (error) throw error;
+    
+    if (!data || data.length === 0) {
+      return res.status(404).json({ error: 'Nova clínica não encontrada' });
+    }
+
+    res.json({ message: 'Status atualizado com sucesso!', clinica: data[0] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.put('/api/novas-clinicas/:id/pegar', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -1891,7 +1980,7 @@ app.put('/api/novas-clinicas/:id/pegar', authenticateToken, async (req, res) => 
       nicho: clinicaAtual.nicho,
       telefone: clinicaAtual.telefone,
       email: clinicaAtual.email,
-      status: 'ativo',
+      status: 'ativa',
       consultor_id: clinicaAtual.criado_por_consultor_id // Definir consultor_id baseado em quem criou
     };
 

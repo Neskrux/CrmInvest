@@ -6,7 +6,7 @@ import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 const Clinicas = () => {
-  const { makeRequest, user, isAdmin } = useAuth();
+  const { makeRequest, user, isAdmin, podeAlterarStatus } = useAuth();
   const { showSuccessToast, showErrorToast } = useToast();
   const [clinicas, setClinicas] = useState([]);
   const [novasClinicas, setNovasClinicas] = useState([]);
@@ -36,7 +36,7 @@ const Clinicas = () => {
     nicho: '',
     telefone: '',
     email: '',
-    status: 'ativo'
+    status: 'ativa'
   });
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
   const [novaClinicaFormData, setNovaClinicaFormData] = useState({
@@ -61,7 +61,9 @@ const Clinicas = () => {
   // Status disponíveis para novas clínicas
   const statusNovaClinicaOptions = [
     { value: 'tem_interesse', label: 'Tem Interesse', color: '#10b981' },
-    { value: 'nao_tem_interesse', label: 'Não tem Interesse', color: '#ef4444' }
+    { value: 'nao_tem_interesse', label: 'Não tem Interesse', color: '#ef4444' },
+    { value: 'em_contato', label: 'Em Contato', color: '#3b82f6' },
+    { value: 'nao_fechou', label: 'Não Fechou', color: '#f59e0b' }
   ];
 
   // Verificar se usuário é consultor
@@ -386,7 +388,7 @@ const Clinicas = () => {
           nicho: '',
           telefone: '',
           email: '',
-          status: 'ativo'
+          status: 'ativa'
         });
         setCidadeCustomizada(false);
         fetchClinicas();
@@ -466,7 +468,7 @@ const Clinicas = () => {
       nicho: '',
       telefone: '',
       email: '',
-      status: 'ativo'
+      status: 'ativa'
     });
     setCidadeCustomizada(false);
     setEditingClinica(null);
@@ -556,6 +558,27 @@ const Clinicas = () => {
     return statusNovaClinicaOptions.find(option => option.value === status) || statusNovaClinicaOptions[0];
   };
 
+  const alterarStatusNovaClinica = async (clinicaId, novoStatus) => {
+    try {
+      const response = await makeRequest(`/novas-clinicas/${clinicaId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: novoStatus })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        showSuccessToast('Status atualizado com sucesso!');
+        fetchNovasClinicas();
+      } else {
+        showErrorToast('Erro ao alterar status: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao alterar status:', error);
+      showErrorToast('Erro ao alterar status da clínica');
+    }
+  };
+
   const handleNovaClinicaInputChange = (e) => {
     let { name, value } = e.target;
     
@@ -590,8 +613,8 @@ const Clinicas = () => {
   };
 
   const toggleStatus = async (clinica) => {
-    const novaStatus = clinica.status === 'ativo' ? 'bloqueado' : 'ativo';
-    const acao = novaStatus === 'ativo' ? 'desbloquear' : 'bloquear';
+    const novaStatus = clinica.status === 'ativa' ? 'inativa' : 'ativa';
+    const acao = novaStatus === 'ativa' ? 'ativar' : 'inativar';
     
     if (!window.confirm(`Deseja ${acao} a clínica "${clinica.nome}"?`)) {
       return;
@@ -614,7 +637,7 @@ const Clinicas = () => {
       const data = await response.json();
       
       if (response.ok) {
-        showSuccessToast(`Clínica ${acao}da com sucesso!`);
+        showSuccessToast(`Clínica ${acao === 'ativar' ? 'ativada' : 'inativada'} com sucesso!`);
         fetchClinicas();
       } else {
         showErrorToast('Erro ao alterar status: ' + data.error);
@@ -1219,8 +1242,10 @@ const Clinicas = () => {
                 className="form-select"
               >
                 <option value="">Todas as clínicas</option>
-                <option value="ativo">Desbloqueadas</option>
-                <option value="bloqueado">Bloqueadas</option>
+                <option value="ativa">Ativas</option>
+                <option value="inativa">Inativas</option>
+                <option value="em_contato">Em Contato</option>
+                <option value="nao_fechou">Não Fechou</option>
               </select>
             </div>
           </div>
@@ -1268,7 +1293,7 @@ const Clinicas = () => {
               </thead>
               <tbody>
                 {clinicasFiltradas.map(clinica => (
-                  <tr key={clinica.id} className={clinica.status === 'bloqueado' ? 'clinica-bloqueada' : ''}>
+                  <tr key={clinica.id} className={clinica.status === 'inativa' ? 'clinica-bloqueada' : ''}>
                     <td>
                       <strong>{clinica.nome}</strong>
                     </td>
@@ -1313,9 +1338,67 @@ const Clinicas = () => {
                       )}
                     </td>
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
-                      <span className={`badge ${clinica.status === 'ativo' ? 'badge-success' : 'badge-danger'}`}>
-                        {clinica.status === 'ativo' ? 'Desbloqueada' : 'Bloqueada'}
-                      </span>
+                      {(isAdmin || podeAlterarStatus) ? (
+                        <select
+                          value={clinica.status}
+                          onChange={(e) => {
+                            const novoStatus = e.target.value;
+                            const clinicaCompleta = clinicas.find(c => c.id === clinica.id);
+                            if (clinicaCompleta) {
+                              const clinicaParaAtualizar = { ...clinicaCompleta, status: novoStatus };
+                              makeRequest(`/clinicas/${clinica.id}`, {
+                                method: 'PUT',
+                                body: JSON.stringify(clinicaParaAtualizar)
+                              }).then(response => response.json()).then(data => {
+                                if (data.error) {
+                                  showErrorToast('Erro ao alterar status: ' + data.error);
+                                } else {
+                                  showSuccessToast('Status atualizado com sucesso!');
+                                  fetchClinicas();
+                                }
+                              }).catch(error => {
+                                console.error('Erro ao alterar status:', error);
+                                showErrorToast('Erro ao alterar status da clínica');
+                              });
+                            }
+                          }}
+                          className="form-select"
+                          style={{
+                            fontSize: '0.75rem',
+                            padding: '0.25rem 0.5rem',
+                            border: 'none',
+                            backgroundColor: 
+                              clinica.status === 'ativa' ? '#dcfce7' : 
+                              clinica.status === 'inativa' ? '#fef2f2' :
+                              clinica.status === 'em_contato' ? '#dbeafe' :
+                              clinica.status === 'nao_fechou' ? '#fef3c7' : '#f3f4f6',
+                            color: 
+                              clinica.status === 'ativa' ? '#166534' : 
+                              clinica.status === 'inativa' ? '#dc2626' :
+                              clinica.status === 'em_contato' ? '#1d4ed8' :
+                              clinica.status === 'nao_fechou' ? '#d97706' : '#374151',
+                            fontWeight: '600',
+                            borderRadius: '0.375rem'
+                          }}
+                        >
+                          <option value="ativa">Ativa</option>
+                          <option value="inativa">Inativa</option>
+                          <option value="em_contato">Em Contato</option>
+                          <option value="nao_fechou">Não Fechou</option>
+                        </select>
+                      ) : (
+                        <span className={`badge ${
+                          clinica.status === 'ativa' ? 'badge-success' : 
+                          clinica.status === 'inativa' ? 'badge-danger' :
+                          clinica.status === 'em_contato' ? 'badge-primary' :
+                          clinica.status === 'nao_fechou' ? 'badge-warning' : 'badge-secondary'
+                        }`}>
+                          {clinica.status === 'ativa' ? 'Ativa' : 
+                           clinica.status === 'inativa' ? 'Inativa' :
+                           clinica.status === 'em_contato' ? 'Em Contato' :
+                           clinica.status === 'nao_fechou' ? 'Não Fechou' : clinica.status}
+                        </span>
+                      )}
                     </td>
                     <td>
                       {isConsultor ? (
@@ -1332,46 +1415,50 @@ const Clinicas = () => {
                       ) : (
                         <>
                           <button
-                            onClick={() => handleEdit(clinica)}
-                            className="btn-action"
-                            title="Editar"
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => toggleStatus(clinica)}
-                            className="btn-action"
-                            title={clinica.status === 'ativo' ? 'Bloquear clínica' : 'Desbloquear clínica'}
-                            style={{ marginLeft: '0.5rem' }}
-                          >
-                            {clinica.status === 'ativo' ? (
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                                <circle cx="12" cy="16" r="1"></circle>
-                                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                              </svg>
-                            ) : (
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                                <circle cx="12" cy="16" r="1"></circle>
-                                <path d="M7 11V7a5 5 0 0 1 9.9 0"></path>
-                              </svg>
-                            )}
-                          </button>
-                          <button
                             onClick={() => handleView(clinica)}
                             className="btn-action"
                             title="Visualizar"
-                            style={{ marginLeft: '0.5rem' }}
                           >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                               <circle cx="12" cy="12" r="3" />
                             </svg>
                           </button>
+                          {(isAdmin || podeAlterarStatus) && (
+                            <>
+                              <button
+                                onClick={() => handleEdit(clinica)}
+                                className="btn-action"
+                                title="Editar"
+                                style={{ marginLeft: '0.5rem' }}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => toggleStatus(clinica)}
+                                className="btn-action"
+                                title={clinica.status === 'ativa' ? 'Inativar clínica' : 'Ativar clínica'}
+                                style={{ marginLeft: '0.5rem' }}
+                              >
+                                {clinica.status === 'ativa' ? (
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                    <circle cx="12" cy="16" r="1"></circle>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                  </svg>
+                                ) : (
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                    <circle cx="12" cy="16" r="1"></circle>
+                                    <path d="M7 11V7a5 5 0 0 1 9.9 0"></path>
+                                  </svg>
+                                )}
+                              </button>
+                            </>
+                          )}
                         </>
                       )}
                     </td>
@@ -1476,16 +1563,39 @@ const Clinicas = () => {
                           )}
                         </td>
                         <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
-                          <span 
-                            className="badge"
-                            style={{
-                              backgroundColor: statusInfo.color + '20',
-                              color: statusInfo.color,
-                              border: `1px solid ${statusInfo.color}`
-                            }}
-                          >
-                            {statusInfo.label}
-                          </span>
+                          {(isAdmin || podeAlterarStatus) ? (
+                            <select
+                              value={clinica.status}
+                              onChange={(e) => alterarStatusNovaClinica(clinica.id, e.target.value)}
+                              className="form-select"
+                              style={{
+                                fontSize: '0.75rem',
+                                padding: '0.25rem 0.5rem',
+                                border: 'none',
+                                backgroundColor: statusInfo.color + '20',
+                                color: statusInfo.color,
+                                fontWeight: '600',
+                                borderRadius: '0.375rem'
+                              }}
+                            >
+                              {statusNovaClinicaOptions.map(option => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span 
+                              className="badge"
+                              style={{
+                                backgroundColor: statusInfo.color + '20',
+                                color: statusInfo.color,
+                                border: `1px solid ${statusInfo.color}`
+                              }}
+                            >
+                              {statusInfo.label}
+                            </span>
+                          )}
                         </td>
                         <td style={{ display: isMobile ? 'none' : 'table-cell' }}>{formatarData(clinica.created_at)}</td>
                         <td style={{
@@ -1509,7 +1619,12 @@ const Clinicas = () => {
                             <button
                               onClick={() => aprovarClinica(clinica.id)}
                               className="btn btn-primary"
-                              style={{ fontSize: '0.875rem', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap' }}
+                              style={{ 
+                                fontSize: '0.875rem', 
+                                padding: '0.5rem 0.75rem', 
+                                whiteSpace: 'nowrap',
+                                marginLeft: '0.5rem'
+                              }}
                             >
                               Aprovar
                             </button>
@@ -1704,8 +1819,10 @@ const Clinicas = () => {
                   value={formData.status}
                   onChange={handleInputChange}
                 >
-                  <option value="ativo">Desbloqueada (padrão)</option>
-                  <option value="bloqueado">Bloqueada</option>
+                  <option value="ativa">Ativa (padrão)</option>
+                  <option value="inativa">Inativa</option>
+                  <option value="em_contato">Em Contato</option>
+                  <option value="nao_fechou">Não Fechou</option>
                 </select>
               </div>
 
@@ -1813,8 +1930,16 @@ const Clinicas = () => {
                    <div>
                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Status</label>
                      <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
-                       <span className={`badge ${viewingClinica.status === 'ativo' ? 'badge-success' : 'badge-danger'}`}>
-                         {viewingClinica.status === 'ativo' ? 'Desbloqueada' : 'Bloqueada'}
+                       <span className={`badge ${
+                         viewingClinica.status === 'ativa' ? 'badge-success' : 
+                         viewingClinica.status === 'inativa' ? 'badge-danger' :
+                         viewingClinica.status === 'em_contato' ? 'badge-primary' :
+                         viewingClinica.status === 'nao_fechou' ? 'badge-warning' : 'badge-secondary'
+                       }`}>
+                         {viewingClinica.status === 'ativa' ? 'Ativa' : 
+                          viewingClinica.status === 'inativa' ? 'Inativa' :
+                          viewingClinica.status === 'em_contato' ? 'Em Contato' :
+                          viewingClinica.status === 'nao_fechou' ? 'Não Fechou' : viewingClinica.status}
                        </span>
                      </p>
                    </div>
