@@ -65,26 +65,35 @@ const Perfil = () => {
 
     const buscarLinkPersonalizado = async () => {
       try {
-        const consultorId = user.consultor_id || user.id;
+        // Usar a rota de perfil que o consultor pode acessar
+        const consultorResponse = await makeRequest('/consultores/perfil');
+        const responseData = await consultorResponse.json();
         
-        // Primeiro buscar dados do consultor para saber se é freelancer
-        const consultorResponse = await makeRequest(`/consultores/${consultorId}`);
-        const consultorData = await consultorResponse.json();
-        
-        if (consultorData.is_freelancer !== false) {
-          // Freelancer: buscar link personalizado
-          const response = await makeRequest(`/consultores/${consultorId}/link-personalizado`);
-          const data = await response.json();
+        if (consultorResponse.ok && responseData.consultor) {
+          const consultorData = responseData.consultor;
           
-          if (response.ok) {
-            setLinkPersonalizado(data.link_personalizado);
+          // Verificar se é consultor interno (tem as duas permissões)
+          const isConsultorInterno = consultorData.pode_ver_todas_novas_clinicas === true && consultorData.podealterarstatus === true;
+          
+          if (!isConsultorInterno) {
+            // Freelancer: buscar link personalizado baseado no código de referência
+            if (consultorData.codigo_referencia) {
+              setLinkPersonalizado(`https://crm.investmoneysa.com.br/captura-lead?ref=${consultorData.codigo_referencia}`);
+            } else {
+              // Se não tem código de referência, mostrar mensagem
+              setLinkPersonalizado(null);
+            }
+          } else {
+            // Interno: usar link geral
+            setLinkPersonalizado('https://crm.investmoneysa.com.br/captura-lead');
           }
         } else {
-          // Interno: usar link geral
-          setLinkPersonalizado('https://crm.investmoneysa.com.br/captura-lead');
+          console.error('Erro ao buscar dados do consultor:', responseData);
+          setLinkPersonalizado(null);
         }
       } catch (error) {
         console.error('Erro ao buscar link personalizado:', error);
+        setLinkPersonalizado(null);
       } finally {
         setLoadingLink(false);
       }
@@ -521,7 +530,7 @@ const Perfil = () => {
       {user?.tipo === 'consultor' && (
         <div className="card" style={{ maxWidth: '600px', margin: '2rem auto 0' }}>
           <div className="card-header">
-            <h2 className="card-title">🔗 Meu Link de Divulgação</h2>
+            <h2 className="card-title">Meu Link de Divulgação</h2>
           </div>
           
           <div className="card-body">
@@ -558,7 +567,7 @@ const Perfil = () => {
                       fontWeight: '600',
                       fontSize: '1rem'
                     }}>
-                      🎯 {linkPersonalizado?.includes('?ref=') ? 'Seu Link Personalizado:' : 'Link Geral da Empresa:'}
+                      {linkPersonalizado?.includes('?ref=') ? 'Seu Link Personalizado:' : 'Link Geral da Empresa:'}
                     </span>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button
@@ -577,25 +586,7 @@ const Perfil = () => {
                           gap: '6px'
                         }}
                       >
-                        📋 Copiar
-                      </button>
-                      <button
-                        onClick={() => compartilharWhatsApp(linkPersonalizado)}
-                        style={{
-                          background: '#25d366',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '8px',
-                          padding: '8px 12px',
-                          fontSize: '14px',
-                          cursor: 'pointer',
-                          fontWeight: '500',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}
-                      >
-                        📱 WhatsApp
+                        Copiar
                       </button>
                     </div>
                   </div>
@@ -620,7 +611,7 @@ const Perfil = () => {
                   padding: '1rem'
                 }}>
                   <div style={{ fontSize: '14px', color: '#1e40af', fontWeight: '600', marginBottom: '8px' }}>
-                    💡 Como usar seu link:
+                    Como usar seu link:
                   </div>
                   <ul style={{ fontSize: '13px', color: '#1e40af', margin: '0', paddingLeft: '1.5rem', lineHeight: '1.6' }}>
                     <li>Compartilhe este link em suas redes sociais</li>
@@ -628,11 +619,11 @@ const Perfil = () => {
                     {linkPersonalizado?.includes('?ref=') ? (
                       <>
                         <li>Todos os leads que se cadastrarem através deste link serão automaticamente associados a você</li>
-                        <li>Acompanhe seus leads na aba "Novos Leads" e na tela de "Pacientes"</li>
+                        <li>Acompanhe seus leads na tela de "Pacientes"</li>
                       </>
                     ) : (
                       <>
-                        <li>Os leads aparecerão na aba "Novos Leads" para você e outros consultores internos</li>
+                        <li>Os leads aparecerão na tela de "Novos Leads" para você e outros consultores internos</li>
                         <li>Você pode "pegar" os leads que desejar atender</li>
                       </>
                     )}

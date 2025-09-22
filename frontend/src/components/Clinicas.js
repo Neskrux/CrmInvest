@@ -1289,6 +1289,7 @@ const Clinicas = () => {
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Nicho</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Contato</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Proprietário</th>
+                  <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Indicado por</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Status</th>
                   <th>Ações</th>
                 </tr>
@@ -1337,6 +1338,15 @@ const Clinicas = () => {
                         <span className="badge" style={{ backgroundColor: '#10b981', color: 'white' }}>
                           Pública
                         </span>
+                      )}
+                    </td>
+                    <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                      {clinica.consultor_nome ? (
+                        <span className="badge" style={{ backgroundColor: '#8b5cf6', color: 'white' }}>
+                          {clinica.consultor_nome}
+                        </span>
+                      ) : (
+                        <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>-</span>
                       )}
                     </td>
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
@@ -1554,9 +1564,9 @@ const Clinicas = () => {
                           ) : '-'}
                         </td>
                         <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
-                          {clinica.criado_por_consultor_id ? (
-                            <span className="badge" style={{ backgroundColor: '#3b82f6', color: 'white' }}>
-                              Exclusiva
+                          {clinica.consultor_nome ? (
+                            <span className="badge" style={{ backgroundColor: '#8b5cf6', color: 'white' }}>
+                              {clinica.consultor_nome}
                             </span>
                           ) : (
                             <span className="badge" style={{ backgroundColor: '#10b981', color: 'white' }}>

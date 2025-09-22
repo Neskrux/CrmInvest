@@ -4,7 +4,7 @@ import { useToast } from '../components/Toast';
 import TutorialAgendamentos from './TutorialAgendamentos';
 
 const Agendamentos = () => {
-  const { makeRequest, user, isAdmin, podeAlterarStatus } = useAuth();
+  const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor } = useAuth();
   const { showSuccessToast, showErrorToast } = useToast();
   const [agendamentos, setAgendamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
@@ -72,10 +72,15 @@ const Agendamentos = () => {
     fetchConsultores();
     fetchClinicas();
     
+    // Aplicar filtro automático por consultor se necessário
+    if (deveFiltrarPorConsultor && user?.consultor_id) {
+      setFiltroConsultor(String(user.consultor_id));
+    }
+    
     // Verificar se tutorial foi completado
     const completed = localStorage.getItem('tutorial-agendamentos-completed');
     setTutorialCompleted(!!completed);
-  }, []);
+  }, [deveFiltrarPorConsultor, user?.consultor_id]);
 
   // Atualização automática dos dados a cada 30 segundos
   useEffect(() => {
@@ -521,7 +526,10 @@ const Agendamentos = () => {
   };
 
   const limparFiltros = () => {
-    setFiltroConsultor('');
+    // Só limpar filtro de consultor se não estiver com filtro automático ativo
+    if (!deveFiltrarPorConsultor) {
+      setFiltroConsultor('');
+    }
     setFiltroClinica('');
     setFiltroDataInicio('');
     setFiltroDataFim('');
@@ -677,6 +685,11 @@ const Agendamentos = () => {
                   value={filtroConsultor}
                   onChange={(e) => setFiltroConsultor(e.target.value)}
                   className="form-select"
+                  disabled={deveFiltrarPorConsultor}
+                  style={{ 
+                    opacity: deveFiltrarPorConsultor ? 0.6 : 1,
+                    cursor: deveFiltrarPorConsultor ? 'not-allowed' : 'pointer'
+                  }}
                 >
                   <option value="">Todos os consultores</option>
                   {consultores.map(consultor => (
@@ -685,6 +698,16 @@ const Agendamentos = () => {
                     </option>
                   ))}
                 </select>
+                {deveFiltrarPorConsultor && (
+                  <div style={{ 
+                    fontSize: '0.75rem', 
+                    color: '#6b7280', 
+                    marginTop: '0.25rem',
+                    fontStyle: 'italic'
+                  }}>
+                    Filtro automático ativo - mostrando apenas seus dados
+                  </div>
+                )}
               </div>
 
               <div className="form-group" style={{ margin: 0 }}>

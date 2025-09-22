@@ -5,7 +5,7 @@ import TutorialPacientes from './TutorialPacientes';
 import { useAudio } from '../contexts/AudioContext';
 
 const Pacientes = () => {
-  const { makeRequest, user, isAdmin, podeAlterarStatus } = useAuth();
+  const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor } = useAuth();
   
   // Verificar se usuário é consultor
   const isConsultor = user?.tipo === 'consultor';
@@ -167,35 +167,40 @@ const Pacientes = () => {
     fetchConsultores();
     fetchClinicas();
     
-    // Buscar novos leads apenas se pode alterar status (não freelancer)
-    if (podeAlterarStatus) {
+    // Buscar novos leads apenas se pode alterar status (não freelancer) ou é consultor interno
+    if (podeAlterarStatus || isConsultorInterno) {
       fetchNovosLeads();
+    }
+    
+    // Aplicar filtro automático por consultor se necessário
+    if (deveFiltrarPorConsultor && user?.consultor_id) {
+      setFiltroConsultor(String(user.consultor_id));
     }
     
     // Verificar se tutorial foi completado
     const completed = localStorage.getItem('tutorial-pacientes-completed');
     setTutorialCompleted(!!completed);
-  }, [podeAlterarStatus]);
+  }, [podeAlterarStatus, isConsultorInterno, deveFiltrarPorConsultor, user?.consultor_id]);
 
   // Garantir que freelancers fiquem na aba "Pacientes"
   useEffect(() => {
-    if (isConsultor && !podeAlterarStatus && activeTab === 'novos-leads') {
+    if (isConsultor && !podeAlterarStatus && !isConsultorInterno && activeTab === 'novos-leads') {
       setActiveTab('pacientes');
     }
-  }, [podeAlterarStatus, activeTab, isConsultor]);
+  }, [podeAlterarStatus, isConsultorInterno, activeTab, isConsultor]);
 
   // Atualização automática dos dados a cada 30 segundos
   useEffect(() => {
     const interval = setInterval(() => {
       fetchPacientes();
-      // Buscar novos leads apenas se pode alterar status (não freelancer)
-      if (podeAlterarStatus) {
+      // Buscar novos leads apenas se pode alterar status (não freelancer) ou é consultor interno
+      if (podeAlterarStatus || isConsultorInterno) {
         fetchNovosLeads();
       }
     }, 30000); // 30 segundos
 
     return () => clearInterval(interval);
-  }, [podeAlterarStatus, isConsultor]);
+  }, [podeAlterarStatus, isConsultorInterno, isConsultor]);
 
   // Atualizar novos leads quando mudar de aba
   useEffect(() => {
@@ -944,8 +949,8 @@ const Pacientes = () => {
   };
 
   const pacientesFiltrados = pacientes.filter(p => {
-    // Mostrar apenas pacientes que já têm consultor atribuído (número válido)
-    if (!p.consultor_id || p.consultor_id === '' || p.consultor_id === null || p.consultor_id === undefined || Number(p.consultor_id) === 0) return false;
+    // Consultores internos veem todos os pacientes, freelancers veem apenas os atribuídos
+    if (!isConsultorInterno && (!p.consultor_id || p.consultor_id === '' || p.consultor_id === null || p.consultor_id === undefined || Number(p.consultor_id) === 0)) return false;
     
     const matchNome = !filtroNome || p.nome.toLowerCase().includes(filtroNome.toLowerCase());
     const matchTelefone = !filtroTelefone || (p.telefone || '').includes(filtroTelefone);
@@ -1079,16 +1084,18 @@ const Pacientes = () => {
         </button>
         {/* Mostrar aba "Novos Leads" apenas para admins e consultores internos */}
         {(() => {
-          // Mostrar aba para admins ou consultores que podem alterar status (não freelancers)
-          const shouldShow = isAdmin || podeAlterarStatus;
+          // Mostrar aba para admins ou consultores internos (não freelancers)
+          const shouldShow = isAdmin || isConsultorInterno;
           
           console.log('Debug - Condição aba Novos Leads:', {
             isAdmin,
             isConsultor,
+            isConsultorInterno,
             podeAlterarStatus,
             shouldShow,
             userType: user?.tipo,
-            condition: `isAdmin: ${isAdmin} || podeAlterarStatus: ${podeAlterarStatus}`
+            isFreelancer: user?.is_freelancer,
+            condition: `isAdmin: ${isAdmin} || isConsultorInterno: ${isConsultorInterno}`
           });
           return shouldShow;
         })() && (
@@ -1128,7 +1135,7 @@ const Pacientes = () => {
             <div className="stat-card">
               <div className="stat-label">Exibindo</div>
               <div className="stat-value">{pacientesFiltrados.length}</div>
-              <div className="stat-sublabel">de {pacientes.filter(p => p.consultor_id && p.consultor_id !== '' && p.consultor_id !== null && p.consultor_id !== undefined && Number(p.consultor_id) !== 0).length}</div>
+              <div className="stat-sublabel">de {isConsultorInterno ? pacientes.length : pacientes.filter(p => p.consultor_id && p.consultor_id !== '' && p.consultor_id !== null && p.consultor_id !== undefined && Number(p.consultor_id) !== 0).length}</div>
             </div>
             
             <div className="stat-card">
@@ -1183,15 +1190,34 @@ const Pacientes = () => {
                     </select>
                   </div>
 
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Consultor</label>
-                    <select className="form-select" value={filtroConsultor} onChange={e => setFiltroConsultor(e.target.value)}>
-                      <option value="">Todos</option>
-                      {consultores.map(c => (
-                        <option key={c.id} value={String(c.id)}>{c.nome}</option>
-                      ))}
-                    </select>
-                  </div>
+                   <div className="form-group" style={{ margin: 0 }}>
+                     <label className="form-label">Consultor</label>
+                     <select 
+                       className="form-select" 
+                       value={filtroConsultor} 
+                       onChange={e => setFiltroConsultor(e.target.value)}
+                       disabled={deveFiltrarPorConsultor}
+                       style={{ 
+                         opacity: deveFiltrarPorConsultor ? 0.6 : 1,
+                         cursor: deveFiltrarPorConsultor ? 'not-allowed' : 'pointer'
+                       }}
+                     >
+                       <option value="">Todos</option>
+                       {consultores.map(c => (
+                         <option key={c.id} value={String(c.id)}>{c.nome}</option>
+                       ))}
+                     </select>
+                     {deveFiltrarPorConsultor && (
+                       <div style={{ 
+                         fontSize: '0.75rem', 
+                         color: '#6b7280', 
+                         marginTop: '0.25rem',
+                         fontStyle: 'italic'
+                       }}>
+                         Filtro automático ativo - mostrando apenas seus dados
+                       </div>
+                     )}
+                   </div>
                 </div>
                 <div className="grid grid-2" style={{ gap: '1rem', marginTop: '1rem' }}>
                   <div className="form-group" style={{ margin: 0 }}>
@@ -1213,16 +1239,19 @@ const Pacientes = () => {
                     />
                   </div>
                 </div>
-                <button className="btn btn-sm btn-secondary" style={{ marginTop: '1rem' }} onClick={() => {
-                  setFiltroNome(''); 
-                  setFiltroTelefone(''); 
-                  setFiltroCPF(''); 
-                  setFiltroTipo(''); 
-                  setFiltroStatus(''); 
-                  setFiltroConsultor('');
-                  setFiltroDataInicio('');
-                  setFiltroDataFim('');
-                }}>Limpar Filtros</button>
+                 <button className="btn btn-sm btn-secondary" style={{ marginTop: '1rem' }} onClick={() => {
+                   setFiltroNome(''); 
+                   setFiltroTelefone(''); 
+                   setFiltroCPF(''); 
+                   setFiltroTipo(''); 
+                   setFiltroStatus(''); 
+                   // Só limpar filtro de consultor se não estiver com filtro automático ativo
+                   if (!deveFiltrarPorConsultor) {
+                     setFiltroConsultor('');
+                   }
+                   setFiltroDataInicio('');
+                   setFiltroDataFim('');
+                 }}>Limpar Filtros</button>
               </div>
             )}
           </div>
@@ -1348,7 +1377,7 @@ const Pacientes = () => {
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarData(paciente.created_at)}</td>
                           <td>
-                            {!isConsultor && (
+                            {!isConsultor ? (
                               <button
                                 onClick={() => handleEdit(paciente)}
                                 className="btn-action"
@@ -1359,7 +1388,7 @@ const Pacientes = () => {
                                   <path d="M18.5 2.5a2.121 2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                                 </svg>
                               </button>
-                            )}
+                            ) : null}
                             <button
                               onClick={() => handleView(paciente)}
                               className="btn-action"

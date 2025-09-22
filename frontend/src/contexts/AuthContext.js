@@ -174,7 +174,14 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated: !!user && !!token,
     isAdmin: user?.tipo === 'admin',
     isConsultor: user?.tipo === 'consultor',
-    podeAlterarStatus: user?.podeAlterarStatus === true || user?.tipo === 'admin'
+    isFreelancer: user?.is_freelancer === true,
+    // Consultor interno: tem pode_ver_todas_novas_clinicas=true E podealterarstatus=true
+    isConsultorInterno: user?.tipo === 'consultor' && user?.pode_ver_todas_novas_clinicas === true && user?.podealterarstatus === true,
+    podeAlterarStatus: user?.podealterarstatus === true || user?.tipo === 'admin',
+    // Pode ver todos os dados: admin OU consultor interno (com ambas as permissões)
+    podeVerTodosDados: user?.tipo === 'admin' || (user?.tipo === 'consultor' && user?.pode_ver_todas_novas_clinicas === true && user?.podealterarstatus === true),
+    // Deve filtrar por consultor: é consultor mas NÃO é interno (não tem as duas permissões)
+    deveFiltrarPorConsultor: user?.tipo === 'consultor' && !(user?.pode_ver_todas_novas_clinicas === true && user?.podealterarstatus === true)
   };
 
   return (

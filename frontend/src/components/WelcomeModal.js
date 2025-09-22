@@ -16,25 +16,35 @@ const WelcomeModal = ({ isOpen, onClose, onStartTutorial }) => {
 
   const fetchLinkPersonalizado = async () => {
     try {
-      const consultorId = user.consultor_id || user.id;
-      const response = await makeRequest(`/consultores/${consultorId}/link-personalizado`);
-      const data = await response.json();
+      // Usar a rota de perfil que o consultor pode acessar
+      const consultorResponse = await makeRequest('/consultores/perfil');
+      const responseData = await consultorResponse.json();
       
-      if (response.ok) {
-        // Verificar se é freelancer para mostrar link personalizado ou geral
-        const consultorResponse = await makeRequest(`/consultores/${consultorId}`);
-        const consultorData = await consultorResponse.json();
+      if (consultorResponse.ok && responseData.consultor) {
+        const consultorData = responseData.consultor;
         
-        if (consultorData.is_freelancer !== false) {
-          // Freelancer: mostrar link personalizado
-          setLinkPersonalizado(data.link_personalizado);
+        // Verificar se é consultor interno (tem as duas permissões)
+        const isConsultorInterno = consultorData.pode_ver_todas_novas_clinicas === true && consultorData.podealterarstatus === true;
+        
+        if (!isConsultorInterno) {
+          // Freelancer: buscar link personalizado baseado no código de referência
+          if (consultorData.codigo_referencia) {
+            setLinkPersonalizado(`https://crm.investmoneysa.com.br/captura-lead?ref=${consultorData.codigo_referencia}`);
+          } else {
+            // Se não tem código de referência, mostrar mensagem
+            setLinkPersonalizado(null);
+          }
         } else {
-          // Interno: mostrar link geral
+          // Interno: usar link geral
           setLinkPersonalizado('https://crm.investmoneysa.com.br/captura-lead');
         }
+      } else {
+        console.error('Erro ao buscar dados do consultor:', responseData);
+        setLinkPersonalizado(null);
       }
     } catch (error) {
       console.error('Erro ao buscar link personalizado:', error);
+      setLinkPersonalizado(null);
     } finally {
       setLoadingLink(false);
     }
@@ -110,7 +120,7 @@ const WelcomeModal = ({ isOpen, onClose, onStartTutorial }) => {
                   fontWeight: '600',
                   fontSize: '14px'
                 }}>
-                  🎯 {linkPersonalizado?.includes('?ref=') ? 'Seu Link Personalizado:' : 'Link Geral da Empresa:'}
+                  {linkPersonalizado?.includes('?ref=') ? 'Seu Link Personalizado:' : 'Link Geral da Empresa:'}
                 </span>
                 <button
                   onClick={() => copiarLink(linkPersonalizado)}
@@ -125,7 +135,7 @@ const WelcomeModal = ({ isOpen, onClose, onStartTutorial }) => {
                     fontWeight: '500'
                   }}
                 >
-                  📋 Copiar
+                  Copiar
                 </button>
               </div>
               <div style={{ 
@@ -160,7 +170,7 @@ const WelcomeModal = ({ isOpen, onClose, onStartTutorial }) => {
           )}
           
           <p style={{ marginBottom: '16px', fontSize: '14px', color: '#6b7280' }}>
-            💡 <strong>Dica:</strong> Seu link estará sempre disponível na seção "Perfil" 
+            <strong>Dica:</strong> Seu link estará sempre disponível na seção "Perfil" 
             quando precisar acessá-lo novamente!
           </p>
           <p style={{ marginBottom: '0' }}>

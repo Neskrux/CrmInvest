@@ -4,7 +4,7 @@ import { useToast } from '../components/Toast';
 import TutorialFechamentos from './TutorialFechamentos';
 
 const Fechamentos = () => {
-  const { makeRequest, isAdmin, user, podeAlterarStatus } = useAuth();
+  const { makeRequest, isAdmin, user, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor } = useAuth();
   const [fechamentos, setFechamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [consultores, setConsultores] = useState([]);
@@ -44,10 +44,15 @@ const Fechamentos = () => {
   useEffect(() => {
     carregarDados();
     
+    // Aplicar filtro automático por consultor se necessário
+    if (deveFiltrarPorConsultor && user?.consultor_id) {
+      setFiltroConsultor(String(user.consultor_id));
+    }
+    
     // Verificar se tutorial foi completado
     const completed = localStorage.getItem('tutorial-fechamentos-completed');
     setTutorialCompleted(!!completed);
-  }, []);
+  }, [deveFiltrarPorConsultor, user?.consultor_id]);
 
   // Detectar mudanças de tamanho da tela
   useEffect(() => {
@@ -224,7 +229,10 @@ const Fechamentos = () => {
   };
 
   const limparFiltros = () => {
-    setFiltroConsultor('');
+    // Só limpar filtro de consultor se não estiver com filtro automático ativo
+    if (!deveFiltrarPorConsultor) {
+      setFiltroConsultor('');
+    }
     setFiltroClinica('');
     setFiltroMes('');
   };
@@ -777,12 +785,27 @@ const Fechamentos = () => {
                   className="form-select"
                   value={filtroConsultor} 
                   onChange={(e) => setFiltroConsultor(e.target.value)}
+                  disabled={deveFiltrarPorConsultor}
+                  style={{ 
+                    opacity: deveFiltrarPorConsultor ? 0.6 : 1,
+                    cursor: deveFiltrarPorConsultor ? 'not-allowed' : 'pointer'
+                  }}
                 >
                   <option value="">Todos</option>
                   {consultores.map(c => (
                     <option key={c.id} value={c.id}>{c.nome}</option>
                   ))}
                 </select>
+                {deveFiltrarPorConsultor && (
+                  <div style={{ 
+                    fontSize: '0.75rem', 
+                    color: '#6b7280', 
+                    marginTop: '0.25rem',
+                    fontStyle: 'italic'
+                  }}>
+                    Filtro automático ativo - mostrando apenas seus dados
+                  </div>
+                )}
               </div>
 
               <div className="form-group" style={{ margin: 0 }}>
