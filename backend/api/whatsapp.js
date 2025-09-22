@@ -11,8 +11,8 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Instância global do WhatsApp Web
-let whatsappService = null;
+// Instâncias do WhatsApp Web por usuário
+const whatsappServices = new Map();
 
 // Configuração do Multer para upload seguro
 const storage = multer.memoryStorage();
@@ -57,23 +57,128 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
+// Cache de configurações para evitar verificações repetidas
+const configCache = new Map();
+
+// Função auxiliar para obter ou criar configuração do WhatsApp do usuário
+async function getWhatsAppConfigByUser(userId) {
+  // Verificar cache primeiro
+  if (configCache.has(userId)) {
+    return configCache.get(userId);
+  }
+
+  try {
+    // Primeiro, verificar se o usuário existe na tabela usuarios
+    const { data: usuario, error: usuarioError } = await supabase
+      .from('usuarios')
+      .select('id')
+      .eq('id', userId)
+      .single();
+
+    let userIdValido = userId;
+    let isConsultor = false;
+    
+    if (usuarioError && usuarioError.code === 'PGRST116') {
+      // Usuário não existe em usuarios, verificar em consultores
+      const { data: consultor, error: consultorError } = await supabase
+        .from('consultores')
+        .select('id')
+        .eq('id', userId)
+        .single();
+
+      if (consultorError || !consultor) {
+        console.error(`Usuário ${userId} não encontrado em usuarios nem consultores`);
+        return null;
+      }
+      
+      isConsultor = true;
+    } else if (usuarioError) {
+      console.error('Erro ao verificar usuário:', usuarioError);
+      return null;
+    }
+
+    // Para consultores, buscar por consultor_id; para usuários, por usuario_id
+    let query = supabase
+      .from('whatsapp_configuracoes')
+      .select('*')
+      .eq('ativo', true);
+      
+    if (isConsultor) {
+      query = query.eq('consultor_id', userIdValido);
+    } else {
+      query = query.eq('usuario_id', userIdValido);
+    }
+    
+    let { data, error } = await query.single();
+
+    if (error && error.code === 'PGRST116') { // PGRST116 = no rows returned
+      // Configuração não existe, criar uma nova
+      console.log(`🔧 Criando nova configuração para usuário ${userIdValido}...`);
+      
+      const configData = {
+        instancia_id: `whatsapp-user-${userIdValido}`,
+        token_acesso: 'auto-generated',
+        numero_telefone: '',
+        nome_empresa: `Usuário ${userIdValido}`,
+        ativo: true
+      };
+      
+      // Para consultores, usar consultor_id; para usuários, usar usuario_id
+      if (isConsultor) {
+        configData.consultor_id = userIdValido;
+      } else {
+        configData.usuario_id = userIdValido;
+      }
+      
+      const { data: novaConfig, error: createError } = await supabase
+        .from('whatsapp_configuracoes')
+        .insert(configData)
+        .select('*')
+        .single();
+
+      if (createError) {
+        console.error('Erro ao criar configuração:', createError);
+        return null;
+      }
+
+      data = novaConfig;
+      console.log(`✅ Nova configuração criada para usuário ${userIdValido}: config_id=${data.id}`);
+    } else if (error) {
+      console.error('Erro ao buscar configuração:', error);
+      return null;
+    }
+
+    // Armazenar no cache
+    configCache.set(userId, data);
+    return data;
+  } catch (error) {
+    console.error('Erro ao buscar/criar configuração do WhatsApp:', error);
+    return null;
+  }
+}
+
 // ===== CONEXÃO WHATSAPP WEB =====
 
 // Inicializar WhatsApp Web
 router.post('/connect', authenticateToken, async (req, res) => {
   try {
-    // Se já existe uma instância, desconectar completamente primeiro
-    if (whatsappService) {
-      console.log('🔄 Desconectando instância anterior...');
-      await whatsappService.disconnect();
-      whatsappService = null;
+    const userId = req.user.id;
+    
+    // Se já existe uma instância para este usuário, desconectar completamente primeiro
+    if (whatsappServices.has(userId)) {
+      console.log(`🔄 Desconectando instância anterior do usuário ${userId}...`);
+      const existingService = whatsappServices.get(userId);
+      await existingService.disconnect();
+      whatsappServices.delete(userId);
       
       // Aguardar um pouco para garantir que a limpeza foi concluída
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
     
-    console.log('🚀 Criando nova instância do WhatsApp...');
-    whatsappService = new WhatsAppWebService();
+    console.log(`🚀 Criando nova instância do WhatsApp para usuário ${userId}...`);
+    const whatsappService = new WhatsAppWebService(userId); // CRÍTICO: passar userId para o serviço
+    whatsappServices.set(userId, whatsappService); // Armazenar por usuário
+    
     await whatsappService.initialize(0, true); // Forçar limpeza
 
     const status = whatsappService.getStatus();
@@ -81,17 +186,23 @@ router.post('/connect', authenticateToken, async (req, res) => {
       success: true,
       status: status.status,
       isConnected: status.isConnected,
+      qrCode: status.qrCode,
       message: 'WhatsApp Web inicializado com limpeza completa'
     });
   } catch (error) {
     console.error('Erro ao conectar WhatsApp:', error);
-    res.status(500).json({ error: 'Erro ao conectar WhatsApp' });
+    res.status(500).json({ error: 'Erro ao conectar WhatsApp: ' + error.message });
   }
 });
 
 // Obter status da conexão
 router.get('/status', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.id;
+    
+    // Buscar instância específica do usuário
+    const whatsappService = whatsappServices.get(userId);
+    
     if (!whatsappService) {
       return res.json({
         success: true,
@@ -148,9 +259,13 @@ router.get('/status', authenticateToken, async (req, res) => {
 // Desconectar WhatsApp
 router.post('/disconnect', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.id;
+    
+    // Buscar e desconectar instância específica do usuário
+    const whatsappService = whatsappServices.get(userId);
     if (whatsappService) {
       await whatsappService.disconnect();
-      whatsappService = null;
+      whatsappServices.delete(userId);
     }
 
     res.json({
@@ -168,23 +283,20 @@ router.post('/disconnect', authenticateToken, async (req, res) => {
 // Obter configurações do WhatsApp
 router.get('/configuracoes', authenticateToken, async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('whatsapp_configuracoes')
-      .select('*')
-      .eq('ativo', true)
-      .single();
+    const userId = req.user.id;
 
-    if (error) {
-      return res.status(500).json({ error: 'Erro ao buscar configurações' });
+    // Buscar configuração específica do usuário
+    const config = await getWhatsAppConfigByUser(userId);
+    if (!config) {
+      return res.status(404).json({ error: 'Configuração do WhatsApp não encontrada para este usuário' });
     }
 
     // Não retornar o token de acesso por segurança
-    if (data) {
-      delete data.token_acesso;
-    }
+    delete config.token_acesso;
 
-    res.json(data);
+    res.json(config);
   } catch (error) {
+    console.error('Erro ao buscar configurações:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -193,10 +305,12 @@ router.get('/configuracoes', authenticateToken, async (req, res) => {
 router.put('/configuracoes', authenticateToken, async (req, res) => {
   try {
     const { instancia_id, token_acesso, numero_telefone, nome_empresa, webhook_url } = req.body;
+    const userId = req.user.id;
 
     const { data, error } = await supabase
       .from('whatsapp_configuracoes')
       .upsert({
+        usuario_id: userId, // CRÍTICO: associar configuração ao usuário logado
         instancia_id,
         token_acesso,
         numero_telefone,
@@ -204,11 +318,14 @@ router.put('/configuracoes', authenticateToken, async (req, res) => {
         webhook_url,
         ativo: true,
         updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'usuario_id' // Atualizar se já existe configuração para este usuário
       })
       .select()
       .single();
 
     if (error) {
+      console.error('Erro ao atualizar configurações:', error);
       return res.status(500).json({ error: 'Erro ao atualizar configurações' });
     }
 
@@ -217,6 +334,7 @@ router.put('/configuracoes', authenticateToken, async (req, res) => {
 
     res.json(data);
   } catch (error) {
+    console.error('Erro ao atualizar configurações:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -228,7 +346,15 @@ router.get('/conversas', authenticateToken, async (req, res) => {
   try {
     const { page = 1, limit = 20, status, consultor_id } = req.query;
     const offset = (page - 1) * limit;
+    const userId = req.user.id;
 
+    // Buscar configuração do WhatsApp do usuário
+    const config = await getWhatsAppConfigByUser(userId);
+    if (!config) {
+      return res.status(404).json({ error: 'Configuração do WhatsApp não encontrada para este usuário' });
+    }
+
+    // Para consultores, filtrar por instancia_id que contém o ID real do usuário
     let query = supabase
       .from('whatsapp_conversas')
       .select(`
@@ -237,6 +363,7 @@ router.get('/conversas', authenticateToken, async (req, res) => {
         consultores(nome),
         whatsapp_mensagens(id, conteudo, direcao, timestamp_whatsapp)
       `)
+      .eq('configuracao_id', config.id) // FILTRO CRÍTICO: apenas conversas da configuração do usuário
       .order('ultima_mensagem_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -254,10 +381,11 @@ router.get('/conversas', authenticateToken, async (req, res) => {
       return res.status(500).json({ error: 'Erro ao buscar conversas' });
     }
 
-    // Buscar total de conversas para paginação
+    // Buscar total de conversas para paginação (com filtro de configuração)
     const { count } = await supabase
       .from('whatsapp_conversas')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .eq('configuracao_id', config.id);
 
     res.json({
       conversas: data,
@@ -269,6 +397,7 @@ router.get('/conversas', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Erro ao buscar conversas:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -277,6 +406,13 @@ router.get('/conversas', authenticateToken, async (req, res) => {
 router.get('/conversas/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user.id;
+
+    // Buscar configuração do WhatsApp do usuário
+    const config = await getWhatsAppConfigByUser(userId);
+    if (!config) {
+      return res.status(404).json({ error: 'Configuração do WhatsApp não encontrada para este usuário' });
+    }
 
     const { data, error } = await supabase
       .from('whatsapp_conversas')
@@ -287,14 +423,19 @@ router.get('/conversas/:id', authenticateToken, async (req, res) => {
         whatsapp_mensagens(*)
       `)
       .eq('id', id)
+      .eq('configuracao_id', config.id) // FILTRO CRÍTICO: verificar se a conversa pertence ao usuário
       .single();
 
     if (error) {
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Conversa não encontrada ou você não tem acesso a ela' });
+      }
       return res.status(500).json({ error: 'Erro ao buscar conversa' });
     }
 
     res.json(data);
   } catch (error) {
+    console.error('Erro ao buscar conversa:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -374,6 +515,25 @@ router.get('/conversas/:conversaId/mensagens', authenticateToken, async (req, re
     const { conversaId } = req.params;
     const { page = 1, limit = 50 } = req.query;
     const offset = (page - 1) * limit;
+    const userId = req.user.id;
+
+    // Buscar configuração do WhatsApp do usuário
+    const config = await getWhatsAppConfigByUser(userId);
+    if (!config) {
+      return res.status(404).json({ error: 'Configuração do WhatsApp não encontrada para este usuário' });
+    }
+
+    // Verificar se a conversa pertence ao usuário
+    const { data: conversa, error: conversaError } = await supabase
+      .from('whatsapp_conversas')
+      .select('id')
+      .eq('id', conversaId)
+      .eq('configuracao_id', config.id)
+      .single();
+
+    if (conversaError || !conversa) {
+      return res.status(404).json({ error: 'Conversa não encontrada ou você não tem acesso a ela' });
+    }
 
     const { data, error } = await supabase
       .from('whatsapp_mensagens')
@@ -402,6 +562,7 @@ router.get('/conversas/:conversaId/mensagens', authenticateToken, async (req, re
       }
     });
   } catch (error) {
+    console.error('Erro ao buscar mensagens:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -411,9 +572,11 @@ router.post('/conversas/:conversaId/mensagens', authenticateToken, async (req, r
   try {
     const { conversaId } = req.params;
     const { conteudo, tipo = 'text' } = req.body;
+    const userId = req.user.id;
 
-    // Verificar se WhatsApp Web está conectado
-    if (!whatsappService || !whatsappService.isConnected) {
+    // Buscar instância específica do usuário
+    const userWhatsappService = whatsappServices.get(userId);
+    if (!userWhatsappService || !userWhatsappService.isConnected) {
       return res.status(400).json({ error: 'WhatsApp não está conectado. Conecte primeiro via QR Code.' });
     }
 
@@ -429,7 +592,7 @@ router.post('/conversas/:conversaId/mensagens', authenticateToken, async (req, r
     }
 
     // Enviar mensagem via WhatsApp Web
-    const message = await whatsappService.sendMessage(conversa.numero_contato, conteudo);
+    const message = await userWhatsappService.sendMessage(conversa.numero_contato, conteudo);
 
     res.json({
       success: true,
@@ -597,11 +760,25 @@ async function processarMensagemRecebida(message, webhookData) {
       .single();
 
     if (!conversa) {
+      // Para webhooks, usar configuração do admin (usuario_id = 1)
+      // NOTA: Webhooks não têm contexto de usuário, então usamos configuração do admin
+      const { data: configAdmin, error: configError } = await supabase
+        .from('whatsapp_configuracoes')
+        .select('id')
+        .eq('usuario_id', 1)
+        .eq('ativo', true)
+        .single();
+        
+      if (configError || !configAdmin) {
+        console.error('❌ Erro: Configuração do admin não encontrada para webhook');
+        return;
+      }
+      
       // Criar nova conversa
       const { data: novaConversa } = await supabase
         .from('whatsapp_conversas')
         .insert({
-          configuracao_id: 1, // Assumindo configuração padrão
+          configuracao_id: configAdmin.id,
           numero_contato: numeroContato,
           nome_contato: webhookData.contacts?.[0]?.profile?.name || numeroContato,
           ultima_mensagem_at: timestamp.toISOString(),
@@ -778,9 +955,11 @@ async function executarAcao(automatizacao, conversa, mensagem) {
 router.post('/enviar-mensagem', authenticateToken, async (req, res) => {
   try {
     const { numero, mensagem, replyMessageId, replyContent, replyAuthor } = req.body;
+    const userId = req.user.id;
 
-    // Verificar se WhatsApp Web está conectado
-    if (!whatsappService || !whatsappService.isConnected) {
+    // Buscar instância específica do usuário
+    const userWhatsappService = whatsappServices.get(userId);
+    if (!userWhatsappService || !userWhatsappService.isConnected) {
       return res.status(400).json({ error: 'WhatsApp não está conectado. Conecte primeiro via QR Code.' });
     }
 
@@ -788,13 +967,13 @@ router.post('/enviar-mensagem', authenticateToken, async (req, res) => {
     let messageResult;
     if (replyMessageId) {
       // Enviar como reply
-      messageResult = await whatsappService.sendReplyMessage(numero, mensagem, replyMessageId, {
+      messageResult = await userWhatsappService.sendReplyMessage(numero, mensagem, replyMessageId, {
         content: replyContent,
         author: replyAuthor
       });
     } else {
       // Enviar mensagem normal
-      messageResult = await whatsappService.sendMessage(numero, mensagem);
+      messageResult = await userWhatsappService.sendMessage(numero, mensagem);
     }
 
     res.json({
@@ -814,14 +993,16 @@ router.post('/enviar-midia', authenticateToken, upload.single('file'), async (re
   try {
     const { numero, caption, replyMessageId } = req.body;
     const file = req.file;
+    const userId = req.user.id;
 
     // Verificar se arquivo foi enviado
     if (!file) {
       return res.status(400).json({ error: 'Nenhum arquivo foi enviado' });
     }
 
-    // Verificar se WhatsApp Web está conectado
-    if (!whatsappService || !whatsappService.isConnected) {
+    // Buscar instância específica do usuário
+    const userWhatsappService = whatsappServices.get(userId);
+    if (!userWhatsappService || !userWhatsappService.isConnected) {
       return res.status(400).json({ error: 'WhatsApp não está conectado. Conecte primeiro via QR Code.' });
     }
 
@@ -838,10 +1019,10 @@ router.post('/enviar-midia', authenticateToken, upload.single('file'), async (re
     
     if (replyMessageId) {
       // Enviar como resposta
-      messageResult = await whatsappService.sendMediaReply(numero, file, replyMessageId, caption || '');
+      messageResult = await userWhatsappService.sendMediaReply(numero, file, replyMessageId, caption || '');
     } else {
       // Enviar mensagem normal
-      messageResult = await whatsappService.sendMediaFile(numero, file, caption || '');
+      messageResult = await userWhatsappService.sendMediaFile(numero, file, caption || '');
     }
 
     res.json({

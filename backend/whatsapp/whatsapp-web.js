@@ -10,7 +10,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 class WhatsAppWebService {
-  constructor() {
+  constructor(userId = null) {
     this.client = null;
     this.isConnected = false;
     this.qrCode = null;
@@ -19,6 +19,106 @@ class WhatsAppWebService {
     this.reconnecting = false;
     this.sentMessages = new Set(); // Para rastrear mensagens enviadas e evitar duplicação
     this.secureStorage = new SecureStorage(); // Sistema de armazenamento seguro
+    this.userId = userId; // CRÍTICO: associar serviço ao usuário específico
+    this.configuracaoId = null; // ID da configuração do usuário
+  }
+
+  // Buscar ou criar configuração do WhatsApp para o usuário
+  async loadUserConfig() {
+    if (!this.userId) {
+      throw new Error('UserId não definido para o serviço WhatsApp');
+    }
+
+    // Se já carregou a configuração, não recarregar
+    if (this.configuracaoId) {
+      return this.configuracaoId;
+    }
+
+    try {
+      // Primeiro, verificar se o usuário existe na tabela usuarios
+      const { data: usuario, error: usuarioError } = await supabase
+        .from('usuarios')
+        .select('id')
+        .eq('id', this.userId)
+        .single();
+
+      let userIdValido = this.userId;
+      let isConsultor = false;
+      
+    if (usuarioError && usuarioError.code === 'PGRST116') {
+      // Usuário não existe em usuarios, verificar em consultores
+      const { data: consultor, error: consultorError } = await supabase
+        .from('consultores')
+        .select('id')
+        .eq('id', this.userId)
+        .single();
+
+      if (consultorError || !consultor) {
+        throw new Error(`Usuário ${this.userId} não encontrado em usuarios nem consultores`);
+      }
+      
+      isConsultor = true;
+    } else if (usuarioError) {
+      throw new Error(`Erro ao verificar usuário: ${usuarioError.message}`);
+    }
+
+      // Para consultores, buscar por consultor_id; para usuários, por usuario_id
+      let query = supabase
+        .from('whatsapp_configuracoes')
+        .select('id')
+        .eq('ativo', true);
+        
+      if (isConsultor) {
+        query = query.eq('consultor_id', userIdValido);
+      } else {
+        query = query.eq('usuario_id', userIdValido);
+      }
+      
+      let { data, error } = await query.single();
+
+      if (error && error.code === 'PGRST116') { // PGRST116 = no rows returned
+        // Configuração não existe, criar uma nova
+        console.log(`🔧 Criando nova configuração para usuário ${userIdValido}...`);
+        
+        const configData = {
+          instancia_id: `whatsapp-user-${userIdValido}`,
+          token_acesso: 'auto-generated',
+          numero_telefone: '',
+          nome_empresa: `Usuário ${userIdValido}`,
+          ativo: true
+        };
+        
+        // Para consultores, usar consultor_id; para usuários, usar usuario_id
+        if (isConsultor) {
+          configData.consultor_id = userIdValido;
+        } else {
+          configData.usuario_id = userIdValido;
+        }
+        
+        const { data: novaConfig, error: createError } = await supabase
+          .from('whatsapp_configuracoes')
+          .insert(configData)
+          .select('id')
+          .single();
+
+        if (createError) {
+          throw new Error(`Erro ao criar configuração para usuário ${userIdValido}: ${createError.message}`);
+        }
+
+        data = novaConfig;
+        console.log(`✅ Nova configuração criada para usuário ${userIdValido}: config_id=${data.id}`);
+      } else if (error) {
+        throw new Error(`Erro ao buscar configuração: ${error.message}`);
+      } else {
+        console.log(`✅ Configuração existente carregada para usuário ${userIdValido}: config_id=${data.id}`);
+      }
+
+      this.configuracaoId = data.id;
+      return this.configuracaoId;
+    } catch (error) {
+      console.error('Erro ao carregar/criar configuração do usuário:', error);
+      throw error;
+    }
   }
 
   // Executar scripts de limpeza antes de conectar
@@ -126,6 +226,9 @@ class WhatsAppWebService {
     const maxRetries = 3;
     
     try {
+      // Carregar configuração do usuário
+      await this.loadUserConfig();
+      
       // Executar scripts de limpeza na primeira tentativa ou quando forçado
       if (retryCount === 0 || forceCleanup) {
         await this.runCleanupScripts();
@@ -539,7 +642,7 @@ class WhatsAppWebService {
         const { data: novaConversa, error: conversaError } = await supabase
           .from('whatsapp_conversas')
           .upsert({
-            configuracao_id: 1,
+            configuracao_id: this.configuracaoId, // CRÍTICO: usar configuração do usuário específico
             numero_contato: numeroDestinatario,
             nome_contato: contact?.name || contact?.pushname || chat.name || numeroDestinatario,
             ultima_mensagem_at: new Date(Date.now() - (3 * 60 * 60 * 1000)).toISOString(), // UTC-3
@@ -695,6 +798,7 @@ class WhatsAppWebService {
         .from('whatsapp_conversas')
         .select('*')
         .eq('numero_contato', numeroLimpo)
+        .eq('configuracao_id', this.configuracaoId) // FILTRO CRÍTICO: apenas conversas da configuração do usuário
         .single();
 
       if (!conversa) {
@@ -702,7 +806,7 @@ class WhatsAppWebService {
         const { data: novaConversa, error: conversaError } = await supabase
           .from('whatsapp_conversas')
           .upsert({
-            configuracao_id: 1,
+            configuracao_id: this.configuracaoId, // CRÍTICO: usar configuração do usuário específico
             numero_contato: numeroLimpo,
             nome_contato: contact.name || contact.pushname || numeroLimpo,
             ultima_mensagem_at: new Date(Date.now() - (3 * 60 * 60 * 1000)).toISOString(), // UTC-3
