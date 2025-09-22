@@ -1764,6 +1764,37 @@ app.put('/api/novos-leads/:id/pegar', authenticateToken, async (req, res) => {
   }
 });
 
+// Excluir lead da aba Novos Leads (apenas admin)
+app.delete('/api/novos-leads/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Verificar se o lead existe e não está atribuído
+    const { data: pacienteAtual, error: checkError } = await supabase
+      .from('pacientes')
+      .select('consultor_id, nome')
+      .eq('id', id)
+      .single();
+
+    if (checkError) throw checkError;
+
+    if (pacienteAtual.consultor_id !== null) {
+      return res.status(400).json({ error: 'Não é possível excluir um lead que já foi atribuído a um consultor!' });
+    }
+
+    // Excluir o lead
+    const { error } = await supabase
+      .from('pacientes')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    res.json({ message: 'Lead excluído com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // === NOVAS CLÍNICAS === (Funcionalidade para pegar clínicas encontradas nas missões)
 app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
   try {

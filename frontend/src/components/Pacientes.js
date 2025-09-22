@@ -330,6 +330,31 @@ const Pacientes = () => {
     }
   };
 
+  const excluirLead = async (leadId) => {
+    // Confirmar antes de excluir
+    if (!window.confirm('Tem certeza que deseja excluir este lead? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+
+    try {
+      const response = await makeRequest(`/novos-leads/${leadId}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        showSuccessToast('Lead excluído com sucesso!');
+        fetchNovosLeads();
+      } else {
+        showErrorToast('Erro ao excluir lead: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao excluir lead:', error);
+      showErrorToast('Erro ao conectar com o servidor');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -1413,7 +1438,7 @@ const Pacientes = () => {
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Tipo</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Status</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
-                      <th style={{ width: '120px' }}>Ações</th>
+                      <th style={{ width: '200px', minWidth: '200px' }}>Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1473,16 +1498,26 @@ const Pacientes = () => {
                             </span>
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarData(lead.created_at)}</td>
-                          <td style={{ padding: '0' }}>
-                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <td style={{ padding: '0.5rem', minWidth: '200px' }}>
+                            <div style={{ 
+                              display: 'flex', 
+                              gap: '0.25rem', 
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              justifyContent: 'flex-start'
+                            }}>
                               {window.innerWidth <= 768 && (
                                 <button
                                   onClick={() => handleView(lead)}
                                   className="btn-action"
                                   title="Visualizar"
-                                  style={{ padding: '0.5rem' }}
+                                  style={{ 
+                                    padding: '0.375rem',
+                                    minWidth: '32px',
+                                    height: '32px'
+                                  }}
                                 >
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                                     <circle cx="12" cy="12" r="3" />
                                   </svg>
@@ -1492,12 +1527,42 @@ const Pacientes = () => {
                                 onClick={() => pegarLead(lead.id)}
                                 className="btn btn-primary"
                                 style={{ 
-                                  fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
-                                  padding: window.innerWidth <= 768 ? '0.5rem 0.75rem' : '0.75rem 1rem'
+                                  fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.8rem',
+                                  padding: window.innerWidth <= 768 ? '0.375rem 0.5rem' : '0.5rem 0.75rem',
+                                  minWidth: '80px',
+                                  height: '32px',
+                                  whiteSpace: 'nowrap'
                                 }}
                               >
                                 {window.innerWidth <= 768 ? 'Pegar' : 'Pegar Lead'}
                               </button>
+                              {/* Botão de excluir - apenas para admin */}
+                              {isAdmin && (
+                                <button
+                                  onClick={() => excluirLead(lead.id)}
+                                  className="btn-action"
+                                  title="Excluir Lead"
+                                  style={{ 
+                                    color: '#dc2626',
+                                    padding: '0.375rem',
+                                    minWidth: '32px',
+                                    height: '32px',
+                                    backgroundColor: '#fef2f2',
+                                    border: '1px solid #fecaca',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <polyline points="3,6 5,6 21,6"></polyline>
+                                    <path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"></path>
+                                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                                  </svg>
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
