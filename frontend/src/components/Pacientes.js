@@ -149,12 +149,14 @@ const Pacientes = () => {
     { value: 'cpf_reprovado', label: 'CPF Reprovado', color: '#ef4444', description: 'CPF foi reprovado' },
     { value: 'nao_passou_cpf', label: 'Não passou CPF', color: '#6366f1', description: 'Cliente não forneceu CPF' },
     { value: 'nao_tem_outro_cpf', label: 'Não tem outro CPF', color: '#a3a3a3', description: 'Cliente não tem CPF alternativo' },
-    { value: 'nao_tem_interesse', label: 'Não tem interesse', color: '#9ca3af', description: 'Cliente perdeu interesse' },
-    { value: 'sem_cedente', label: 'Sem cedente (CPF Aprovado)', color: '#fbbf24', description: 'CPF aprovado mas sem cedente' },
+    { value: 'nao_existe', label: 'Paciente não existe', color: '#9ca3af', description: 'Cliente não existe' },
+    { value: 'nao_tem_interesse', label: 'Paciente não tem interesse', color: '#9ca3af', description: 'Cliente não tem interesse' },
+    { value: 'nao_reconhece', label: 'Paciente não reconhece', color: '#9ca3af', description: 'Cliente não reconhece' },
+    { value: 'sem_cedente', label: 'Sem clínica (CPF Aprovado)', color: '#fbbf24', description: 'CPF aprovado mas sem cedente' },
     // Demais status no final
     { value: 'agendado', label: 'Agendado', color: '#3b82f6', description: 'Abre modal para criar agendamento' },
     { value: 'compareceu', label: 'Compareceu', color: '#10b981', description: 'Cliente compareceu ao agendamento' },
-    { value: 'fechado', label: 'Fechado', color: '#059669', description: '💰 Abre modal para criar fechamento' },
+    { value: 'fechado', label: 'Fechado', color: '#059669', description: 'Abre modal para criar fechamento' },
     { value: 'nao_fechou', label: 'Não Fechou', color: '#dc2626', description: 'Cliente não fechou o negócio' },
     { value: 'nao_compareceu', label: 'Não Compareceu', color: '#ef4444', description: 'Cliente não compareceu' },
     { value: 'reagendado', label: 'Reagendado', color: '#8b5cf6', description: 'Agendamento foi reagendado' }
