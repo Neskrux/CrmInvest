@@ -16,12 +16,15 @@ const Consultores = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingConsultor, setViewingConsultor] = useState(null);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [linkConsultor, setLinkConsultor] = useState(null);
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
     email: '',
     senha: '',
-    pix: ''
+    pix: '',
+    is_freelancer: true // Por padrão, freelancer
   });
 
   const fetchConsultores = useCallback(async () => {
@@ -84,7 +87,8 @@ const Consultores = () => {
           telefone: '',
           email: '',
           senha: '',
-          pix: ''
+          pix: '',
+          is_freelancer: true
         });
         fetchConsultores();
       } else {
@@ -103,7 +107,8 @@ const Consultores = () => {
       telefone: consultor.telefone || '',
       email: consultor.email || '',
       senha: consultor.senha || '',
-      pix: consultor.pix || ''
+      pix: consultor.pix || '',
+      is_freelancer: consultor.is_freelancer !== undefined ? consultor.is_freelancer : true
     });
     setShowModal(true);
   };
@@ -174,7 +179,8 @@ const Consultores = () => {
       telefone: '',
       email: '',
       senha: '',
-      pix: ''
+      pix: '',
+      is_freelancer: true
     });
     setEditingConsultor(null);
     setShowModal(false);
@@ -256,6 +262,143 @@ const Consultores = () => {
     }
   };
 
+  const gerarCodigoReferencia = async (consultorId) => {
+    try {
+      const response = await makeRequest(`/consultores/${consultorId}/gerar-codigo`, {
+        method: 'POST'
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        showSuccessToast('Código de referência gerado com sucesso!');
+        fetchConsultores(); // Recarregar lista para mostrar novo código
+        
+        // Mostrar modal com link gerado
+        setLinkConsultor({
+          ...consultores.find(c => c.id === consultorId),
+          codigo_referencia: data.codigo_referencia,
+          link_personalizado: data.link_personalizado
+        });
+        setShowLinkModal(true);
+      } else {
+        showErrorToast('Erro ao gerar código: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao gerar código:', error);
+      showErrorToast('Erro ao gerar código de referência');
+    }
+  };
+
+  const visualizarLinkPersonalizado = async (consultor) => {
+    try {
+      const response = await makeRequest(`/consultores/${consultor.id}/link-personalizado`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        setLinkConsultor({
+          ...consultor,
+          ...data
+        });
+        setShowLinkModal(true);
+      } else {
+        showErrorToast('Erro ao obter link: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao obter link personalizado:', error);
+      showErrorToast('Erro ao conectar com o servidor');
+    }
+  };
+
+  const copiarLink = async (link) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      showSuccessToast('Link copiado para a área de transferência!');
+    } catch (error) {
+      // Fallback para navegadores mais antigos
+      const textArea = document.createElement('textarea');
+      textArea.value = link;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      showSuccessToast('Link copiado para a área de transferência!');
+    }
+  };
+
+  const executarDiagnostico = async () => {
+    try {
+      const response = await makeRequest('/consultores/diagnostico');
+      const data = await response.json();
+      
+      if (response.ok) {
+        console.log('🔍 Diagnóstico da tabela consultores:', data);
+        
+        if (!data.estrutura_tabela.tem_coluna_codigo_referencia) {
+          showErrorToast('⚠️ Migração necessária! A coluna codigo_referencia não existe na tabela consultores.');
+        } else if (data.consultores.sem_codigo > 0) {
+          showSuccessToast(`✅ Estrutura OK. ${data.consultores.sem_codigo} consultores precisam de códigos de referência.`);
+        } else {
+          showSuccessToast('✅ Todos os consultores já possuem códigos de referência!');
+        }
+      } else {
+        showErrorToast('Erro no diagnóstico: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro no diagnóstico:', error);
+      showErrorToast('Erro ao executar diagnóstico');
+    }
+  };
+
+
+  const limparCodigosInternos = async () => {
+    if (!window.confirm('Tem certeza que deseja remover os códigos de referência dos consultores internos?')) {
+      return;
+    }
+
+    try {
+      const response = await makeRequest('/consultores/limpar-codigos-internos', {
+        method: 'POST'
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        showSuccessToast(data.message);
+        if (data.processados > 0) {
+          fetchConsultores(); // Recarregar lista
+        }
+      } else {
+        showErrorToast('Erro ao limpar códigos: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao limpar códigos internos:', error);
+      showErrorToast('Erro ao conectar com o servidor');
+    }
+  };
+
+  const gerarCodigosFaltantes = async () => {
+    try {
+      const response = await makeRequest('/consultores/gerar-codigos-faltantes', {
+        method: 'POST'
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        showSuccessToast(data.message);
+        if (data.processados > 0) {
+          fetchConsultores(); // Recarregar lista
+        }
+      } else {
+        showErrorToast('Erro ao gerar códigos: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao gerar códigos faltantes:', error);
+      showErrorToast('Erro ao conectar com o servidor');
+    }
+  };
+
   return (
     <div>
       <div className="page-header">
@@ -266,15 +409,51 @@ const Consultores = () => {
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Equipe de Consultores</h2>
-          <button 
-            className="btn btn-primary"
-            onClick={() => setShowModal(true)}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            Novo Consultor
-          </button>
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <button 
+              className="btn btn-outline"
+              onClick={executarDiagnostico}
+              title="Verificar estrutura da tabela e status dos códigos"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24" />
+              </svg>
+              Diagnóstico
+            </button>
+            <button 
+              className="btn btn-warning"
+              onClick={limparCodigosInternos}
+              title="Remover códigos de referência dos consultores internos"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                <line x1="10" y1="11" x2="10" y2="17" />
+                <line x1="14" y1="11" x2="14" y2="17" />
+              </svg>
+              Limpar Códigos Internos
+            </button>
+            <button 
+              className="btn btn-secondary"
+              onClick={gerarCodigosFaltantes}
+              title="Gerar códigos de referência para consultores freelancers que não possuem"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+              Gerar Links Freelancers
+            </button>
+            <button 
+              className="btn btn-primary"
+              onClick={() => setShowModal(true)}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Novo Consultor
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -291,6 +470,7 @@ const Consultores = () => {
               <thead>
                 <tr>
                   <th>Nome</th>
+                  <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Tipo</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Email de Acesso</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Telefone</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>PIX</th>
@@ -303,6 +483,11 @@ const Consultores = () => {
                   <tr key={consultor.id}>
                     <td>
                       <strong>{consultor.nome}</strong>
+                    </td>
+                    <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                      <span className={`status-badge ${consultor.is_freelancer !== false ? 'freelancer' : 'interno'}`}>
+                        {consultor.is_freelancer !== false ? 'Freelancer' : 'Interno'}
+                      </span>
                     </td>
                     <td className="text-wrap" style={{ display: isMobile ? 'none' : 'table-cell' }}>
                       <span className="email-cell">
@@ -390,6 +575,17 @@ const Consultores = () => {
                             </svg>
                           </button>
                         )}
+                        <button
+                          onClick={() => visualizarLinkPersonalizado(consultor)}
+                          className="btn-action"
+                          title="Link personalizado"
+                          style={{ color: '#f59e0b' }}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                          </svg>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -583,6 +779,35 @@ const Consultores = () => {
                 </small>
               </div>
 
+              <div className="form-group">
+                <label className="form-label">Tipo de Consultor</label>
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="is_freelancer"
+                      value="true"
+                      checked={formData.is_freelancer === true}
+                      onChange={(e) => setFormData(prev => ({ ...prev, is_freelancer: e.target.value === 'true' }))}
+                    />
+                    <span>Freelancer (link personalizado)</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="is_freelancer"
+                      value="false"
+                      checked={formData.is_freelancer === false}
+                      onChange={(e) => setFormData(prev => ({ ...prev, is_freelancer: e.target.value === 'false' }))}
+                    />
+                    <span>Interno (link geral)</span>
+                  </label>
+                </div>
+                <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                  Freelancers veem apenas leads do seu código. Internos veem leads gerais.
+                </small>
+              </div>
+
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
                 <button 
                   type="button"
@@ -740,6 +965,161 @@ const Consultores = () => {
                   </svg>
                   Copiar PIX
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Link Personalizado */}
+      {showLinkModal && linkConsultor && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">
+                Link Personalizado - {linkConsultor.nome}
+              </h2>
+              <button 
+                className="close-btn"
+                onClick={() => setShowLinkModal(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem' }}>
+              {linkConsultor.link_personalizado ? (
+                <div>
+                  <div style={{ 
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    backgroundColor: '#f0fdf4',
+                    border: '1px solid #86efac',
+                    marginBottom: '1.5rem'
+                  }}>
+                    <div style={{ fontSize: '0.875rem', color: '#166534', fontWeight: '600' }}>
+                      Link Personalizado Ativo
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                      Use este link para divulgar e capturar leads com sua referência
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem', display: 'block', marginBottom: '0.5rem' }}>
+                      Código de Referência
+                    </label>
+                    <div style={{ 
+                      padding: '0.75rem',
+                      borderRadius: '8px',
+                      backgroundColor: '#f3f4f6',
+                      border: '1px solid #e5e7eb',
+                      fontFamily: 'monospace',
+                      fontSize: '1rem',
+                      color: '#1f2937'
+                    }}>
+                      {linkConsultor.codigo_referencia}
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem', display: 'block', marginBottom: '0.5rem' }}>
+                      Link Personalizado
+                    </label>
+                    <div style={{ 
+                      padding: '0.75rem',
+                      borderRadius: '8px',
+                      backgroundColor: '#f3f4f6',
+                      border: '1px solid #e5e7eb',
+                      fontFamily: 'monospace',
+                      fontSize: '0.875rem',
+                      color: '#1f2937',
+                      wordBreak: 'break-all',
+                      lineHeight: '1.5'
+                    }}>
+                      {linkConsultor.link_personalizado}
+                    </div>
+                  </div>
+
+                  <div style={{ 
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    backgroundColor: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    marginBottom: '1.5rem'
+                  }}>
+                    <div style={{ fontSize: '0.875rem', color: '#1e40af', fontWeight: '600' }}>
+                      💡 Como usar:
+                    </div>
+                    <ul style={{ fontSize: '0.875rem', color: '#1e40af', marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
+                      <li>Compartilhe este link em suas redes sociais</li>
+                      <li>Envie para clientes em potencial via WhatsApp</li>
+                      <li>Todos os leads que se cadastrarem através deste link serão automaticamente associados a você</li>
+                      <li>Você poderá acompanhar suas conversões e comissões</li>
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ 
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    marginBottom: '1.5rem'
+                  }}>
+                    <div style={{ fontSize: '0.875rem', color: '#dc2626', fontWeight: '600' }}>
+                      Link não gerado
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                      Este consultor ainda não possui um link personalizado
+                    </div>
+                  </div>
+
+                  {isAdmin && (
+                    <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                      <button 
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => {
+                          setShowLinkModal(false);
+                          gerarCodigoReferencia(linkConsultor.id);
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                        </svg>
+                        Gerar Link Personalizado
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                <button 
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowLinkModal(false)}
+                >
+                  Fechar
+                </button>
+                {linkConsultor.link_personalizado && (
+                  <button 
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => {
+                      copiarLink(linkConsultor.link_personalizado);
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    Copiar Link
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -692,6 +692,23 @@ const Fechamentos = () => {
         </div>
       </div>
 
+      <div style={{
+          backgroundColor: '#f0f9ff',
+          border: '1px solid #bae6fd',
+          borderRadius: '8px',
+          padding: '1rem',
+          marginTop: '1rem',
+          fontSize: '0.875rem',
+          marginBottom: '2rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <strong style={{ color: '#0c4a6e' }}>Ações</strong>
+          </div>
+          <div style={{ color: '#0c4a6e', lineHeight: '1.4' }}>
+            • Aqui em <strong>Fechamentos</strong> → Você pode visualizar os fechamentos dos tratamentos dos seus pacientes, baixar o contrato e filtrar por consultor, clínica e mês<br/>
+          </div>
+      </div>
+
       {/* KPIs */}
       <div className="stats-grid" style={{ marginBottom: '2rem' }}>
         <div className="stat-card">
@@ -914,16 +931,18 @@ const Fechamentos = () => {
                                 PDF
                               </button>
                             )}
-                            <button 
-                              className="btn-action"
-                              onClick={() => abrirModal(fechamento)}
-                              title="Editar fechamento"
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                              </svg>
-                            </button>
+                            {!isConsultor && (
+                              <button 
+                                className="btn-action"
+                                onClick={() => abrirModal(fechamento)}
+                                title="Editar fechamento"
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                              </button>
+                            )}
                             {isAdmin && (
                               <button 
                                 className="btn-action"

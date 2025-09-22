@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Sparkles, Trophy, Gem, Lock, Check, Star } from 'lucide-react';
 import logoBrasao from '../images/logobrasao.png';
 import config from '../config';
 
 const CapturaLead = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
@@ -22,6 +23,8 @@ const CapturaLead = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
+  const [refConsultor, setRefConsultor] = useState(null);
+  const [nomeConsultor, setNomeConsultor] = useState(null);
 
   // Estados brasileiros
   const estadosBrasileiros = [
@@ -84,6 +87,20 @@ const CapturaLead = () => {
     'AM': ['Manaus', 'Parintins', 'Itacoatiara', 'Manacapuru', 'Coari', 'Tefé', 'Tabatinga'],
     'PA': ['Belém', 'Ananindeua', 'Santarém', 'Marabá', 'Parauapebas', 'Castanhal', 'Abaetetuba']
   };
+
+  // Capturar parâmetro de referência da URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const refParam = urlParams.get('ref');
+    
+    if (refParam && refParam.trim() !== '') {
+      const codigoLimpo = refParam.trim();
+      setRefConsultor(codigoLimpo);
+      
+    } else {
+      setRefConsultor(null);
+    }
+  }, [location]);
 
   const formatarTelefone = (value) => {
     const numbers = value.replace(/\D/g, '');
@@ -223,8 +240,10 @@ const CapturaLead = () => {
     }
     const formDataToSend = {
       ...formData,
-      observacoes: observacoesComDias
+      observacoes: observacoesComDias,
+      ref_consultor: refConsultor // Incluir código de referência se existir
     };
+
 
     try {
       const response = await fetch(`${config.API_BASE_URL}/leads/cadastro`, {
@@ -241,7 +260,8 @@ const CapturaLead = () => {
         navigate('/captura-sucesso', { 
           state: { 
             nome: data.nome,
-            message: data.message 
+            message: data.message,
+            consultor_referencia: data.consultor_referencia
           } 
         });
       } else {

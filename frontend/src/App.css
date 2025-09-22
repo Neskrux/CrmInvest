@@ -1432,6 +1432,30 @@
     color: #155724;
     border: 1px solid #c3e6cb;
   }
+
+  .status-badge.freelancer {
+    background: #e0f2fe;
+    color: #0277bd;
+    border: 1px solid #b3e5fc;
+  }
+
+  .status-badge.interno {
+    background: #f3e5f5;
+    color: #7b1fa2;
+    border: 1px solid #e1bee7;
+  }
+
+  /* Detail field styles */
+  .detail-field {
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: #374151;
+    font-weight: 500;
+  }
   
   .status-dot {
     width: 6px;
