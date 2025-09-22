@@ -735,9 +735,11 @@ const Clinicas = () => {
             <strong style={{ color: '#0c4a6e' }}>Ações</strong>
           </div>
           <div style={{ color: '#0c4a6e', lineHeight: '1.4' }}>
-            • Na aba <strong>"Clínicas"</strong> → Você pode visualizar todas as clínicas disponíveis para você<br/>
-            • Na aba <strong>"{isAdmin ? 'Novas Clínicas' : 'Indicar Clínicas'}"</strong> → Você pode cadastrar novas clínicas, que se aprovadas, não poderão ser visualizadas por outros consultores freelancers<br/>
-            • Na aba <strong>"Mapa"</strong> → Você pode visualizar todas as clínicas disponíveis e novas clínicas, que serão exibidas no mapa
+            • Na aba <strong>"Clínicas"</strong> → Você pode visualizar todas as clínicas parceiras<br/>
+            • Na aba <strong>"{isAdmin ? 'Novas Clínicas' : 'Indicar Clínicas'}"</strong> → Você pode cadastrar novas clínicas, que se aprovadas, você ganhará uma comissão e elas não poderão ser visualizadas por outros consultores freelancers<br/>
+            • Na aba <strong>"Mapa"</strong> → Você pode visualizar todas as clínicas disponíveis e novas clínicas, que serão exibidas no mapa<br/>
+            • <strong>Dica:</strong> → Lembre-se de indicar clínicas que queiram antecipar seus boletos, ou que ainda não ofereçam parcelamento no boleto como método de pagamento<br/>
+            • <strong>Dica de Argumento:</strong> → Nós levamos pacientes pré-aprovados até a sua clinica, você só precisa atender
           </div>
         </div>
       </div>
@@ -1945,6 +1947,17 @@ const Clinicas = () => {
                    </div>
                  )}
                  
+                 {viewingClinica.consultor_nome && (
+                   <div>
+                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Indicado por</label>
+                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                       <span className="badge" style={{ backgroundColor: '#3b82f6', color: 'white' }}>
+                         {viewingClinica.consultor_nome}
+                       </span>
+                     </p>
+                   </div>
+                 )}
+                 
                  {viewingClinica.created_at && (
                    <div>
                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Data de Cadastro</label>
@@ -2064,6 +2077,17 @@ const Clinicas = () => {
                   <div>
                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Observações</label>
                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingNovaClinica.observacoes}</p>
+                  </div>
+                )}
+                
+                {viewingNovaClinica.consultor_nome && (
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Indicado por</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                      <span className="badge" style={{ backgroundColor: '#3b82f6', color: 'white' }}>
+                        {viewingNovaClinica.consultor_nome}
+                      </span>
+                    </p>
                   </div>
                 )}
                 

@@ -277,6 +277,7 @@ const AppContentWithNotifications = () => {
             </Link>
           </div>
 
+
           <div className="nav-item">
             <Link
               to="/clinicas"

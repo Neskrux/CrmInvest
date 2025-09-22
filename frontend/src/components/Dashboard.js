@@ -396,8 +396,8 @@ const Dashboard = () => {
 
       const novosLeadsPeriodo = dataInicio ? pacientes.filter(p => {
         const data = new Date(p.created_at);
-        return data >= dataInicio && data <= dataFim;
-      }).length : pacientes.length;
+        return data >= dataInicio && data <= dataFim && p.status === 'lead';
+      }).length : pacientes.filter(p => p.status === 'lead').length;
 
       // Calcular estatísticas por dia da semana (apenas para visualização semanal)
       let estatisticasPorDia = {};

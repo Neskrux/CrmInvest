@@ -237,6 +237,7 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+
 // Função auxiliar para aplicar filtro de permissões nas clínicas
 async function aplicarFiltroPermissoes(query, req, supabase) {
   if (req.user.tipo === 'admin') {
@@ -265,16 +266,37 @@ async function aplicarFiltroPermissoes(query, req, supabase) {
   }
 }
 
-// Middleware para verificar se é o próprio consultor ou admin
-const requireOwnerOrAdmin = (req, res, next) => {
+// Middleware para verificar se é o próprio consultor, admin ou consultor interno
+const requireOwnerOrAdmin = async (req, res, next) => {
   const consultorId = req.params.consultorId || req.query.consultor_id || req.body.consultor_id;
   
   if (req.user.tipo === 'admin') {
     return next(); // Admin pode tudo
   }
   
-  if (req.user.tipo === 'consultor' && req.user.consultor_id === parseInt(consultorId)) {
-    return next(); // Consultor pode acessar seus próprios dados
+  if (req.user.tipo === 'consultor') {
+    // Verificar se é consultor interno (pode ver tudo) ou freelancer (apenas seus dados)
+    try {
+      const { data: consultorInfo, error } = await supabase
+        .from('consultores')
+        .select('is_freelancer')
+        .eq('id', req.user.consultor_id || req.user.id)
+        .single();
+
+      if (error) throw error;
+
+      // Consultor interno pode ver tudo
+      if (consultorInfo.is_freelancer === false) {
+        return next();
+      }
+
+      // Freelancer pode acessar apenas seus próprios dados
+      if (req.user.consultor_id === parseInt(consultorId)) {
+        return next();
+      }
+    } catch (error) {
+      console.error('Erro ao verificar permissões do consultor:', error);
+    }
   }
   
   return res.status(403).json({ error: 'Acesso negado' });
@@ -757,7 +779,10 @@ app.get('/api/clinicas', authenticateToken, async (req, res) => {
     
     let query = supabase
       .from('clinicas')
-      .select('*')
+      .select(`
+        *,
+        consultores(nome)
+      `)
       .order('nome');
 
     // Filtrar por estado se especificado
@@ -776,7 +801,14 @@ app.get('/api/clinicas', authenticateToken, async (req, res) => {
     const { data, error } = await query;
 
     if (error) throw error;
-    res.json(data);
+    
+    // Reformatar dados para compatibilidade com frontend
+    const formattedData = data.map(clinica => ({
+      ...clinica,
+      consultor_nome: clinica.consultores?.nome
+    }));
+
+    res.json(formattedData);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -893,7 +925,8 @@ app.post('/api/clinicas', authenticateToken, requireAdmin, async (req, res) => {
         email, 
         status: status || 'ativo', // Padrão: desbloqueado
         latitude,
-        longitude
+        longitude,
+        consultor_id: req.user.tipo === 'consultor' ? req.user.id : null
       }])
       .select();
 
@@ -1015,7 +1048,7 @@ app.get('/api/consultores', authenticateToken, async (req, res) => {
 
 app.post('/api/consultores', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { nome, telefone, email, senha, pix } = req.body;
+    const { nome, telefone, email, senha, pix, is_freelancer } = req.body;
     
     // Validar campos obrigatórios
     if (!senha || senha.trim() === '') {
@@ -1046,16 +1079,39 @@ app.post('/api/consultores', authenticateToken, requireAdmin, async (req, res) =
     const saltRounds = 10;
     const senhaHash = await bcrypt.hash(senha, saltRounds);
     
+    // Determinar se é freelancer (padrão: true)
+    const isFreelancer = is_freelancer !== undefined ? is_freelancer : true;
+    
+    // Gerar código de referência apenas para freelancers
+    let codigoReferencia = null;
+    if (isFreelancer) {
+      codigoReferencia = await gerarCodigoReferencia(nome);
+      console.log(`✅ Consultor freelancer criado com código: ${nome} (${codigoReferencia})`);
+    } else {
+      console.log(`✅ Consultor interno criado: ${nome} (sem código personalizado)`);
+    }
+    
     const { data, error } = await supabase
       .from('consultores')
-      .insert([{ nome, telefone, email: emailNormalizado, senha: senhaHash, pix }])
+      .insert([{ 
+        nome, 
+        telefone, 
+        email: emailNormalizado, 
+        senha: senhaHash, 
+        pix,
+        codigo_referencia: codigoReferencia,
+        is_freelancer: isFreelancer
+      }])
       .select();
 
     if (error) throw error;
+    
     res.json({ 
       id: data[0].id, 
       message: 'Consultor cadastrado com sucesso!',
-      email: emailNormalizado
+      email: emailNormalizado,
+      codigo_referencia: codigoReferencia,
+      link_personalizado: `https://crm.investmoneysa.com.br/captura-lead?ref=${codigoReferencia}`
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1111,6 +1167,13 @@ app.post('/api/consultores/cadastro', async (req, res) => {
     const saltRounds = 10;
     const senhaHash = await bcrypt.hash(senha, saltRounds);
     
+    // Gerar código de referência automaticamente (apenas para freelancers)
+    let codigoReferencia = null;
+    
+    // Por padrão, novos consultores são freelancers e ganham código
+    // Admins podem alterar isso depois se necessário
+    codigoReferencia = await gerarCodigoReferencia(nome);
+    
     // Inserir consultor
     const { data, error } = await supabase
       .from('consultores')
@@ -1122,7 +1185,9 @@ app.post('/api/consultores/cadastro', async (req, res) => {
         cpf, 
         pix,
         tipo: 'consultor',
-        ativo: true
+        ativo: true,
+        codigo_referencia: codigoReferencia,
+        is_freelancer: true // Por padrão, novos consultores são freelancers
       }])
       .select();
 
@@ -1131,11 +1196,12 @@ app.post('/api/consultores/cadastro', async (req, res) => {
       throw error;
     }
     
-    
     res.json({ 
       id: data[0].id, 
       message: 'Consultor cadastrado com sucesso! Agora você pode fazer login.',
-      email: emailNormalizado
+      email: emailNormalizado,
+      codigo_referencia: codigoReferencia,
+      link_personalizado: `https://crm.investmoneysa.com.br/captura-lead?ref=${codigoReferencia}`
     });
   } catch (error) {
     console.error('Erro no cadastro:', error);
@@ -1146,7 +1212,7 @@ app.post('/api/consultores/cadastro', async (req, res) => {
 // === CADASTRO PÚBLICO DE PACIENTES/LEADS === (Sem autenticação)
 app.post('/api/leads/cadastro', async (req, res) => {
   try {
-    const { nome, telefone, tipo_tratamento, cpf, observacoes, cidade, estado } = req.body;
+    const { nome, telefone, tipo_tratamento, cpf, observacoes, cidade, estado, ref_consultor } = req.body;
     
     // Validar campos obrigatórios
     if (!nome || !telefone || !cpf) {
@@ -1224,9 +1290,23 @@ app.post('/api/leads/cadastro', async (req, res) => {
       });
     }
     
+    // Verificar se existe código de referência do consultor
+    let consultorReferencia = null;
+    if (ref_consultor) {
+      const { data: consultorData, error: consultorError } = await supabase
+        .from('consultores')
+        .select('id, nome, codigo_referencia')
+        .eq('codigo_referencia', ref_consultor.trim())
+        .single();
+
+      if (consultorError && consultorError.code !== 'PGRST116') {
+        console.error('Erro ao buscar consultor por referência:', consultorError);
+      } else if (consultorData) {
+        consultorReferencia = consultorData;
+      }
+    }
     
     // Inserir lead/paciente
-    
     const { data, error } = await supabase
       .from('pacientes')
       .insert([{ 
@@ -1238,20 +1318,22 @@ app.post('/api/leads/cadastro', async (req, res) => {
         observacoes: observacoes || null,
         cidade: cidade ? cidade.trim() : null,
         estado: estado ? estado.trim() : null,
-        consultor_id: null // Lead público não tem consultor inicial
+        consultor_id: consultorReferencia ? consultorReferencia.id : null // Associar consultor se houver referência
       }])
       .select();
 
     if (error) {
-      console.error('❌ Erro ao inserir lead:', error);
+      console.error('Erro ao inserir lead:', error);
       throw error;
     }
     
-    
     res.json({ 
       id: data[0].id, 
-      message: 'Cadastro realizado com sucesso! Entraremos em contato em breve.',
-      nome: nome.trim()
+      message: consultorReferencia 
+        ? `Cadastro realizado com sucesso! Você será atendido pelo consultor ${consultorReferencia.nome}. Entraremos em contato em breve.`
+        : 'Cadastro realizado com sucesso! Entraremos em contato em breve.',
+      nome: nome.trim(),
+      consultor_referencia: consultorReferencia ? consultorReferencia.nome : null
     });
   } catch (error) {
     console.error('Erro no cadastro de lead:', error);
@@ -1259,13 +1341,340 @@ app.post('/api/leads/cadastro', async (req, res) => {
   }
 });
 
+// === FUNÇÃO AUXILIAR PARA GERAR CÓDIGO DE REFERÊNCIA ===
+const gerarCodigoReferencia = async (nome, consultorId = null) => {
+  // Gerar código único baseado no nome do consultor
+  const nomeNormalizado = nome
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, '')
+    .trim()
+    .replace(/\s+/g, '');
+  
+  const timestamp = Date.now().toString().slice(-4);
+  let codigoBase = `${nomeNormalizado}${timestamp}`;
+  
+  // Garantir que o código seja único
+  let codigoFinal = codigoBase;
+  let tentativa = 1;
+  
+  while (true) {
+    const { data: existente, error: checkError } = await supabase
+      .from('consultores')
+      .select('id')
+      .eq('codigo_referencia', codigoFinal)
+      .single();
+
+    if (checkError && checkError.code === 'PGRST116') {
+      // Código não existe, pode usar
+      break;
+    } else if (checkError) {
+      throw checkError;
+    } else if (existente && (!consultorId || existente.id !== parseInt(consultorId))) {
+      // Código existe para outro consultor, tentar novamente
+      codigoFinal = `${codigoBase}${tentativa}`;
+      tentativa++;
+    } else {
+      // Código já pertence a este consultor
+      break;
+    }
+  }
+  
+  return codigoFinal;
+};
+
+// === GERAR CÓDIGO DE REFERÊNCIA PARA CONSULTOR ===
+app.post('/api/consultores/:id/gerar-codigo', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Verificar se consultor existe
+    const { data: consultor, error: consultorError } = await supabase
+      .from('consultores')
+      .select('id, nome, codigo_referencia')
+      .eq('id', id)
+      .single();
+
+    if (consultorError) throw consultorError;
+
+    // Gerar código único
+    const codigoFinal = await gerarCodigoReferencia(consultor.nome, id);
+
+    // Atualizar consultor com o novo código
+    const { error: updateError } = await supabase
+      .from('consultores')
+      .update({ codigo_referencia: codigoFinal })
+      .eq('id', id);
+
+    if (updateError) throw updateError;
+
+    res.json({ 
+      codigo_referencia: codigoFinal,
+      link_personalizado: `https://crm.investmoneysa.com.br/captura-lead?ref=${codigoFinal}`,
+      message: 'Código de referência gerado com sucesso!'
+    });
+  } catch (error) {
+    console.error('Erro ao gerar código de referência:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+// === DIAGNÓSTICO: VERIFICAR ESTRUTURA DA TABELA CONSULTORES ===
+app.get('/api/consultores/diagnostico', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    // Tentar buscar consultores com a coluna codigo_referencia
+    const { data: consultores, error: consultoresError } = await supabase
+      .from('consultores')
+      .select('id, nome, codigo_referencia')
+      .order('id');
+
+    let temColunaCodigoReferencia = true;
+    let erroColuna = null;
+
+    if (consultoresError) {
+      // Se deu erro, pode ser que a coluna não existe
+      if (consultoresError.message.includes('codigo_referencia')) {
+        temColunaCodigoReferencia = false;
+        erroColuna = 'Coluna codigo_referencia não existe na tabela consultores';
+        
+        // Tentar buscar sem a coluna codigo_referencia
+        const { data: consultoresSemColuna, error: errorSemColuna } = await supabase
+          .from('consultores')
+          .select('id, nome')
+          .order('id');
+
+        if (errorSemColuna) throw errorSemColuna;
+
+        return res.json({
+          estrutura_tabela: {
+            tem_coluna_codigo_referencia: false,
+            erro: erroColuna,
+            migracao_necessaria: true
+          },
+          consultores: {
+            total: consultoresSemColuna.length,
+            com_codigo: 0,
+            sem_codigo: consultoresSemColuna.length,
+            detalhes: consultoresSemColuna.map(c => ({
+              id: c.id,
+              nome: c.nome,
+              tem_codigo: false,
+              codigo: null
+            }))
+          }
+        });
+      } else {
+        throw consultoresError;
+      }
+    }
+
+    // Contar consultores com e sem código
+    const comCodigo = consultores.filter(c => c.codigo_referencia).length;
+    const semCodigo = consultores.filter(c => !c.codigo_referencia).length;
+
+    res.json({
+      estrutura_tabela: {
+        tem_coluna_codigo_referencia: true,
+        erro: null,
+        migracao_necessaria: false
+      },
+      consultores: {
+        total: consultores.length,
+        com_codigo: comCodigo,
+        sem_codigo: semCodigo,
+        detalhes: consultores.map(c => ({
+          id: c.id,
+          nome: c.nome,
+          tem_codigo: !!c.codigo_referencia,
+          codigo: c.codigo_referencia || null
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Erro no diagnóstico:', error);
+    res.status(500).json({ 
+      error: error.message,
+      detalhes: 'Erro ao executar diagnóstico da tabela consultores'
+    });
+  }
+});
+
+// === LIMPAR CÓDIGOS DOS CONSULTORES INTERNOS ===
+app.post('/api/consultores/limpar-codigos-internos', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    // Buscar consultores internos com código de referência
+    const { data: consultoresInternos, error: consultoresError } = await supabase
+      .from('consultores')
+      .select('id, nome, codigo_referencia')
+      .eq('is_freelancer', false)
+      .not('codigo_referencia', 'is', null);
+
+    if (consultoresError) throw consultoresError;
+
+    if (consultoresInternos.length === 0) {
+      return res.json({ 
+        message: 'Nenhum consultor interno com código de referência encontrado.',
+        processados: 0
+      });
+    }
+
+    // Limpar códigos dos consultores internos
+    const { error: updateError } = await supabase
+      .from('consultores')
+      .update({ codigo_referencia: null })
+      .eq('is_freelancer', false);
+
+    if (updateError) throw updateError;
+
+
+    res.json({
+      message: `Códigos de referência removidos de ${consultoresInternos.length} consultores internos com sucesso!`,
+      processados: consultoresInternos.length,
+      consultores_limpos: consultoresInternos.map(c => ({
+        id: c.id,
+        nome: c.nome,
+        codigo_removido: c.codigo_referencia
+      }))
+    });
+  } catch (error) {
+    console.error('Erro ao limpar códigos dos consultores internos:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === GERAR CÓDIGO PARA CONSULTORES EXISTENTES (SEM CÓDIGO) ===
+app.post('/api/consultores/gerar-codigos-faltantes', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    // Buscar consultores sem código de referência
+    const { data: consultoresSemCodigo, error: consultoresError } = await supabase
+      .from('consultores')
+      .select('id, nome')
+      .is('codigo_referencia', null);
+
+    if (consultoresError) throw consultoresError;
+
+    if (consultoresSemCodigo.length === 0) {
+      return res.json({ 
+        message: 'Todos os consultores já possuem códigos de referência!',
+        processados: 0
+      });
+    }
+
+    let processados = 0;
+    const resultados = [];
+
+    for (const consultor of consultoresSemCodigo) {
+      try {
+        // Gerar código único
+        const codigoReferencia = await gerarCodigoReferencia(consultor.nome, consultor.id);
+
+        // Atualizar consultor com o novo código
+        const { error: updateError } = await supabase
+          .from('consultores')
+          .update({ codigo_referencia: codigoReferencia })
+          .eq('id', consultor.id);
+
+        if (updateError) {
+          console.error(`Erro ao atualizar consultor ${consultor.id}:`, updateError);
+          resultados.push({
+            id: consultor.id,
+            nome: consultor.nome,
+            sucesso: false,
+            erro: updateError.message
+          });
+        } else {
+          processados++;
+          resultados.push({
+            id: consultor.id,
+            nome: consultor.nome,
+            sucesso: true,
+            codigo_referencia: codigoReferencia,
+            link_personalizado: `https://crm.investmoneysa.com.br/captura-lead?ref=${codigoReferencia}`
+          });
+        }
+      } catch (error) {
+        console.error(`Erro ao processar consultor ${consultor.id}:`, error);
+        resultados.push({
+          id: consultor.id,
+          nome: consultor.nome,
+          sucesso: false,
+          erro: error.message
+        });
+      }
+    }
+
+    res.json({
+      message: `Processamento concluído! ${processados} de ${consultoresSemCodigo.length} consultores receberam códigos.`,
+      processados,
+      total: consultoresSemCodigo.length,
+      resultados
+    });
+  } catch (error) {
+    console.error('Erro ao gerar códigos faltantes:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === OBTER LINK PERSONALIZADO DO CONSULTOR ===
+app.get('/api/consultores/:id/link-personalizado', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Verificar permissões: admin ou próprio consultor
+    if (req.user.tipo !== 'admin' && req.user.consultor_id !== parseInt(id)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+    
+    const { data: consultor, error } = await supabase
+      .from('consultores')
+      .select('id, nome, codigo_referencia')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+
+    if (!consultor.codigo_referencia) {
+      return res.json({
+        codigo_referencia: null,
+        link_personalizado: null,
+        message: 'Código de referência não foi gerado ainda.'
+      });
+    }
+
+    res.json({
+      codigo_referencia: consultor.codigo_referencia,
+      link_personalizado: `https://crm.investmoneysa.com.br/captura-lead?ref=${consultor.codigo_referencia}`,
+      nome: consultor.nome
+    });
+  } catch (error) {
+    console.error('Erro ao obter link personalizado:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 app.put('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, telefone, email, senha, pix } = req.body;
+    const { nome, telefone, email, senha, pix, is_freelancer } = req.body;
     
     // Preparar dados para atualização
     const updateData = { nome, telefone, pix };
+    
+    // Atualizar tipo de consultor se fornecido
+    if (is_freelancer !== undefined) {
+      updateData.is_freelancer = is_freelancer;
+      
+      // Se mudou para interno, remover código de referência
+      if (!is_freelancer) {
+        updateData.codigo_referencia = null;
+      } else if (!updateData.codigo_referencia) {
+        // Se mudou para freelancer e não tem código, gerar um
+        updateData.codigo_referencia = await gerarCodigoReferencia(nome, id);
+      }
+    }
     
     // Atualizar email se fornecido
     if (email && email.trim() !== '') {
@@ -1342,27 +1751,40 @@ app.get('/api/pacientes', authenticateToken, async (req, res) => {
       `)
       .order('created_at', { ascending: false });
 
-    // Se for consultor, filtrar pacientes atribuídos a ele OU vinculados através de agendamentos
+    // Se for consultor, verificar se é freelancer ou interno
     if (req.user.tipo === 'consultor') {
-      // Buscar pacientes com agendamentos deste consultor
-      const { data: agendamentos, error: agendError } = await supabase
-        .from('agendamentos')
-        .select('paciente_id')
-        .eq('consultor_id', req.user.consultor_id);
+      // Buscar informações do consultor
+      const { data: consultorInfo, error: consultorError } = await supabase
+        .from('consultores')
+        .select('is_freelancer')
+        .eq('id', req.user.consultor_id || req.user.id)
+        .single();
 
-      if (agendError) throw agendError;
+      if (consultorError) throw consultorError;
 
-      const pacienteIds = agendamentos.map(a => a.paciente_id);
-      
-      // Combinar: pacientes atribuídos diretamente OU com agendamentos
-      const conditions = [`consultor_id.eq.${req.user.consultor_id}`];
-      
-      if (pacienteIds.length > 0) {
-        conditions.push(`id.in.(${pacienteIds.join(',')})`);
+      // Se for freelancer, filtrar apenas seus pacientes
+      if (consultorInfo.is_freelancer !== false) {
+        // Buscar pacientes com agendamentos deste consultor
+        const { data: agendamentos, error: agendError } = await supabase
+          .from('agendamentos')
+          .select('paciente_id')
+          .eq('consultor_id', req.user.consultor_id);
+
+        if (agendError) throw agendError;
+
+        const pacienteIds = agendamentos.map(a => a.paciente_id);
+        
+        // Combinar: pacientes atribuídos diretamente OU com agendamentos
+        const conditions = [`consultor_id.eq.${req.user.consultor_id}`];
+        
+        if (pacienteIds.length > 0) {
+          conditions.push(`id.in.(${pacienteIds.join(',')})`);
+        }
+        
+        // Aplicar filtro OR
+        query = query.or(conditions.join(','));
       }
-      
-      // Aplicar filtro OR
-      query = query.or(conditions.join(','));
+      // Se for consultor interno (is_freelancer = false), não aplicar filtro - vê todos
     }
 
     const { data, error } = await query;
@@ -1606,7 +2028,7 @@ app.put('/api/pacientes/:id', authenticateToken, requireAdmin, async (req, res) 
   }
 });
 
-app.put('/api/pacientes/:id/status', authenticateToken, requireAdmin, async (req, res) => {
+app.put('/api/pacientes/:id/status', authenticateToken, requireOwnerOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -1718,17 +2140,51 @@ app.delete('/api/pacientes/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// === NOVOS LEADS === (Funcionalidade para pegar leads)
+// === NOVOS LEADS === (Apenas para Admin e Consultores Internos)
 app.get('/api/novos-leads', authenticateToken, async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('pacientes')
-      .select('*')
-      .is('consultor_id', null)
-      .order('created_at', { ascending: false });
+    if (req.user.tipo === 'admin') {
+      // Admin vê leads sem consultor (leads do link geral)
+      const { data, error } = await supabase
+        .from('pacientes')
+        .select('*')
+        .is('consultor_id', null)
+        .eq('status', 'lead')
+        .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    res.json(data);
+      if (error) throw error;
+      return res.json(data);
+    } 
+    
+    if (req.user.tipo === 'consultor') {
+      // Buscar informações do consultor para saber se é freelancer ou interno
+      const { data: consultorInfo, error: consultorError } = await supabase
+        .from('consultores')
+        .select('is_freelancer')
+        .eq('id', req.user.consultor_id || req.user.id)
+        .single();
+
+      if (consultorError) throw consultorError;
+
+      if (consultorInfo.is_freelancer) {
+        // Freelancers NÃO veem novos leads - seus leads vão direto para "Pacientes"
+        return res.json([]);
+      } else {
+        // Consultor interno: vê leads gerais (sem consultor)
+        const { data, error } = await supabase
+          .from('pacientes')
+          .select('*')
+          .is('consultor_id', null)
+          .eq('status', 'lead')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return res.json(data);
+      }
+    }
+
+    // Outros tipos não veem leads
+    res.json([]);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1737,24 +2193,29 @@ app.get('/api/novos-leads', authenticateToken, async (req, res) => {
 app.put('/api/novos-leads/:id/pegar', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
+    const consultorId = req.user.consultor_id || req.user.id;
     
-    // Verificar se o lead ainda está disponível
+    // Verificar se o lead ainda está disponível (sem consultor)
     const { data: pacienteAtual, error: checkError } = await supabase
       .from('pacientes')
-      .select('consultor_id')
+      .select('consultor_id, status, nome')
       .eq('id', id)
       .single();
 
     if (checkError) throw checkError;
 
+    // Apenas leads gerais (sem consultor) podem ser "pegos"
     if (pacienteAtual.consultor_id !== null) {
       return res.status(400).json({ error: 'Este lead já foi atribuído a outro consultor!' });
     }
 
-    // Atribuir o lead ao consultor atual
+    // Atribuir o lead ao consultor atual e mudar status
     const { error } = await supabase
       .from('pacientes')
-      .update({ consultor_id: req.user.consultor_id })
+      .update({ 
+        consultor_id: consultorId,
+        status: 'agendado'
+      })
       .eq('id', id);
 
     if (error) throw error;
@@ -1769,7 +2230,10 @@ app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
   try {
     let query = supabase
       .from('novas_clinicas')
-      .select('*')
+      .select(`
+        *,
+        consultores(nome)
+      `)
       .order('created_at', { ascending: false });
 
     // Lógica de filtro baseada no tipo de usuário e permissões
@@ -1801,7 +2265,14 @@ app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
     const { data, error } = await query;
 
     if (error) throw error;
-    res.json(data);
+    
+    // Reformatar dados para compatibilidade com frontend
+    const formattedData = data.map(clinica => ({
+      ...clinica,
+      consultor_nome: clinica.consultores?.nome
+    }));
+
+    res.json(formattedData);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -2022,9 +2493,22 @@ app.get('/api/agendamentos', authenticateToken, async (req, res) => {
       .order('data_agendamento', { ascending: false })
       .order('horario');
 
-    // Se for consultor, filtrar apenas seus agendamentos
+    // Se for consultor, verificar se é freelancer ou interno
     if (req.user.tipo === 'consultor') {
-      query = query.eq('consultor_id', req.user.id);
+      // Buscar informações do consultor
+      const { data: consultorInfo, error: consultorError } = await supabase
+        .from('consultores')
+        .select('is_freelancer')
+        .eq('id', req.user.consultor_id || req.user.id)
+        .single();
+
+      if (consultorError) throw consultorError;
+
+      // Se for freelancer, filtrar apenas seus agendamentos
+      if (consultorInfo.is_freelancer !== false) {
+        query = query.eq('consultor_id', req.user.consultor_id || req.user.id);
+      }
+      // Se for consultor interno, não aplicar filtro - vê todos
     }
 
     const { data, error } = await query;
@@ -2149,7 +2633,7 @@ app.put('/api/agendamentos/:id', authenticateToken, async (req, res) => {
   }
 });
 
-app.put('/api/agendamentos/:id/status', authenticateToken, async (req, res) => {
+app.put('/api/agendamentos/:id/status', authenticateToken, requireOwnerOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -2237,9 +2721,22 @@ app.get('/api/fechamentos', authenticateToken, async (req, res) => {
       .order('data_fechamento', { ascending: false })
       .order('created_at', { ascending: false });
 
-    // Se for consultor, filtrar apenas seus fechamentos
+    // Se for consultor, verificar se é freelancer ou interno
     if (req.user.tipo === 'consultor') {
-      query = query.eq('consultor_id', req.user.consultor_id);
+      // Buscar informações do consultor
+      const { data: consultorInfo, error: consultorError } = await supabase
+        .from('consultores')
+        .select('is_freelancer')
+        .eq('id', req.user.consultor_id || req.user.id)
+        .single();
+
+      if (consultorError) throw consultorError;
+
+      // Se for freelancer, filtrar apenas seus fechamentos
+      if (consultorInfo.is_freelancer !== false) {
+        query = query.eq('consultor_id', req.user.consultor_id || req.user.id);
+      }
+      // Se for consultor interno, não aplicar filtro - vê todos
     }
 
     const { data, error } = await query;
@@ -2700,23 +3197,36 @@ app.get('/api/meta-ads/leads', authenticateToken, async (req, res) => {
       `)
       .order('created_at', { ascending: false });
 
-    // Se for consultor, filtrar apenas leads de pacientes atribuídos a ele
+    // Se for consultor, verificar se é freelancer ou interno
     if (req.user.tipo === 'consultor') {
-      const { data: pacientesConsultor, error: pacientesError } = await supabase
-        .from('pacientes')
-        .select('id')
-        .eq('consultor_id', req.user.consultor_id);
+      // Buscar informações do consultor
+      const { data: consultorInfo, error: consultorError } = await supabase
+        .from('consultores')
+        .select('is_freelancer')
+        .eq('id', req.user.consultor_id || req.user.id)
+        .single();
 
-      if (pacientesError) throw pacientesError;
+      if (consultorError) throw consultorError;
 
-      const pacienteIds = pacientesConsultor.map(p => p.id);
-      
-      if (pacienteIds.length > 0) {
-        query = query.in('paciente_id', pacienteIds);
-      } else {
-        // Se não tem pacientes, retornar array vazio
-        return res.json([]);
+      // Se for freelancer, filtrar apenas leads de pacientes atribuídos a ele
+      if (consultorInfo.is_freelancer !== false) {
+        const { data: pacientesConsultor, error: pacientesError } = await supabase
+          .from('pacientes')
+          .select('id')
+          .eq('consultor_id', req.user.consultor_id);
+
+        if (pacientesError) throw pacientesError;
+
+        const pacienteIds = pacientesConsultor.map(p => p.id);
+        
+        if (pacienteIds.length > 0) {
+          query = query.in('paciente_id', pacienteIds);
+        } else {
+          // Se não tem pacientes, retornar array vazio
+          return res.json([]);
+        }
       }
+      // Se for consultor interno, não aplicar filtro - vê todos
     }
 
     const { data, error } = await query;
@@ -3187,35 +3697,33 @@ if (!process.env.VERCEL && !process.env.DISABLE_WEBSOCKET) {
 }
 
 
-// Função para notificar novos leads
+// Função para notificar novos leads (apenas para admins)
 const notifyNewLead = async (leadData) => {
   if (!io) return;
   
   try {
-    const { data: connectedUsers } = await io.fetchSockets();
-    
-    // Filtrar apenas usuários administradores
-    const adminUsers = connectedUsers.filter(socket => {
-      const userData = connectedUsers.get(socket.id);
-      return userData && userData.userType === 'admin';
-    });
-    
-    adminUsers.forEach(socket => {
-      socket.emit('new-lead', {
-        lead: leadData,
-        timestamp: new Date().toISOString()
-      });
-    });
-    
-    console.log('🔔 Notificação de novo lead enviada para', adminUsers.length, 'administradores conectados');
+    // Enviar notificação apenas para administradores
+    for (const [socketId, userData] of connectedUsers.entries()) {
+      if (userData.userType === 'admin') {
+        const socket = io.sockets.sockets.get(socketId);
+        if (socket) {
+          socket.emit('new-lead', {
+            lead: leadData,
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
+    }
   } catch (error) {
     console.log('Erro ao notificar novo lead:', error);
   }
 };
 
+// Map global para usuários conectados
+const connectedUsers = new Map();
+
 // Socket.IO connection handling (apenas se Socket.IO estiver habilitado)
 if (io) {
-  const connectedUsers = new Map();
   
   io.on('connection', (socket) => {
     console.log('🔌 Cliente conectado:', socket.id);

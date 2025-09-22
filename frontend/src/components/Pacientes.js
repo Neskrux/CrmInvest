@@ -160,26 +160,42 @@ const Pacientes = () => {
     { value: 'reagendado', label: 'Reagendado', color: '#8b5cf6', description: 'Agendamento foi reagendado' }
   ];
 
+  // Removido: fetchConsultorInfo - agora usando podeAlterarStatus do contexto
+
   useEffect(() => {
     fetchPacientes();
     fetchConsultores();
     fetchClinicas();
-    fetchNovosLeads(); // Sempre buscar novos leads para mostrar o badge
+    
+    // Buscar novos leads apenas se pode alterar status (não freelancer)
+    if (podeAlterarStatus) {
+      fetchNovosLeads();
+    }
     
     // Verificar se tutorial foi completado
     const completed = localStorage.getItem('tutorial-pacientes-completed');
     setTutorialCompleted(!!completed);
-  }, []);
+  }, [podeAlterarStatus]);
+
+  // Garantir que freelancers fiquem na aba "Pacientes"
+  useEffect(() => {
+    if (isConsultor && !podeAlterarStatus && activeTab === 'novos-leads') {
+      setActiveTab('pacientes');
+    }
+  }, [podeAlterarStatus, activeTab, isConsultor]);
 
   // Atualização automática dos dados a cada 30 segundos
   useEffect(() => {
     const interval = setInterval(() => {
       fetchPacientes();
-      fetchNovosLeads();
+      // Buscar novos leads apenas se pode alterar status (não freelancer)
+      if (podeAlterarStatus) {
+        fetchNovosLeads();
+      }
     }, 30000); // 30 segundos
 
     return () => clearInterval(interval);
-  }, []);
+  }, [podeAlterarStatus, isConsultor]);
 
   // Atualizar novos leads quando mudar de aba
   useEffect(() => {
@@ -188,29 +204,28 @@ const Pacientes = () => {
     }
   }, [activeTab]);
 
-  // Detectar novos leads e tocar som
+  // Detectar novos leads e tocar som (apenas para admins)
   useEffect(() => {
-    if (novosLeads.length > 0) {
-      const currentLeadsIds = new Set(novosLeads.map(lead => lead.id));
-      const previousIds = previousLeadsIdsRef.current;
-      
-      // Verificar se há leads novos (que não estavam na lista anterior)
-      const newLeadsIds = [...currentLeadsIds].filter(id => !previousIds.has(id));
-      
-      if (newLeadsIds.length > 0) {
-        console.log('🚨 NOVO LEAD DETECTADO! Iniciando som e notificação...');
-        playNotificationSound();
-      }
-      
-      // Atualizar as referências
-      previousLeadsIdsRef.current = currentLeadsIds;
-      previousLeadsCountRef.current = novosLeads.length;
-    } else {
-      // Se não há leads, limpar as referências
-      previousLeadsIdsRef.current.clear();
-      previousLeadsCountRef.current = 0;
+    // Apenas admins devem receber notificações sonoras
+    if (!isAdmin || novosLeads.length === 0) {
+      return;
     }
-  }, [novosLeads, playNotificationSound]);
+    
+    const currentLeadsIds = new Set(novosLeads.map(lead => lead.id));
+    const previousIds = previousLeadsIdsRef.current;
+    
+    // Verificar se há leads novos (que não estavam na lista anterior)
+    const newLeadsIds = [...currentLeadsIds].filter(id => !previousIds.has(id));
+    
+    if (newLeadsIds.length > 0) {
+      console.log('🚨 NOVO LEAD DETECTADO! Iniciando som e notificação...');
+      playNotificationSound();
+    }
+    
+    // Atualizar as referências
+    previousLeadsIdsRef.current = currentLeadsIds;
+    previousLeadsCountRef.current = novosLeads.length;
+  }, [novosLeads, playNotificationSound, isAdmin]);
 
   // Controlar scroll do body quando modal estiver aberto
   useEffect(() => {
@@ -1039,8 +1054,17 @@ const Pacientes = () => {
             <strong style={{ color: '#0c4a6e' }}>Ações</strong>
           </div>
           <div style={{ color: '#0c4a6e', lineHeight: '1.4' }}>
-            • Na aba <strong>"Pacientes"</strong> → Você pode cadastrar novos pacientes ou leads<br/>
-            • Na aba <strong>"Novos Leads"</strong> → Você pode pegar novos os leads disponíveis para você	
+            {podeAlterarStatus ? (
+              <>
+                • Na aba <strong>"Pacientes"</strong> → Você pode cadastrar novos pacientes ou leads<br/>
+                • Na aba <strong>"Novos Leads"</strong> → Você pode pegar novos os leads disponíveis para você
+              </>
+            ) : (
+              <>
+                • Na aba <strong>"Pacientes"</strong> → Verifique seus novos leads, ou cadastre novos pacientes<br/>
+                • <strong>Dica:</strong> → Indique apenas pacientes que desejam fazer tratamentos estéticos ou odontológicos, parcelados no boleto
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -1053,16 +1077,32 @@ const Pacientes = () => {
         >
           Pacientes
         </button>
-        <button
-          className={`tab ${activeTab === 'novos-leads' ? 'active' : ''}`}
-          onClick={() => setActiveTab('novos-leads')}
-          style={{ position: 'relative' }}
-        >
-          Novos Leads
-          {novosLeads.length > 0 && (
-            <span className="tab-badge">{novosLeads.length}</span>
-          )}
-        </button>
+        {/* Mostrar aba "Novos Leads" apenas para admins e consultores internos */}
+        {(() => {
+          // Mostrar aba para admins ou consultores que podem alterar status (não freelancers)
+          const shouldShow = isAdmin || podeAlterarStatus;
+          
+          console.log('Debug - Condição aba Novos Leads:', {
+            isAdmin,
+            isConsultor,
+            podeAlterarStatus,
+            shouldShow,
+            userType: user?.tipo,
+            condition: `isAdmin: ${isAdmin} || podeAlterarStatus: ${podeAlterarStatus}`
+          });
+          return shouldShow;
+        })() && (
+          <button
+            className={`tab ${activeTab === 'novos-leads' ? 'active' : ''}`}
+            onClick={() => setActiveTab('novos-leads')}
+            style={{ position: 'relative' }}
+          >
+            Novos Leads
+            {novosLeads.length > 0 && (
+              <span className="tab-badge">{novosLeads.length}</span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Conteúdo da aba Pacientes */}
@@ -1387,9 +1427,9 @@ const Pacientes = () => {
         <>
           <div className="card">
             <div className="card-header">
-              <h2 className="card-title">Novos Leads Disponíveis</h2>
+              <h2 className="card-title">Novos Leads</h2>
               <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                {novosLeads.length} lead(s) disponível(eis)
+                {novosLeads.length} lead(s)
               </div>
             </div>
 
