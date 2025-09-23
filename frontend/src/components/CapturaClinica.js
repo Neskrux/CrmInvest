@@ -103,6 +103,30 @@ const CapturaClinica = () => {
     }
   }, [location]);
 
+  // Google Analytics
+  useEffect(() => {
+    // Carregar o script do Google Analytics
+    const script1 = document.createElement('script');
+    script1.async = true;
+    script1.src = 'https://www.googletagmanager.com/gtag/js?id=AW-17515519025';
+    document.head.appendChild(script1);
+
+    // Configurar o gtag
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'AW-17515519025');
+
+    // Cleanup function
+    return () => {
+      // Remover o script quando o componente for desmontado
+      const existingScript = document.querySelector('script[src="https://www.googletagmanager.com/gtag/js?id=AW-17515519025"]');
+      if (existingScript) {
+        document.head.removeChild(existingScript);
+      }
+    };
+  }, []);
+
   const formatarTelefone = (value) => {
     const numbers = value.replace(/\D/g, '');
     if (numbers.length <= 10) {
