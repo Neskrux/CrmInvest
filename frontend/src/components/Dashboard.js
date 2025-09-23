@@ -1032,38 +1032,46 @@ const Dashboard = () => {
       {/* KPIs do Período - Apenas quando não é Total */}
       {periodo !== 'total' && (
         <div style={{ marginBottom: '2rem' }}>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1a1d23', marginBottom: '1rem' }}>
-            Resumo do Período - {obterPeriodoTexto()}
+          <h3 style={{ 
+            fontSize: '1.25rem', 
+            fontWeight: '700', 
+            color: '#1a1d23', 
+            marginBottom: '1.5rem',
+            letterSpacing: '-0.025em',
+            borderBottom: '2px solid #e5e7eb',
+            paddingBottom: '0.75rem'
+          }}>
+            Análise do Período: {obterPeriodoTexto()}
           </h3>
           <div className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-label">Novos Leads</div>
-              <div className="stat-value">{stats.novosLeadsPeriodo}</div>
-              <div className="stat-subtitle" style={{ color: '#6b7280' }}>
+            <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
+              <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px' }}>Novos Leads</div>
+              <div className="stat-value" style={{ fontSize: '2.5rem' }}>{stats.novosLeadsPeriodo}</div>
+              <div className="stat-subtitle" style={{ color: '#6b7280', fontSize: '0.8rem', fontWeight: '500' }}>
                 No período selecionado
               </div>
             </div>
 
-            <div className="stat-card">
-              <div className="stat-label">Agendamentos</div>
-              <div className="stat-value">{stats.agendamentosPeriodo}</div>
-              <div className="stat-subtitle" style={{ color: '#6b7280' }}>
+            <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
+              <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px' }}>Agendamentos</div>
+              <div className="stat-value" style={{ fontSize: '2.5rem' }}>{stats.agendamentosPeriodo}</div>
+              <div className="stat-subtitle" style={{ color: '#6b7280', fontSize: '0.8rem', fontWeight: '500' }}>
                 No período selecionado
               </div>
             </div>
 
-            <div className="stat-card">
-              <div className="stat-label">Fechamentos</div>
-              <div className="stat-value">{stats.fechamentosPeriodo}</div>
-              <div className="stat-subtitle" style={{ color: '#6b7280' }}>
+            <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
+              <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px' }}>Fechamentos</div>
+              <div className="stat-value" style={{ fontSize: '2.5rem' }}>{stats.fechamentosPeriodo}</div>
+              <div className="stat-subtitle" style={{ color: '#6b7280', fontSize: '0.8rem', fontWeight: '500' }}>
                 No período selecionado
               </div>
             </div>
 
-            <div className="stat-card">
-              <div className="stat-label">Valor Fechado</div>
-              <div className="stat-value">{formatCurrency(stats.valorPeriodo)}</div>
-              <div className="stat-subtitle" style={{ color: '#6b7280' }}>
+            <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
+              <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px' }}>Valor Fechado</div>
+              <div className="stat-value" style={{ fontSize: '2.5rem' }}>{formatCurrency(stats.valorPeriodo)}</div>
+              <div className="stat-subtitle" style={{ color: '#6b7280', fontSize: '0.8rem', fontWeight: '500' }}>
                 No período selecionado
               </div>
             </div>
@@ -1073,13 +1081,21 @@ const Dashboard = () => {
 
       {/* KPIs Principais */}
       <div style={{ marginBottom: '2rem' }} data-tutorial="main-kpis">
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1a1d23', marginBottom: '1rem' }}>
-          Totais Gerais
+        <h3 style={{ 
+          fontSize: '1.25rem', 
+          fontWeight: '700', 
+          color: '#1a1d23', 
+          marginBottom: '1.5rem',
+          letterSpacing: '-0.025em',
+          borderBottom: '2px solid #e5e7eb',
+          paddingBottom: '0.75rem'
+        }}>
+          Indicadores Principais
         </h3>
         <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-label">Total de Pacientes</div>
-            <div className="stat-value">{kpisPrincipais.totalPacientes}</div>
+          <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
+            <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600' }}>Total de Pacientes</div>
+            <div className="stat-value" style={{ fontSize: '2.5rem' }}>{kpisPrincipais.totalPacientes}</div>
             <div className={`stat-change ${(isAdmin ? stats.crescimentoPacientes : crescimentosFiltrados.crescimentoPacientes) >= 0 ? 'positive' : 'negative'}`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 {(isAdmin ? stats.crescimentoPacientes : crescimentosFiltrados.crescimentoPacientes) >= 0 ? (
@@ -1097,17 +1113,17 @@ const Dashboard = () => {
               {formatPercentage(isAdmin ? stats.crescimentoPacientes : crescimentosFiltrados.crescimentoPacientes)} este mês
             </div>
           </div>
-          <div className="stat-card">
-            <div className="stat-label">Agendamentos</div>
-            <div className="stat-value">{kpisPrincipais.totalAgendamentos}</div>
+          <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
+            <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600' }}>Agendamentos</div>
+            <div className="stat-value" style={{ fontSize: '2.5rem' }}>{kpisPrincipais.totalAgendamentos}</div>
           </div>
-          <div className="stat-card">
-            <div className="stat-label">Fechamentos</div>
-            <div className="stat-value">{kpisPrincipais.totalFechamentos}</div>
+          <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
+            <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600' }}>Fechamentos</div>
+            <div className="stat-value" style={{ fontSize: '2.5rem' }}>{kpisPrincipais.totalFechamentos}</div>
           </div>
-          <div className="stat-card">
-            <div className="stat-label">Valor Total</div>
-            <div className="stat-value">{formatCurrency(kpisPrincipais.valorTotalFechamentos)}</div>
+          <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
+            <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600' }}>Valor Total</div>
+            <div className="stat-value" style={{ fontSize: '2.5rem' }}>{formatCurrency(kpisPrincipais.valorTotalFechamentos)}</div>
             {(isAdmin ? stats.crescimentoValor : crescimentosFiltrados.crescimentoValor) > 0 && (
               <div className="stat-change positive">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1123,22 +1139,40 @@ const Dashboard = () => {
 
       {/* Cards de Comissão (dados filtrados) */}
       <div className="stats-grid" style={{ marginTop: '2rem', gridTemplateColumns: 'repeat(2, 1fr)' }}>
-        <div className="stat-card" style={{ backgroundColor: '#fef3c7' }}>
-          <div className="stat-label">Comissão do Mês</div>
-          <div className="stat-value" style={{ color: '#f59e0b' }}>
+        <div className="stat-card" style={{ 
+          background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
+          border: '2px solid #f97316'
+        }}>
+          <div className="stat-label" style={{ 
+            textTransform: 'uppercase', 
+            fontSize: '0.75rem', 
+            letterSpacing: '0.5px', 
+            fontWeight: '600',
+            color: '#c2410c'
+          }}>Comissão do Mês</div>
+          <div className="stat-value" style={{ color: '#ea580c', fontSize: '2.5rem' }}>
             {formatCurrency(comissoesFiltradas.mes)}
           </div>
-          <div className="stat-subtitle" style={{ color: '#92400e' }}>
+          <div className="stat-subtitle" style={{ color: '#7c2d12', fontWeight: '500', fontSize: '0.8rem' }}>
             Total de comissões este mês
           </div>
         </div>
 
-        <div className="stat-card" style={{ backgroundColor: '#ede9fe' }}>
-          <div className="stat-label">Comissão Total Geral</div>
-          <div className="stat-value" style={{ color: '#8b5cf6' }}>
+        <div className="stat-card" style={{ 
+          background: 'linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)',
+          border: '2px solid #9333ea'
+        }}>
+          <div className="stat-label" style={{ 
+            textTransform: 'uppercase', 
+            fontSize: '0.75rem', 
+            letterSpacing: '0.5px', 
+            fontWeight: '600',
+            color: '#6b21a8'
+          }}>Comissão Total Geral</div>
+          <div className="stat-value" style={{ color: '#7c3aed', fontSize: '2.5rem' }}>
             {formatCurrency(comissoesFiltradas.total)}
           </div>
-          <div className="stat-subtitle" style={{ color: '#5b21b6' }}>
+          <div className="stat-subtitle" style={{ color: '#581c87', fontWeight: '500', fontSize: '0.8rem' }}>
             Comissões acumuladas
           </div>
         </div>
@@ -1147,10 +1181,10 @@ const Dashboard = () => {
       {/* Gráfico de Pacientes, Agendamentos e Fechamentos por Cidade */}
       {stats.agendamentosPorCidade.length > 0 && (
         <div className="card" style={{ marginTop: '2rem' }} data-tutorial="cities-chart">
-          <div className="card-header">
-            <h2 className="card-title">Pacientes, Agendamentos e Fechamentos por Cidade</h2>
-            <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-              {window.innerWidth <= 768 ? 'Top 3' : 'Top 10'} cidades com mais movimentação no funil de vendas
+          <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
+            <h2 className="card-title" style={{ color: '#1a1d23', fontWeight: '700' }}>Análise Geográfica de Performance</h2>
+            <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0, fontWeight: '500' }}>
+              {window.innerWidth <= 768 ? 'Top 3' : 'Top 10'} cidades com maior volume de operações
             </p>
           </div>
           <div className="card-body">
@@ -1249,8 +1283,8 @@ const Dashboard = () => {
       <div className="grid grid-2" style={{ gap: '2rem' }}>
         {/* Pipeline de Vendas (dados filtrados) */}
         <div className="card" style={{ minWidth: 0 }} data-tutorial="sales-pipeline">
-          <div className="card-header">
-            <h2 className="card-title">Pipeline de Vendas</h2>
+          <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
+            <h2 className="card-title" style={{ color: '#1a1d23', fontWeight: '700' }}>Pipeline de Vendas</h2>
           </div>
           <div className="card-body">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -1290,9 +1324,9 @@ const Dashboard = () => {
 
         {/* Ranking dos Consultores */}
         <div className="card" style={{ minWidth: 0 }} data-tutorial="ranking">
-          <div className="card-header">
-            <h2 className="card-title">🏆 Ranking dos Consultores</h2>
-            <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+          <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
+            <h2 className="card-title" style={{ color: '#1a1d23', fontWeight: '700' }}>Ranking de Performance</h2>
+            <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0, fontWeight: '500' }}>
               Classificação por valor fechado
             </p>
           </div>
@@ -1343,24 +1377,27 @@ const Dashboard = () => {
                           style={{
                             padding: '1.5rem',
                             borderRadius: '16px',
-                            background: idx === 0 ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' :
-                                       idx === 1 ? 'linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%)' :
-                                                  'linear-gradient(135deg, #fed7aa 0%, #fdba74 100%)',
+                            background: idx === 0 ? 'linear-gradient(135deg, #1a1d23 0%, #2d3748 100%)' :
+                                       idx === 1 ? 'linear-gradient(135deg, #475569 0%, #64748b 100%)' :
+                                                  'linear-gradient(135deg, #94a3b8 0%, #cbd5e1 100%)',
                             border: '2px solid',
-                            borderColor: idx === 0 ? '#fbbf24' :
-                                        idx === 1 ? '#9ca3af' : '#fb923c',
+                            borderColor: idx === 0 ? '#1a1d23' :
+                                        idx === 1 ? '#475569' : '#94a3b8',
                             boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
                             textAlign: 'center',
                             position: 'relative',
                             overflow: 'hidden'
                           }}
                         >
-                          {/* Medalha */}
+                          {/* Posição */}
                           <div style={{ 
-                            fontSize: '3rem', 
-                            marginBottom: '0.5rem' 
+                            fontSize: '2.5rem', 
+                            fontWeight: '800',
+                            marginBottom: '0.5rem',
+                            color: idx === 0 ? '#FFD700' : idx === 1 ? '#C0C0C0' : '#CD7F32',
+                            textShadow: '0 2px 4px rgba(0,0,0,0.1)'
                           }}>
-                            {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
+                            {idx + 1}º
                           </div>
                           
                           {/* Nome */}
@@ -1368,20 +1405,23 @@ const Dashboard = () => {
                             fontSize: '1.25rem', 
                             fontWeight: '700',
                             marginBottom: '0.5rem',
-                            color: '#1e293b'
+                            color: 'white'
                           }}>
                             {consultor.nome}
                           </h3>
                           
-                          {/* Posição */}
+                          {/* Título da Posição */}
                           <div style={{ 
                             fontSize: '0.875rem', 
-                            color: '#64748b',
-                            marginBottom: '1rem'
+                            color: 'rgba(255, 255, 255, 0.9)',
+                            marginBottom: '1rem',
+                            fontWeight: '600',
+                            letterSpacing: '0.5px',
+                            textTransform: 'uppercase'
                           }}>
-                            {idx === 0 ? '👑 Líder do Ranking' :
-                             idx === 1 ? '⭐ Vice-líder' : 
-                                        '🌟 3º Lugar'}
+                            {idx === 0 ? 'Primeiro Lugar' :
+                             idx === 1 ? 'Segundo Lugar' : 
+                                        'Terceiro Lugar'}
                           </div>
 
                           {/* Estatísticas */}
@@ -1392,26 +1432,26 @@ const Dashboard = () => {
                             marginBottom: '1rem'
                           }}>
                             <div>
-                              <div style={{ fontSize: '1.25rem', fontWeight: '700' }}>
+                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'white' }}>
                                 {consultor.totalPacientes}
                               </div>
-                              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                              <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.8)' }}>
                                 Pacientes
                               </div>
                             </div>
                             <div>
-                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#3b82f6' }}>
+                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'white' }}>
                                 {consultor.totalAgendamentos}
                               </div>
-                              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                              <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.8)' }}>
                                 Agendamentos
                               </div>
                             </div>
                             <div>
-                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#10b981' }}>
+                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'white' }}>
                                 {consultor.totalFechamentos}
                               </div>
-                              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                              <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.8)' }}>
                                 Fechamentos
                               </div>
                             </div>
@@ -1420,14 +1460,14 @@ const Dashboard = () => {
                           {/* Valores */}
                           <div style={{ 
                             padding: '1rem', 
-                            background: 'rgba(255, 255, 255, 0.8)',
+                            background: 'rgba(255, 255, 255, 0.95)',
                             borderRadius: '12px',
                             marginTop: '1rem'
                           }}>
-                            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#059669' }}>
+                            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1a1d23' }}>
                               {formatCurrency(consultor.valorFechado)}
                             </div>
-                            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                            <div style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: '600' }}>
                               Comissão: {formatCurrency(consultor.comissaoTotal)}
                             </div>
                           </div>
@@ -1535,7 +1575,7 @@ const Dashboard = () => {
                           color: '#6b7280',
                           marginBottom: '1rem'
                         }}>
-                          💤 Aguardando Primeira Venda
+                          Consultores Sem Vendas
                         </h4>
                         <div style={{ 
                           display: 'grid',
@@ -1555,11 +1595,13 @@ const Dashboard = () => {
                               }}
                             >
                               <div style={{ 
-                                fontSize: '1.5rem', 
-                                marginBottom: '0.5rem' 
+                                fontSize: '0.875rem', 
+                                marginBottom: '0.5rem',
+                                color: '#9ca3af',
+                                fontWeight: '600' 
                               }}>
-                                ⭕
-          </div>
+                                —
+                              </div>
                               <div style={{ fontWeight: '600', color: '#64748b' }}>
                                 {consultor.nome}
                               </div>
@@ -1585,55 +1627,107 @@ const Dashboard = () => {
 
       {/* Gráfico de Conversão (dados filtrados) */}
       <div className="card" style={{ marginTop: '2rem' }} data-tutorial="conversion-rate">
-        <div className="card-header">
-          <h2 className="card-title">Taxa de Conversão do Funil</h2>
+        <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
+          <h2 className="card-title" style={{ color: '#1a1d23', fontWeight: '700' }}>Taxa de Conversão do Funil</h2>
         </div>
         <div className="card-body">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: window.innerWidth <= 768 ? '0.4rem' : '2rem' }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              gap: window.innerWidth <= 768 ? '0.4rem' : '2rem',
+              padding: '2rem',
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              borderRadius: '12px'
+            }}>
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: window.innerWidth <= 768 ? '1rem' : '2rem', fontWeight: '700', color: '#1a1d23' }}>
+              <div style={{ 
+                fontSize: window.innerWidth <= 768 ? '1.5rem' : '2.5rem', 
+                fontWeight: '800', 
+                color: '#1a1d23',
+                marginBottom: '0.5rem'
+              }}>
                 {kpisPrincipais.totalPacientes}
               </div>
-              <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+              <div style={{ 
+                fontSize: '0.75rem', 
+                color: '#64748b', 
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                fontWeight: '600'
+              }}>
                 Leads Totais
               </div>
             </div>
 
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="2">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5">
               <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
 
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: window.innerWidth <= 768 ? '1rem' : '2rem', fontWeight: '700', color: '#1a1d23' }}>
+              <div style={{ 
+                fontSize: window.innerWidth <= 768 ? '1.5rem' : '2.5rem', 
+                fontWeight: '800', 
+                color: '#1a1d23',
+                marginBottom: '0.5rem'
+              }}>
                 {pipelineFiltrado.agendado || 0}
               </div>
-              <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+              <div style={{ 
+                fontSize: '0.75rem', 
+                color: '#64748b', 
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                fontWeight: '600'
+              }}>
                 Agendados
               </div>
             </div>
 
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="2">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5">
               <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
 
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: window.innerWidth <= 768 ? '1rem' : '2rem', fontWeight: '700', color: '#1a1d23' }}>
+              <div style={{ 
+                fontSize: window.innerWidth <= 768 ? '1.5rem' : '2.5rem', 
+                fontWeight: '800', 
+                color: '#1a1d23',
+                marginBottom: '0.5rem'
+              }}>
                 {pipelineFiltrado.compareceu || 0}
               </div>
-              <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+              <div style={{ 
+                fontSize: '0.75rem', 
+                color: '#64748b', 
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                fontWeight: '600'
+              }}>
                 Compareceram
               </div>
             </div>
 
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="2">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5">
               <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
 
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: window.innerWidth <= 768 ? '1rem' : '2rem', fontWeight: '700', color: '#059669' }}>
+              <div style={{ 
+                fontSize: window.innerWidth <= 768 ? '1.5rem' : '2.5rem', 
+                fontWeight: '800', 
+                color: '#059669',
+                marginBottom: '0.5rem'
+              }}>
                 {pipelineFiltrado.fechado || 0}
               </div>
-              <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+              <div style={{ 
+                fontSize: '0.75rem', 
+                color: '#64748b', 
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                fontWeight: '600'
+              }}>
                 Fechados
               </div>
             </div>
@@ -1641,17 +1735,25 @@ const Dashboard = () => {
 
           <div style={{ 
             marginTop: '2rem', 
-            padding: '1rem', 
-            backgroundColor: '#f9fafb',
-            borderRadius: '8px',
-            textAlign: 'center' 
+            padding: '1.5rem', 
+            background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
+            borderRadius: '12px',
+            textAlign: 'center',
+            border: '2px solid #22c55e'
           }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#059669' }}>
+            <div style={{ fontSize: '2.5rem', fontWeight: '800', color: '#15803d' }}>
               {kpisPrincipais.totalPacientes > 0 
                 ? ((pipelineFiltrado.fechado || 0) / kpisPrincipais.totalPacientes * 100).toFixed(1)
                 : 0}%
             </div>
-            <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+            <div style={{ 
+              fontSize: '0.875rem', 
+              color: '#166534', 
+              marginTop: '0.5rem',
+              fontWeight: '600',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
               Taxa de Conversão Total
             </div>
           </div>
@@ -1689,8 +1791,8 @@ const Dashboard = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1e293b', margin: 0 }}>
-                💰 Valores Financeiros
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b', margin: 0 }}>
+                Valores Financeiros
               </h3>
               <button
                 onClick={() => setShowConsultoresExtrasModal(false)}
@@ -1732,8 +1834,8 @@ const Dashboard = () => {
                 borderRadius: '12px',
                 textAlign: 'center'
               }}>
-                <div style={{ fontSize: '0.875rem', color: '#166534', marginBottom: '0.5rem', fontWeight: '600' }}>
-                  💵 Valor Total Fechado
+                <div style={{ fontSize: '0.875rem', color: '#166534', marginBottom: '0.5rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Valor Total Fechado
                 </div>
                 <div style={{ fontSize: '2rem', fontWeight: '700', color: '#059669' }}>
                   {formatCurrency(showConsultoresExtrasModal.valorFechado)}
@@ -1747,8 +1849,8 @@ const Dashboard = () => {
                 borderRadius: '12px',
                 textAlign: 'center'
               }}>
-                <div style={{ fontSize: '0.875rem', color: '#92400e', marginBottom: '0.5rem', fontWeight: '600' }}>
-                  🎯 Comissão Total
+                <div style={{ fontSize: '0.875rem', color: '#92400e', marginBottom: '0.5rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Comissão Total
                 </div>
                 <div style={{ fontSize: '2rem', fontWeight: '700', color: '#d97706' }}>
                   {formatCurrency(showConsultoresExtrasModal.comissaoTotal)}
