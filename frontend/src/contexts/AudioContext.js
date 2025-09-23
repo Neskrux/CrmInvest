@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useMemo } from 'react';
+import React, { createContext, useContext, useState, useMemo, useRef, useEffect } from 'react';
 import useAudioNotification from '../hooks/useAudioNotification';
-import NewLeadNotification from '../components/NewLeadNotification';
+import NewNotification from '../components/NewNotification';
 
 const AudioContext = createContext();
 
@@ -15,37 +15,76 @@ export const useAudio = () => {
 export const AudioProvider = ({ children }) => {
   const audioHook = useAudioNotification();
   const [showNotification, setShowNotification] = useState(false);
-  const [leadData, setLeadData] = useState(null);
+  const [notificationData, setNotificationData] = useState(null);
+  const [notificationType, setNotificationType] = useState('lead');
+  const [isNotificationActive, setIsNotificationActive] = useState(false);
+  const timeoutRef = useRef(null);
   
   // Memoizar o componente de áudio para evitar re-renders
   const AudioComponentMemo = useMemo(() => audioHook.AudioComponent, []);
 
-  const playNotificationSound = () => {
+  // Cleanup timeout ao desmontar componente
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  const playNotificationSound = (type = 'lead', data = null) => {
+    // Evitar múltiplas notificações simultâneas
+    if (isNotificationActive) {
+      console.log('⚠️ Notificação já ativa - ignorando nova chamada');
+      return;
+    }
+    
+    console.log('🔊 AudioContext: Iniciando notificação sonora e visual para:', type);
+    setIsNotificationActive(true);
+    setNotificationType(type);
+    setNotificationData(data);
     setShowNotification(true);
     audioHook.playNotificationSound();
+    
+    // Auto-parar após 30 segundos se o usuário não clicar
+    timeoutRef.current = setTimeout(() => {
+      console.log('⏰ Timeout - parando notificação automaticamente');
+      hideNotification();
+    }, 30000);
   };
 
   const hideNotification = () => {
+    console.log('🔇 AudioContext: Parando notificação');
+    setIsNotificationActive(false);
     setShowNotification(false);
-    setLeadData(null);
+    setNotificationData(null);
+    setNotificationType('lead');
     audioHook.stopNotificationSound();
+    
+    // Limpar timeout se existir
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
   };
 
   const value = {
     ...audioHook,
     playNotificationSound,
     showNotification,
-    leadData
+    notificationData,
+    notificationType
   };
 
   return (
     <AudioContext.Provider value={value}>
       {children}
       <AudioComponentMemo />
-      <NewLeadNotification 
+      <NewNotification 
         isVisible={showNotification}
         onClose={hideNotification}
-        leadData={leadData}
+        type={notificationType}
+        data={notificationData}
       />
     </AudioContext.Provider>
   );

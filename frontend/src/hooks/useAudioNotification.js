@@ -78,6 +78,7 @@ const useAudioNotification = () => {
         
         // Tentar reproduzir
         audio.play().then(() => {
+          console.log('🔊 Som de notificação iniciado');
         }).catch(error => {
           console.error('❌ Erro ao tocar áudio:', error);
           isPlayingRef.current = false;
@@ -88,6 +89,7 @@ const useAudioNotification = () => {
               isPlayingRef.current = true;
               audioRef.current.loop = true;
               audioRef.current.play().then(() => {
+                console.log('🔊 Som de notificação iniciado (retry)');
               }).catch(err => {
                 console.error('❌ Falhou novamente:', err);
                 isPlayingRef.current = false;
@@ -96,6 +98,7 @@ const useAudioNotification = () => {
           }, 100);
         });
       } else {
+        console.log('❌ AudioRef não disponível');
       }
     } catch (error) {
       console.error('❌ Erro ao executar playNotificationSound:', error);
@@ -110,6 +113,7 @@ const useAudioNotification = () => {
         audio.currentTime = 0;
         audio.loop = false;
         isPlayingRef.current = false;
+        console.log('🔇 Som de notificação parado');
       }
     } catch (error) {
       console.error('❌ Erro ao parar áudio:', error);
