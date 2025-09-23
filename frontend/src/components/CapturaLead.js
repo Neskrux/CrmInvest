@@ -112,7 +112,7 @@ const CapturaLead = () => {
 
     // Configurar o gtag
     window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
+    function gtag(){window.dataLayer.push(arguments);}
     gtag('js', new Date());
     gtag('config', 'AW-17515519025');
 
