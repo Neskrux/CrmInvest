@@ -619,17 +619,6 @@ const Consultores = () => {
                           >
                             {formatarPixExibicao(consultor.pix)}
                           </span>
-                          <div className="pix-buttons">
-                            <button
-                              onClick={() => mostrarPixCompleto(consultor.pix)}
-                              className="btn-action"
-                              title="Ver PIX completo"
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                <circle cx="12" cy="12" r="3"></circle>
-                              </svg>
-                            </button>
                             <button
                               onClick={() => copiarPix(consultor.pix)}
                               className="btn-action"
@@ -640,7 +629,6 @@ const Consultores = () => {
                                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                               </svg>
                             </button>
-                          </div>
                         </div>
                       ) : (
                         '-'

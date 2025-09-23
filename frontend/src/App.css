@@ -981,14 +981,6 @@
     max-width: 250px;
   }
   
-  /* Container para PIX com botões */
-  .pix-container {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    max-width: 100%;
-  }
-  
   .pix-text {
     fontFamily: 'monospace';
     fontSize: '0.8rem';
@@ -998,6 +990,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    margin-right: 0.5rem;
   }
   
   .pix-buttons {

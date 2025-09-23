@@ -29,6 +29,7 @@ const Clinicas = () => {
   const [geocoding, setGeocoding] = useState(false);
   const [formData, setFormData] = useState({
     nome: '',
+    cnpj: '',
     endereco: '',
     bairro: '',
     cidade: '',
@@ -36,11 +37,13 @@ const Clinicas = () => {
     nicho: '',
     telefone: '',
     email: '',
+    responsavel: '',
     status: 'ativa'
   });
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
   const [novaClinicaFormData, setNovaClinicaFormData] = useState({
     nome: '',
+    cnpj: '',
     endereco: '',
     bairro: '',
     cidade: '',
@@ -48,6 +51,7 @@ const Clinicas = () => {
     nicho: '',
     telefone: '',
     email: '',
+    responsavel: '',
     status: 'tem_interesse',
     observacoes: ''
   });
@@ -331,6 +335,7 @@ const Clinicas = () => {
         setShowNovaClinicaModal(false);
         setNovaClinicaFormData({
           nome: '',
+          cnpj: '',
           endereco: '',
           bairro: '',
           cidade: '',
@@ -338,6 +343,7 @@ const Clinicas = () => {
           nicho: '',
           telefone: '',
           email: '',
+          responsavel: '',
           status: 'tem_interesse',
           observacoes: ''
         });
@@ -384,6 +390,7 @@ const Clinicas = () => {
         setEditingClinica(null);
         setFormData({
           nome: '',
+          cnpj: '',
           endereco: '',
           bairro: '',
           cidade: '',
@@ -391,6 +398,7 @@ const Clinicas = () => {
           nicho: '',
           telefone: '',
           email: '',
+          responsavel: '',
           status: 'ativa'
         });
         setCidadeCustomizada(false);
@@ -415,6 +423,7 @@ const Clinicas = () => {
     
     setFormData({
       nome: clinica.nome || '',
+      cnpj: clinica.cnpj || '',
       endereco: clinica.endereco || '',
       bairro: clinica.bairro || '',
       cidade: cidadeClinica,
@@ -422,6 +431,7 @@ const Clinicas = () => {
       nicho: clinica.nicho || '',
       telefone: clinica.telefone || '',
       email: clinica.email || '',
+      responsavel: clinica.responsavel || '',
       status: clinica.status || 'ativo'
     });
     setCidadeCustomizada(cidadeEhCustomizada);
@@ -461,9 +471,15 @@ const Clinicas = () => {
     return telefone;
   };
 
+  const formatarCNPJ = (value) => {
+    const numbers = value.replace(/\D/g, '');
+    return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+  };
+
   const resetForm = () => {
     setFormData({
       nome: '',
+      cnpj: '',
       endereco: '',
       bairro: '',
       cidade: '',
@@ -471,6 +487,7 @@ const Clinicas = () => {
       nicho: '',
       telefone: '',
       email: '',
+      responsavel: '',
       status: 'ativa'
     });
     setCidadeCustomizada(false);
@@ -536,9 +553,11 @@ const Clinicas = () => {
   const handleInputChange = (e) => {
     let { name, value } = e.target;
     
-    // Aplicar formatação na cidade
+    // Aplicar formatação específica baseada no campo
     if (name === 'cidade') {
       value = formatarCidade(value);
+    } else if (name === 'cnpj') {
+      value = formatarCNPJ(value);
     }
     
     // Limpar cidade se estado mudar
@@ -585,17 +604,16 @@ const Clinicas = () => {
   const handleNovaClinicaInputChange = (e) => {
     let { name, value } = e.target;
     
-    // Aplicar máscara de telefone se necessário
+    // Aplicar formatação específica baseada no campo
     if (name === 'telefone') {
       value = value
         .replace(/\D/g, '')
         .replace(/(\d{2})(\d)/, '($1) $2')
         .replace(/(\d{5})(\d)/, '$1-$2')
         .replace(/(-\d{4})\d+?$/, '$1');
-    }
-    
-    // Aplicar formatação na cidade
-    if (name === 'cidade') {
+    } else if (name === 'cnpj') {
+      value = formatarCNPJ(value);
+    } else if (name === 'cidade') {
       value = formatarCidade(value);
     }
     
@@ -1286,14 +1304,12 @@ const Clinicas = () => {
               <thead>
                 <tr>
                   <th>Nome</th>
-                  <th style={{ display: isMobile ? 'none' : 'table-cell' }}>CNPJ</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Endereço</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Bairro</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Cidade/Estado</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Nicho</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Contato</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Proprietário</th>
-                  <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Indicado por</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>
                     Status
                     {!podeAlterarStatus && (
@@ -1340,20 +1356,6 @@ const Clinicas = () => {
                     <td>
                       <strong>{clinica.nome}</strong>
                     </td>
-                    <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
-                      {clinica.cnpj ? (
-                        <span style={{ 
-                          fontFamily: 'monospace', 
-                          fontSize: '0.875rem',
-                          backgroundColor: '#f3f4f6',
-                          padding: '0.25rem 0.5rem',
-                          borderRadius: '4px',
-                          color: '#374151'
-                        }}>
-                          {clinica.cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')}
-                        </span>
-                      ) : '-'}
-                    </td>
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>{clinica.endereco || '-'}</td>
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>{clinica.bairro || '-'}</td>
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
@@ -1392,15 +1394,6 @@ const Clinicas = () => {
                         <span className="badge" style={{ backgroundColor: '#10b981', color: 'white' }}>
                           Pública
                         </span>
-                      )}
-                    </td>
-                    <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
-                      {clinica.consultor_nome ? (
-                        <span className="badge" style={{ backgroundColor: '#8b5cf6', color: 'white' }}>
-                          {clinica.consultor_nome}
-                        </span>
-                      ) : (
-                        <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>-</span>
                       )}
                     </td>
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
@@ -1466,7 +1459,7 @@ const Clinicas = () => {
                         </span>
                       )}
                     </td>
-                    <td style={{ display: 'flex' }}>
+                    <td>
                       {isConsultor ? (
                         <button
                           onClick={() => handleView(clinica)}
@@ -1552,12 +1545,10 @@ const Clinicas = () => {
                 <thead>
                   <tr>
                     <th>Nome</th>
-                    <th style={{ display: isMobile ? 'none' : 'table-cell' }}>CNPJ</th>
                     <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Localização</th>
                     <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Nicho</th>
                     <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Telefone</th>
                     <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Email</th>
-                    <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Proprietário</th>
                     <th style={{ display: isMobile ? 'none' : 'table-cell' }}>
                       Status
                       {!podeAlterarStatus && (
@@ -1615,20 +1606,6 @@ const Clinicas = () => {
                           </div>
                         </td>
                         <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
-                          {clinica.cnpj ? (
-                            <span style={{ 
-                              fontFamily: 'monospace', 
-                              fontSize: '0.875rem',
-                              backgroundColor: '#f3f4f6',
-                              padding: '0.25rem 0.5rem',
-                              borderRadius: '4px',
-                              color: '#374151'
-                            }}>
-                              {clinica.cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')}
-                            </span>
-                          ) : '-'}
-                        </td>
-                        <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                           <div style={{ fontSize: '0.875rem' }}>
                             {clinica.cidade && clinica.estado ? 
                               `${clinica.cidade}/${clinica.estado}` : 
@@ -1647,17 +1624,6 @@ const Clinicas = () => {
                           {clinica.email ? (
                             <span style={{ fontSize: '0.875rem' }}>{clinica.email}</span>
                           ) : '-'}
-                        </td>
-                        <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
-                          {clinica.consultor_nome ? (
-                            <span className="badge" style={{ backgroundColor: '#8b5cf6', color: 'white' }}>
-                              {clinica.consultor_nome}
-                            </span>
-                          ) : (
-                            <span className="badge" style={{ backgroundColor: '#10b981', color: 'white' }}>
-                              Pública
-                            </span>
-                          )}
                         </td>
                         <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                           {(isAdmin || podeAlterarStatus) ? (
@@ -1697,7 +1663,6 @@ const Clinicas = () => {
                         <td style={{ display: isMobile ? 'none' : 'table-cell' }}>{formatarData(clinica.created_at)}</td>
                         <td style={{
                               padding: '0.5rem',
-                              display: 'flex',
                               gap: '0.5rem',
                               alignItems: 'center',
                               justifyContent: 'flex-start'
@@ -1765,6 +1730,35 @@ const Clinicas = () => {
                   placeholder="Digite o nome da clínica"
                   required
                 />
+              </div>
+
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">CNPJ *</label>
+                  <input
+                    type="text"
+                    name="cnpj"
+                    className="form-input"
+                    value={formData.cnpj}
+                    onChange={handleInputChange}
+                    placeholder="00.000.000/0000-00"
+                    maxLength="18"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Responsável *</label>
+                  <input
+                    type="text"
+                    name="responsavel"
+                    className="form-input"
+                    value={formData.responsavel}
+                    onChange={handleInputChange}
+                    placeholder="Nome do responsável"
+                    required
+                  />
+                </div>
               </div>
 
               <div className="form-group">
@@ -1984,6 +1978,13 @@ const Clinicas = () => {
                      </p>
                    </div>
                  )}
+
+                 {viewingClinica.responsavel && (
+                   <div>
+                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Responsável</label>
+                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.responsavel}</p>
+                   </div>
+                 )}
                  
                  {viewingClinica.endereco && (
                    <div>
@@ -2107,14 +2108,21 @@ const Clinicas = () => {
                   <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingNovaClinica.nome}</p>
                 </div>
                 
-                {viewingNovaClinica.cnpj && (
-                  <div>
-                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>CNPJ</label>
-                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937', fontFamily: 'monospace' }}>
-                      {viewingNovaClinica.cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')}
-                    </p>
-                  </div>
-                )}
+                 {viewingNovaClinica.cnpj && (
+                   <div>
+                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>CNPJ</label>
+                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937', fontFamily: 'monospace' }}>
+                       {viewingNovaClinica.cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')}
+                     </p>
+                   </div>
+                 )}
+
+                 {viewingNovaClinica.responsavel && (
+                   <div>
+                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Responsável</label>
+                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingNovaClinica.responsavel}</p>
+                   </div>
+                 )}
                 
                 {viewingNovaClinica.endereco && (
                   <div>
@@ -2238,6 +2246,7 @@ const Clinicas = () => {
                   setShowNovaClinicaModal(false);
                   setNovaClinicaFormData({ 
                     nome: '',
+                    cnpj: '',
                     endereco: '',
                     bairro: '',
                     cidade: '',
@@ -2245,6 +2254,7 @@ const Clinicas = () => {
                     nicho: '',
                     telefone: '',
                     email: '',
+                    responsavel: '',
                     status: 'tem_interesse',
                     observacoes: ''
                   });
@@ -2267,6 +2277,35 @@ const Clinicas = () => {
                   placeholder="Digite o nome da clínica"
                   required
                 />
+              </div>
+
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">CNPJ *</label>
+                  <input
+                    type="text"
+                    name="cnpj"
+                    className="form-input"
+                    value={novaClinicaFormData.cnpj}
+                    onChange={handleNovaClinicaInputChange}
+                    placeholder="00.000.000/0000-00"
+                    maxLength="18"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Responsável *</label>
+                  <input
+                    type="text"
+                    name="responsavel"
+                    className="form-input"
+                    value={novaClinicaFormData.responsavel}
+                    onChange={handleNovaClinicaInputChange}
+                    placeholder="Nome do responsável"
+                    required
+                  />
+                </div>
               </div>
 
               <div className="form-group">
@@ -2452,6 +2491,7 @@ const Clinicas = () => {
                       setShowNovaClinicaModal(false);
                       setNovaClinicaFormData({ 
                         nome: '',
+                        cnpj: '',
                         endereco: '',
                         bairro: '',
                         cidade: '',
@@ -2459,6 +2499,7 @@ const Clinicas = () => {
                         nicho: '',
                         telefone: '',
                         email: '',
+                        responsavel: '',
                         status: 'tem_interesse',
                         observacoes: ''
                       });
