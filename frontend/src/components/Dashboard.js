@@ -1187,28 +1187,52 @@ const Dashboard = () => {
               {window.innerWidth <= 768 ? 'Top 3' : 'Top 10'} cidades com maior volume de operações
             </p>
           </div>
-          <div className="card-body">
-            <ResponsiveContainer width="100%" height={400}>
+          <div className="card-body" style={{ padding: '2rem', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' }}>
+            <ResponsiveContainer width="100%" height={450}>
               <BarChart
                 data={stats.agendamentosPorCidade}
                 margin={{
-                  top: 20,
-                  right: 30,
-                  left: 20,
-                  bottom: 5,
+                  top: 30,
+                  right: 40,
+                  left: 40,
+                  bottom: 80,
                 }}
               >
-                <CartesianGrid strokeDasharray="3 3" />
+                <defs>
+                  <linearGradient id="pacientesGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#f97316" stopOpacity={1}/>
+                    <stop offset="100%" stopColor="#ea580c" stopOpacity={0.8}/>
+                  </linearGradient>
+                  <linearGradient id="agendamentosGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={1}/>
+                    <stop offset="100%" stopColor="#2563eb" stopOpacity={0.8}/>
+                  </linearGradient>
+                  <linearGradient id="fechamentosGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10b981" stopOpacity={1}/>
+                    <stop offset="100%" stopColor="#059669" stopOpacity={0.8}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid 
+                  strokeDasharray="3 3" 
+                  stroke="#e5e7eb"
+                  vertical={false}
+                />
                 <XAxis 
                   dataKey="cidade" 
                   angle={-45}
                   textAnchor="end"
                   height={100}
                   interval={0}
+                  tick={{ fontSize: 12, fill: '#6b7280', fontWeight: 500 }}
+                  axisLine={{ stroke: '#e5e7eb', strokeWidth: 1 }}
                 />
-                <YAxis />
+                <YAxis 
+                  tick={{ fontSize: 12, fill: '#6b7280' }}
+                  axisLine={{ stroke: '#e5e7eb', strokeWidth: 1 }}
+                  gridLine={{ stroke: '#f3f4f6' }}
+                />
                 <Tooltip 
-                  labelFormatter={(value) => `Cidade: ${value}`}
+                  labelFormatter={(value) => value}
                   formatter={(value, name, props) => {
                     const labels = {
                       pacientes: 'Pacientes',
@@ -1216,57 +1240,149 @@ const Dashboard = () => {
                       fechamentos: 'Fechamentos',
                       total: 'Total'
                     };
-                    return [value, labels[name] || name];
+                    return [`${value}`, labels[name] || name];
                   }}
-                  labelStyle={{ fontWeight: 'bold' }}
+                  labelStyle={{ fontWeight: '700', color: '#1a1d23', fontSize: '14px' }}
                   contentStyle={{ 
-                    backgroundColor: '#f9fafb', 
+                    backgroundColor: 'rgba(255, 255, 255, 0.98)', 
                     border: '1px solid #e5e7eb',
-                    borderRadius: '6px'
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                    padding: '12px'
                   }}
+                  cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }}
                 />
-                <Legend />
-                <Bar dataKey="pacientes" fill="#f59e0b" name="Pacientes" />
-                <Bar dataKey="agendamentos" fill="#3b82f6" name="Agendamentos" />
-                <Bar dataKey="fechamentos" fill="#059669" name="Fechamentos" />
+                <Legend 
+                  wrapperStyle={{ paddingTop: '20px' }}
+                  iconType="rect"
+                  iconSize={12}
+                  formatter={(value) => (
+                    <span style={{ color: '#374151', fontSize: '13px', fontWeight: '600' }}>
+                      {value}
+                    </span>
+                  )}
+                />
+                <Bar 
+                  dataKey="pacientes" 
+                  fill="url(#pacientesGradient)" 
+                  name="Pacientes"
+                  radius={[8, 8, 0, 0]}
+                  barSize={60}
+                />
+                <Bar 
+                  dataKey="agendamentos" 
+                  fill="url(#agendamentosGradient)" 
+                  name="Agendamentos"
+                  radius={[8, 8, 0, 0]}
+                  barSize={60}
+                />
+                <Bar 
+                  dataKey="fechamentos" 
+                  fill="url(#fechamentosGradient)" 
+                  name="Fechamentos"
+                  radius={[8, 8, 0, 0]}
+                  barSize={60}
+                />
               </BarChart>
             </ResponsiveContainer>
             
             {/* Tabela de Conversão por Cidade */}
-            <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
-              <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1f2937', marginBottom: '1rem' }}>
+            <div style={{ 
+              marginTop: '2rem', 
+              padding: '1.5rem', 
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              borderRadius: '12px',
+              border: '1px solid #e5e7eb'
+            }}>
+              <h4 style={{ 
+                fontSize: '1rem', 
+                fontWeight: '700', 
+                color: '#1a1d23', 
+                marginBottom: '1.5rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
                 Taxa de Conversão por Cidade
               </h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
                 {stats.agendamentosPorCidade.map((cidade, index) => (
                   <div key={index} style={{ 
-                    padding: '0.75rem',
+                    padding: '1rem',
                     backgroundColor: 'white',
-                    borderRadius: '6px',
-                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-                  }}>
-                    <div style={{ fontWeight: '600', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
+                    borderRadius: '10px',
+                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.06)',
+                    border: '1px solid #e5e7eb',
+                    transition: 'all 0.2s ease',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.06)';
+                  }}
+                  >
+                    <div style={{ 
+                      fontWeight: '700', 
+                      marginBottom: '0.75rem', 
+                      fontSize: '0.95rem',
+                      color: '#1a1d23',
+                      borderBottom: '2px solid #f3f4f6',
+                      paddingBottom: '0.5rem'
+                    }}>
                       {cidade.cidade}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Pacientes → Agendamentos:</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '0.5rem',
+                        background: '#f9fafb',
+                        borderRadius: '6px'
+                      }}>
                         <span style={{ 
-                          fontSize: '0.75rem', 
-                          fontWeight: '600',
-                          color: parseFloat(cidade.conversaoAgendamento) > 50 ? '#059669' : 
-                                 parseFloat(cidade.conversaoAgendamento) > 20 ? '#f59e0b' : '#ef4444'
+                          fontSize: '0.8rem', 
+                          color: '#64748b',
+                          fontWeight: '500'
+                        }}>Pacientes → Agendamentos</span>
+                        <span style={{ 
+                          fontSize: '0.9rem', 
+                          fontWeight: '700',
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '4px',
+                          background: parseFloat(cidade.conversaoAgendamento) > 50 ? '#dcfce7' : 
+                                     parseFloat(cidade.conversaoAgendamento) > 20 ? '#fef3c7' : '#fee2e2',
+                          color: parseFloat(cidade.conversaoAgendamento) > 50 ? '#166534' : 
+                                 parseFloat(cidade.conversaoAgendamento) > 20 ? '#92400e' : '#991b1b'
                         }}>
                           {cidade.conversaoAgendamento}%
                         </span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Agendamentos → Fechamentos:</span>
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '0.5rem',
+                        background: '#f9fafb',
+                        borderRadius: '6px'
+                      }}>
                         <span style={{ 
-                          fontSize: '0.75rem', 
-                          fontWeight: '600',
-                          color: parseFloat(cidade.conversaoFechamento) > 50 ? '#059669' : 
-                                 parseFloat(cidade.conversaoFechamento) > 20 ? '#f59e0b' : '#ef4444'
+                          fontSize: '0.8rem', 
+                          color: '#64748b',
+                          fontWeight: '500'
+                        }}>Agendamentos → Fechamentos</span>
+                        <span style={{ 
+                          fontSize: '0.9rem', 
+                          fontWeight: '700',
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '4px',
+                          background: parseFloat(cidade.conversaoFechamento) > 50 ? '#dcfce7' : 
+                                     parseFloat(cidade.conversaoFechamento) > 20 ? '#fef3c7' : '#fee2e2',
+                          color: parseFloat(cidade.conversaoFechamento) > 50 ? '#166534' : 
+                                 parseFloat(cidade.conversaoFechamento) > 20 ? '#92400e' : '#991b1b'
                         }}>
                           {cidade.conversaoFechamento}%
                         </span>
@@ -1366,39 +1482,50 @@ const Dashboard = () => {
                   <>
                     {/* Top 3 em destaque */}
                     <div style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                      display: 'flex', 
+                      flexDirection: 'column',
+                      alignItems: 'center',
                       gap: '1rem',
                       marginBottom: '2rem'
                     }}>
-                      {consultoresAtivos.slice(0, 3).map((consultor, idx) => (
-                        <div 
-                          key={idx}
-                          style={{
-                            padding: '1.5rem',
-                            borderRadius: '16px',
-                            background: idx === 0 ? 'linear-gradient(135deg, #1a1d23 0%, #2d3748 100%)' :
-                                       idx === 1 ? 'linear-gradient(135deg, #475569 0%, #64748b 100%)' :
-                                                  'linear-gradient(135deg, #94a3b8 0%, #cbd5e1 100%)',
-                            border: '2px solid',
-                            borderColor: idx === 0 ? '#1a1d23' :
-                                        idx === 1 ? '#475569' : '#94a3b8',
-                            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
-                            textAlign: 'center',
-                            position: 'relative',
-                            overflow: 'hidden'
-                          }}
+                      {/* Primeira linha: 1º e 2º lugares */}
+                      <div style={{
+                        display: 'flex',
+                        gap: '1rem',
+                        justifyContent: 'center',
+                        flexWrap: 'wrap'
+                      }}>
+                        {[0, 1].map((idx) => {
+                          const consultor = consultoresAtivos[idx];
+                          if (!consultor) return null;
+                          return (
+                            <div 
+                              key={idx}
+                              style={{
+                                padding: '1.5rem',
+                                borderRadius: '16px',
+                                background: idx === 0 ? 'linear-gradient(135deg, #1a1d23 0%, #2d3748 100%)' :
+                                           'linear-gradient(135deg, #475569 0%, #64748b 100%)',
+                                border: '2px solid',
+                                borderColor: idx === 0 ? '#1a1d23' : '#475569',
+                                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+                                textAlign: 'center',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                width: '320px',
+                                minHeight: idx === 0 ? '420px' : '400px'
+                              }}
                         >
-                          {/* Posição */}
-                          <div style={{ 
-                            fontSize: '2.5rem', 
-                            fontWeight: '800',
-                            marginBottom: '0.5rem',
-                            color: idx === 0 ? '#FFD700' : idx === 1 ? '#C0C0C0' : '#CD7F32',
-                            textShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                          }}>
-                            {idx + 1}º
-                          </div>
+                              {/* Posição */}
+                              <div style={{ 
+                                fontSize: '2.5rem', 
+                                fontWeight: '800',
+                                marginBottom: '0.5rem',
+                                color: idx === 0 ? '#FFD700' : '#C0C0C0',
+                                textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                              }}>
+                                {idx + 1}º
+                              </div>
                           
                           {/* Nome */}
                           <h3 style={{ 
@@ -1410,19 +1537,17 @@ const Dashboard = () => {
                             {consultor.nome}
                           </h3>
                           
-                          {/* Título da Posição */}
-                          <div style={{ 
-                            fontSize: '0.875rem', 
-                            color: 'rgba(255, 255, 255, 0.9)',
-                            marginBottom: '1rem',
-                            fontWeight: '600',
-                            letterSpacing: '0.5px',
-                            textTransform: 'uppercase'
-                          }}>
-                            {idx === 0 ? 'Primeiro Lugar' :
-                             idx === 1 ? 'Segundo Lugar' : 
-                                        'Terceiro Lugar'}
-                          </div>
+                              {/* Título da Posição */}
+                              <div style={{ 
+                                fontSize: '0.875rem', 
+                                color: 'rgba(255, 255, 255, 0.9)',
+                                marginBottom: '1rem',
+                                fontWeight: '600',
+                                letterSpacing: '0.5px',
+                                textTransform: 'uppercase'
+                              }}>
+                                {idx === 0 ? 'Primeiro Lugar' : 'Segundo Lugar'}
+                              </div>
 
                           {/* Estatísticas */}
                           <div style={{ 
@@ -1472,7 +1597,109 @@ const Dashboard = () => {
                             </div>
                           </div>
                         </div>
-                      ))}
+                          );
+                        })}
+                      </div>
+                      
+                      {/* Segunda linha: 3º lugar */}
+                      {consultoresAtivos[2] && (
+                        <div 
+                          style={{
+                            padding: '1.5rem',
+                            borderRadius: '16px',
+                            background: 'linear-gradient(135deg, #94a3b8 0%, #cbd5e1 100%)',
+                            border: '2px solid',
+                            borderColor: '#94a3b8',
+                            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+                            textAlign: 'center',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            width: '320px',
+                            minHeight: '400px'
+                          }}
+                        >
+                          {/* Posição */}
+                          <div style={{ 
+                            fontSize: '2.5rem', 
+                            fontWeight: '800',
+                            marginBottom: '0.5rem',
+                            color: '#CD7F32',
+                            textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                          }}>
+                            3º
+                          </div>
+                          
+                          {/* Nome */}
+                          <h3 style={{ 
+                            fontSize: '1.25rem', 
+                            fontWeight: '700',
+                            marginBottom: '0.5rem',
+                            color: 'white'
+                          }}>
+                            {consultoresAtivos[2].nome}
+                          </h3>
+                          
+                          {/* Título da Posição */}
+                          <div style={{ 
+                            fontSize: '0.875rem', 
+                            color: 'rgba(255, 255, 255, 0.9)',
+                            marginBottom: '1rem',
+                            fontWeight: '600',
+                            letterSpacing: '0.5px',
+                            textTransform: 'uppercase'
+                          }}>
+                            Terceiro Lugar
+                          </div>
+
+                          {/* Estatísticas */}
+                          <div style={{ 
+                            display: 'grid', 
+                            gridTemplateColumns: 'repeat(3, 1fr)',
+                            gap: '0.5rem',
+                            marginBottom: '1rem'
+                          }}>
+                            <div>
+                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'white' }}>
+                                {consultoresAtivos[2].totalPacientes}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.8)' }}>
+                                Pacientes
+                              </div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'white' }}>
+                                {consultoresAtivos[2].totalAgendamentos}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.8)' }}>
+                                Agendamentos
+                              </div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'white' }}>
+                                {consultoresAtivos[2].totalFechamentos}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.8)' }}>
+                                Fechamentos
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Valores */}
+                          <div style={{ 
+                            padding: '1rem', 
+                            background: 'rgba(255, 255, 255, 0.95)',
+                            borderRadius: '12px',
+                            marginTop: '1rem'
+                          }}>
+                            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1a1d23' }}>
+                              {formatCurrency(consultoresAtivos[2].valorFechado)}
+                            </div>
+                            <div style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: '600' }}>
+                              Comissão: {formatCurrency(consultoresAtivos[2].comissaoTotal)}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Restante dos consultores */}

@@ -36,7 +36,22 @@ const Clinicas = () => {
     nicho: '',
     telefone: '',
     email: '',
-    status: 'ativa'
+    status: 'ativa',
+    // Campos de documentação
+    doc_cartao_cnpj: false,
+    doc_contrato_social: false,
+    doc_alvara_sanitario: false,
+    doc_balanco: false,
+    doc_comprovante_endereco: false,
+    doc_dados_bancarios: false,
+    doc_socios: false,
+    doc_certidao_resp_tecnico: false,
+    doc_resp_tecnico: false,
+    visita_online: false,
+    visita_online_url: '',
+    visita_online_data: '',
+    visita_online_observacoes: '',
+    doc_certidao_casamento: false
   });
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
   const [novaClinicaFormData, setNovaClinicaFormData] = useState({
@@ -53,6 +68,7 @@ const Clinicas = () => {
   });
   const [cidadeCustomizadaNova, setCidadeCustomizadaNova] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [uploadingDocs, setUploadingDocs] = useState({});
 
   // Estados para controlar o tutorial
   const [showTutorial, setShowTutorial] = useState(false);
@@ -354,6 +370,105 @@ const Clinicas = () => {
     }
   };
 
+  // Funções para upload de documentos
+  const handleUploadDocument = async (event, docType) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    setUploadingDocs(prev => ({ ...prev, [docType]: true }));
+    
+    const formData = new FormData();
+    formData.append('document', file);
+    
+    try {
+      const response = await fetch(`http://localhost:5000/api/documents/upload/${editingClinica.id}/${docType}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formData
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        showSuccessToast('Documento enviado com sucesso!');
+        
+        // Atualizar o estado do formulário
+        const docField = `doc_${docType}`;
+        setFormData(prev => ({ ...prev, [docField]: true }));
+        
+        // Recarregar dados da clínica
+        fetchClinicas();
+      } else {
+        const error = await response.json();
+        showErrorToast(error.error || 'Erro ao enviar documento');
+      }
+    } catch (error) {
+      console.error('Erro ao fazer upload:', error);
+      showErrorToast('Erro ao enviar documento');
+    } finally {
+      setUploadingDocs(prev => ({ ...prev, [docType]: false }));
+    }
+  };
+  
+  const handleDownloadDocument = async (docType) => {
+    try {
+      // Buscar a URL do documento no banco de dados
+      const response = await fetch(`http://localhost:5000/api/clinicas/${editingClinica.id}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        const clinica = await response.json();
+        const docField = `doc_${docType}_url`;
+        const docUrl = clinica[docField];
+        
+        if (docUrl) {
+          // Abrir o documento em uma nova aba
+          window.open(docUrl, '_blank');
+        } else {
+          showErrorToast('Documento não encontrado');
+        }
+      } else {
+        showErrorToast('Erro ao buscar documento');
+      }
+    } catch (error) {
+      console.error('Erro ao baixar:', error);
+      showErrorToast('Erro ao baixar documento');
+    }
+  };
+  
+  const handleDeleteDocument = async (docType) => {
+    if (!window.confirm('Tem certeza que deseja excluir este documento?')) return;
+    
+    try {
+      const response = await fetch(`http://localhost:5000/api/documents/delete/${editingClinica.id}/${docType}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        showSuccessToast('Documento excluído com sucesso!');
+        
+        // Atualizar o estado do formulário
+        const docField = `doc_${docType}`;
+        setFormData(prev => ({ ...prev, [docField]: false }));
+        
+        // Recarregar dados da clínica
+        fetchClinicas();
+      } else {
+        showErrorToast('Erro ao excluir documento');
+      }
+    } catch (error) {
+      console.error('Erro ao excluir:', error);
+      showErrorToast('Erro ao excluir documento');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -422,7 +537,22 @@ const Clinicas = () => {
       nicho: clinica.nicho || '',
       telefone: clinica.telefone || '',
       email: clinica.email || '',
-      status: clinica.status || 'ativo'
+      status: clinica.status || 'ativo',
+      // Campos de documentação
+      doc_cartao_cnpj: clinica.doc_cartao_cnpj || false,
+      doc_contrato_social: clinica.doc_contrato_social || false,
+      doc_alvara_sanitario: clinica.doc_alvara_sanitario || false,
+      doc_balanco: clinica.doc_balanco || false,
+      doc_comprovante_endereco: clinica.doc_comprovante_endereco || false,
+      doc_dados_bancarios: clinica.doc_dados_bancarios || false,
+      doc_socios: clinica.doc_socios || false,
+      doc_certidao_resp_tecnico: clinica.doc_certidao_resp_tecnico || false,
+      doc_resp_tecnico: clinica.doc_resp_tecnico || false,
+      visita_online: clinica.visita_online || false,
+      visita_online_url: clinica.visita_online_url || '',
+      visita_online_data: clinica.visita_online_data || '',
+      visita_online_observacoes: clinica.visita_online_observacoes || '',
+      doc_certidao_casamento: clinica.doc_certidao_casamento || false
     });
     setCidadeCustomizada(cidadeEhCustomizada);
     setShowModal(true);
@@ -471,7 +601,19 @@ const Clinicas = () => {
       nicho: '',
       telefone: '',
       email: '',
-      status: 'ativa'
+      status: 'ativa',
+      // Campos de documentação
+      doc_cartao_cnpj: false,
+      doc_contrato_social: false,
+      doc_alvara_sanitario: false,
+      doc_balanco: false,
+      doc_comprovante_endereco: false,
+      doc_dados_bancarios: false,
+      doc_socios: false,
+      doc_certidao_resp_tecnico: false,
+      doc_resp_tecnico: false,
+      visita_online: false,
+      doc_certidao_casamento: false
     });
     setCidadeCustomizada(false);
     setEditingClinica(null);
@@ -1922,6 +2064,664 @@ const Clinicas = () => {
                   <option value="nao_fechou">Não Fechou</option>
                 </select>
               </div>
+              
+              {/* Seção de Documentação - Apenas para Edição */}
+              {editingClinica && (
+                <div style={{ 
+                  marginTop: '2rem', 
+                  paddingTop: '2rem', 
+                  borderTop: '2px solid #e5e7eb' 
+                }}>
+                  <h3 style={{ 
+                    fontSize: '1.125rem', 
+                    fontWeight: '700', 
+                    color: '#1a1d23', 
+                    marginBottom: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="16" y1="13" x2="8" y2="13"></line>
+                      <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                    Documentação da Clínica
+                  </h3>
+                  
+                  <div className="alert alert-info" style={{ marginBottom: '1rem' }}>
+                    <strong>Nota:</strong> Faça upload dos documentos clicando no botão "Enviar" ao lado de cada item. Formatos aceitos: PDF, DOC, DOCX, JPG, JPEG e PNG (máx. 10MB).
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1rem' }}>
+                    {/* Upload de documentos */}
+                    <div className="form-group" style={{ 
+                      padding: '1rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input 
+                            type="checkbox" 
+                            name="doc_cartao_cnpj"
+                            checked={formData.doc_cartao_cnpj || false}
+                            onChange={(e) => setFormData({...formData, doc_cartao_cnpj: e.target.checked})}
+                            disabled
+                          />
+                          <span style={{ fontWeight: '600' }}>1. Cartão CNPJ</span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          {formData.doc_cartao_cnpj ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-secondary"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDownloadDocument('cartao_cnpj')}
+                              >
+                                Baixar
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDeleteDocument('cartao_cnpj')}
+                              >
+                                Excluir
+                              </button>
+                            </>
+                          ) : (
+                            <label className="btn btn-sm btn-primary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', cursor: 'pointer', color: 'white' }}>
+                              <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                onChange={(e) => handleUploadDocument(e, 'cartao_cnpj')}
+                              />
+                              Enviar
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                      {uploadingDocs['cartao_cnpj'] && (
+                        <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
+                      )}
+                    </div>
+                    
+                    <div className="form-group" style={{ 
+                      padding: '1rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input 
+                            type="checkbox" 
+                            name="doc_contrato_social"
+                            checked={formData.doc_contrato_social || false}
+                            onChange={(e) => setFormData({...formData, doc_contrato_social: e.target.checked})}
+                            disabled
+                          />
+                          <span style={{ fontWeight: '600' }}>2. Contrato Social</span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          {formData.doc_contrato_social ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-secondary"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDownloadDocument('contrato_social')}
+                              >
+                                Baixar
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDeleteDocument('contrato_social')}
+                              >
+                                Excluir
+                              </button>
+                            </>
+                          ) : (
+                            <label className="btn btn-sm btn-primary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', cursor: 'pointer', color: 'white' }}>
+                              <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                onChange={(e) => handleUploadDocument(e, 'contrato_social')}
+                              />
+                              Enviar
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                      {uploadingDocs['contrato_social'] && (
+                        <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
+                      )}
+                    </div>
+                    
+                    <div className="form-group" style={{ 
+                      padding: '1rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input 
+                            type="checkbox" 
+                            name="doc_alvara_sanitario"
+                            checked={formData.doc_alvara_sanitario || false}
+                            onChange={(e) => setFormData({...formData, doc_alvara_sanitario: e.target.checked})}
+                            disabled
+                          />
+                          <span style={{ fontWeight: '600' }}>3. Alvará de Funcionamento Sanitário</span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          {formData.doc_alvara_sanitario ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-secondary"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDownloadDocument('alvara_sanitario')}
+                              >
+                                Baixar
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDeleteDocument('alvara_sanitario')}
+                              >
+                                Excluir
+                              </button>
+                            </>
+                          ) : (
+                            <label className="btn btn-sm btn-primary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', cursor: 'pointer', color: 'white' }}>
+                              <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                onChange={(e) => handleUploadDocument(e, 'alvara_sanitario')}
+                              />
+                              Enviar
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                      {uploadingDocs['alvara_sanitario'] && (
+                        <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
+                      )}
+                    </div>
+                    
+                    <div className="form-group" style={{ 
+                      padding: '1rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input 
+                            type="checkbox" 
+                            name="doc_balanco"
+                            checked={formData.doc_balanco || false}
+                            onChange={(e) => setFormData({...formData, doc_balanco: e.target.checked})}
+                            disabled
+                          />
+                          <span style={{ fontWeight: '600' }}>4. Balanço/Balancete Assinado</span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          {formData.doc_balanco ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-secondary"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDownloadDocument('balanco')}
+                              >
+                                Baixar
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDeleteDocument('balanco')}
+                              >
+                                Excluir
+                              </button>
+                            </>
+                          ) : (
+                            <label className="btn btn-sm btn-primary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', cursor: 'pointer', color: 'white' }}>
+                              <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                onChange={(e) => handleUploadDocument(e, 'balanco')}
+                              />
+                              Enviar
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                      {uploadingDocs['balanco'] && (
+                        <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
+                      )}
+                    </div>
+                    
+                    <div className="form-group" style={{ 
+                      padding: '1rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input 
+                            type="checkbox" 
+                            name="doc_comprovante_endereco"
+                            checked={formData.doc_comprovante_endereco || false}
+                            onChange={(e) => setFormData({...formData, doc_comprovante_endereco: e.target.checked})}
+                            disabled
+                          />
+                          <span style={{ fontWeight: '600' }}>5. Comprovante de Endereço da Clínica</span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          {formData.doc_comprovante_endereco ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-secondary"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDownloadDocument('comprovante_endereco')}
+                              >
+                                Baixar
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDeleteDocument('comprovante_endereco')}
+                              >
+                                Excluir
+                              </button>
+                            </>
+                          ) : (
+                            <label className="btn btn-sm btn-primary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', cursor: 'pointer', color: 'white' }}>
+                              <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                onChange={(e) => handleUploadDocument(e, 'comprovante_endereco')}
+                              />
+                              Enviar
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                      {uploadingDocs['comprovante_endereco'] && (
+                        <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
+                      )}
+                    </div>
+                    
+                    <div className="form-group" style={{ 
+                      padding: '1rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input 
+                            type="checkbox" 
+                            name="doc_dados_bancarios"
+                            checked={formData.doc_dados_bancarios || false}
+                            onChange={(e) => setFormData({...formData, doc_dados_bancarios: e.target.checked})}
+                            disabled
+                          />
+                          <span style={{ fontWeight: '600' }}>6. Dados Bancários PJ</span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          {formData.doc_dados_bancarios ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-secondary"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDownloadDocument('dados_bancarios')}
+                              >
+                                Baixar
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDeleteDocument('dados_bancarios')}
+                              >
+                                Excluir
+                              </button>
+                            </>
+                          ) : (
+                            <label className="btn btn-sm btn-primary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', cursor: 'pointer', color: 'white' }}>
+                              <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                onChange={(e) => handleUploadDocument(e, 'dados_bancarios')}
+                              />
+                              Enviar
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                      {uploadingDocs['dados_bancarios'] && (
+                        <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
+                      )}
+                    </div>
+                    
+                    <div className="form-group" style={{ 
+                      padding: '1rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input 
+                            type="checkbox" 
+                            name="doc_socios"
+                            checked={formData.doc_socios || false}
+                            onChange={(e) => setFormData({...formData, doc_socios: e.target.checked})}
+                            disabled
+                          />
+                          <span style={{ fontWeight: '600' }}>7. Documentos dos Sócios</span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          {formData.doc_socios ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-secondary"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDownloadDocument('socios')}
+                              >
+                                Baixar
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDeleteDocument('socios')}
+                              >
+                                Excluir
+                              </button>
+                            </>
+                          ) : (
+                            <label className="btn btn-sm btn-primary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', cursor: 'pointer', color: 'white' }}>
+                              <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                onChange={(e) => handleUploadDocument(e, 'socios')}
+                              />
+                              Enviar
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                      {uploadingDocs['socios'] && (
+                        <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
+                      )}
+                    </div>
+                    
+                    <div className="form-group" style={{ 
+                      padding: '1rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input 
+                            type="checkbox" 
+                            name="doc_certidao_resp_tecnico"
+                            checked={formData.doc_certidao_resp_tecnico || false}
+                            onChange={(e) => setFormData({...formData, doc_certidao_resp_tecnico: e.target.checked})}
+                            disabled
+                          />
+                          <span style={{ fontWeight: '600' }}>8. Certidão de Responsabilidade Técnica</span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          {formData.doc_certidao_resp_tecnico ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-secondary"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDownloadDocument('certidao_resp_tecnico')}
+                              >
+                                Baixar
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDeleteDocument('certidao_resp_tecnico')}
+                              >
+                                Excluir
+                              </button>
+                            </>
+                          ) : (
+                            <label className="btn btn-sm btn-primary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', cursor: 'pointer', color: 'white' }}>
+                              <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                onChange={(e) => handleUploadDocument(e, 'certidao_resp_tecnico')}
+                              />
+                              Enviar
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                      {uploadingDocs['certidao_resp_tecnico'] && (
+                        <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
+                      )}
+                    </div>
+                    
+                    <div className="form-group" style={{ 
+                      padding: '1rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input 
+                            type="checkbox" 
+                            name="doc_resp_tecnico"
+                            checked={formData.doc_resp_tecnico || false}
+                            onChange={(e) => setFormData({...formData, doc_resp_tecnico: e.target.checked})}
+                            disabled
+                          />
+                          <span style={{ fontWeight: '600' }}>9. Documentos do Responsável Técnico</span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          {formData.doc_resp_tecnico ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-secondary"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDownloadDocument('resp_tecnico')}
+                              >
+                                Baixar
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDeleteDocument('resp_tecnico')}
+                              >
+                                Excluir
+                              </button>
+                            </>
+                          ) : (
+                            <label className="btn btn-sm btn-primary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', cursor: 'pointer', color: 'white' }}>
+                              <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                onChange={(e) => handleUploadDocument(e, 'resp_tecnico')}
+                              />
+                              Enviar
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                      {uploadingDocs['resp_tecnico'] && (
+                        <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
+                      )}
+                    </div>
+                    
+                    <div className="form-group" style={{ 
+                      padding: '1rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input 
+                            type="checkbox" 
+                            name="visita_online"
+                            checked={formData.visita_online || false}
+                            onChange={(e) => setFormData({...formData, visita_online: e.target.checked})}
+                            disabled={formData.visita_online_url ? true : false}
+                          />
+                          <span style={{ fontWeight: '600' }}>10. Visita Online (Vídeo)</span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          {formData.visita_online_url ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-secondary"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => window.open(formData.visita_online_url, '_blank')}
+                              >
+                                Assistir
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDeleteDocument('visita_online')}
+                              >
+                                Excluir
+                              </button>
+                            </>
+                          ) : (
+                            <label className="btn btn-sm btn-primary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', cursor: 'pointer', color: 'white' }}>
+                              <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                accept="video/mp4,video/avi,video/mov,video/wmv,video/webm,video/mkv"
+                                onChange={(e) => handleUploadDocument(e, 'visita_online')}
+                              />
+                              Enviar Vídeo
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                      {uploadingDocs['visita_online'] && (
+                        <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando vídeo... (pode demorar alguns segundos)</div>
+                      )}
+                      {formData.visita_online_url && (
+                        <div style={{ marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
+                          <input
+                            type="date"
+                            className="form-control"
+                            value={formData.visita_online_data || ''}
+                            onChange={(e) => setFormData({...formData, visita_online_data: e.target.value})}
+                            placeholder="Data da visita"
+                            style={{ marginBottom: '0.5rem' }}
+                          />
+                          <textarea
+                            className="form-control"
+                            value={formData.visita_online_observacoes || ''}
+                            onChange={(e) => setFormData({...formData, visita_online_observacoes: e.target.value})}
+                            placeholder="Observações sobre a visita..."
+                            rows="2"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="form-group" style={{ 
+                      padding: '1rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input 
+                            type="checkbox" 
+                            name="doc_certidao_casamento"
+                            checked={formData.doc_certidao_casamento || false}
+                            onChange={(e) => setFormData({...formData, doc_certidao_casamento: e.target.checked})}
+                            disabled
+                          />
+                          <span style={{ fontWeight: '600' }}>11. Certidão de Casamento (se aplicável)</span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          {formData.doc_certidao_casamento ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-secondary"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDownloadDocument('certidao_casamento')}
+                              >
+                                Baixar
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDeleteDocument('certidao_casamento')}
+                              >
+                                Excluir
+                              </button>
+                            </>
+                          ) : (
+                            <label className="btn btn-sm btn-primary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', cursor: 'pointer', color: 'white' }}>
+                              <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                onChange={(e) => handleUploadDocument(e, 'certidao_casamento')}
+                              />
+                              Enviar
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                      {uploadingDocs['certidao_casamento'] && (
+                        <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
                 <button 
@@ -1956,7 +2756,7 @@ const Clinicas = () => {
              {/* Modal de Visualização */}
        {viewModalOpen && viewingClinica && (
          <div className="modal-overlay">
-           <div className="modal" style={{ maxWidth: '600px' }}>
+           <div className="modal" style={{ maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto' }}>
              <div className="modal-header">
                <h2 className="modal-title">
                  Detalhes da Clínica
@@ -2068,6 +2868,347 @@ const Clinicas = () => {
                      <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>{formatarData(viewingClinica.created_at)}</p>
                    </div>
                  )}
+               </div>
+               
+               {/* Seção de Documentos */}
+               <div style={{ 
+                 marginTop: '2rem', 
+                 paddingTop: '2rem', 
+                 borderTop: '2px solid #e5e7eb' 
+               }}>
+                 <h3 style={{ 
+                   fontSize: '1.125rem', 
+                   fontWeight: '700', 
+                   color: '#1a1d23', 
+                   marginBottom: '1.5rem',
+                   display: 'flex',
+                   alignItems: 'center',
+                   gap: '0.5rem'
+                 }}>
+                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                     <polyline points="14 2 14 8 20 8"></polyline>
+                     <line x1="16" y1="13" x2="8" y2="13"></line>
+                     <line x1="16" y1="17" x2="8" y2="17"></line>
+                     <polyline points="10 9 9 9 8 9"></polyline>
+                   </svg>
+                   Documentação da Clínica
+                 </h3>
+                 
+                 <div style={{ 
+                   display: 'grid', 
+                   gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                   gap: '1rem'
+                 }}>
+                   {/* 1 - Cartão CNPJ */}
+                   <div style={{
+                     padding: '1rem',
+                     backgroundColor: '#f9fafb',
+                     borderRadius: '8px',
+                     border: '1px solid #e5e7eb'
+                   }}>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <div>
+                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>1. Cartão CNPJ</label>
+                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_cartao_cnpj ? '#059669' : '#dc2626' }}>
+                           {viewingClinica.doc_cartao_cnpj ? '✓ Enviado' : '✗ Pendente'}
+                         </p>
+                       </div>
+                       {viewingClinica.doc_cartao_cnpj && (
+                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
+                           Visualizar
+                         </button>
+                       )}
+                     </div>
+                   </div>
+                   
+                   {/* 2 - Contrato Social */}
+                   <div style={{
+                     padding: '1rem',
+                     backgroundColor: '#f9fafb',
+                     borderRadius: '8px',
+                     border: '1px solid #e5e7eb'
+                   }}>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <div>
+                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>2. Contrato Social</label>
+                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_contrato_social ? '#059669' : '#dc2626' }}>
+                           {viewingClinica.doc_contrato_social ? '✓ Enviado' : '✗ Pendente'}
+                         </p>
+                       </div>
+                       {viewingClinica.doc_contrato_social && (
+                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
+                           Visualizar
+                         </button>
+                       )}
+                     </div>
+                   </div>
+                   
+                   {/* 3 - Alvará Sanitário */}
+                   <div style={{
+                     padding: '1rem',
+                     backgroundColor: '#f9fafb',
+                     borderRadius: '8px',
+                     border: '1px solid #e5e7eb'
+                   }}>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <div>
+                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>3. Alvará Sanitário</label>
+                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_alvara_sanitario ? '#059669' : '#dc2626' }}>
+                           {viewingClinica.doc_alvara_sanitario ? '✓ Enviado' : '✗ Pendente'}
+                         </p>
+                       </div>
+                       {viewingClinica.doc_alvara_sanitario && (
+                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
+                           Visualizar
+                         </button>
+                       )}
+                     </div>
+                   </div>
+                   
+                   {/* 4 - Balanço/Balancete */}
+                   <div style={{
+                     padding: '1rem',
+                     backgroundColor: '#f9fafb',
+                     borderRadius: '8px',
+                     border: '1px solid #e5e7eb'
+                   }}>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <div>
+                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>4. Balanço/Balancete</label>
+                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_balanco ? '#059669' : '#dc2626' }}>
+                           {viewingClinica.doc_balanco ? '✓ Enviado' : '✗ Pendente'}
+                         </p>
+                       </div>
+                       {viewingClinica.doc_balanco && (
+                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
+                           Visualizar
+                         </button>
+                       )}
+                     </div>
+                   </div>
+                   
+                   {/* 5 - Comprovante de Endereço */}
+                   <div style={{
+                     padding: '1rem',
+                     backgroundColor: '#f9fafb',
+                     borderRadius: '8px',
+                     border: '1px solid #e5e7eb'
+                   }}>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <div>
+                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>5. Comprovante Endereço</label>
+                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_comprovante_endereco ? '#059669' : '#dc2626' }}>
+                           {viewingClinica.doc_comprovante_endereco ? '✓ Enviado' : '✗ Pendente'}
+                         </p>
+                       </div>
+                       {viewingClinica.doc_comprovante_endereco && (
+                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
+                           Visualizar
+                         </button>
+                       )}
+                     </div>
+                   </div>
+                   
+                   {/* 6 - Dados Bancários PJ */}
+                   <div style={{
+                     padding: '1rem',
+                     backgroundColor: '#f9fafb',
+                     borderRadius: '8px',
+                     border: '1px solid #e5e7eb'
+                   }}>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <div>
+                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>6. Dados Bancários PJ</label>
+                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_dados_bancarios ? '#059669' : '#dc2626' }}>
+                           {viewingClinica.doc_dados_bancarios ? '✓ Enviado' : '✗ Pendente'}
+                         </p>
+                       </div>
+                       {viewingClinica.doc_dados_bancarios && (
+                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
+                           Visualizar
+                         </button>
+                       )}
+                     </div>
+                   </div>
+                   
+                   {/* 7 - Documentos dos Sócios */}
+                   <div style={{
+                     padding: '1rem',
+                     backgroundColor: '#f9fafb',
+                     borderRadius: '8px',
+                     border: '1px solid #e5e7eb'
+                   }}>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <div>
+                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>7. Docs dos Sócios</label>
+                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_socios ? '#059669' : '#dc2626' }}>
+                           {viewingClinica.doc_socios ? '✓ Enviado' : '✗ Pendente'}
+                         </p>
+                       </div>
+                       {viewingClinica.doc_socios && (
+                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
+                           Visualizar
+                         </button>
+                       )}
+                     </div>
+                   </div>
+                   
+                   {/* 8 - Certidão Responsável Técnico */}
+                   <div style={{
+                     padding: '1rem',
+                     backgroundColor: '#f9fafb',
+                     borderRadius: '8px',
+                     border: '1px solid #e5e7eb'
+                   }}>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <div>
+                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>8. Certidão Resp. Técnico</label>
+                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_certidao_resp_tecnico ? '#059669' : '#dc2626' }}>
+                           {viewingClinica.doc_certidao_resp_tecnico ? '✓ Enviado' : '✗ Pendente'}
+                         </p>
+                       </div>
+                       {viewingClinica.doc_certidao_resp_tecnico && (
+                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
+                           Visualizar
+                         </button>
+                       )}
+                     </div>
+                   </div>
+                   
+                   {/* 9 - Docs Responsável Técnico */}
+                   <div style={{
+                     padding: '1rem',
+                     backgroundColor: '#f9fafb',
+                     borderRadius: '8px',
+                     border: '1px solid #e5e7eb'
+                   }}>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <div>
+                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>9. Docs Resp. Técnico</label>
+                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_resp_tecnico ? '#059669' : '#dc2626' }}>
+                           {viewingClinica.doc_resp_tecnico ? '✓ Enviado' : '✗ Pendente'}
+                         </p>
+                       </div>
+                       {viewingClinica.doc_resp_tecnico && (
+                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
+                           Visualizar
+                         </button>
+                       )}
+                     </div>
+                   </div>
+                   
+                   {/* 10 - Visita Online */}
+                   <div style={{
+                     padding: '1rem',
+                     backgroundColor: '#f9fafb',
+                     borderRadius: '8px',
+                     border: '1px solid #e5e7eb'
+                   }}>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <div>
+                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>10. Visita Online</label>
+                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.visita_online ? '#059669' : '#dc2626' }}>
+                           {viewingClinica.visita_online ? '✓ Realizada' : '✗ Pendente'}
+                         </p>
+                       </div>
+                       {viewingClinica.visita_online && (
+                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
+                           Ver Detalhes
+                         </button>
+                       )}
+                     </div>
+                   </div>
+                   
+                   {/* 11 - Certidão de Casamento */}
+                   <div style={{
+                     padding: '1rem',
+                     backgroundColor: '#f9fafb',
+                     borderRadius: '8px',
+                     border: '1px solid #e5e7eb'
+                   }}>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <div>
+                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>11. Certidão Casamento</label>
+                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_certidao_casamento ? '#059669' : '#dc2626' }}>
+                           {viewingClinica.doc_certidao_casamento ? '✓ Enviado' : '✗ Não aplicável'}
+                         </p>
+                       </div>
+                       {viewingClinica.doc_certidao_casamento && (
+                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
+                           Visualizar
+                         </button>
+                       )}
+                     </div>
+                   </div>
+                 </div>
+                 
+                 {/* Resumo dos Documentos */}
+                 <div style={{ 
+                   marginTop: '1.5rem', 
+                   padding: '1rem', 
+                   backgroundColor: '#f0f9ff',
+                   borderRadius: '8px',
+                   border: '1px solid #3b82f6'
+                 }}>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                     <div>
+                       <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1e40af', margin: 0 }}>
+                         Status da Documentação
+                       </h4>
+                       <p style={{ fontSize: '0.75rem', color: '#3730a3', margin: '0.25rem 0 0 0' }}>
+                         {(() => {
+                           const totalDocs = 11;
+                           const docsEnviados = [
+                             viewingClinica.doc_cartao_cnpj,
+                             viewingClinica.doc_contrato_social,
+                             viewingClinica.doc_alvara_sanitario,
+                             viewingClinica.doc_balanco,
+                             viewingClinica.doc_comprovante_endereco,
+                             viewingClinica.doc_dados_bancarios,
+                             viewingClinica.doc_socios,
+                             viewingClinica.doc_certidao_resp_tecnico,
+                             viewingClinica.doc_resp_tecnico,
+                             viewingClinica.visita_online,
+                             viewingClinica.doc_certidao_casamento
+                           ].filter(Boolean).length;
+                           
+                           return `${docsEnviados} de ${totalDocs} documentos completos`;
+                         })()}
+                       </p>
+                     </div>
+                     <div style={{ 
+                       width: '120px', 
+                       height: '8px', 
+                       backgroundColor: '#e5e7eb',
+                       borderRadius: '4px',
+                       overflow: 'hidden'
+                     }}>
+                       <div style={{ 
+                         width: `${(() => {
+                           const totalDocs = 11;
+                           const docsEnviados = [
+                             viewingClinica.doc_cartao_cnpj,
+                             viewingClinica.doc_contrato_social,
+                             viewingClinica.doc_alvara_sanitario,
+                             viewingClinica.doc_balanco,
+                             viewingClinica.doc_comprovante_endereco,
+                             viewingClinica.doc_dados_bancarios,
+                             viewingClinica.doc_socios,
+                             viewingClinica.doc_certidao_resp_tecnico,
+                             viewingClinica.doc_resp_tecnico,
+                             viewingClinica.visita_online,
+                             viewingClinica.doc_certidao_casamento
+                           ].filter(Boolean).length;
+                           return (docsEnviados / totalDocs) * 100;
+                         })()}%`,
+                         height: '100%',
+                         backgroundColor: '#3b82f6',
+                         transition: 'width 0.3s ease'
+                       }} />
+                     </div>
+                   </div>
+                 </div>
                </div>
                
                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem' }}>
