@@ -126,18 +126,68 @@ const CapturaLead = () => {
     };
   }, []);
 
+  // Função para formatar telefone (formato brasileiro correto)
   const formatarTelefone = (value) => {
+    if (!value) return '';
+    
+    // Remove todos os caracteres não numéricos (apenas números)
     const numbers = value.replace(/\D/g, '');
-    if (numbers.length <= 10) {
-      return numbers.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
-    } else {
-      return numbers.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    
+    // Limita a 11 dígitos (máximo para celular brasileiro)
+    const limitedNumbers = numbers.substring(0, 11);
+    
+    // Aplica formatação baseada no tamanho
+    if (limitedNumbers.length === 11) {
+      // Celular: (XX) 9XXXX-XXXX
+      return `(${limitedNumbers.substring(0, 2)}) ${limitedNumbers.substring(2, 7)}-${limitedNumbers.substring(7, 11)}`;
+    } else if (limitedNumbers.length === 10) {
+      // Fixo: (XX) XXXX-XXXX
+      return `(${limitedNumbers.substring(0, 2)}) ${limitedNumbers.substring(2, 6)}-${limitedNumbers.substring(6, 10)}`;
+    } else if (limitedNumbers.length > 0) {
+      // Formatação parcial conforme vai digitando
+      if (limitedNumbers.length <= 2) {
+        return `(${limitedNumbers}`;
+      } else if (limitedNumbers.length <= 7) {
+        return `(${limitedNumbers.substring(0, 2)}) ${limitedNumbers.substring(2)}`;
+      } else if (limitedNumbers.length <= 11) {
+        return `(${limitedNumbers.substring(0, 2)}) ${limitedNumbers.substring(2, 7)}-${limitedNumbers.substring(7)}`;
+      }
     }
+    
+    return limitedNumbers;
   };
 
   const formatarCPF = (value) => {
     const numbers = value.replace(/\D/g, '');
     return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  };
+
+  // Função para formatar nome (mesmo padrão da migração do banco)
+  const formatarNome = (value) => {
+    if (!value) return '';
+    
+    // Remove números e caracteres especiais, mantém apenas letras, espaços e acentos
+    let cleanValue = value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
+    
+    // Remove espaços duplos/múltiplos, mas mantém espaços simples
+    cleanValue = cleanValue.replace(/\s+/g, ' ');
+    
+    // Remove espaços apenas do início e fim
+    cleanValue = cleanValue.trim();
+    
+    if (!cleanValue) return '';
+    
+    // Aplica INITCAP - primeira letra de cada palavra maiúscula
+    const nomeFormatado = cleanValue
+      .toLowerCase()
+      .split(' ')
+      .map(palavra => {
+        if (!palavra) return '';
+        return palavra.charAt(0).toUpperCase() + palavra.slice(1);
+      })
+      .join(' ');
+    
+    return nomeFormatado;
   };
 
   const formatarCidade = (value) => {
@@ -197,8 +247,13 @@ const CapturaLead = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     
-    if (name === 'telefone') {
-      const formattedValue = formatarTelefone(value);
+    if (name === 'nome') {
+      // Para nome, permitir digitação normal (incluindo espaços) e formatar apenas no final
+      setFormData(prev => ({ ...prev, [name]: value }));
+    } else if (name === 'telefone') {
+      // Para telefone, permitir apenas números durante a digitação
+      const numbersOnly = value.replace(/\D/g, '');
+      const formattedValue = numbersOnly.length > 0 ? formatarTelefone(numbersOnly) : '';
       setFormData(prev => ({ ...prev, [name]: formattedValue }));
     } else if (name === 'cpf') {
       const formattedValue = formatarCPF(value);
@@ -218,6 +273,97 @@ const CapturaLead = () => {
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
+  };
+
+  // Função para formatar nome quando sair do campo (onBlur)
+  const handleNomeBlur = (e) => {
+    const { value } = e.target;
+    if (value && value.trim()) {
+      const nomeFormatado = formatarNome(value);
+      setFormData(prev => ({
+        ...prev,
+        nome: nomeFormatado
+      }));
+    }
+  };
+
+  // Função para formatar data com máscara DD/MM/YYYY
+  const formatarData = (value) => {
+    // Remove tudo que não é número
+    const numbers = value.replace(/\D/g, '');
+    
+    // Aplica máscara conforme vai digitando
+    if (numbers.length <= 2) {
+      return numbers;
+    } else if (numbers.length <= 4) {
+      return `${numbers.substring(0, 2)}/${numbers.substring(2)}`;
+    } else if (numbers.length <= 8) {
+      return `${numbers.substring(0, 2)}/${numbers.substring(2, 4)}/${numbers.substring(4)}`;
+    } else {
+      // Limita a 8 dígitos (DDMMYYYY)
+      return `${numbers.substring(0, 2)}/${numbers.substring(2, 4)}/${numbers.substring(4, 8)}`;
+    }
+  };
+
+  // Função para validar data formatada (mantém formato DD/MM/YYYY)
+  const validarDataFormatada = (dataFormatada) => {
+    if (!dataFormatada || dataFormatada.length < 10) return '';
+    
+    const [dia, mes, ano] = dataFormatada.split('/');
+    if (dia && mes && ano && ano.length === 4) {
+      // Validar se é uma data válida
+      const data = new Date(`${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`);
+      if (!isNaN(data.getTime())) {
+        return dataFormatada; // Retorna no formato DD/MM/YYYY
+      }
+    }
+    return '';
+  };
+
+  // Função para validar e formatar data (onBlur)
+  const handleDataChange = (e) => {
+    const { name, value } = e.target;
+    
+    if (value && value.length === 10) {
+      // Validar data formatada
+      const dataValidada = validarDataFormatada(value);
+      
+      if (dataValidada) {
+        const [dia, mes, ano] = value.split('/');
+        const anoNum = parseInt(ano);
+        
+        // Verificar se ano está entre 2024-2030
+        if (anoNum >= 2024 && anoNum <= 2030) {
+          // Data válida, manter como está
+          return;
+        } else {
+          // Ano inválido, limpar campo
+          setFormData(prev => ({
+            ...prev,
+            [name]: ''
+          }));
+        }
+      } else {
+        // Data inválida, limpar campo
+        setFormData(prev => ({
+          ...prev,
+          [name]: ''
+        }));
+      }
+    }
+  };
+
+  // Função para lidar com digitação manual de data
+  const handleDataInput = (e) => {
+    const { name, value } = e.target;
+    
+    // Aplicar máscara de formatação
+    const dataFormatada = formatarData(value);
+    
+    setFormData(prev => ({
+      ...prev,
+      [name]: dataFormatada
+    }));
   };
 
   const validateForm = () => {
@@ -358,6 +504,7 @@ const CapturaLead = () => {
                   className={`form-input ${errors.nome ? 'error' : ''}`}
                   value={formData.nome}
                   onChange={handleInputChange}
+                  onBlur={handleNomeBlur}
                   placeholder="Digite seu nome completo"
                   disabled={loading}
                 />
@@ -483,13 +630,15 @@ const CapturaLead = () => {
               <div className="form-group">
                 <label className="form-label">1ª Opção - Melhor dia para agendamento</label>
                 <input
-                  type="date"
+                  type="text"
                   name="melhor_dia1"
                   className="form-input"
                   value={formData.melhor_dia1}
-                  onChange={handleInputChange}
+                  onChange={handleDataInput}
+                  onBlur={handleDataChange}
                   disabled={loading}
-                  min={new Date().toISOString().split('T')[0]}
+                  placeholder="DD/MM/YYYY"
+                  maxLength="10"
                 />
               </div>
               <div className="form-group">
@@ -528,13 +677,15 @@ const CapturaLead = () => {
               <div className="form-group">
                 <label className="form-label">2ª Opção - Melhor dia para agendamento</label>
                 <input
-                  type="date"
+                  type="text"
                   name="melhor_dia2"
                   className="form-input"
                   value={formData.melhor_dia2}
-                  onChange={handleInputChange}
+                  onChange={handleDataInput}
+                  onBlur={handleDataChange}
                   disabled={loading}
-                  min={new Date().toISOString().split('T')[0]}
+                  placeholder="DD/MM/YYYY"
+                  maxLength="10"
                 />
               </div>
               <div className="form-group">
