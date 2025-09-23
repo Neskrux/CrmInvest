@@ -68,6 +68,32 @@ const CadastroConsultor = () => {
     return value;
   };
 
+  // Função para formatar nome (primeira letra maiúscula de cada palavra)
+  const formatarNome = (value) => {
+    if (!value) return '';
+    
+    // Remove números e caracteres especiais, mantém apenas letras, espaços e acentos
+    let cleanValue = value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
+    
+    // Remove espaços do início
+    cleanValue = cleanValue.trimStart();
+    
+    // Remove espaços duplos ou múltiplos, deixando apenas um espaço entre palavras
+    cleanValue = cleanValue.replace(/\s+/g, ' ');
+
+    // Aplica formatação: primeira letra maiúscula de cada palavra
+    const nomeFormatado = cleanValue
+      .toLowerCase()
+      .split(' ')
+      .map(palavra => {
+        if (!palavra) return '';
+        return palavra.charAt(0).toUpperCase() + palavra.slice(1);
+      })
+      .join(' ');
+    
+    return nomeFormatado;
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     
@@ -79,6 +105,8 @@ const CadastroConsultor = () => {
       formattedValue = formatPhone(value);
     } else if (name === 'pix') {
       formattedValue = formatCPF(value);
+    } else if (name === 'nome') {
+      formattedValue = formatarNome(value);
     }
     
     setFormData(prev => ({
