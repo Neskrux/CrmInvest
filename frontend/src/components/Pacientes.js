@@ -5,7 +5,7 @@ import TutorialPacientes from './TutorialPacientes';
 import { useAudio } from '../contexts/AudioContext';
 
 const Pacientes = () => {
-  const { makeRequest, user, isAdmin, podeAlterarStatus } = useAuth();
+  const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor } = useAuth();
   
   // Verificar se usuário é consultor
   const isConsultor = user?.tipo === 'consultor';
@@ -149,37 +149,60 @@ const Pacientes = () => {
     { value: 'cpf_reprovado', label: 'CPF Reprovado', color: '#ef4444', description: 'CPF foi reprovado' },
     { value: 'nao_passou_cpf', label: 'Não passou CPF', color: '#6366f1', description: 'Cliente não forneceu CPF' },
     { value: 'nao_tem_outro_cpf', label: 'Não tem outro CPF', color: '#a3a3a3', description: 'Cliente não tem CPF alternativo' },
-    { value: 'nao_tem_interesse', label: 'Não tem interesse', color: '#9ca3af', description: 'Cliente perdeu interesse' },
-    { value: 'sem_cedente', label: 'Sem cedente (CPF Aprovado)', color: '#fbbf24', description: 'CPF aprovado mas sem cedente' },
+    { value: 'nao_existe', label: 'Paciente não existe', color: '#9ca3af', description: 'Cliente não existe' },
+    { value: 'nao_tem_interesse', label: 'Paciente não tem interesse', color: '#9ca3af', description: 'Cliente não tem interesse' },
+    { value: 'nao_reconhece', label: 'Paciente não reconhece', color: '#9ca3af', description: 'Cliente não reconhece' },
+    { value: 'sem_cedente', label: 'Sem clínica (CPF Aprovado)', color: '#fbbf24', description: 'CPF aprovado mas sem cedente' },
     // Demais status no final
     { value: 'agendado', label: 'Agendado', color: '#3b82f6', description: 'Abre modal para criar agendamento' },
     { value: 'compareceu', label: 'Compareceu', color: '#10b981', description: 'Cliente compareceu ao agendamento' },
-    { value: 'fechado', label: 'Fechado', color: '#059669', description: '💰 Abre modal para criar fechamento' },
+    { value: 'fechado', label: 'Fechado', color: '#059669', description: 'Abre modal para criar fechamento' },
     { value: 'nao_fechou', label: 'Não Fechou', color: '#dc2626', description: 'Cliente não fechou o negócio' },
     { value: 'nao_compareceu', label: 'Não Compareceu', color: '#ef4444', description: 'Cliente não compareceu' },
     { value: 'reagendado', label: 'Reagendado', color: '#8b5cf6', description: 'Agendamento foi reagendado' }
   ];
 
+  // Removido: fetchConsultorInfo - agora usando podeAlterarStatus do contexto
+
   useEffect(() => {
     fetchPacientes();
     fetchConsultores();
     fetchClinicas();
-    fetchNovosLeads(); // Sempre buscar novos leads para mostrar o badge
+    
+    // Buscar novos leads apenas se pode alterar status (não freelancer) ou é consultor interno
+    if (podeAlterarStatus || isConsultorInterno) {
+      fetchNovosLeads();
+    }
+    
+    // Aplicar filtro automático por consultor se necessário
+    if (deveFiltrarPorConsultor && user?.consultor_id) {
+      setFiltroConsultor(String(user.consultor_id));
+    }
     
     // Verificar se tutorial foi completado
     const completed = localStorage.getItem('tutorial-pacientes-completed');
     setTutorialCompleted(!!completed);
-  }, []);
+  }, [podeAlterarStatus, isConsultorInterno, deveFiltrarPorConsultor, user?.consultor_id]);
+
+  // Garantir que freelancers fiquem na aba "Pacientes"
+  useEffect(() => {
+    if (isConsultor && !podeAlterarStatus && !isConsultorInterno && activeTab === 'novos-leads') {
+      setActiveTab('pacientes');
+    }
+  }, [podeAlterarStatus, isConsultorInterno, activeTab, isConsultor]);
 
   // Atualização automática dos dados a cada 30 segundos
   useEffect(() => {
     const interval = setInterval(() => {
       fetchPacientes();
-      fetchNovosLeads();
+      // Buscar novos leads apenas se pode alterar status (não freelancer) ou é consultor interno
+      if (podeAlterarStatus || isConsultorInterno) {
+        fetchNovosLeads();
+      }
     }, 30000); // 30 segundos
 
     return () => clearInterval(interval);
-  }, []);
+  }, [podeAlterarStatus, isConsultorInterno, isConsultor]);
 
   // Atualizar novos leads quando mudar de aba
   useEffect(() => {
@@ -188,29 +211,28 @@ const Pacientes = () => {
     }
   }, [activeTab]);
 
-  // Detectar novos leads e tocar som
+  // Detectar novos leads e tocar som (apenas para admins)
   useEffect(() => {
-    if (novosLeads.length > 0) {
-      const currentLeadsIds = new Set(novosLeads.map(lead => lead.id));
-      const previousIds = previousLeadsIdsRef.current;
-      
-      // Verificar se há leads novos (que não estavam na lista anterior)
-      const newLeadsIds = [...currentLeadsIds].filter(id => !previousIds.has(id));
-      
-      if (newLeadsIds.length > 0) {
-        console.log('🚨 NOVO LEAD DETECTADO! Iniciando som e notificação...');
-        playNotificationSound();
-      }
-      
-      // Atualizar as referências
-      previousLeadsIdsRef.current = currentLeadsIds;
-      previousLeadsCountRef.current = novosLeads.length;
-    } else {
-      // Se não há leads, limpar as referências
-      previousLeadsIdsRef.current.clear();
-      previousLeadsCountRef.current = 0;
+    // Apenas admins devem receber notificações sonoras
+    if (!isAdmin || novosLeads.length === 0) {
+      return;
     }
-  }, [novosLeads, playNotificationSound]);
+    
+    const currentLeadsIds = new Set(novosLeads.map(lead => lead.id));
+    const previousIds = previousLeadsIdsRef.current;
+    
+    // Verificar se há leads novos (que não estavam na lista anterior)
+    const newLeadsIds = [...currentLeadsIds].filter(id => !previousIds.has(id));
+    
+    if (newLeadsIds.length > 0) {
+      console.log('🚨 NOVO LEAD DETECTADO! Iniciando som e notificação...');
+      playNotificationSound();
+    }
+    
+    // Atualizar as referências
+    previousLeadsIdsRef.current = currentLeadsIds;
+    previousLeadsCountRef.current = novosLeads.length;
+  }, [novosLeads, playNotificationSound, isAdmin]);
 
   // Controlar scroll do body quando modal estiver aberto
   useEffect(() => {
@@ -954,8 +976,8 @@ const Pacientes = () => {
   };
 
   const pacientesFiltrados = pacientes.filter(p => {
-    // Mostrar apenas pacientes que já têm consultor atribuído (número válido)
-    if (!p.consultor_id || p.consultor_id === '' || p.consultor_id === null || p.consultor_id === undefined || Number(p.consultor_id) === 0) return false;
+    // Consultores internos veem todos os pacientes, freelancers veem apenas os atribuídos
+    if (!isConsultorInterno && (!p.consultor_id || p.consultor_id === '' || p.consultor_id === null || p.consultor_id === undefined || Number(p.consultor_id) === 0)) return false;
     
     const matchNome = !filtroNome || p.nome.toLowerCase().includes(filtroNome.toLowerCase());
     const matchTelefone = !filtroTelefone || (p.telefone || '').includes(filtroTelefone);
@@ -1064,8 +1086,17 @@ const Pacientes = () => {
             <strong style={{ color: '#0c4a6e' }}>Ações</strong>
           </div>
           <div style={{ color: '#0c4a6e', lineHeight: '1.4' }}>
-            • Na aba <strong>"Pacientes"</strong> → Você pode cadastrar novos pacientes ou leads<br/>
-            • Na aba <strong>"Novos Leads"</strong> → Você pode pegar novos os leads disponíveis para você	
+            {podeAlterarStatus ? (
+              <>
+                • Na aba <strong>"Pacientes"</strong> → Você pode cadastrar novos pacientes ou leads<br/>
+                • Na aba <strong>"Novos Leads"</strong> → Você pode pegar novos os leads disponíveis para você
+              </>
+            ) : (
+              <>
+                • Na aba <strong>"Pacientes"</strong> → Verifique seus novos leads, ou cadastre novos pacientes<br/>
+                • <strong>Dica:</strong> → Indique apenas pacientes que desejam fazer tratamentos estéticos ou odontológicos, parcelados no boleto
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -1078,16 +1109,34 @@ const Pacientes = () => {
         >
           Pacientes
         </button>
-        <button
-          className={`tab ${activeTab === 'novos-leads' ? 'active' : ''}`}
-          onClick={() => setActiveTab('novos-leads')}
-          style={{ position: 'relative' }}
-        >
-          Novos Leads
-          {novosLeads.length > 0 && (
-            <span className="tab-badge">{novosLeads.length}</span>
-          )}
-        </button>
+        {/* Mostrar aba "Novos Leads" apenas para admins e consultores internos */}
+        {(() => {
+          // Mostrar aba para admins ou consultores internos (não freelancers)
+          const shouldShow = isAdmin || isConsultorInterno;
+          
+          console.log('Debug - Condição aba Novos Leads:', {
+            isAdmin,
+            isConsultor,
+            isConsultorInterno,
+            podeAlterarStatus,
+            shouldShow,
+            userType: user?.tipo,
+            isFreelancer: user?.is_freelancer,
+            condition: `isAdmin: ${isAdmin} || isConsultorInterno: ${isConsultorInterno}`
+          });
+          return shouldShow;
+        })() && (
+          <button
+            className={`tab ${activeTab === 'novos-leads' ? 'active' : ''}`}
+            onClick={() => setActiveTab('novos-leads')}
+            style={{ position: 'relative' }}
+          >
+            Novos Leads
+            {novosLeads.length > 0 && (
+              <span className="tab-badge">{novosLeads.length}</span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Conteúdo da aba Pacientes */}
@@ -1113,7 +1162,7 @@ const Pacientes = () => {
             <div className="stat-card">
               <div className="stat-label">Exibindo</div>
               <div className="stat-value">{pacientesFiltrados.length}</div>
-              <div className="stat-sublabel">de {pacientes.filter(p => p.consultor_id && p.consultor_id !== '' && p.consultor_id !== null && p.consultor_id !== undefined && Number(p.consultor_id) !== 0).length}</div>
+              <div className="stat-sublabel">de {isConsultorInterno ? pacientes.length : pacientes.filter(p => p.consultor_id && p.consultor_id !== '' && p.consultor_id !== null && p.consultor_id !== undefined && Number(p.consultor_id) !== 0).length}</div>
             </div>
             
             <div className="stat-card">
@@ -1168,15 +1217,34 @@ const Pacientes = () => {
                     </select>
                   </div>
 
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Consultor</label>
-                    <select className="form-select" value={filtroConsultor} onChange={e => setFiltroConsultor(e.target.value)}>
-                      <option value="">Todos</option>
-                      {consultores.map(c => (
-                        <option key={c.id} value={String(c.id)}>{c.nome}</option>
-                      ))}
-                    </select>
-                  </div>
+                   <div className="form-group" style={{ margin: 0 }}>
+                     <label className="form-label">Consultor</label>
+                     <select 
+                       className="form-select" 
+                       value={filtroConsultor} 
+                       onChange={e => setFiltroConsultor(e.target.value)}
+                       disabled={deveFiltrarPorConsultor}
+                       style={{ 
+                         opacity: deveFiltrarPorConsultor ? 0.6 : 1,
+                         cursor: deveFiltrarPorConsultor ? 'not-allowed' : 'pointer'
+                       }}
+                     >
+                       <option value="">Todos</option>
+                       {consultores.map(c => (
+                         <option key={c.id} value={String(c.id)}>{c.nome}</option>
+                       ))}
+                     </select>
+                     {deveFiltrarPorConsultor && (
+                       <div style={{ 
+                         fontSize: '0.75rem', 
+                         color: '#6b7280', 
+                         marginTop: '0.25rem',
+                         fontStyle: 'italic'
+                       }}>
+                         Filtro automático ativo - mostrando apenas seus dados
+                       </div>
+                     )}
+                   </div>
                 </div>
                 <div className="grid grid-2" style={{ gap: '1rem', marginTop: '1rem' }}>
                   <div className="form-group" style={{ margin: 0 }}>
@@ -1198,16 +1266,19 @@ const Pacientes = () => {
                     />
                   </div>
                 </div>
-                <button className="btn btn-sm btn-secondary" style={{ marginTop: '1rem' }} onClick={() => {
-                  setFiltroNome(''); 
-                  setFiltroTelefone(''); 
-                  setFiltroCPF(''); 
-                  setFiltroTipo(''); 
-                  setFiltroStatus(''); 
-                  setFiltroConsultor('');
-                  setFiltroDataInicio('');
-                  setFiltroDataFim('');
-                }}>Limpar Filtros</button>
+                 <button className="btn btn-sm btn-secondary" style={{ marginTop: '1rem' }} onClick={() => {
+                   setFiltroNome(''); 
+                   setFiltroTelefone(''); 
+                   setFiltroCPF(''); 
+                   setFiltroTipo(''); 
+                   setFiltroStatus(''); 
+                   // Só limpar filtro de consultor se não estiver com filtro automático ativo
+                   if (!deveFiltrarPorConsultor) {
+                     setFiltroConsultor('');
+                   }
+                   setFiltroDataInicio('');
+                   setFiltroDataFim('');
+                 }}>Limpar Filtros</button>
               </div>
             )}
           </div>
@@ -1333,7 +1404,7 @@ const Pacientes = () => {
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarData(paciente.created_at)}</td>
                           <td>
-                            {!isConsultor && (
+                            {!isConsultor ? (
                               <button
                                 onClick={() => handleEdit(paciente)}
                                 className="btn-action"
@@ -1344,7 +1415,7 @@ const Pacientes = () => {
                                   <path d="M18.5 2.5a2.121 2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                                 </svg>
                               </button>
-                            )}
+                            ) : null}
                             <button
                               onClick={() => handleView(paciente)}
                               className="btn-action"
@@ -1412,9 +1483,9 @@ const Pacientes = () => {
         <>
           <div className="card">
             <div className="card-header">
-              <h2 className="card-title">Novos Leads Disponíveis</h2>
+              <h2 className="card-title">Novos Leads</h2>
               <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                {novosLeads.length} lead(s) disponível(eis)
+                {novosLeads.length} lead(s)
               </div>
             </div>
 

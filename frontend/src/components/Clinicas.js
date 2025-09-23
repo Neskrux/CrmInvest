@@ -735,9 +735,11 @@ const Clinicas = () => {
             <strong style={{ color: '#0c4a6e' }}>Ações</strong>
           </div>
           <div style={{ color: '#0c4a6e', lineHeight: '1.4' }}>
-            • Na aba <strong>"Clínicas"</strong> → Você pode visualizar todas as clínicas disponíveis para você<br/>
-            • Na aba <strong>"{isAdmin ? 'Novas Clínicas' : 'Indicar Clínicas'}"</strong> → Você pode cadastrar novas clínicas, que se aprovadas, não poderão ser visualizadas por outros consultores freelancers<br/>
-            • Na aba <strong>"Mapa"</strong> → Você pode visualizar todas as clínicas disponíveis e novas clínicas, que serão exibidas no mapa
+            • Na aba <strong>"Clínicas"</strong> → Você pode visualizar todas as clínicas parceiras<br/>
+            • Na aba <strong>"{isAdmin ? 'Novas Clínicas' : 'Indicar Clínicas'}"</strong> → Você pode cadastrar novas clínicas, que se aprovadas, você ganhará uma comissão e elas não poderão ser visualizadas por outros consultores freelancers<br/>
+            • Na aba <strong>"Mapa"</strong> → Você pode visualizar todas as clínicas disponíveis e novas clínicas, que serão exibidas no mapa<br/>
+            • <strong>Dica:</strong> → Lembre-se de indicar clínicas que queiram antecipar seus boletos, ou que ainda não ofereçam parcelamento no boleto como método de pagamento<br/>
+            • <strong>Dica de Argumento:</strong> → Nós levamos pacientes pré-aprovados até a sua clinica, você só precisa atender
           </div>
         </div>
       </div>
@@ -1287,6 +1289,7 @@ const Clinicas = () => {
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Nicho</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Contato</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Proprietário</th>
+                  <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Indicado por</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Status</th>
                   <th>Ações</th>
                 </tr>
@@ -1335,6 +1338,15 @@ const Clinicas = () => {
                         <span className="badge" style={{ backgroundColor: '#10b981', color: 'white' }}>
                           Pública
                         </span>
+                      )}
+                    </td>
+                    <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                      {clinica.consultor_nome ? (
+                        <span className="badge" style={{ backgroundColor: '#8b5cf6', color: 'white' }}>
+                          {clinica.consultor_nome}
+                        </span>
+                      ) : (
+                        <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>-</span>
                       )}
                     </td>
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
@@ -1552,9 +1564,9 @@ const Clinicas = () => {
                           ) : '-'}
                         </td>
                         <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
-                          {clinica.criado_por_consultor_id ? (
-                            <span className="badge" style={{ backgroundColor: '#3b82f6', color: 'white' }}>
-                              Exclusiva
+                          {clinica.consultor_nome ? (
+                            <span className="badge" style={{ backgroundColor: '#8b5cf6', color: 'white' }}>
+                              {clinica.consultor_nome}
                             </span>
                           ) : (
                             <span className="badge" style={{ backgroundColor: '#10b981', color: 'white' }}>
@@ -1945,6 +1957,17 @@ const Clinicas = () => {
                    </div>
                  )}
                  
+                 {viewingClinica.consultor_nome && (
+                   <div>
+                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Indicado por</label>
+                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                       <span className="badge" style={{ backgroundColor: '#3b82f6', color: 'white' }}>
+                         {viewingClinica.consultor_nome}
+                       </span>
+                     </p>
+                   </div>
+                 )}
+                 
                  {viewingClinica.created_at && (
                    <div>
                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Data de Cadastro</label>
@@ -2064,6 +2087,17 @@ const Clinicas = () => {
                   <div>
                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Observações</label>
                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingNovaClinica.observacoes}</p>
+                  </div>
+                )}
+                
+                {viewingNovaClinica.consultor_nome && (
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Indicado por</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                      <span className="badge" style={{ backgroundColor: '#3b82f6', color: 'white' }}>
+                        {viewingNovaClinica.consultor_nome}
+                      </span>
+                    </p>
                   </div>
                 )}
                 

@@ -4,7 +4,7 @@ import { useToast } from '../components/Toast';
 import TutorialFechamentos from './TutorialFechamentos';
 
 const Fechamentos = () => {
-  const { makeRequest, isAdmin, user, podeAlterarStatus } = useAuth();
+  const { makeRequest, isAdmin, user, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor } = useAuth();
   const [fechamentos, setFechamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [consultores, setConsultores] = useState([]);
@@ -44,10 +44,15 @@ const Fechamentos = () => {
   useEffect(() => {
     carregarDados();
     
+    // Aplicar filtro automático por consultor se necessário
+    if (deveFiltrarPorConsultor && user?.consultor_id) {
+      setFiltroConsultor(String(user.consultor_id));
+    }
+    
     // Verificar se tutorial foi completado
     const completed = localStorage.getItem('tutorial-fechamentos-completed');
     setTutorialCompleted(!!completed);
-  }, []);
+  }, [deveFiltrarPorConsultor, user?.consultor_id]);
 
   // Detectar mudanças de tamanho da tela
   useEffect(() => {
@@ -224,7 +229,10 @@ const Fechamentos = () => {
   };
 
   const limparFiltros = () => {
-    setFiltroConsultor('');
+    // Só limpar filtro de consultor se não estiver com filtro automático ativo
+    if (!deveFiltrarPorConsultor) {
+      setFiltroConsultor('');
+    }
     setFiltroClinica('');
     setFiltroMes('');
   };
@@ -692,6 +700,23 @@ const Fechamentos = () => {
         </div>
       </div>
 
+      <div style={{
+          backgroundColor: '#f0f9ff',
+          border: '1px solid #bae6fd',
+          borderRadius: '8px',
+          padding: '1rem',
+          marginTop: '1rem',
+          fontSize: '0.875rem',
+          marginBottom: '2rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <strong style={{ color: '#0c4a6e' }}>Ações</strong>
+          </div>
+          <div style={{ color: '#0c4a6e', lineHeight: '1.4' }}>
+            • Aqui em <strong>Fechamentos</strong> → Você pode visualizar os fechamentos dos tratamentos dos seus pacientes, baixar o contrato e filtrar por consultor, clínica e mês<br/>
+          </div>
+      </div>
+
       {/* KPIs */}
       <div className="stats-grid" style={{ marginBottom: '2rem' }}>
         <div className="stat-card">
@@ -760,12 +785,27 @@ const Fechamentos = () => {
                   className="form-select"
                   value={filtroConsultor} 
                   onChange={(e) => setFiltroConsultor(e.target.value)}
+                  disabled={deveFiltrarPorConsultor}
+                  style={{ 
+                    opacity: deveFiltrarPorConsultor ? 0.6 : 1,
+                    cursor: deveFiltrarPorConsultor ? 'not-allowed' : 'pointer'
+                  }}
                 >
                   <option value="">Todos</option>
                   {consultores.map(c => (
                     <option key={c.id} value={c.id}>{c.nome}</option>
                   ))}
                 </select>
+                {deveFiltrarPorConsultor && (
+                  <div style={{ 
+                    fontSize: '0.75rem', 
+                    color: '#6b7280', 
+                    marginTop: '0.25rem',
+                    fontStyle: 'italic'
+                  }}>
+                    Filtro automático ativo - mostrando apenas seus dados
+                  </div>
+                )}
               </div>
 
               <div className="form-group" style={{ margin: 0 }}>
@@ -914,7 +954,7 @@ const Fechamentos = () => {
                                 PDF
                               </button>
                             )}
-                            {(isAdmin || podeAlterarStatus) && (
+                            {!isConsultor && (
                               <button 
                                 className="btn-action"
                                 onClick={() => abrirModal(fechamento)}

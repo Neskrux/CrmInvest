@@ -1,7 +1,70 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 const WelcomeModal = ({ isOpen, onClose, onStartTutorial }) => {
+  const { makeRequest, user } = useAuth();
   const [currentPage, setCurrentPage] = useState(0);
+  const [linkPersonalizado, setLinkPersonalizado] = useState(null);
+  const [loadingLink, setLoadingLink] = useState(true);
+
+  // Buscar link personalizado do consultor (apenas freelancers)
+  useEffect(() => {
+    if (isOpen && user?.tipo === 'consultor') {
+      fetchLinkPersonalizado();
+    }
+  }, [isOpen, user]);
+
+  const fetchLinkPersonalizado = async () => {
+    try {
+      // Usar a rota de perfil que o consultor pode acessar
+      const consultorResponse = await makeRequest('/consultores/perfil');
+      const responseData = await consultorResponse.json();
+      
+      if (consultorResponse.ok && responseData.consultor) {
+        const consultorData = responseData.consultor;
+        
+        // Verificar se é consultor interno (tem as duas permissões)
+        const isConsultorInterno = consultorData.pode_ver_todas_novas_clinicas === true && consultorData.podealterarstatus === true;
+        
+        if (!isConsultorInterno) {
+          // Freelancer: buscar link personalizado baseado no código de referência
+          if (consultorData.codigo_referencia) {
+            setLinkPersonalizado(`https://crm.investmoneysa.com.br/captura-lead?ref=${consultorData.codigo_referencia}`);
+          } else {
+            // Se não tem código de referência, mostrar mensagem
+            setLinkPersonalizado(null);
+          }
+        } else {
+          // Interno: usar link geral
+          setLinkPersonalizado('https://crm.investmoneysa.com.br/captura-lead');
+        }
+      } else {
+        console.error('Erro ao buscar dados do consultor:', responseData);
+        setLinkPersonalizado(null);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar link personalizado:', error);
+      setLinkPersonalizado(null);
+    } finally {
+      setLoadingLink(false);
+    }
+  };
+
+  const copiarLink = async (link) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      alert('Link copiado para a área de transferência!');
+    } catch (error) {
+      // Fallback para navegadores mais antigos
+      const textArea = document.createElement('textarea');
+      textArea.value = link;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      alert('Link copiado para a área de transferência!');
+    }
+  };
 
   const pages = [
     {
@@ -21,32 +84,97 @@ const WelcomeModal = ({ isOpen, onClose, onStartTutorial }) => {
           </p>
           <p style={{ marginBottom: '16px' }}>
             Aqui trabalhamos com pacientes que desejam fazer os tratamentos parcelados no boleto. 
-            Se você conhece alguém nessas condições, envie o link abaixo:
+            Se você conhece alguém nessas condições, envie SEU link personalizado abaixo:
           </p>
-          <div style={{ 
-            backgroundColor: '#f8fafc', 
-            border: '1px solid #e2e8f0', 
-            borderRadius: '8px', 
-            padding: '12px', 
-            marginBottom: '16px',
-            textAlign: 'center'
-          }}>
-            <a 
-              href="https://crm.investmoneysa.com.br/captura-lead" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              style={{ 
-                color: '#2563eb', 
-                textDecoration: 'none', 
-                fontWeight: '500',
-                fontSize: '14px'
-              }}
-            >
-              🔗 https://crm.investmoneysa.com.br/captura-lead
-            </a>
-          </div>
+          
+          {loadingLink ? (
+            <div style={{ 
+              backgroundColor: '#f8fafc', 
+              border: '1px solid #e2e8f0', 
+              borderRadius: '8px', 
+              padding: '16px', 
+              marginBottom: '16px',
+              textAlign: 'center'
+            }}>
+              <div style={{ color: '#6b7280', fontSize: '14px' }}>
+                Carregando seu link personalizado...
+              </div>
+            </div>
+          ) : linkPersonalizado ? (
+            <div style={{ 
+              backgroundColor: '#f0fdf4', 
+              border: '2px solid #86efac', 
+              borderRadius: '8px', 
+              padding: '12px', 
+              marginBottom: '16px'
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                gap: '8px',
+                marginBottom: '8px'
+              }}>
+                <span style={{ 
+                  color: '#166534', 
+                  fontWeight: '600',
+                  fontSize: '14px'
+                }}>
+                  {linkPersonalizado?.includes('?ref=') ? 'Seu Link Personalizado:' : 'Link Geral da Empresa:'}
+                </span>
+                <button
+                  onClick={() => copiarLink(linkPersonalizado)}
+                  style={{
+                    background: '#16a34a',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '4px 8px',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    fontWeight: '500'
+                  }}
+                >
+                  Copiar
+                </button>
+              </div>
+              <div style={{ 
+                color: '#166534', 
+                fontSize: '12px',
+                fontFamily: 'monospace',
+                wordBreak: 'break-all',
+                lineHeight: '1.4',
+                backgroundColor: 'rgba(255,255,255,0.5)',
+                padding: '8px',
+                borderRadius: '4px'
+              }}>
+                {linkPersonalizado}
+              </div>
+            </div>
+          ) : (
+            <div style={{ 
+              backgroundColor: '#fef2f2', 
+              border: '1px solid #fecaca', 
+              borderRadius: '8px', 
+              padding: '12px', 
+              marginBottom: '16px',
+              textAlign: 'center'
+            }}>
+              <div style={{ color: '#dc2626', fontSize: '14px', marginBottom: '8px' }}>
+                ⚠️ Link personalizado não encontrado
+              </div>
+              <div style={{ color: '#6b7280', fontSize: '12px' }}>
+                Entre em contato com o administrador para gerar seu link
+              </div>
+            </div>
+          )}
+          
+          <p style={{ marginBottom: '16px', fontSize: '14px', color: '#6b7280' }}>
+            <strong>Dica:</strong> Seu link estará sempre disponível na seção "Perfil" 
+            quando precisar acessá-lo novamente!
+          </p>
           <p style={{ marginBottom: '0' }}>
-            Ou preencha as informações na tela de pacientes.
+            Ou preencha as informações diretamente na tela de pacientes.
           </p>
         </div>
       ),

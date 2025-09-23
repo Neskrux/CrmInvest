@@ -4,7 +4,7 @@ import { useToast } from '../components/Toast';
 import TutorialAgendamentos from './TutorialAgendamentos';
 
 const Agendamentos = () => {
-  const { makeRequest, user, isAdmin, podeAlterarStatus } = useAuth();
+  const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor } = useAuth();
   const { showSuccessToast, showErrorToast } = useToast();
   const [agendamentos, setAgendamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
@@ -72,10 +72,15 @@ const Agendamentos = () => {
     fetchConsultores();
     fetchClinicas();
     
+    // Aplicar filtro automático por consultor se necessário
+    if (deveFiltrarPorConsultor && user?.consultor_id) {
+      setFiltroConsultor(String(user.consultor_id));
+    }
+    
     // Verificar se tutorial foi completado
     const completed = localStorage.getItem('tutorial-agendamentos-completed');
     setTutorialCompleted(!!completed);
-  }, []);
+  }, [deveFiltrarPorConsultor, user?.consultor_id]);
 
   // Atualização automática dos dados a cada 30 segundos
   useEffect(() => {
@@ -240,6 +245,23 @@ const Agendamentos = () => {
     setDetalhesAtual({
       telefone: telefone || 'Nenhum telefone cadastrado.',
       observacoes: observacoes || 'Nenhuma observação cadastrada.'
+    });
+    setShowDetalhesModal(true);
+  };
+
+  const handleViewPaciente = (agendamento) => {
+    const paciente = pacientes.find(p => p.id === agendamento.paciente_id);
+    setDetalhesAtual({
+      nome: agendamento.paciente_nome || 'Nome não informado',
+      telefone: agendamento.paciente_telefone || paciente?.telefone || 'Telefone não cadastrado',
+      cpf: paciente?.cpf || 'CPF não cadastrado',
+      cidade: paciente?.cidade || 'Cidade não informada',
+      estado: paciente?.estado || 'Estado não informado',
+      tipo_tratamento: paciente?.tipo_tratamento || 'Tipo de tratamento não informado',
+      status: paciente?.status || 'Status não informado',
+      observacoes: agendamento.observacoes || paciente?.observacoes || 'Nenhuma observação cadastrada',
+      data_agendamento: agendamento.data_agendamento || 'Data não informada',
+      horario: agendamento.horario || 'Horário não informado'
     });
     setShowDetalhesModal(true);
   };
@@ -504,7 +526,10 @@ const Agendamentos = () => {
   };
 
   const limparFiltros = () => {
-    setFiltroConsultor('');
+    // Só limpar filtro de consultor se não estiver com filtro automático ativo
+    if (!deveFiltrarPorConsultor) {
+      setFiltroConsultor('');
+    }
     setFiltroClinica('');
     setFiltroDataInicio('');
     setFiltroDataFim('');
@@ -595,6 +620,23 @@ const Agendamentos = () => {
         </div>
       </div>
 
+      <div style={{
+          backgroundColor: '#f0f9ff',
+          border: '1px solid #bae6fd',
+          borderRadius: '8px',
+          padding: '1rem',
+          marginTop: '1rem',
+          fontSize: '0.875rem',
+          marginBottom: '2rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <strong style={{ color: '#0c4a6e' }}>Ações</strong>
+          </div>
+          <div style={{ color: '#0c4a6e', lineHeight: '1.4' }}>
+            • Aqui em <strong>Agendamentos</strong> → Você pode visualizar o status dos agendamentos dos seus pacientes e filtrar por consultor, clínica, data e status<br/>
+          </div>
+      </div>
+
       {/* Dashboard de Agendamentos */}
       <div className="stats-grid" style={{ marginBottom: '2rem' }}>
         <div className="stat-card">
@@ -643,6 +685,11 @@ const Agendamentos = () => {
                   value={filtroConsultor}
                   onChange={(e) => setFiltroConsultor(e.target.value)}
                   className="form-select"
+                  disabled={deveFiltrarPorConsultor}
+                  style={{ 
+                    opacity: deveFiltrarPorConsultor ? 0.6 : 1,
+                    cursor: deveFiltrarPorConsultor ? 'not-allowed' : 'pointer'
+                  }}
                 >
                   <option value="">Todos os consultores</option>
                   {consultores.map(consultor => (
@@ -651,6 +698,16 @@ const Agendamentos = () => {
                     </option>
                   ))}
                 </select>
+                {deveFiltrarPorConsultor && (
+                  <div style={{ 
+                    fontSize: '0.75rem', 
+                    color: '#6b7280', 
+                    marginTop: '0.25rem',
+                    fontStyle: 'italic'
+                  }}>
+                    Filtro automático ativo - mostrando apenas seus dados
+                  </div>
+                )}
               </div>
 
               <div className="form-group" style={{ margin: 0 }}>
@@ -835,7 +892,17 @@ const Agendamentos = () => {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          {(isAdmin || podeAlterarStatus) && (
+                          <button
+                            onClick={() => handleViewPaciente(agendamento)}
+                            className="btn-action"
+                            title="Visualizar informações do paciente"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                              <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                          </button>
+                          {!isConsultor && (
                             <button
                               onClick={() => handleEdit(agendamento)}
                               className="btn-action"
@@ -1034,43 +1101,112 @@ const Agendamentos = () => {
       {/* Modal de Detalhes */}
       {showDetalhesModal && (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: '500px' }}>
+          <div className="modal" style={{ maxWidth: '600px' }}>
             <div className="modal-header">
-              <h2 className="modal-title">Detalhes do agendamento</h2>
+              <h2 className="modal-title">
+                {detalhesAtual.nome ? 'Informações do Paciente' : 'Detalhes do agendamento'}
+              </h2>
             </div>
             <div style={{ padding: '1.5rem' }}>
-              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                <label className="form-label">Telefone do paciente</label>
-                <div style={{
-                  backgroundColor: '#f9fafb',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  padding: '1rem',
-                  fontSize: '0.875rem',
-                  lineHeight: '1.5',
-                  color: '#374151',
-                  fontWeight: '500'
-                }}>
-                  {detalhesAtual.telefone}
-                </div>
-              </div>
-              
-              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                <label className="form-label">Observações do agendamento</label>
-                <div style={{
-                  backgroundColor: '#f9fafb',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  padding: '1rem',
-                  minHeight: '120px',
-                  fontSize: '0.875rem',
-                  lineHeight: '1.5',
-                  color: '#374151',
-                  whiteSpace: 'pre-wrap'
-                }}>
-                  {detalhesAtual.observacoes}
-                </div>
-              </div>
+              {detalhesAtual.nome ? (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div className="form-group">
+                      <label className="form-label">Nome</label>
+                      <div className="detail-field">
+                        {detalhesAtual.nome}
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Telefone</label>
+                      <div className="detail-field">
+                        {detalhesAtual.telefone}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div className="form-group">
+                      <label className="form-label">CPF</label>
+                      <div className="detail-field">
+                        {detalhesAtual.cpf}
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Status</label>
+                      <div className="detail-field">
+                        {detalhesAtual.status}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div className="form-group">
+                      <label className="form-label">Cidade</label>
+                      <div className="detail-field">
+                        {detalhesAtual.cidade}
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Estado</label>
+                      <div className="detail-field">
+                        {detalhesAtual.estado}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div className="form-group">
+                      <label className="form-label">Data do Agendamento</label>
+                      <div className="detail-field">
+                        {detalhesAtual.data_agendamento ? new Date(detalhesAtual.data_agendamento).toLocaleDateString('pt-BR') : 'Não informada'}
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Horário</label>
+                      <div className="detail-field">
+                        {detalhesAtual.horario}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                    <label className="form-label">Tipo de Tratamento</label>
+                    <div className="detail-field">
+                      {detalhesAtual.tipo_tratamento}
+                    </div>
+                  </div>
+                  
+                  <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                    <label className="form-label">Observações</label>
+                    <div className="detail-field" style={{
+                      minHeight: '80px',
+                      whiteSpace: 'pre-wrap'
+                    }}>
+                      {detalhesAtual.observacoes}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                    <label className="form-label">Telefone do paciente</label>
+                    <div className="detail-field">
+                      {detalhesAtual.telefone}
+                    </div>
+                  </div>
+                  
+                  <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                    <label className="form-label">Observações do agendamento</label>
+                    <div className="detail-field" style={{
+                      minHeight: '120px',
+                      whiteSpace: 'pre-wrap'
+                    }}>
+                      {detalhesAtual.observacoes}
+                    </div>
+                  </div>
+                </>
+              )}
               
               <div style={{ textAlign: 'right' }}>
                 <button 

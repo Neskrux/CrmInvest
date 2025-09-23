@@ -974,7 +974,7 @@ app.post('/api/consultores/cadastro', async (req, res) => {
 app.post('/api/leads/cadastro', async (req, res) => {
   try {
     console.log('📝 Cadastro de lead recebido:', req.body);
-    const { nome, telefone, tipo_tratamento, cpf, observacoes, cidade, estado } = req.body;
+    const { nome, telefone, tipo_tratamento, cpf, observacoes, cidade, estado, ref_consultor } = req.body;
     
     // Validar campos obrigatórios
     if (!nome || !telefone || !cpf) {
@@ -1057,6 +1057,29 @@ app.post('/api/leads/cadastro', async (req, res) => {
     
     console.log('✅ CPF disponível para cadastro');
     
+    // Buscar consultor pelo código de referência se fornecido
+    let consultorId = null;
+    if (ref_consultor && ref_consultor.trim() !== '') {
+      console.log('🔍 Buscando consultor pelo código de referência:', ref_consultor);
+      
+      const { data: consultorData, error: consultorError } = await supabase
+        .from('consultores')
+        .select('id, nome')
+        .eq('codigo_referencia', ref_consultor.trim())
+        .eq('ativo', true)
+        .single();
+      
+      if (consultorError) {
+        console.error('❌ Erro ao buscar consultor:', consultorError);
+        // Não falhar o cadastro se não encontrar o consultor, apenas logar o erro
+      } else if (consultorData) {
+        consultorId = consultorData.id;
+        console.log('✅ Consultor encontrado:', { id: consultorData.id, nome: consultorData.nome });
+      } else {
+        console.log('⚠️ Consultor não encontrado para o código:', ref_consultor);
+      }
+    }
+    
     // Inserir lead/paciente
     console.log('💾 Tentando inserir lead no Supabase...');
     console.log('📍 Dados de localização:', { cidade, estado });
@@ -1072,7 +1095,7 @@ app.post('/api/leads/cadastro', async (req, res) => {
         observacoes: observacoes || null,
         cidade: cidade ? cidade.trim() : null,
         estado: estado ? estado.trim() : null,
-        consultor_id: null // Lead público não tem consultor inicial
+        consultor_id: consultorId // Atribuir ao consultor se encontrado pelo código de referência
       }])
       .select();
 

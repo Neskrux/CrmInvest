@@ -6,7 +6,7 @@ import logoBrasao from '../images/logobrasao.png';
 const CapturaSucesso = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { nome, message } = location.state || {};
+  const { nome, message, consultor_referencia } = location.state || {};
 
   const handleWhatsApp = () => {
     const phoneNumber = '5541997233138'; // Número do WhatsApp da clínica
@@ -40,6 +40,7 @@ const CapturaSucesso = () => {
             Sua solicitação foi enviada com sucesso. Nossa equipe entrará em contato 
             em até <strong>2 horas</strong> para agendar sua consulta gratuita.
           </p>
+
           
           <div className="next-steps">
             <h3 className="steps-title">

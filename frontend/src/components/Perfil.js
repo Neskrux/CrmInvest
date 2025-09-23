@@ -10,6 +10,8 @@ const Perfil = () => {
   const [profilePhoto, setProfilePhoto] = useState(null);
   const [previewPhoto, setPreviewPhoto] = useState(null);
   const [perfilCompleto, setPerfilCompleto] = useState(null);
+  const [linkPersonalizado, setLinkPersonalizado] = useState(null);
+  const [loadingLink, setLoadingLink] = useState(true);
   
   const [formData, setFormData] = useState({
     nome: user?.nome || '',
@@ -48,9 +50,52 @@ const Perfil = () => {
             telefone: perfilData.telefone || '',
             pix: perfilData.pix || ''
           }));
+
+          // Se for consultor, buscar link personalizado
+          if (user?.tipo === 'consultor') {
+            buscarLinkPersonalizado();
+          } else {
+            setLoadingLink(false);
+          }
         }
       } catch (error) {
         console.error('Erro ao buscar perfil completo:', error);
+      }
+    };
+
+    const buscarLinkPersonalizado = async () => {
+      try {
+        // Usar a rota de perfil que o consultor pode acessar
+        const consultorResponse = await makeRequest('/consultores/perfil');
+        const responseData = await consultorResponse.json();
+        
+        if (consultorResponse.ok && responseData.consultor) {
+          const consultorData = responseData.consultor;
+          
+          // Verificar se é consultor interno (tem as duas permissões)
+          const isConsultorInterno = consultorData.pode_ver_todas_novas_clinicas === true && consultorData.podealterarstatus === true;
+          
+          if (!isConsultorInterno) {
+            // Freelancer: buscar link personalizado baseado no código de referência
+            if (consultorData.codigo_referencia) {
+              setLinkPersonalizado(`https://crm.investmoneysa.com.br/captura-lead?ref=${consultorData.codigo_referencia}`);
+            } else {
+              // Se não tem código de referência, mostrar mensagem
+              setLinkPersonalizado(null);
+            }
+          } else {
+            // Interno: usar link geral
+            setLinkPersonalizado('https://crm.investmoneysa.com.br/captura-lead');
+          }
+        } else {
+          console.error('Erro ao buscar dados do consultor:', responseData);
+          setLinkPersonalizado(null);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar link personalizado:', error);
+        setLinkPersonalizado(null);
+      } finally {
+        setLoadingLink(false);
       }
     };
 
@@ -58,6 +103,34 @@ const Perfil = () => {
       buscarPerfilCompleto();
     }
   }, [user, makeRequest]);
+
+  // Função para copiar link personalizado
+  const copiarLink = async (link) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      showSuccessToast('Link copiado para a área de transferência!');
+    } catch (error) {
+      // Fallback para navegadores mais antigos
+      const textArea = document.createElement('textarea');
+      textArea.value = link;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      showSuccessToast('Link copiado para a área de transferência!');
+    }
+  };
+
+  const compartilharWhatsApp = (link) => {
+    const texto = encodeURIComponent(
+      `🌟 Transforme sua autoestima com nossos tratamentos especializados!\n\n` +
+      `✨ Consulta gratuita\n` +
+      `💎 Profissionais qualificados\n` +
+      `📱 Atendimento personalizado\n\n` +
+      `Agende agora: ${link}`
+    );
+    window.open(`https://wa.me/?text=${texto}`, '_blank');
+  };
 
   // Função para obter iniciais do nome
   const getUserInitials = () => {
@@ -453,6 +526,137 @@ const Perfil = () => {
         </form>
       </div>
 
+      {/* Seção do Link Personalizado - Apenas para consultores */}
+      {user?.tipo === 'consultor' && (
+        <div className="card" style={{ maxWidth: '600px', margin: '2rem auto 0' }}>
+          <div className="card-header">
+            <h2 className="card-title">Meu Link de Divulgação</h2>
+          </div>
+          
+          <div className="card-body">
+            {loadingLink ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                <div style={{ 
+                  width: '2rem', 
+                  height: '2rem', 
+                  border: '3px solid #e5e7eb', 
+                  borderTop: '3px solid #3b82f6', 
+                  borderRadius: '50%', 
+                  animation: 'spin 1s linear infinite', 
+                  margin: '0 auto 1rem' 
+                }}></div>
+                Carregando link personalizado...
+              </div>
+            ) : linkPersonalizado ? (
+              <div>
+                <div style={{ 
+                  backgroundColor: '#f0fdf4', 
+                  border: '2px solid #86efac', 
+                  borderRadius: '12px', 
+                  padding: '1.5rem', 
+                  marginBottom: '1.5rem'
+                }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between',
+                    marginBottom: '1rem'
+                  }}>
+                    <span style={{ 
+                      color: '#166534', 
+                      fontWeight: '600',
+                      fontSize: '1rem'
+                    }}>
+                      {linkPersonalizado?.includes('?ref=') ? 'Seu Link Personalizado:' : 'Link Geral da Empresa:'}
+                    </span>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        onClick={() => copiarLink(linkPersonalizado)}
+                        style={{
+                          background: '#16a34a',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '8px 12px',
+                          fontSize: '14px',
+                          cursor: 'pointer',
+                          fontWeight: '500',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        Copiar
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ 
+                    color: '#166534', 
+                    fontSize: '13px',
+                    fontFamily: 'monospace',
+                    wordBreak: 'break-all',
+                    lineHeight: '1.5',
+                    backgroundColor: 'rgba(255,255,255,0.7)',
+                    padding: '12px',
+                    borderRadius: '8px'
+                  }}>
+                    {linkPersonalizado}
+                  </div>
+                </div>
+                
+                <div style={{ 
+                  backgroundColor: '#eff6ff', 
+                  border: '1px solid #bfdbfe', 
+                  borderRadius: '8px', 
+                  padding: '1rem'
+                }}>
+                  <div style={{ fontSize: '14px', color: '#1e40af', fontWeight: '600', marginBottom: '8px' }}>
+                    Como usar seu link:
+                  </div>
+                  <ul style={{ fontSize: '13px', color: '#1e40af', margin: '0', paddingLeft: '1.5rem', lineHeight: '1.6' }}>
+                    <li>Compartilhe este link em suas redes sociais</li>
+                    <li>Envie para clientes em potencial via WhatsApp</li>
+                    {linkPersonalizado?.includes('?ref=') ? (
+                      <>
+                        <li>Todos os leads que se cadastrarem através deste link serão automaticamente associados a você</li>
+                        <li>Acompanhe seus leads na tela de "Pacientes"</li>
+                      </>
+                    ) : (
+                      <>
+                        <li>Os leads aparecerão na tela de "Novos Leads" para você e outros consultores internos</li>
+                        <li>Você pode "pegar" os leads que desejar atender</li>
+                      </>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <div style={{ 
+                backgroundColor: '#fef2f2', 
+                border: '1px solid #fecaca', 
+                borderRadius: '8px', 
+                padding: '1.5rem',
+                textAlign: 'center'
+              }}>
+                <div style={{ color: '#dc2626', fontSize: '16px', marginBottom: '8px' }}>
+                  ⚠️ Link personalizado não encontrado
+                </div>
+                <div style={{ color: '#6b7280', fontSize: '14px' }}>
+                  Entre em contato com o administrador para gerar seu link personalizado.
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+      `}</style>
     </div>
   );
 };
