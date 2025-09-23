@@ -455,13 +455,35 @@ const Pacientes = () => {
     setShowObservacoesModal(true);
   };
 
-  // Função para formatar telefone
+  // Função para formatar telefone (formato brasileiro correto)
   function maskTelefone(value) {
-    return value
-      .replace(/\D/g, '')
-      .replace(/(\d{2})(\d)/, '($1) $2')
-      .replace(/(\d{5})(\d)/, '$1-$2')
-      .replace(/(-\d{4})\d+?$/, '$1');
+    if (!value) return '';
+    
+    // Remove todos os caracteres não numéricos (apenas números)
+    const numbers = value.replace(/\D/g, '');
+    
+    // Limita a 11 dígitos (máximo para celular brasileiro)
+    const limitedNumbers = numbers.substring(0, 11);
+    
+    // Aplica formatação baseada no tamanho
+    if (limitedNumbers.length === 11) {
+      // Celular: (XX) 9XXXX-XXXX
+      return `(${limitedNumbers.substring(0, 2)}) ${limitedNumbers.substring(2, 7)}-${limitedNumbers.substring(7, 11)}`;
+    } else if (limitedNumbers.length === 10) {
+      // Fixo: (XX) XXXX-XXXX
+      return `(${limitedNumbers.substring(0, 2)}) ${limitedNumbers.substring(2, 6)}-${limitedNumbers.substring(6, 10)}`;
+    } else if (limitedNumbers.length > 0) {
+      // Formatação parcial conforme vai digitando
+      if (limitedNumbers.length <= 2) {
+        return `(${limitedNumbers}`;
+      } else if (limitedNumbers.length <= 7) {
+        return `(${limitedNumbers.substring(0, 2)}) ${limitedNumbers.substring(2)}`;
+      } else if (limitedNumbers.length <= 11) {
+        return `(${limitedNumbers.substring(0, 2)}) ${limitedNumbers.substring(2, 7)}-${limitedNumbers.substring(7)}`;
+      }
+    }
+    
+    return limitedNumbers;
   }
   // Função para formatar CPF
   function maskCPF(value) {
@@ -472,21 +494,30 @@ const Pacientes = () => {
       .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
   }
 
-  // Função para formatar nome (sem números)
+  // Função para formatar nome (mesmo padrão da migração do banco)
   function formatarNome(value) {
     if (!value) return '';
     
     // Remove números e caracteres especiais, mantém apenas letras, espaços e acentos
     let cleanValue = value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
     
-    // Remove espaços do início
-    cleanValue = cleanValue.trimStart();
-    
-    // Remove espaços duplos ou múltiplos, deixando apenas um espaço entre palavras
+    // Remove espaços duplos/múltiplos, mas mantém espaços simples
     cleanValue = cleanValue.replace(/\s+/g, ' ');
-
-    // Primeira letra maiúscula no nome
-    const nomeFormatado = cleanValue.charAt(0).toUpperCase() + cleanValue.slice(1).toLowerCase();
+    
+    // Remove espaços apenas do início e fim
+    cleanValue = cleanValue.trim();
+    
+    if (!cleanValue) return '';
+    
+    // Aplica INITCAP - primeira letra de cada palavra maiúscula
+    const nomeFormatado = cleanValue
+      .toLowerCase()
+      .split(' ')
+      .map(palavra => {
+        if (!palavra) return '';
+        return palavra.charAt(0).toUpperCase() + palavra.slice(1);
+      })
+      .join(' ');
     
     return nomeFormatado;
   }
@@ -553,10 +584,22 @@ const Pacientes = () => {
     if (type === 'checkbox') {
       value = checked;
     } else {
-    if (name === 'telefone') value = maskTelefone(value);
-    if (name === 'cpf') value = maskCPF(value);
-    if (name === 'nome') value = formatarNome(value);
-      if (name === 'cidade') value = formatarCidade(value);
+      // Aplicar formatação apenas quando necessário
+      if (name === 'telefone') {
+        // Para telefone, permitir apenas números durante a digitação
+        value = value.replace(/\D/g, '');
+        if (value.length > 0) {
+          value = maskTelefone(value);
+        }
+      } else if (name === 'cpf') {
+        value = maskCPF(value);
+      } else if (name === 'nome') {
+        // Para nome, permitir digitação normal (incluindo espaços) e formatar apenas no final
+        // Não aplicar formatação durante a digitação para permitir espaços
+        value = value;
+      } else if (name === 'cidade') {
+        value = formatarCidade(value);
+      }
     }
     
     // Se mudou o estado, limpar a cidade e resetar cidade customizada
@@ -572,6 +615,18 @@ const Pacientes = () => {
         ...formData,
         [name]: value
       });
+    }
+  };
+
+  // Função para formatar nome quando sair do campo (onBlur)
+  const handleNomeBlur = (e) => {
+    const { value } = e.target;
+    if (value && value.trim()) {
+      const nomeFormatado = formatarNome(value);
+      setFormData(prev => ({
+        ...prev,
+        nome: nomeFormatado
+      }));
     }
   };
 
@@ -1708,6 +1763,7 @@ const Pacientes = () => {
                   className="form-input"
                   value={formData.nome}
                   onChange={handleInputChange}
+                  onBlur={handleNomeBlur}
                   placeholder="Digite o nome do paciente"
                   required
                 />
