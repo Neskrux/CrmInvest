@@ -22,7 +22,6 @@ const useRealtimeLeads = () => {
     });
 
     socketInstance.on('connect', () => {
-      console.log('🔌 Conectado ao servidor de notificações');
       setIsConnected(true);
       
       socketInstance.emit('join-lead-notifications', {
@@ -32,18 +31,15 @@ const useRealtimeLeads = () => {
     });
 
     socketInstance.on('disconnect', () => {
-      console.log('🔌 Desconectado do servidor de notificações');
       setIsConnected(false);
     });
 
     socketInstance.on('new-lead', (data) => {
-      console.log('🔔 Novo lead recebido:', data);
       setNewLeadCount(prev => prev + 1);
       playNotificationSound();
     });
 
     socketInstance.on('lead-count-update', (data) => {
-      console.log('📊 Atualização de contagem de leads:', data);
       setNewLeadCount(data.count);
       
       if (data.count > lastLeadCountRef.current) {
@@ -53,7 +49,6 @@ const useRealtimeLeads = () => {
     });
 
     socketInstance.on('connect_error', (error) => {
-      console.log('❌ Erro de conexão:', error);
       setIsConnected(false);
     });
 

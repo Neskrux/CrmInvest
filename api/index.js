@@ -1117,6 +1117,177 @@ app.post('/api/leads/cadastro', async (req, res) => {
   }
 });
 
+// === CADASTRO PÚBLICO DE CLÍNICAS === (Sem autenticação)
+app.post('/api/clinicas/cadastro-publico', async (req, res) => {
+  try {
+    console.log('📝 Cadastro de clínica recebido:', req.body);
+    const { 
+      nome, 
+      cnpj, 
+      endereco, 
+      bairro, 
+      cidade, 
+      estado, 
+      telefone, 
+      email, 
+      nicho, 
+      responsavel, 
+      observacoes, 
+      ref_consultor 
+    } = req.body;
+    
+    // Validar campos obrigatórios
+    if (!nome || !cnpj || !telefone || !email || !responsavel) {
+      return res.status(400).json({ error: 'Nome da clínica, CNPJ, telefone, email e responsável são obrigatórios!' });
+    }
+    
+    // Validar nome (mínimo 2 caracteres)
+    if (nome.trim().length < 2) {
+      return res.status(400).json({ error: 'Nome da clínica deve ter pelo menos 2 caracteres!' });
+    }
+    
+    // Validar CNPJ (14 dígitos)
+    const cnpjNumeros = cnpj.replace(/\D/g, '');
+    if (cnpjNumeros.length !== 14) {
+      return res.status(400).json({ error: 'CNPJ deve ter 14 dígitos!' });
+    }
+    
+    // Validar telefone (formato básico)
+    const telefoneRegex = /^[\(\)\s\-\+\d]{10,15}$/;
+    if (!telefoneRegex.test(telefone.replace(/\s/g, ''))) {
+      return res.status(400).json({ error: 'Telefone inválido!' });
+    }
+    
+    // Validar email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Email inválido!' });
+    }
+    
+    // Normalizar telefone (remover formatação)
+    const telefoneNumeros = telefone.replace(/\D/g, '');
+    
+    // Verificar se telefone já existe
+    const { data: telefoneExistente, error: telefoneError } = await supabase
+      .from('novas_clinicas')
+      .select('id, nome, created_at')
+      .eq('telefone', telefoneNumeros)
+      .limit(1);
+
+    if (telefoneError) {
+      console.error('❌ Erro ao verificar telefone:', telefoneError);
+      throw telefoneError;
+    }
+    
+    if (telefoneExistente && telefoneExistente.length > 0) {
+      const clinicaExistente = telefoneExistente[0];
+      const dataCadastro = new Date(clinicaExistente.created_at).toLocaleDateString('pt-BR');
+      console.log('❌ Telefone já cadastrado:', { 
+        telefone: telefoneNumeros, 
+        clinica: clinicaExistente.nome,
+        data: dataCadastro
+      });
+      return res.status(400).json({ 
+        error: `Este número de telefone já está cadastrado para ${clinicaExistente.nome} (cadastrado em ${dataCadastro}).` 
+      });
+    }
+    
+    // Buscar consultor pelo código de referência se fornecido
+    let consultorId = null;
+    let consultorNome = null;
+    if (ref_consultor && ref_consultor.trim() !== '') {
+      console.log('🔍 Buscando consultor pelo código de referência:', ref_consultor);
+      
+      const { data: consultorData, error: consultorError } = await supabase
+        .from('consultores')
+        .select('id, nome, codigo_referencia, ativo')
+        .eq('codigo_referencia', ref_consultor.trim())
+        .eq('ativo', true)
+        .single();
+      
+      if (consultorError) {
+        console.error('❌ Erro ao buscar consultor:', consultorError);
+        // Não falhar o cadastro se não encontrar o consultor, apenas logar o erro
+      } else if (consultorData) {
+        consultorId = consultorData.id;
+        consultorNome = consultorData.nome;
+        console.log('✅ Consultor encontrado:', { 
+          id: consultorData.id, 
+          nome: consultorData.nome,
+          codigo_referencia: consultorData.codigo_referencia,
+          ativo: consultorData.ativo
+        });
+      } else {
+        console.log('⚠️ Consultor não encontrado para o código:', ref_consultor);
+      }
+    } else {
+      console.log('ℹ️ Nenhum código de referência fornecido');
+    }
+    
+    // Geocodificar endereço se tiver cidade e estado
+    let latitude = null;
+    let longitude = null;
+    
+    if (cidade && estado) {
+      try {
+        const address = `${endereco ? endereco + ', ' : ''}${cidade}, ${estado}, Brasil`;
+        const geocodeUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
+        const geocodeResponse = await fetch(geocodeUrl);
+        const geocodeData = await geocodeResponse.json();
+        
+        if (geocodeData && geocodeData.length > 0) {
+          latitude = parseFloat(geocodeData[0].lat);
+          longitude = parseFloat(geocodeData[0].lon);
+        }
+      } catch (geocodeError) {
+        console.error('Erro ao geocodificar:', geocodeError);
+        // Continua sem coordenadas se falhar
+      }
+    }
+    
+    // Inserir clínica na tabela novas_clinicas
+    console.log('💾 Inserindo clínica com consultor_id:', consultorId);
+    
+    const { data, error } = await supabase
+      .from('novas_clinicas')
+      .insert([{ 
+        nome: nome.trim(), 
+        cnpj: cnpjNumeros,
+        endereco: endereco ? endereco.trim() : null,
+        bairro: bairro ? bairro.trim() : null,
+        cidade: cidade ? cidade.trim() : null,
+        estado: estado ? estado.trim() : null,
+        telefone: telefoneNumeros,
+        email: email.trim(),
+        nicho: nicho || null,
+        responsavel: responsavel.trim(),
+        observacoes: observacoes ? observacoes.trim() : null,
+        status: 'tem_interesse',
+        latitude,
+        longitude,
+        criado_por_consultor_id: consultorId
+      }])
+      .select();
+
+    if (error) {
+      console.error('❌ Erro ao inserir clínica:', error);
+      throw error;
+    }
+    
+    console.log('✅ Clínica inserida com sucesso:', data[0]);
+    
+    res.json({ 
+      id: data[0].id, 
+      message: 'Cadastro realizado com sucesso! Entraremos em contato em até 24 horas.',
+      nome: nome.trim(),
+      consultor_referencia: consultorNome
+    });
+  } catch (error) {
+    console.error('Erro no cadastro de clínica:', error);
+    res.status(500).json({ error: 'Erro interno do servidor. Tente novamente.' });
+  }
+});
+
 app.put('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;

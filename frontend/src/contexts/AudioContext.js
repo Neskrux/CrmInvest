@@ -21,13 +21,11 @@ export const AudioProvider = ({ children }) => {
   const AudioComponentMemo = useMemo(() => audioHook.AudioComponent, []);
 
   const playNotificationSound = () => {
-    console.log('📢 AudioContext: Iniciando notificação e som...');
     setShowNotification(true);
     audioHook.playNotificationSound();
   };
 
   const hideNotification = () => {
-    console.log('🔕 AudioContext: Fechando notificação e parando som...');
     setShowNotification(false);
     setLeadData(null);
     audioHook.stopNotificationSound();

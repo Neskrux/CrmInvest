@@ -5,6 +5,7 @@ const WelcomeModal = ({ isOpen, onClose, onStartTutorial }) => {
   const { makeRequest, user } = useAuth();
   const [currentPage, setCurrentPage] = useState(0);
   const [linkPersonalizado, setLinkPersonalizado] = useState(null);
+  const [linkClinicas, setLinkClinicas] = useState(null);
   const [loadingLink, setLoadingLink] = useState(true);
 
   // Buscar link personalizado do consultor (apenas freelancers)
@@ -30,21 +31,26 @@ const WelcomeModal = ({ isOpen, onClose, onStartTutorial }) => {
           // Freelancer: buscar link personalizado baseado no código de referência
           if (consultorData.codigo_referencia) {
             setLinkPersonalizado(`https://crm.investmoneysa.com.br/captura-lead?ref=${consultorData.codigo_referencia}`);
+            setLinkClinicas(`https://crm.investmoneysa.com.br/captura-clinica?ref=${consultorData.codigo_referencia}`);
           } else {
             // Se não tem código de referência, mostrar mensagem
             setLinkPersonalizado(null);
+            setLinkClinicas(null);
           }
         } else {
           // Interno: usar link geral
           setLinkPersonalizado('https://crm.investmoneysa.com.br/captura-lead');
+          setLinkClinicas('https://crm.investmoneysa.com.br/captura-clinica');
         }
       } else {
         console.error('Erro ao buscar dados do consultor:', responseData);
         setLinkPersonalizado(null);
+        setLinkClinicas(null);
       }
     } catch (error) {
       console.error('Erro ao buscar link personalizado:', error);
       setLinkPersonalizado(null);
+      setLinkClinicas(null);
     } finally {
       setLoadingLink(false);
     }
@@ -78,13 +84,13 @@ const WelcomeModal = ({ isOpen, onClose, onStartTutorial }) => {
       content: (
         <div>
           <p style={{ marginBottom: '16px' }}>
-            Se você conhece alguém que deseja realizar procedimentos odontológicos ou estéticos 
-            que não possui limite suficiente no cartão, ou o valor à vista na conta, 
+            <strong>Para Pacientes:</strong> Se você conhece alguém que deseja realizar procedimentos 
+            odontológicos ou estéticos mas não possui limite suficiente no cartão ou o valor à vista, 
             indique esse possível paciente para nós!
           </p>
           <p style={{ marginBottom: '16px' }}>
-            Aqui trabalhamos com pacientes que desejam fazer os tratamentos parcelados no boleto. 
-            Se você conhece alguém nessas condições, envie SEU link personalizado abaixo:
+            Trabalhamos com pacientes que desejam fazer os tratamentos parcelados no boleto. 
+            Use seu link personalizado abaixo para indicar pacientes:
           </p>
           
           {loadingLink ? (
@@ -120,7 +126,7 @@ const WelcomeModal = ({ isOpen, onClose, onStartTutorial }) => {
                   fontWeight: '600',
                   fontSize: '14px'
                 }}>
-                  {linkPersonalizado?.includes('?ref=') ? 'Seu Link Personalizado:' : 'Link Geral da Empresa:'}
+                  Link para Pacientes:
                 </span>
                 <button
                   onClick={() => copiarLink(linkPersonalizado)}
@@ -140,7 +146,7 @@ const WelcomeModal = ({ isOpen, onClose, onStartTutorial }) => {
               </div>
               <div style={{ 
                 color: '#166534', 
-                fontSize: '12px',
+                fontSize: '11px',
                 fontFamily: 'monospace',
                 wordBreak: 'break-all',
                 lineHeight: '1.4',
@@ -161,7 +167,7 @@ const WelcomeModal = ({ isOpen, onClose, onStartTutorial }) => {
               textAlign: 'center'
             }}>
               <div style={{ color: '#dc2626', fontSize: '14px', marginBottom: '8px' }}>
-                ⚠️ Link personalizado não encontrado
+                Link personalizado não encontrado
               </div>
               <div style={{ color: '#6b7280', fontSize: '12px' }}>
                 Entre em contato com o administrador para gerar seu link
@@ -182,17 +188,132 @@ const WelcomeModal = ({ isOpen, onClose, onStartTutorial }) => {
       onButtonClick: () => setCurrentPage(2)
     },
     {
+      title: 'Link para Clínicas',
+      content: (
+        <div>
+          <p style={{ marginBottom: '16px' }}>
+            <strong>Para Clínicas:</strong> Se você conhece alguma clínica odontológica ou estética 
+            que gostaria de trabalhar conosco, use seu link personalizado abaixo!
+          </p>
+          <p style={{ marginBottom: '16px' }}>
+            Nós enviamos o valor à vista do tratamento para nossas clínicas parceiras, 
+            mesmo se o tratamento for parcelado no boleto. Isso ajuda as clínicas a 
+            receber o dinheiro mais rapidamente!
+          </p>
+          
+          {loadingLink ? (
+            <div style={{ 
+              backgroundColor: '#f8fafc', 
+              border: '1px solid #e2e8f0', 
+              borderRadius: '8px', 
+              padding: '16px', 
+              marginBottom: '16px',
+              textAlign: 'center'
+            }}>
+              <div style={{ color: '#6b7280', fontSize: '14px' }}>
+                Carregando seu link personalizado...
+              </div>
+            </div>
+          ) : linkClinicas ? (
+            <div style={{ 
+              backgroundColor: '#eff6ff', 
+              border: '2px solid #93c5fd', 
+              borderRadius: '8px', 
+              padding: '12px', 
+              marginBottom: '16px'
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                gap: '8px',
+                marginBottom: '8px'
+              }}>
+                <span style={{ 
+                  color: '#1d4ed8', 
+                  fontWeight: '600',
+                  fontSize: '14px'
+                }}>
+                  Link para Clínicas:
+                </span>
+                <button
+                  onClick={() => copiarLink(linkClinicas)}
+                  style={{
+                    background: '#2563eb',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '4px 8px',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    fontWeight: '500'
+                  }}
+                >
+                  Copiar
+                </button>
+              </div>
+              <div style={{ 
+                color: '#1d4ed8', 
+                fontSize: '11px',
+                fontFamily: 'monospace',
+                wordBreak: 'break-all',
+                lineHeight: '1.4',
+                backgroundColor: 'rgba(255,255,255,0.5)',
+                padding: '8px',
+                borderRadius: '4px'
+              }}>
+                {linkClinicas}
+              </div>
+            </div>
+          ) : (
+            <div style={{ 
+              backgroundColor: '#fef2f2', 
+              border: '1px solid #fecaca', 
+              borderRadius: '8px', 
+              padding: '12px', 
+              marginBottom: '16px',
+              textAlign: 'center'
+            }}>
+              <div style={{ color: '#dc2626', fontSize: '14px', marginBottom: '8px' }}>
+                Link personalizado não encontrado
+              </div>
+              <div style={{ color: '#6b7280', fontSize: '12px' }}>
+                Entre em contato com o administrador para gerar seu link
+              </div>
+            </div>
+          )}
+          
+          <p style={{ marginBottom: '16px', fontSize: '14px', color: '#6b7280' }}>
+            <strong>Dica:</strong> Seu link estará sempre disponível na seção "Perfil" 
+            quando precisar acessá-lo novamente!
+          </p>
+          <p style={{ marginBottom: '0' }}>
+            Ou preencha as informações diretamente na tela de clínicas.
+          </p>
+        </div>
+      ),
+      buttonText: 'Próxima Página',
+      onButtonClick: () => setCurrentPage(3)
+    },
+    {
       title: 'Para Clínicas Parceiras',
       content: (
         <div>
           <p style={{ marginBottom: '16px' }}>
-            Nós enviamos o valor à vista do tratamento para nossas clínicas parceiras, 
-            mesmo se o tratamento for parcelado no boleto.
+            <strong>Resumo:</strong> Agora você tem acesso aos seus links personalizados para 
+            indicar tanto pacientes quanto clínicas!
           </p>
-          <p style={{ marginBottom: '0' }}>
-            Se você conhece alguma clínica que já trabalha com esse método de pagamento, 
-            ou que gostaria de antecipar o recebimento do valor do tratamento conosco, 
-            preencha as informações dessa clínica na página de clínicas!
+          <p style={{ marginBottom: '16px' }}>
+            <strong>Para Pacientes:</strong> Use o link personalizado para indicar pessoas que querem 
+            fazer tratamentos parcelados no boleto.
+          </p>
+          <p style={{ marginBottom: '16px' }}>
+            <strong>Para Clínicas:</strong> Use o link personalizado para indicar clínicas que querem 
+            receber o valor à vista dos tratamentos.
+          </p>
+          <p style={{ marginBottom: '0', fontSize: '14px', color: '#6b7280' }}>
+            <strong>Dica:</strong> Cada indicação bem-sucedida gera comissão para você! 
+            Seus links estão sempre disponíveis na seção "Perfil".
           </p>
         </div>
       ),

@@ -9,14 +9,14 @@ const CapturaSucesso = () => {
   const { nome, message, consultor_referencia } = location.state || {};
 
   const handleWhatsApp = () => {
-    const phoneNumber = '5541997233138'; // Número do WhatsApp da clínica
-    const text = `Olá! Acabei de me cadastrar no site para agendar uma consulta.`;
+    const phoneNumber = '5511976631571'; // Número do WhatsApp da clínica
+    const text = `Olá! Acabei de me cadastrar no site como clínica.`;
     const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
 
   const handleVoltar = () => {
-    navigate('/captura-lead');
+    navigate('/captura-clinica');
   };
 
   return (
@@ -28,7 +28,7 @@ const CapturaSucesso = () => {
             Cadastro <span className="highlight">Realizado!</span>
           </h1>
           <p className="sucesso-subtitle">
-            {message || 'Entraremos em contato em breve!'}
+            {message || 'Cadastro realizado com sucesso! Entraremos em contato em breve.'}
           </p>
         </div>
 
@@ -37,8 +37,8 @@ const CapturaSucesso = () => {
             Obrigado por se cadastrar!
           </h2>
           <p className="card-text">
-            Sua solicitação foi enviada com sucesso. Nossa equipe entrará em contato 
-            em até <strong>2 horas</strong> para agendar sua consulta gratuita.
+            Sua solicitação foi enviada com sucesso. Nossa equipe entrará em contato<br />
+            em até <strong>2 horas</strong>.
           </p>
 
           
@@ -58,20 +58,11 @@ const CapturaSucesso = () => {
               </div>
               <div className="step-item">
                 <div className="step-icon">
-                  <Clock size={20} color="#ffffff" />
-                </div>
-                <div className="step-content">
-                  <strong>Agende sua consulta</strong>
-                  <p>Escolha o melhor horário para você</p>
-                </div>
-              </div>
-              <div className="step-item">
-                <div className="step-icon">
                   <Users size={20} color="#ffffff" />
                 </div>
                 <div className="step-content">
-                  <strong>Realize sua consulta</strong>
-                  <p>Avaliação gratuita com nossos especialistas</p>
+                  <strong>Novos pacientes</strong>
+                  <p>Disponibilizamos uma rede de pacientes para você</p>
                 </div>
               </div>
             </div>
@@ -102,21 +93,21 @@ const CapturaSucesso = () => {
                 <Clock size={32} color="#ffde34" />
               </div>
               <h4>Resposta Rápida</h4>
-              <p>Respondemos em até 2 horas</p>
+              <p>Respondemos em<br /> até 2 horas</p>
             </div>
             <div className="info-card">
               <div className="info-icon">
                 <Gift size={32} color="#ffde34" />
               </div>
-              <h4>Consulta Gratuita</h4>
-              <p>Primeira consulta sem custo</p>
+              <h4>Valores Antecipados</h4>
+              <p>Antecipe seus valores à vista de tratamentos parcelados no boleto</p>
             </div>
             <div className="info-card">
               <div className="info-icon">
                 <Star size={32} color="#ffde34" />
               </div>
-              <h4>Atendimento Premium</h4>
-              <p>Profissionais qualificados</p>
+              <h4>Novos Pacientes</h4>
+              <p>Disponibilizamos uma rede de pacientes<br /> para você</p>
             </div>
           </div>
         </div>

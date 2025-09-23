@@ -11,6 +11,7 @@ const Perfil = () => {
   const [previewPhoto, setPreviewPhoto] = useState(null);
   const [perfilCompleto, setPerfilCompleto] = useState(null);
   const [linkPersonalizado, setLinkPersonalizado] = useState(null);
+  const [linkClinicas, setLinkClinicas] = useState(null);
   const [loadingLink, setLoadingLink] = useState(true);
   
   const [formData, setFormData] = useState({
@@ -79,21 +80,26 @@ const Perfil = () => {
             // Freelancer: buscar link personalizado baseado no código de referência
             if (consultorData.codigo_referencia) {
               setLinkPersonalizado(`https://crm.investmoneysa.com.br/captura-lead?ref=${consultorData.codigo_referencia}`);
+              setLinkClinicas(`https://crm.investmoneysa.com.br/captura-clinica?ref=${consultorData.codigo_referencia}`);
             } else {
               // Se não tem código de referência, mostrar mensagem
               setLinkPersonalizado(null);
+              setLinkClinicas(null);
             }
           } else {
             // Interno: usar link geral
             setLinkPersonalizado('https://crm.investmoneysa.com.br/captura-lead');
+            setLinkClinicas('https://crm.investmoneysa.com.br/captura-clinica');
           }
         } else {
           console.error('Erro ao buscar dados do consultor:', responseData);
           setLinkPersonalizado(null);
+          setLinkClinicas(null);
         }
       } catch (error) {
         console.error('Erro ao buscar link personalizado:', error);
         setLinkPersonalizado(null);
+        setLinkClinicas(null);
       } finally {
         setLoadingLink(false);
       }
@@ -530,7 +536,7 @@ const Perfil = () => {
       {user?.tipo === 'consultor' && (
         <div className="card" style={{ maxWidth: '600px', margin: '2rem auto 0' }}>
           <div className="card-header">
-            <h2 className="card-title">Meu Link de Divulgação</h2>
+            <h2 className="card-title">Meus Links de Divulgação</h2>
           </div>
           
           <div className="card-body">
@@ -547,84 +553,146 @@ const Perfil = () => {
                 }}></div>
                 Carregando link personalizado...
               </div>
-            ) : linkPersonalizado ? (
+            ) : (linkPersonalizado || linkClinicas) ? (
               <div>
-                <div style={{ 
-                  backgroundColor: '#f0fdf4', 
-                  border: '2px solid #86efac', 
-                  borderRadius: '12px', 
-                  padding: '1.5rem', 
-                  marginBottom: '1.5rem'
-                }}>
+                {/* Link para Pacientes */}
+                {linkPersonalizado && (
                   <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'space-between',
-                    marginBottom: '1rem'
+                    backgroundColor: '#f0fdf4', 
+                    border: '2px solid #86efac', 
+                    borderRadius: '12px', 
+                    padding: '1.5rem', 
+                    marginBottom: '1.5rem'
                   }}>
-                    <span style={{ 
-                      color: '#166534', 
-                      fontWeight: '600',
-                      fontSize: '1rem'
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      marginBottom: '1rem'
                     }}>
-                      {linkPersonalizado?.includes('?ref=') ? 'Seu Link Personalizado:' : 'Link Geral da Empresa:'}
-                    </span>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button
-                        onClick={() => copiarLink(linkPersonalizado)}
-                        style={{
-                          background: '#16a34a',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '8px',
-                          padding: '8px 12px',
-                          fontSize: '14px',
-                          cursor: 'pointer',
-                          fontWeight: '500',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}
-                      >
-                        Copiar
-                      </button>
+                      <span style={{ 
+                        color: '#166534', 
+                        fontWeight: '600',
+                        fontSize: '1rem'
+                      }}>
+                        Link para Pacientes:
+                      </span>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          onClick={() => copiarLink(linkPersonalizado)}
+                          style={{
+                            background: '#16a34a',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '8px 12px',
+                            fontSize: '14px',
+                            cursor: 'pointer',
+                            fontWeight: '500',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          Copiar
+                        </button>
+                      </div>
+                    </div>
+                    <div style={{ 
+                      color: '#166534', 
+                      fontSize: '13px',
+                      fontFamily: 'monospace',
+                      wordBreak: 'break-all',
+                      lineHeight: '1.5',
+                      backgroundColor: 'rgba(255,255,255,0.7)',
+                      padding: '12px',
+                      borderRadius: '8px'
+                    }}>
+                      {linkPersonalizado}
                     </div>
                   </div>
+                )}
+
+                {/* Link para Clínicas */}
+                {linkClinicas && (
                   <div style={{ 
-                    color: '#166534', 
-                    fontSize: '13px',
-                    fontFamily: 'monospace',
-                    wordBreak: 'break-all',
-                    lineHeight: '1.5',
-                    backgroundColor: 'rgba(255,255,255,0.7)',
-                    padding: '12px',
-                    borderRadius: '8px'
+                    backgroundColor: '#eff6ff', 
+                    border: '2px solid #93c5fd', 
+                    borderRadius: '12px', 
+                    padding: '1.5rem', 
+                    marginBottom: '1.5rem'
                   }}>
-                    {linkPersonalizado}
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      marginBottom: '1rem'
+                    }}>
+                      <span style={{ 
+                        color: '#1d4ed8', 
+                        fontWeight: '600',
+                        fontSize: '1rem'
+                      }}>
+                        Link para Clínicas:
+                      </span>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          onClick={() => copiarLink(linkClinicas)}
+                          style={{
+                            background: '#2563eb',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '8px 12px',
+                            fontSize: '10px',
+                            cursor: 'pointer',
+                            fontWeight: '500',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          Copiar
+                        </button>
+                      </div>
+                    </div>
+                    <div style={{ 
+                      color: '#1d4ed8', 
+                      fontSize: '13px',
+                      fontFamily: 'monospace',
+                      wordBreak: 'break-all',
+                      lineHeight: '1.5',
+                      backgroundColor: 'rgba(255,255,255,0.7)',
+                      padding: '12px',
+                      borderRadius: '8px'
+                    }}>
+                      {linkClinicas}
+                    </div>
                   </div>
-                </div>
+                )}
                 
                 <div style={{ 
-                  backgroundColor: '#eff6ff', 
-                  border: '1px solid #bfdbfe', 
+                  backgroundColor: '#f8fafc', 
+                  border: '1px solid #e2e8f0', 
                   borderRadius: '8px', 
                   padding: '1rem'
                 }}>
-                  <div style={{ fontSize: '14px', color: '#1e40af', fontWeight: '600', marginBottom: '8px' }}>
-                    Como usar seu link:
+                  <div style={{ fontSize: '14px', color: '#374151', fontWeight: '600', marginBottom: '8px' }}>
+                    Como usar seus links:
                   </div>
-                  <ul style={{ fontSize: '13px', color: '#1e40af', margin: '0', paddingLeft: '1.5rem', lineHeight: '1.6' }}>
-                    <li>Compartilhe este link em suas redes sociais</li>
-                    <li>Envie para clientes em potencial via WhatsApp</li>
+                  <ul style={{ fontSize: '13px', color: '#374151', margin: '0', paddingLeft: '1.5rem', lineHeight: '1.6' }}>
+                    <li><strong>Link Verde (Pacientes):</strong> Para indicar pessoas que querem fazer tratamentos parcelados no boleto</li>
+                    <li><strong>Link Azul (Clínicas):</strong> Para indicar clínicas que querem receber o valor à vista dos tratamentos</li>
+                    <li>Compartilhe os links em suas redes sociais e WhatsApp</li>
                     {linkPersonalizado?.includes('?ref=') ? (
                       <>
-                        <li>Todos os leads que se cadastrarem através deste link serão automaticamente associados a você</li>
-                        <li>Acompanhe seus leads na tela de "Pacientes"</li>
+                        <li>Todos os cadastros através destes links serão automaticamente associados a você</li>
+                        <li>Acompanhe seus leads na tela de "Pacientes" e clínicas na tela de "Clínicas"</li>
                       </>
                     ) : (
                       <>
-                        <li>Os leads aparecerão na tela de "Novos Leads" para você e outros consultores internos</li>
-                        <li>Você pode "pegar" os leads que desejar atender</li>
+                        <li>Os cadastros aparecerão nas telas de "Novos Leads" e "Novas Clínicas"</li>
+                        <li>Você pode "pegar" os leads e clínicas que desejar atender</li>
                       </>
                     )}
                   </ul>
@@ -639,10 +707,10 @@ const Perfil = () => {
                 textAlign: 'center'
               }}>
                 <div style={{ color: '#dc2626', fontSize: '16px', marginBottom: '8px' }}>
-                  ⚠️ Link personalizado não encontrado
+                  ⚠️ Links personalizados não encontrados
                 </div>
                 <div style={{ color: '#6b7280', fontSize: '14px' }}>
-                  Entre em contato com o administrador para gerar seu link personalizado.
+                  Entre em contato com o administrador para gerar seus links personalizados.
                 </div>
               </div>
             )}

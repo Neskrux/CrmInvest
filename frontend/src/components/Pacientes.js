@@ -225,7 +225,6 @@ const Pacientes = () => {
     const newLeadsIds = [...currentLeadsIds].filter(id => !previousIds.has(id));
     
     if (newLeadsIds.length > 0) {
-      console.log('🚨 NOVO LEAD DETECTADO! Iniciando som e notificação...');
       playNotificationSound();
     }
     
@@ -1113,17 +1112,6 @@ const Pacientes = () => {
         {(() => {
           // Mostrar aba para admins ou consultores internos (não freelancers)
           const shouldShow = isAdmin || isConsultorInterno;
-          
-          console.log('Debug - Condição aba Novos Leads:', {
-            isAdmin,
-            isConsultor,
-            isConsultorInterno,
-            podeAlterarStatus,
-            shouldShow,
-            userType: user?.tipo,
-            isFreelancer: user?.is_freelancer,
-            condition: `isAdmin: ${isAdmin} || isConsultorInterno: ${isConsultorInterno}`
-          });
           return shouldShow;
         })() && (
           <button

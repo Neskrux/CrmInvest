@@ -8,7 +8,6 @@ const useAudioNotification = () => {
   // Habilitar áudio após primeira interação do usuário
   useEffect(() => {
     const enableAudio = () => {
-      console.log('🔊 Áudio habilitado!');
       setAudioEnabled(true);
       document.removeEventListener('click', enableAudio);
       document.removeEventListener('keydown', enableAudio);
@@ -36,10 +35,7 @@ const useAudioNotification = () => {
     const audio = audioRef.current;
     if (audio) {
       const handleEnded = () => {
-        console.log('🔄 Áudio terminou, verificando se deve repetir...');
-        // Se ainda deve estar tocando, reiniciar o áudio
         if (isPlayingRef.current) {
-          console.log('🔁 Reiniciando áudio em loop...');
           audio.currentTime = 0;
           audio.play().catch(err => {
             console.error('❌ Erro ao reiniciar loop:', err);
@@ -63,17 +59,14 @@ const useAudioNotification = () => {
   }, []);
 
   const playNotificationSound = useCallback(() => {
-    console.log('🎵 playNotificationSound chamado, audioEnabled:', audioEnabled);
     
     if (!audioEnabled) {
-      console.log('❌ Áudio não habilitado - tentando habilitar...');
       setAudioEnabled(true);
     }
 
     try {
       if (audioRef.current) {
         const audio = audioRef.current;
-        console.log('🎵 Elemento de áudio encontrado, iniciando...');
         
         // Marcar como tocando ANTES de iniciar
         isPlayingRef.current = true;
@@ -85,7 +78,6 @@ const useAudioNotification = () => {
         
         // Tentar reproduzir
         audio.play().then(() => {
-          console.log('✅ Áudio tocando! Loop ativo:', audio.loop);
         }).catch(error => {
           console.error('❌ Erro ao tocar áudio:', error);
           isPlayingRef.current = false;
@@ -93,11 +85,9 @@ const useAudioNotification = () => {
           // Tentar novamente após um pequeno delay
           setTimeout(() => {
             if (audioRef.current && isPlayingRef.current) {
-              console.log('🔄 Segunda tentativa...');
               isPlayingRef.current = true;
               audioRef.current.loop = true;
               audioRef.current.play().then(() => {
-                console.log('✅ Funcionou na segunda tentativa!');
               }).catch(err => {
                 console.error('❌ Falhou novamente:', err);
                 isPlayingRef.current = false;
@@ -106,7 +96,6 @@ const useAudioNotification = () => {
           }, 100);
         });
       } else {
-        console.error('❌ audioRef.current é null!');
       }
     } catch (error) {
       console.error('❌ Erro ao executar playNotificationSound:', error);
@@ -117,12 +106,10 @@ const useAudioNotification = () => {
     try {
       if (audioRef.current) {
         const audio = audioRef.current;
-        console.log('🛑 Parando áudio em loop...');
         audio.pause();
         audio.currentTime = 0;
         audio.loop = false;
         isPlayingRef.current = false;
-        console.log('✅ Áudio parado!');
       }
     } catch (error) {
       console.error('❌ Erro ao parar áudio:', error);
@@ -131,7 +118,6 @@ const useAudioNotification = () => {
   }, []);
 
   const AudioComponent = () => {
-    console.log('🎧 AudioComponent renderizado');
     return (
       <audio
         ref={audioRef}
