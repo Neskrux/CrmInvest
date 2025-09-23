@@ -63,10 +63,15 @@ const LandingPage = () => {
               fontSize: '1rem',
               fontWeight: '500',
               cursor: 'pointer',
-              transition: 'all 0.15s ease'
+              transition: 'all 0.15s ease',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center'
             }}
           >
-            Cadastrar como Clínica
+            <span style={{ textAlign: 'left', width: '100%', maxWidth: '200px', marginLeft: '2rem' }}>
+              Cadastrar como Clínica
+            </span>
           </button>
 
           <button
@@ -80,7 +85,10 @@ const LandingPage = () => {
               fontSize: '1rem',
               fontWeight: '500',
               cursor: 'pointer',
-              transition: 'all 0.15s ease'
+              transition: 'all 0.15s ease',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center'
             }}
             onMouseOver={(e) => {
               e.target.style.background = '#0f1114';
@@ -91,7 +99,9 @@ const LandingPage = () => {
               e.target.style.transform = 'translateY(0)';
             }}
           >
-            Cadastrar como Paciente
+            <span style={{ textAlign: 'left', width: '100%', maxWidth: '200px', marginLeft: '2rem' }}>
+              Cadastrar como Paciente
+            </span>
           </button>
 
           <button
@@ -105,7 +115,10 @@ const LandingPage = () => {
               fontSize: '1rem',
               fontWeight: '500',
               cursor: 'pointer',
-              transition: 'all 0.15s ease'
+              transition: 'all 0.15s ease',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center'
             }}
             onMouseOver={(e) => {
               e.target.style.background = '#0f1114';
@@ -116,7 +129,9 @@ const LandingPage = () => {
               e.target.style.transform = 'translateY(0)';
             }}
           >
-            Cadastrar como Consultor
+            <span style={{ textAlign: 'left', width: '100%', maxWidth: '200px', marginLeft: '2rem' }}>
+              Cadastrar como Consultor
+            </span>
           </button>
 
           <button
@@ -164,7 +179,7 @@ const LandingPage = () => {
                 color: '#1a1d23',
                 marginBottom: '0.25rem'
               }}>
-                R$ 5
+                R$ 10
               </div>
               <div style={{
                 fontSize: '0.75rem',

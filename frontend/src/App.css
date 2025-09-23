@@ -856,13 +856,6 @@
     width: 100%;
   }
   
-  .consultores-table th:nth-child(1) { width: 15%; } /* Nome */
-  .consultores-table th:nth-child(2) { width: 30%; } /* Email */
-  .consultores-table th:nth-child(3) { width: 15%; } /* Telefone */
-  .consultores-table th:nth-child(4) { width: 20%; } /* PIX - aumentado para acomodar botões */
-  .consultores-table th:nth-child(5) { width: 12%; } /* Data */
-  .consultores-table th:nth-child(6) { width: 8%; }  /* Ações */
-  
   .consultores-table td {
     word-wrap: break-word;
     overflow-wrap: break-word;
@@ -986,22 +979,6 @@
     word-break: break-all;
     line-height: 1.2;
     max-width: 250px;
-  }
-  
-  /* Responsividade para tablets */
-  @media (max-width: 1024px) {
-    .consultores-table th:nth-child(2) { width: 28%; } /* Email - reduzido um pouco */
-    .consultores-table th:nth-child(1) { width: 18%; } /* Nome */
-    .consultores-table th:nth-child(3) { width: 15%; } /* Telefone */
-    .consultores-table th:nth-child(4) { width: 22%; } /* PIX - mais espaço */
-    .consultores-table th:nth-child(5) { width: 12%; } /* Data */
-    .consultores-table th:nth-child(6) { width: 5%; }  /* Ações */
-  
-    /* Esconder texto dos botões em telas menores */
-    .consultores-table .btn-action svg {
-      width: 14px;
-      height: 14px;
-    }
   }
   
   /* Container para PIX com botões */

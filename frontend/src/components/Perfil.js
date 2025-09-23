@@ -644,7 +644,7 @@ const Perfil = () => {
                             border: 'none',
                             borderRadius: '8px',
                             padding: '8px 12px',
-                            fontSize: '10px',
+                            fontSize: '14px',
                             cursor: 'pointer',
                             fontWeight: '500',
                             display: 'flex',

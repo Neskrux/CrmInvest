@@ -449,7 +449,6 @@ const Consultores = () => {
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Email de Acesso</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Telefone</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>PIX</th>
-                  <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Data de Cadastro</th>
                   <th>Ações</th>
                 </tr>
               </thead>
@@ -513,9 +512,7 @@ const Consultores = () => {
                         '-'
                       )}
                     </td>
-                    <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
-                      {formatarData(consultor.created_at)}
-                    </td>
+                    
                     <td>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button
@@ -1016,24 +1013,6 @@ const Consultores = () => {
                     }}>
                       {linkConsultor.link_personalizado}
                     </div>
-                  </div>
-
-                  <div style={{ 
-                    padding: '1rem',
-                    borderRadius: '8px',
-                    backgroundColor: '#eff6ff',
-                    border: '1px solid #bfdbfe',
-                    marginBottom: '1.5rem'
-                  }}>
-                    <div style={{ fontSize: '0.875rem', color: '#1e40af', fontWeight: '600' }}>
-                      💡 Como usar:
-                    </div>
-                    <ul style={{ fontSize: '0.875rem', color: '#1e40af', marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
-                      <li>Compartilhe este link em suas redes sociais</li>
-                      <li>Envie para clientes em potencial via WhatsApp</li>
-                      <li>Todos os leads que se cadastrarem através deste link serão automaticamente associados a você</li>
-                      <li>Você poderá acompanhar suas conversões e comissões</li>
-                    </ul>
                   </div>
                 </div>
               ) : (
