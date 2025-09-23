@@ -26,6 +26,7 @@ const Consultores = () => {
     pix: '',
     is_freelancer: true // Por padrão, freelancer
   });
+  const [errors, setErrors] = useState({});
 
   const fetchConsultores = useCallback(async () => {
     try {
@@ -62,6 +63,11 @@ const Consultores = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+    
     try {
       let response;
       if (editingConsultor) {
@@ -90,6 +96,7 @@ const Consultores = () => {
           pix: '',
           is_freelancer: true
         });
+        setErrors({});
         fetchConsultores();
       } else {
         showErrorToast('Erro ao salvar consultor: ' + data.error);
@@ -124,10 +131,54 @@ const Consultores = () => {
   };
 
   const handleInputChange = (e) => {
+    let { name, value } = e.target;
+    
+    // Aplicar formatação específica baseada no campo
+    if (name === 'nome') {
+      value = formatarNome(value);
+    } else if (name === 'telefone') {
+      value = formatPhone(value);
+    } else if (name === 'pix') {
+      value = formatCPF(value);
+    }
+    
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: value
     });
+
+    // Limpar erro quando o usuário começa a digitar
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.nome.trim()) {
+      newErrors.nome = 'Nome é obrigatório';
+    }
+    
+    if (formData.telefone && !validatePhone(formData.telefone)) {
+      newErrors.telefone = 'Telefone inválido';
+    }
+    
+    if (!formData.email.trim()) {
+      newErrors.email = 'E-mail é obrigatório';
+    } else if (!validateEmail(formData.email)) {
+      newErrors.email = 'E-mail inválido';
+    }
+    
+    if (formData.pix && !validateCPF(formData.pix)) {
+      newErrors.pix = 'PIX deve ser um CPF válido';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const formatarData = (data) => {
@@ -173,6 +224,88 @@ const Consultores = () => {
     return `${nomeNormalizado}@investmoneysa.com.br`;
   };
 
+  // Função para formatar nome (primeira letra maiúscula de cada palavra)
+  const formatarNome = (value) => {
+    if (!value) return '';
+    
+    // Remove números e caracteres especiais, mantém apenas letras, espaços e acentos
+    let cleanValue = value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
+    
+    // Remove espaços do início
+    cleanValue = cleanValue.trimStart();
+    
+    // Remove espaços duplos ou múltiplos, deixando apenas um espaço entre palavras
+    cleanValue = cleanValue.replace(/\s+/g, ' ');
+
+    // Aplica formatação: primeira letra maiúscula de cada palavra
+    const nomeFormatado = cleanValue
+      .toLowerCase()
+      .split(' ')
+      .map(palavra => {
+        if (!palavra) return '';
+        return palavra.charAt(0).toUpperCase() + palavra.slice(1);
+      })
+      .join(' ');
+    
+    return nomeFormatado;
+  };
+
+  // Função para formatar telefone
+  const formatPhone = (value) => {
+    value = value.replace(/\D/g, '');
+    value = value.replace(/(\d{2})(\d)/, '($1) $2');
+    value = value.replace(/(\d{4})(\d)/, '$1-$2');
+    value = value.replace(/(\d{4})-(\d)(\d{4})/, '$1$2-$3');
+    return value;
+  };
+
+  // Função para formatar CPF
+  const formatCPF = (value) => {
+    value = value.replace(/\D/g, '');
+    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+    value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    return value;
+  };
+
+  // Função para validar CPF
+  const validateCPF = (cpf) => {
+    cpf = cpf.replace(/[^\d]/g, '');
+    if (cpf.length !== 11) return false;
+    
+    if (/^(\d)\1{10}$/.test(cpf)) return false;
+    
+    let sum = 0;
+    for (let i = 0; i < 9; i++) {
+      sum += parseInt(cpf.charAt(i)) * (10 - i);
+    }
+    let remainder = (sum * 10) % 11;
+    if (remainder === 10 || remainder === 11) remainder = 0;
+    if (remainder !== parseInt(cpf.charAt(9))) return false;
+    
+    sum = 0;
+    for (let i = 0; i < 10; i++) {
+      sum += parseInt(cpf.charAt(i)) * (11 - i);
+    }
+    remainder = (sum * 10) % 11;
+    if (remainder === 10 || remainder === 11) remainder = 0;
+    if (remainder !== parseInt(cpf.charAt(10))) return false;
+    
+    return true;
+  };
+
+  // Função para validar email
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Função para validar telefone
+  const validatePhone = (phone) => {
+    const phoneRegex = /^\(\d{2}\) \d{4,5}-\d{4}$/;
+    return phoneRegex.test(phone);
+  };
+
   const resetForm = () => {
     setFormData({
       nome: '',
@@ -182,6 +315,7 @@ const Consultores = () => {
       pix: '',
       is_freelancer: true
     });
+    setErrors({});
     setEditingConsultor(null);
     setShowModal(false);
   };
@@ -688,7 +822,15 @@ const Consultores = () => {
                   placeholder="Digite o nome do consultor"
                   required
                   autoComplete="off"
+                  style={{
+                    borderColor: errors.nome ? '#ef4444' : '#d1d5db'
+                  }}
                 />
+                {errors.nome && (
+                  <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>
+                    {errors.nome}
+                  </span>
+                )}
               </div>
 
               <div className="form-group">
@@ -701,7 +843,16 @@ const Consultores = () => {
                   onChange={handleInputChange}
                   placeholder="(11) 99999-9999"
                   autoComplete="off"
+                  maxLength="15"
+                  style={{
+                    borderColor: errors.telefone ? '#ef4444' : '#d1d5db'
+                  }}
                 />
+                {errors.telefone && (
+                  <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>
+                    {errors.telefone}
+                  </span>
+                )}
               </div>
 
               <div className="form-group">
@@ -715,10 +866,18 @@ const Consultores = () => {
                   placeholder="consultor@email.com"
                   required
                   autoComplete="off"
+                  style={{
+                    borderColor: errors.email ? '#ef4444' : '#d1d5db'
+                  }}
                 />
                 <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
                   Email que será usado para fazer login no sistema
                 </small>
+                {errors.email && (
+                  <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>
+                    {errors.email}
+                  </span>
+                )}
               </div>
 
               <div className="form-group">
@@ -745,12 +904,21 @@ const Consultores = () => {
                   className="form-input"
                   value={formData.pix}
                   onChange={handleInputChange}
-                  placeholder="CPF, Email, Telefone ou Chave Aleatória"
+                  placeholder="000.000.000-00"
                   autoComplete="off"
+                  maxLength="14"
+                  style={{
+                    borderColor: errors.pix ? '#ef4444' : '#d1d5db'
+                  }}
                 />
                 <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
-                  Chave PIX para recebimento de comissões
+                  Chave PIX para recebimento de comissões (formato CPF)
                 </small>
+                {errors.pix && (
+                  <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>
+                    {errors.pix}
+                  </span>
+                )}
               </div>
 
               <div className="form-group">
