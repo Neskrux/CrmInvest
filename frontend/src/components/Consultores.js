@@ -332,8 +332,6 @@ const Consultores = () => {
       const data = await response.json();
       
       if (response.ok) {
-        console.log('🔍 Diagnóstico da tabela consultores:', data);
-        
         if (!data.estrutura_tabela.tem_coluna_codigo_referencia) {
           showErrorToast('⚠️ Migração necessária! A coluna codigo_referencia não existe na tabela consultores.');
         } else if (data.consultores.sem_codigo > 0) {

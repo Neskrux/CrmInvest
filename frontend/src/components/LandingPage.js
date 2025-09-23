@@ -51,6 +51,24 @@ const LandingPage = () => {
           flexDirection: 'column',
           gap: '1rem'
         }}>
+
+          <button
+            onClick={() => navigate('/captura-clinica')}
+            style={{
+              background: '#1a1d23',
+              color: 'white',
+              border: 'none',
+              padding: '1rem 2rem',
+              borderRadius: '6px',
+              fontSize: '1rem',
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            Cadastrar como Clínica
+          </button>
+
           <button
             onClick={() => navigate('/captura-lead')}
             style={{
@@ -73,7 +91,7 @@ const LandingPage = () => {
               e.target.style.transform = 'translateY(0)';
             }}
           >
-            Cadastrar Paciente
+            Cadastrar como Paciente
           </button>
 
           <button

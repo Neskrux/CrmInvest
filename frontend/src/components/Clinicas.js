@@ -1283,6 +1283,7 @@ const Clinicas = () => {
               <thead>
                 <tr>
                   <th>Nome</th>
+                  <th style={{ display: isMobile ? 'none' : 'table-cell' }}>CNPJ</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Endereço</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Bairro</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Cidade/Estado</th>
@@ -1299,6 +1300,20 @@ const Clinicas = () => {
                   <tr key={clinica.id} className={clinica.status === 'inativa' ? 'clinica-bloqueada' : ''}>
                     <td>
                       <strong>{clinica.nome}</strong>
+                    </td>
+                    <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                      {clinica.cnpj ? (
+                        <span style={{ 
+                          fontFamily: 'monospace', 
+                          fontSize: '0.875rem',
+                          backgroundColor: '#f3f4f6',
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '4px',
+                          color: '#374151'
+                        }}>
+                          {clinica.cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')}
+                        </span>
+                      ) : '-'}
                     </td>
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>{clinica.endereco || '-'}</td>
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>{clinica.bairro || '-'}</td>
@@ -1518,6 +1533,7 @@ const Clinicas = () => {
                 <thead>
                   <tr>
                     <th>Nome</th>
+                    <th style={{ display: isMobile ? 'none' : 'table-cell' }}>CNPJ</th>
                     <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Localização</th>
                     <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Nicho</th>
                     <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Telefone</th>
@@ -1542,6 +1558,20 @@ const Clinicas = () => {
                               </div>
                             )}
                           </div>
+                        </td>
+                        <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                          {clinica.cnpj ? (
+                            <span style={{ 
+                              fontFamily: 'monospace', 
+                              fontSize: '0.875rem',
+                              backgroundColor: '#f3f4f6',
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '4px',
+                              color: '#374151'
+                            }}>
+                              {clinica.cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')}
+                            </span>
+                          ) : '-'}
                         </td>
                         <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                           <div style={{ fontSize: '0.875rem' }}>
@@ -1891,6 +1921,15 @@ const Clinicas = () => {
                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.nome}</p>
                  </div>
                  
+                 {viewingClinica.cnpj && (
+                   <div>
+                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>CNPJ</label>
+                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937', fontFamily: 'monospace' }}>
+                       {viewingClinica.cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')}
+                     </p>
+                   </div>
+                 )}
+                 
                  {viewingClinica.endereco && (
                    <div>
                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Endereço</label>
@@ -2012,6 +2051,15 @@ const Clinicas = () => {
                   <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Nome da Clínica</label>
                   <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingNovaClinica.nome}</p>
                 </div>
+                
+                {viewingNovaClinica.cnpj && (
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>CNPJ</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937', fontFamily: 'monospace' }}>
+                      {viewingNovaClinica.cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')}
+                    </p>
+                  </div>
+                )}
                 
                 {viewingNovaClinica.endereco && (
                   <div>

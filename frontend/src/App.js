@@ -10,6 +10,8 @@ import CadastroConsultor from './components/CadastroConsultor';
 import CadastroSucesso from './components/CadastroSucesso';
 import CapturaLead from './components/CapturaLead';
 import CapturaSucesso from './components/CapturaSucesso';
+import CapturaClinica from './components/CapturaClinica';
+import CapturaClinicaSucesso from './components/CapturaClinicaSucesso';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Pacientes from './components/Pacientes';
@@ -603,6 +605,10 @@ function App() {
                 {/* Rotas públicas - Captura de leads */}
                 <Route path="/captura-lead" element={<CapturaLead />} />
                 <Route path="/captura-sucesso" element={<CapturaSucesso />} />
+                
+                {/* Rotas públicas - Captura de clínicas */}
+                <Route path="/captura-clinica" element={<CapturaClinica />} />
+                <Route path="/captura-clinica-sucesso" element={<CapturaClinicaSucesso />} />
                 
                 {/* Rotas da aplicação principal */}
                 <Route path="/*" element={<AppContentWithNotifications />} />

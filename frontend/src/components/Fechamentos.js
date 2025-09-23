@@ -244,7 +244,6 @@ const Fechamentos = () => {
 
   const abrirModal = (fechamento = null) => {
     if (fechamento) {
-      console.log('Debug - Abrindo modal com fechamento:', fechamento);
       setFechamentoEditando(fechamento);
       
       // Garantir que valor_fechado seja um número válido
@@ -252,15 +251,11 @@ const Fechamentos = () => {
       let valorNumerico = '';
       let valorFormatado = '';
       
-      console.log('Debug - Valor original do banco:', valorOriginal, 'tipo:', typeof valorOriginal);
-      
       if (valorOriginal !== null && valorOriginal !== undefined && valorOriginal !== '') {
         // Converter para número, independente se vier como string ou número
         const numeroLimpo = typeof valorOriginal === 'string' 
           ? parseFloat(valorOriginal.replace(/[^\d.,-]/g, '').replace(',', '.'))
           : parseFloat(valorOriginal);
-        
-        console.log('Debug - Número limpo:', numeroLimpo);
         
         if (!isNaN(numeroLimpo)) {
           valorNumerico = numeroLimpo.toString();
@@ -270,8 +265,6 @@ const Fechamentos = () => {
           });
         }
       }
-      
-      console.log('Debug - Valores finais:', { valorNumerico, valorFormatado });
       
       setNovoFechamento({ 
         ...fechamento, 
@@ -357,16 +350,7 @@ const Fechamentos = () => {
       
       // Validar e enviar valor_fechado
       const valorFechado = parseFloat(novoFechamento.valor_fechado);
-      console.log('Debug - Validação valor:', {
-        valorOriginal: novoFechamento.valor_fechado,
-        valorFechado,
-        isNaN: isNaN(valorFechado),
-        condicao: isNaN(valorFechado) || valorFechado < 0,
-        fechamentoEditando: !!fechamentoEditando
-      });
-      
-      // Para novos fechamentos, valor deve ser maior que 0
-      // Para fechamentos existentes (editando), pode ser 0 ou maior
+
       const valorMinimo = fechamentoEditando ? 0 : 0.01;
       
       if (isNaN(valorFechado) || valorFechado < 0) {
@@ -385,12 +369,6 @@ const Fechamentos = () => {
       formData.append('data_fechamento', novoFechamento.data_fechamento);
       formData.append('tipo_tratamento', novoFechamento.tipo_tratamento || '');
       formData.append('observacoes', novoFechamento.observacoes || '');
-      
-      // Debug: verificar o que está sendo enviado
-      console.log('Debug - Dados sendo enviados no FormData:');
-      for (let pair of formData.entries()) {
-        console.log(pair[0] + ': ' + pair[1]);
-      }
       
       if (contratoSelecionado) {
         formData.append('contrato', contratoSelecionado);
