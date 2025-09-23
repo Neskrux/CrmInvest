@@ -51,6 +51,9 @@ const Agendamentos = () => {
   const [showTutorial, setShowTutorial] = useState(false);
   const [tutorialCompleted, setTutorialCompleted] = useState(false);
 
+  // Estado para modal de explicação de permissões
+  const [showPermissaoModal, setShowPermissaoModal] = useState(false);
+
   // Status disponíveis para agendamentos
   const statusOptions = [
     { value: 'agendado', label: 'Agendado', color: '#2563eb', description: 'Agendamento confirmado' },
@@ -108,7 +111,7 @@ const Agendamentos = () => {
 
   // Controlar scroll do body quando modal estiver aberto
   useEffect(() => {
-    if (showModal || showDetalhesModal || showValorModal) {
+    if (showModal || showDetalhesModal || showValorModal || showPermissaoModal) {
       // Bloquear scroll da página
       document.body.style.overflow = 'hidden';
     } else {
@@ -120,7 +123,7 @@ const Agendamentos = () => {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [showModal, showDetalhesModal, showValorModal]);
+  }, [showModal, showDetalhesModal, showValorModal, showPermissaoModal]);
 
   const fetchAgendamentos = async () => {
     try {
@@ -805,7 +808,43 @@ const Agendamentos = () => {
                   <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Clínica</th>
                   <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Data</th>
                   <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Horário</th>
-                  <th>Status</th>
+                  <th>
+                    Status
+                    {!podeAlterarStatus && (
+                      <button
+                        onClick={() => setShowPermissaoModal(true)}
+                        style={{
+                          marginLeft: '8px',
+                          color: '#6b7280',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          position: 'relative',
+                          display: 'inline-block',
+                          width: '16px',
+                          height: '16px',
+                          borderRadius: '50%',
+                          backgroundColor: '#e5e7eb',
+                          border: '1px solid #d1d5db',
+                          textAlign: 'center',
+                          lineHeight: '14px',
+                          fontWeight: 'bold',
+                          padding: 0,
+                          outline: 'none'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.backgroundColor = '#d1d5db';
+                          e.target.style.borderColor = '#9ca3af';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.backgroundColor = '#e5e7eb';
+                          e.target.style.borderColor = '#d1d5db';
+                        }}
+                        title="Clique para saber mais sobre permissões"
+                      >
+                        ?
+                      </button>
+                    )}
+                  </th>
                   <th>Ações</th>
                 </tr>
               </thead>
@@ -919,7 +958,7 @@ const Agendamentos = () => {
                               onClick={() => excluirAgendamento(agendamento.id)}
                               className="btn-action"
                               title="Excluir agendamento"
-                              style={{ color: '#dc2626', marginLeft: '0.5rem' }}
+                              style={{ color: '#dc2626' }}
                             >
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -1350,6 +1389,55 @@ const Agendamentos = () => {
         </div>
       )}
 
+      {/* Modal de Explicação de Permissões */}
+      {showPermissaoModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Permissões de Status</h2>
+              <button className="close-btn" onClick={() => setShowPermissaoModal(false)}>
+                ×
+              </button>
+            </div>
+            <div style={{ padding: '1.5rem' }}>
+              <div style={{
+                backgroundColor: '#fef3c7',
+                border: '1px solid #f59e0b',
+                borderRadius: '8px',
+                padding: '1rem',
+                marginBottom: '1rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '1.25rem' }}></span>
+                  <strong style={{ color: '#92400e' }}>Limitação de Permissão</strong>
+                </div>
+                <p style={{ color: '#92400e', margin: 0, lineHeight: '1.5' }}>
+                  Como consultor freelancer, você não pode alterar o status dos pacientes, aguarde que iremos atualizar o status conforme a negociação avançar.
+                </p>
+              </div>
+              
+              <div style={{ marginBottom: '1rem' }}>
+                <h3 style={{ color: '#374151', marginBottom: '0.5rem', fontSize: '1rem' }}>
+                  Quem pode alterar status?
+                </h3>
+                <ul style={{ color: '#6b7280', lineHeight: '1.6', paddingLeft: '1.5rem' }}>
+                  <li><strong>Administradores e Consultores Internos:</strong> Podem alterar qualquer status</li>
+                  <li><strong>Consultores Freelancers:</strong> Apenas visualizam os status</li>
+                </ul>
+              </div>
+              <div style={{ textAlign: 'right', marginTop: '1.5rem' }}>
+                <button 
+                  className="btn btn-primary" 
+                  onClick={() => setShowPermissaoModal(false)}
+                >
+                  Entendi
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Tutorial Overlay */}
       <TutorialAgendamentos
         isOpen={showTutorial}
