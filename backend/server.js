@@ -1187,6 +1187,23 @@ app.post('/api/leads/cadastro', async (req, res) => {
       status: data[0].status
     });
     
+    // Emitir evento Socket.IO para notificar admins sobre novo lead
+    if (io) {
+      console.log('📢 Emitindo evento new-lead via Socket.IO');
+      io.to('lead-notifications').emit('new-lead', {
+        leadId: data[0].id,
+        nome: data[0].nome,
+        telefone: data[0].telefone,
+        tipo_tratamento: data[0].tipo_tratamento,
+        cidade: data[0].cidade,
+        estado: data[0].estado,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Atualizar contagem de leads para admins
+      setTimeout(() => updateLeadCount(), 100); // Pequeno delay para garantir que o lead foi inserido
+    }
+    
     res.json({ 
       id: data[0].id, 
       message: 'Cadastro realizado com sucesso! Entraremos em contato em breve.',
@@ -1356,6 +1373,29 @@ app.post('/api/clinicas/cadastro-publico', async (req, res) => {
     }
     
     console.log('✅ Clínica inserida com sucesso:', data[0]);
+    
+    // Emitir evento Socket.IO para notificar admins sobre nova clínica (cadastro público)
+    if (io) {
+      console.log('📢 Emitindo evento new-clinica via Socket.IO (cadastro público)');
+      io.to('clinicas-notifications').emit('new-clinica', {
+        clinicaId: data[0].id,
+        nome: data[0].nome,
+        cidade: data[0].cidade,
+        estado: data[0].estado,
+        telefone: data[0].telefone,
+        email: data[0].email,
+        nicho: data[0].nicho,
+        status: data[0].status,
+        observacoes: data[0].observacoes,
+        responsavel: data[0].responsavel,
+        criado_por_consultor_id: data[0].criado_por_consultor_id,
+        created_at: data[0].created_at,
+        origem: 'cadastro_publico' // Identificar que veio do formulário público
+      });
+      
+      // Atualizar contagem de novas clínicas para admins
+      setTimeout(() => updateClinicasCount(), 100); // Pequeno delay para garantir que a clínica foi inserida
+    }
     
     res.json({ 
       id: data[0].id, 
@@ -1982,6 +2022,13 @@ app.put('/api/novos-leads/:id/pegar', authenticateToken, async (req, res) => {
       .eq('id', id);
 
     if (error) throw error;
+    
+    // Emitir evento Socket.IO para atualizar contagem de leads
+    if (io) {
+      console.log('📢 Lead atribuído - atualizando contagem via Socket.IO');
+      setTimeout(() => updateLeadCount(), 100);
+    }
+    
     res.json({ message: 'Lead atribuído com sucesso!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -2013,6 +2060,13 @@ app.delete('/api/novos-leads/:id', authenticateToken, requireAdmin, async (req, 
       .eq('id', id);
 
     if (error) throw error;
+    
+    // Emitir evento Socket.IO para atualizar contagem de leads
+    if (io) {
+      console.log('📢 Lead excluído - atualizando contagem via Socket.IO');
+      setTimeout(() => updateLeadCount(), 100);
+    }
+    
     res.json({ message: 'Lead excluído com sucesso!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -2122,6 +2176,36 @@ app.post('/api/novas-clinicas', authenticateToken, async (req, res) => {
       .select();
 
     if (error) throw error;
+    
+    console.log('✅ Nova clínica cadastrada com sucesso:', {
+      id: data[0].id,
+      nome: data[0].nome,
+      cidade: data[0].cidade,
+      estado: data[0].estado,
+      consultor_id: data[0].criado_por_consultor_id
+    });
+    
+    // Emitir evento Socket.IO para notificar admins sobre nova clínica
+    if (io) {
+      console.log('📢 Emitindo evento new-clinica via Socket.IO');
+      io.to('clinicas-notifications').emit('new-clinica', {
+        clinicaId: data[0].id,
+        nome: data[0].nome,
+        cidade: data[0].cidade,
+        estado: data[0].estado,
+        telefone: data[0].telefone,
+        email: data[0].email,
+        nicho: data[0].nicho,
+        status: data[0].status,
+        observacoes: data[0].observacoes,
+        criado_por_consultor_id: data[0].criado_por_consultor_id,
+        created_at: data[0].created_at
+      });
+      
+      // Atualizar contagem de novas clínicas para admins
+      setTimeout(() => updateClinicasCount(), 100); // Pequeno delay para garantir que a clínica foi inserida
+    }
+    
     res.json({ id: data[0].id, message: 'Nova clínica cadastrada com sucesso!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -2182,6 +2266,12 @@ app.put('/api/novas-clinicas/:id/pegar', authenticateToken, async (req, res) => 
       .eq('id', id);
 
     if (deleteError) throw deleteError;
+    
+    // Emitir evento Socket.IO para atualizar contagem de novas clínicas
+    if (io) {
+      console.log('📢 Clínica aprovada - atualizando contagem via Socket.IO');
+      setTimeout(() => updateClinicasCount(), 100);
+    }
 
     res.json({ message: 'Clínica aprovada e movida para clínicas parceiras com sucesso!' });
   } catch (error) {
@@ -3354,12 +3444,137 @@ if (!process.env.VERCEL && !process.env.DISABLE_WEBSOCKET) {
   });
 }
 
+// Controle de debounce para evitar múltiplas atualizações
+let updateLeadCountTimeout = null;
+
+// Função auxiliar para contar leads não atribuídos e notificar via Socket.IO
+async function updateLeadCount() {
+  if (!io) return;
+  
+  // Debounce: cancelar atualização anterior se ainda não foi executada
+  if (updateLeadCountTimeout) {
+    clearTimeout(updateLeadCountTimeout);
+  }
+  
+  updateLeadCountTimeout = setTimeout(async () => {
+    try {
+      const { count, error } = await supabase
+        .from('pacientes')
+        .select('*', { count: 'exact', head: true })
+        .is('consultor_id', null)
+        .eq('status', 'lead');
+        
+      if (!error) {
+        console.log(`📊 Atualizando contagem de leads: ${count || 0}`);
+        io.to('lead-notifications').emit('lead-count-update', { count: count || 0 });
+      }
+    } catch (error) {
+      console.error('❌ Erro ao atualizar contagem de leads:', error);
+    }
+    updateLeadCountTimeout = null;
+  }, 500); // 500ms de debounce
+}
+
+// Controle de debounce para evitar múltiplas atualizações de clínicas
+let updateClinicasCountTimeout = null;
+
+// Função auxiliar para contar novas clínicas e notificar via Socket.IO
+async function updateClinicasCount() {
+  if (!io) return;
+  
+  // Debounce: cancelar atualização anterior se ainda não foi executada
+  if (updateClinicasCountTimeout) {
+    clearTimeout(updateClinicasCountTimeout);
+  }
+  
+  updateClinicasCountTimeout = setTimeout(async () => {
+    try {
+      const { count, error } = await supabase
+        .from('novas_clinicas')
+        .select('*', { count: 'exact', head: true });
+        
+      if (!error) {
+        console.log(`📊 Atualizando contagem de novas clínicas: ${count || 0}`);
+        io.to('clinicas-notifications').emit('clinicas-count-update', { count: count || 0 });
+      }
+    } catch (error) {
+      console.error('❌ Erro ao atualizar contagem de novas clínicas:', error);
+    }
+    updateClinicasCountTimeout = null;
+  }, 500); // 500ms de debounce
+}
+
 
 // Socket.IO connection handling (apenas se Socket.IO estiver habilitado)
 if (io) {
   io.on('connection', (socket) => {
     console.log('🔌 Cliente conectado:', socket.id);
     
+    // Handler para join-lead-notifications
+    socket.on('join-lead-notifications', (data) => {
+      console.log('📢 Cliente entrou no grupo de notificações de leads:', data);
+      socket.join('lead-notifications');
+      
+      // Enviar contagem atual de leads para admins
+      if (data.userType === 'admin') {
+        socket.emit('lead-count-update', { count: 0 }); // Será atualizado pela requisição
+      }
+    });
+    
+    // Handler para request-lead-count
+    socket.on('request-lead-count', async (data) => {
+      console.log('📊 Solicitação de contagem de leads:', data);
+      
+      if (data.userType === 'admin') {
+        try {
+          // Contar leads não atribuídos
+          const { count, error } = await supabase
+            .from('pacientes')
+            .select('*', { count: 'exact', head: true })
+            .is('consultor_id', null)
+            .eq('status', 'lead');
+            
+          if (!error) {
+            socket.emit('lead-count-update', { count: count || 0 });
+            console.log(`📊 Contagem de leads enviada: ${count || 0}`);
+          }
+        } catch (error) {
+          console.error('❌ Erro ao contar leads:', error);
+        }
+      }
+    });
+    
+    // Handler para join-clinicas-notifications
+    socket.on('join-clinicas-notifications', (data) => {
+      console.log('📢 Cliente entrou no grupo de notificações de clínicas:', data);
+      socket.join('clinicas-notifications');
+      
+      // Enviar contagem atual de clínicas para admins
+      if (data.userType === 'admin') {
+        socket.emit('clinicas-count-update', { count: 0 }); // Será atualizado pela requisição
+      }
+    });
+    
+    // Handler para request-clinicas-count
+    socket.on('request-clinicas-count', async (data) => {
+      console.log('📊 Solicitação de contagem de novas clínicas:', data);
+      
+      if (data.userType === 'admin') {
+        try {
+          // Contar novas clínicas
+          const { count, error } = await supabase
+            .from('novas_clinicas')
+            .select('*', { count: 'exact', head: true });
+            
+          if (!error) {
+            socket.emit('clinicas-count-update', { count: count || 0 });
+            console.log(`📊 Contagem de novas clínicas enviada: ${count || 0}`);
+          }
+        } catch (error) {
+          console.error('❌ Erro ao contar novas clínicas:', error);
+        }
+      }
+    });
     
     socket.on('disconnect', () => {
       console.log('🔌 Cliente desconectado:', socket.id);

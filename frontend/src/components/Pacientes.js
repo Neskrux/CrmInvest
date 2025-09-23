@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import TutorialPacientes from './TutorialPacientes';
-import { useAudio } from '../contexts/AudioContext';
 
 const Pacientes = () => {
   const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor } = useAuth();
@@ -11,9 +10,6 @@ const Pacientes = () => {
   const isConsultor = user?.tipo === 'consultor';
   const [pacientes, setPacientes] = useState([]);
   const [novosLeads, setNovosLeads] = useState([]);
-  const { playNotificationSound } = useAudio();
-  const previousLeadsCountRef = useRef(0);
-  const previousLeadsIdsRef = useRef(new Set());
   const [consultores, setConsultores] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingPaciente, setEditingPaciente] = useState(null);
@@ -214,27 +210,6 @@ const Pacientes = () => {
     }
   }, [activeTab]);
 
-  // Detectar novos leads e tocar som (apenas para admins)
-  useEffect(() => {
-    // Apenas admins devem receber notificações sonoras
-    if (!isAdmin || novosLeads.length === 0) {
-      return;
-    }
-    
-    const currentLeadsIds = new Set(novosLeads.map(lead => lead.id));
-    const previousIds = previousLeadsIdsRef.current;
-    
-    // Verificar se há leads novos (que não estavam na lista anterior)
-    const newLeadsIds = [...currentLeadsIds].filter(id => !previousIds.has(id));
-    
-    if (newLeadsIds.length > 0) {
-      playNotificationSound();
-    }
-    
-    // Atualizar as referências
-    previousLeadsIdsRef.current = currentLeadsIds;
-    previousLeadsCountRef.current = novosLeads.length;
-  }, [novosLeads, playNotificationSound, isAdmin]);
 
   // Controlar scroll do body quando modal estiver aberto
   useEffect(() => {

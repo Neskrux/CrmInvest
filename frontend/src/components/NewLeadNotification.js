@@ -30,11 +30,11 @@ const NewLeadNotification = ({ isVisible, onClose, leadData }) => {
         </div>
         
         <div className="notification-text">
-          <h3>🎉 NOVO LEAD CHEGOU! 🎉</h3>
-          <p>✨ Um novo lead foi adicionado ao sistema ✨</p>
+          <h3>NOVO LEAD CHEGOU!</h3>
+          <p>Um novo lead foi adicionado ao sistema</p>
           <div className="lead-info">
-            <span className="lead-name">👤 Verifique a aba "Novos Leads"</span>
-            <span className="lead-phone">📞 Clique em OK para parar o som</span>
+            <span className="lead-name">Verifique a aba "Novos Leads"</span>
+            <span className="lead-phone">Clique em OK para parar o som</span>
           </div>
         </div>
 
@@ -45,7 +45,7 @@ const NewLeadNotification = ({ isVisible, onClose, leadData }) => {
             setTimeout(() => onClose(), 300);
           }}
         >
-          ✅ OK
+          OK
         </button>
       </div>
     </div>
