@@ -4089,3 +4089,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // ===== ROTAS WHATSAPP =====
 const whatsappRoutes = require('./api/whatsapp');
 app.use('/api/whatsapp', whatsappRoutes);
+
+// ===== ROTAS DE DOCUMENTOS =====
+const documentsRoutes = require('./api/documents');
+app.use('/api/documents', documentsRoutes);
