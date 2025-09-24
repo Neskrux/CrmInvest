@@ -3919,7 +3919,7 @@ app.get('/api/meta-ads/advanced-metrics', authenticateToken, requireAdmin, async
 
     // Buscar fechamentos do período para calcular CPA real
     const { since, until } = metaAPI.getDateRange(dateRange);
-    const { data: fechamentos, error: fechError } = await supabaseAdminAdmin
+    const { data: fechamentos, error: fechError } = await supabaseAdmin
       .from('fechamentos')
       .select(`
         valor_fechado, 

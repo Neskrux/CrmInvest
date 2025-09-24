@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const { createClient } = require('@supabase/supabase-js');
 const WhatsAppWebService = require('../whatsapp/whatsapp-web');
+const WhatsAppFallback = require('../whatsapp-fallback');
 const { validateFile } = require('../utils/fileValidator');
 
 // Configuração do Supabase
@@ -176,19 +177,40 @@ router.post('/connect', authenticateToken, async (req, res) => {
     }
     
     console.log(`🚀 Criando nova instância do WhatsApp para usuário ${userId}...`);
-    const whatsappService = new WhatsAppWebService(userId); // CRÍTICO: passar userId para o serviço
-    whatsappServices.set(userId, whatsappService); // Armazenar por usuário
     
-    await whatsappService.initialize(0, true); // Forçar limpeza
-
-    const status = whatsappService.getStatus();
-    res.json({
-      success: true,
-      status: status.status,
-      isConnected: status.isConnected,
-      qrCode: status.qrCode,
-      message: 'WhatsApp Web inicializado com limpeza completa'
-    });
+    try {
+      const whatsappService = new WhatsAppWebService(userId);
+      whatsappServices.set(userId, whatsappService);
+      
+      await whatsappService.initialize(0, true);
+      const status = whatsappService.getStatus();
+      
+      res.json({
+        success: true,
+        status: status.status,
+        isConnected: status.isConnected,
+        qrCode: status.qrCode,
+        message: 'WhatsApp Web inicializado com sucesso'
+      });
+    } catch (whatsappError) {
+      console.error('❌ WhatsApp Web falhou, usando fallback:', whatsappError.message);
+      
+      // Usar fallback quando WhatsApp Web falha
+      const fallbackService = new WhatsAppFallback();
+      whatsappServices.set(userId, fallbackService);
+      
+      const fallbackResult = await fallbackService.connect();
+      
+      res.json({
+        success: false,
+        status: 'unavailable',
+        isConnected: false,
+        qrCode: null,
+        message: fallbackResult.message,
+        alternative: fallbackResult.alternative,
+        fallback: true
+      });
+    }
   } catch (error) {
     console.error('Erro ao conectar WhatsApp:', error);
     res.status(500).json({ error: 'Erro ao conectar WhatsApp: ' + error.message });
