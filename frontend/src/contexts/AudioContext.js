@@ -45,12 +45,6 @@ export const AudioProvider = ({ children }) => {
     setNotificationData(data);
     setShowNotification(true);
     audioHook.playNotificationSound();
-    
-    // Auto-parar após 30 segundos se o usuário não clicar
-    timeoutRef.current = setTimeout(() => {
-      console.log('⏰ Timeout - parando notificação automaticamente');
-      hideNotification();
-    }, 30000);
   };
 
   const hideNotification = () => {
