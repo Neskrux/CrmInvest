@@ -14,6 +14,9 @@ jobs:
     name: Deploy Backend to Fly.io
     runs-on: ubuntu-latest
     
+    # Verificar se o secret existe
+    if: ${{ secrets.FLY_API_TOKEN != '' }}
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,11 +26,14 @@ jobs:
         
       - name: Login to Fly.io
         run: |
+          echo "🔍 Verificando token do Fly.io..."
           if [ -z "${{ secrets.FLY_API_TOKEN }}" ]; then
             echo "❌ FLY_API_TOKEN não configurado nos secrets do GitHub"
             echo "Configure o token em: Settings > Secrets and variables > Actions"
+            echo "Token atual: '${{ secrets.FLY_API_TOKEN }}'"
             exit 1
           fi
+          echo "✅ Token encontrado, fazendo login..."
           echo "${{ secrets.FLY_API_TOKEN }}" | flyctl auth login --stdin
           
       - name: Deploy to Fly.io
