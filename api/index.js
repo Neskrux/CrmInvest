@@ -1902,6 +1902,72 @@ app.put('/api/novas-clinicas/:id/pegar', authenticateToken, async (req, res) => 
   }
 });
 
+// === ATUALIZAR STATUS DE NOVA CLÍNICA ===
+app.put('/api/novas-clinicas/:id/status', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    console.log('🔧 PUT /api/novas-clinicas/:id/status recebido');
+    console.log('🔧 ID da clínica:', id);
+    console.log('🔧 Novo status:', status);
+    console.log('🔧 Usuário autenticado:', req.user);
+    
+    // Verificar se o status é válido
+    const statusValidos = ['tem_interesse', 'em_contato', 'nao_fechou', 'fechou'];
+    if (!status || !statusValidos.includes(status)) {
+      return res.status(400).json({ error: 'Status inválido! Status válidos: ' + statusValidos.join(', ') });
+    }
+    
+    // Verificar permissões: admin ou consultor com permissão
+    const podeAlterarStatus = req.user.tipo === 'admin' || 
+      (req.user.tipo === 'consultor' && req.user.podealterarstatus === true);
+    
+    if (!podeAlterarStatus) {
+      return res.status(403).json({ error: 'Você não tem permissão para alterar o status de clínicas!' });
+    }
+    
+    // Verificar se a clínica existe
+    const { data: clinicaAtual, error: checkError } = await supabase
+      .from('novas_clinicas')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (checkError) {
+      console.error('❌ Erro ao buscar clínica:', checkError);
+      return res.status(404).json({ error: 'Clínica não encontrada!' });
+    }
+    
+    if (!clinicaAtual) {
+      return res.status(404).json({ error: 'Clínica não encontrada!' });
+    }
+    
+    // Atualizar o status
+    const { data, error } = await supabase
+      .from('novas_clinicas')
+      .update({ status })
+      .eq('id', id)
+      .select();
+
+    if (error) {
+      console.error('❌ Erro do Supabase:', error);
+      return res.status(500).json({ error: error.message });
+    }
+    
+    if (!data || data.length === 0) {
+      console.error('❌ Nenhuma linha foi atualizada!');
+      return res.status(403).json({ error: 'Nenhuma linha atualizada! Verifique as policies do Supabase.' });
+    }
+    
+    console.log('✅ Status da clínica atualizado com sucesso:', data[0]);
+    res.json({ id: data[0].id, message: 'Status atualizado com sucesso!' });
+  } catch (error) {
+    console.error('❌ Erro geral:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/agendamentos', authenticateToken, async (req, res) => {
   try {
     let query = supabase
