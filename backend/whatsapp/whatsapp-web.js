@@ -265,19 +265,17 @@ class WhatsAppWebService {
         authStrategy: authStrategy,
         puppeteer: {
           headless: true,
+          executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
             '--disable-gpu',
             '--disable-web-security',
             '--disable-features=VizDisplayCompositor',
+            '--no-first-run',
             '--disable-extensions',
             '--disable-plugins',
-            '--disable-images',
             '--disable-default-apps',
             '--disable-background-timer-throttling',
             '--disable-backgrounding-occluded-windows',
@@ -301,27 +299,25 @@ class WhatsAppWebService {
             '--enable-automation',
             '--password-store=basic',
             '--use-mock-keychain',
-            // Argumentos específicos para melhor persistência
-            '--disable-backgrounding-occluded-windows',
-            '--disable-background-timer-throttling',
-            '--disable-renderer-backgrounding',
             '--disable-features=TranslateUI',
             '--disable-blink-features=AutomationControlled',
             '--no-default-browser-check',
             '--disable-extensions-file-access-check',
-            '--disable-features=VizDisplayCompositor',
             '--ignore-certificate-errors',
             '--ignore-ssl-errors',
             '--ignore-certificate-errors-spki-list',
             '--disable-logging',
             '--disable-login-animations',
-            '--disable-notifications'
+            '--disable-notifications',
+            '--single-process',
+            '--no-zygote',
+            '--disable-accelerated-2d-canvas',
+            '--disable-images',
+            '--display=:99'
           ],
-          // Timeouts mais generosos para resistir a hibernação
-          timeout: 180000, // 3 minutos
-          protocolTimeout: 180000, // 3 minutos
-          defaultViewport: null,
-          // Configurações adicionais para estabilidade
+          timeout: 60000, // 60 segundos
+          protocolTimeout: 60000, // 60 segundos
+          defaultViewport: { width: 1280, height: 720 },
           devtools: false,
           slowMo: 0,
           ignoreDefaultArgs: ['--disable-extensions'],
@@ -387,8 +383,13 @@ class WhatsAppWebService {
         await this.updateConnectionStatus('auth_failed');
       });
 
-      // Inicializar cliente
-      await this.client.initialize();
+      // Inicializar cliente com timeout
+      const initPromise = this.client.initialize();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout na inicialização do WhatsApp')), 60000)
+      );
+      
+      await Promise.race([initPromise, timeoutPromise]);
       
     } catch (error) {
       console.error(`❌ Erro ao inicializar WhatsApp Web (tentativa ${retryCount + 1}):`, error.message);

@@ -1,0 +1,36 @@
+name: Deploy Backend to Fly.io
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths: [ 'backend/**' ]
+  pull_request:
+    branches: [ main ]
+    paths: [ 'backend/**' ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Backend to Fly.io
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Fly.io CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+        
+      - name: Deploy to Fly.io
+        run: |
+          cd backend
+          flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          
+      - name: Health Check
+        run: |
+          echo "Aguardando deploy..."
+          sleep 30
+          curl -f https://crminvest-backend.fly.dev/health || exit 1
+          echo "✅ Deploy concluído com sucesso!"

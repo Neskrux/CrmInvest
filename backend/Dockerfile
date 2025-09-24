@@ -10,11 +10,14 @@ RUN apk add --no-cache \
     harfbuzz \
     ca-certificates \
     ttf-freefont \
+    xvfb \
+    dbus \
     && rm -rf /var/cache/apk/*
 
 # Configurar Puppeteer para usar Chromium instalado
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV DISPLAY=:99
 
 # Criar diretório da aplicação
 WORKDIR /app
