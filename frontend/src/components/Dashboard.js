@@ -259,11 +259,24 @@ const Dashboard = () => {
         makeRequest(`/clinicas?${clinicasParams.toString()}`)
       ]);
 
+      // Para gráfico de cidades e ranking, buscar dados gerais (não filtrados por consultor)
+      const [pacientesGeraisRes, agendamentosGeraisRes, fechamentosGeraisRes] = await Promise.all([
+        makeRequest('/dashboard/gerais/pacientes'),
+        makeRequest('/dashboard/gerais/agendamentos'),
+        makeRequest('/dashboard/gerais/fechamentos')
+      ]);
+
       const pacientes = await pacientesRes.json();
       let agendamentos = await agendamentosRes.json();
       let fechamentos = await fechamentosRes.json();
       const consultores = await consultoresRes.json();
       const clinicasFiltradas = await clinicasRes.json();
+
+      // Dados gerais para gráfico de cidades e ranking
+      const pacientesGerais = await pacientesGeraisRes.json();
+      const agendamentosGerais = await agendamentosGeraisRes.json();
+      const fechamentosGerais = await fechamentosGeraisRes.json();
+
 
       // Calcular períodos para comparação de crescimento
       const hoje = new Date();
@@ -399,6 +412,7 @@ const Dashboard = () => {
         return data >= dataInicio && data <= dataFim && p.status === 'lead';
       }).length : pacientes.filter(p => p.status === 'lead').length;
 
+
       // Calcular estatísticas por dia da semana (apenas para visualização semanal)
       let estatisticasPorDia = {};
       if (periodo === 'semanal' && !subPeriodo) {
@@ -447,15 +461,27 @@ const Dashboard = () => {
       });
       
       // Agrupar pacientes por cidade (usando a clínica do agendamento mais recente ou primeira clínica)
-      pacientes.forEach(paciente => {
+      // Usar dados gerais para gráfico de cidades
+      pacientesGerais.forEach(paciente => {
         // Buscar agendamento mais recente do paciente para determinar a cidade
-        const agendamentoPaciente = agendamentos.find(a => a.paciente_id === paciente.id);
+        const agendamentoPaciente = agendamentosGerais.find(a => a.paciente_id === paciente.id);
         let cidade = null;
         
         if (agendamentoPaciente && agendamentoPaciente.clinica_id) {
           const clinica = clinicasMap[agendamentoPaciente.clinica_id];
           if (clinica) {
             cidade = clinica.cidade;
+          }
+        }
+        
+        // Se não encontrou cidade pelo agendamento, tentar pelo fechamento
+        if (!cidade) {
+          const fechamentoPaciente = fechamentosGerais.find(f => f.paciente_id === paciente.id && f.aprovado !== 'reprovado');
+          if (fechamentoPaciente && fechamentoPaciente.clinica_id) {
+            const clinica = clinicasMap[fechamentoPaciente.clinica_id];
+            if (clinica) {
+              cidade = clinica.cidade;
+            }
           }
         }
         
@@ -472,8 +498,33 @@ const Dashboard = () => {
         }
       });
       
+      // Se não há pacientes, mas há fechamentos, criar entradas de cidade baseadas nos fechamentos
+      if (pacientesGerais.length === 0 && fechamentosGerais.length > 0) {
+        fechamentosGerais
+          .filter(f => f.aprovado !== 'reprovado')
+          .forEach(fechamento => {
+            if (fechamento.clinica_id) {
+              const clinica = clinicasMap[fechamento.clinica_id];
+              if (clinica && clinica.cidade) {
+                const cidade = clinica.cidade;
+                if (!dadosPorCidade[cidade]) {
+                  dadosPorCidade[cidade] = {
+                    cidade: cidade,
+                    pacientes: 0,
+                    agendamentos: 0,
+                    fechamentos: 0
+                  };
+                }
+                // Não incrementar pacientes aqui, apenas garantir que a cidade existe
+              }
+            }
+          });
+      }
+      
+      
+      
       // Agrupar agendamentos por cidade das clínicas
-      agendamentos.forEach(agendamento => {
+      agendamentosGerais.forEach(agendamento => {
         if (agendamento.clinica_id) {
           const clinica = clinicasMap[agendamento.clinica_id];
           if (clinica && clinica.cidade) {
@@ -490,9 +541,10 @@ const Dashboard = () => {
           }
         }
       });
+      
 
       // Agrupar fechamentos por cidade das clínicas
-      fechamentos
+      fechamentosGerais
         .filter(f => f.aprovado !== 'reprovado')
         .forEach(fechamento => {
           if (fechamento.clinica_id) {
@@ -511,6 +563,7 @@ const Dashboard = () => {
             }
           }
         });
+        
 
       // Converter para array e ordenar por total (pacientes + agendamentos + fechamentos)
       const limiteCidades = window.innerWidth <= 768 ? 3 : 10; // Limitar a 3 cidades em mobile, 10 em desktop
@@ -523,6 +576,8 @@ const Dashboard = () => {
         }))
         .sort((a, b) => b.total - a.total)
         .slice(0, limiteCidades); // Mostrar top cidades baseado no dispositivo
+        
+        
 
       // Calcular comissões
       let comissaoTotalMes = 0;
@@ -543,20 +598,20 @@ const Dashboard = () => {
         };
       });
 
-      // Atualizar estatísticas dos consultores
-      pacientes.forEach(p => {
+      // Atualizar estatísticas dos consultores usando dados gerais para ranking
+      pacientesGerais.forEach(p => {
         if (p.consultor_nome && consultoresMap[p.consultor_nome]) {
           consultoresMap[p.consultor_nome].totalPacientes++;
         }
       });
 
-      agendamentos.forEach(a => {
+      agendamentosGerais.forEach(a => {
         if (a.consultor_nome && consultoresMap[a.consultor_nome]) {
           consultoresMap[a.consultor_nome].totalAgendamentos++;
         }
       });
 
-      fechamentos
+      fechamentosGerais
         .filter(f => f.aprovado !== 'reprovado')
         .forEach(f => {
           if (f.consultor_nome && consultoresMap[f.consultor_nome]) {
@@ -579,6 +634,7 @@ const Dashboard = () => {
         });
 
       const consultoresStats = Object.values(consultoresMap);
+      
 
       setStats({
         totalPacientes: pacientes.length,
