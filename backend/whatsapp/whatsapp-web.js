@@ -156,7 +156,7 @@ class WhatsAppWebService {
         console.log('ℹ️ Sessão específica não encontrada (já limpa)');
       }
       
-      // 4. Limpar pasta de sessão em produção (Railway)
+      // 4. Limpar pasta de sessão em produção (Fly.io)
       const prodAuthPath = '/tmp/.wwebjs_auth';
       try {
         await fs.rm(prodAuthPath, { recursive: true, force: true });
@@ -251,11 +251,11 @@ class WhatsAppWebService {
       this.connectionStatus = 'disconnected';
       this.qrCode = null;
       this.reconnecting = false;
-      // Configuração para ambiente de produção (Railway)
+      // Configuração para ambiente de produção (Fly.io)
       const authStrategy = process.env.NODE_ENV === 'production' 
         ? new LocalAuth({
             clientId: "crm-whatsapp",
-            dataPath: "/tmp/.wwebjs_auth" // Usar diretório temporário no Railway
+            dataPath: "/tmp/.wwebjs_auth" // Usar diretório temporário no Fly.io
           })
         : new LocalAuth({
             clientId: "crm-whatsapp"

@@ -430,7 +430,7 @@ const Agendamentos = () => {
           formData.append('contrato', contratoFechamento);
         }
 
-        const API_BASE_URL = process.env.NODE_ENV === 'production' ? 'https://crminvest-production.up.railway.app/api' : 'http://localhost:5000/api';
+        const API_BASE_URL = process.env.NODE_ENV === 'production' ? 'https://crminvest-backend.fly.dev/api' : 'http://localhost:5000/api';
         const token = localStorage.getItem('token');
         
         const fechamentoResponse = await fetch(`${API_BASE_URL}/fechamentos`, {
