@@ -1,6 +1,5 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import logoBrasaoPreto from '../images/logobrasaopreto.png';
 
 const CadastroSucesso = () => {
   const navigate = useNavigate();
@@ -23,16 +22,6 @@ const CadastroSucesso = () => {
         maxWidth: '500px',
         textAlign: 'center'
       }}>
-        <img 
-          src={logoBrasaoPreto} 
-          alt="CRM System" 
-          style={{ 
-            width: '80px', 
-            height: '80px', 
-            marginBottom: '1rem',
-            objectFit: 'contain'
-          }} 
-        />
 
         <div style={{
           width: '60px',
@@ -96,7 +85,7 @@ const CadastroSucesso = () => {
               • Você pode fazer login com seu e-mail
             </p>
             <p style={{ margin: '0 0 0.5rem 0' }}>
-              • Comece a ganhar R$ 5 por cada R$ 1.000 fechados
+              • Comece a ganhar R$ 10 por cada R$ 1.000 fechados
             </p>
             <p style={{ margin: '0' }}>
               • Acesse agora sua área de trabalho
@@ -136,7 +125,7 @@ const CadastroSucesso = () => {
           color: '#6b7280'
         }}>
           <p style={{ margin: 0 }}>
-            Boas-vindasà nossa equipe!
+            Boas-vindas à nossa equipe!
           </p>
           <p style={{ margin: '0.5rem 0 0 0' }}>
             Estamos ansiosos para vê-lo crescer conosco.
