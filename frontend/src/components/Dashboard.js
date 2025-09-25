@@ -64,14 +64,59 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchKPIsPrincipais = async () => {
       try {
-        const [pacientesRes, agendamentosRes, fechamentosRes] = await Promise.all([
-          makeRequest('/pacientes'),
-          makeRequest('/agendamentos'),
-          makeRequest('/fechamentos'),
+        // Construir parâmetros de busca para clínicas
+        const clinicasParams = new URLSearchParams();
+        if (filtroRegiao.estado) clinicasParams.append('estado', filtroRegiao.estado);
+        if (filtroRegiao.cidade) clinicasParams.append('cidade', filtroRegiao.cidade);
+        
+        const [pacientesRes, agendamentosRes, fechamentosRes, clinicasRes] = await Promise.all([
+          makeRequest('/dashboard/pacientes'),
+          makeRequest('/dashboard/agendamentos'),
+          makeRequest('/dashboard/fechamentos'),
+          makeRequest(`/clinicas?${clinicasParams.toString()}`)
         ]);
-        const pacientes = await pacientesRes.json();
-        const agendamentos = await agendamentosRes.json();
-        const fechamentos = await fechamentosRes.json();
+        let pacientes = await pacientesRes.json();
+        let agendamentos = await agendamentosRes.json();
+        let fechamentos = await fechamentosRes.json();
+        const clinicasFiltradas = await clinicasRes.json();
+        
+        // Aplicar filtros por região se especificados
+        if (filtroRegiao.cidade || filtroRegiao.estado) {
+          const clinicasIds = clinicasFiltradas.map(c => c.id);
+          
+          // Filtrar agendamentos por região (via clínicas)
+          agendamentos = agendamentos.filter(agendamento => {
+            if (!agendamento.clinica_id) return false; // excluir agendamentos sem clínica quando há filtro
+            return clinicasIds.includes(agendamento.clinica_id);
+          });
+
+          // Filtrar fechamentos por região (via clínicas)
+          fechamentos = fechamentos.filter(fechamento => {
+            if (!fechamento.clinica_id) return false; // excluir fechamentos sem clínica quando há filtro
+            return clinicasIds.includes(fechamento.clinica_id);
+          });
+          
+          // Filtrar pacientes por região (via agendamentos ou fechamentos)
+          const pacientesIdsComRegiao = new Set();
+          
+          // Adicionar IDs de pacientes que têm agendamentos na região
+          agendamentos.forEach(agendamento => {
+            if (agendamento.paciente_id) {
+              pacientesIdsComRegiao.add(agendamento.paciente_id);
+            }
+          });
+          
+          // Adicionar IDs de pacientes que têm fechamentos na região
+          fechamentos.forEach(fechamento => {
+            if (fechamento.paciente_id) {
+              pacientesIdsComRegiao.add(fechamento.paciente_id);
+            }
+          });
+          
+          // Filtrar pacientes baseado nos IDs encontrados
+          pacientes = pacientes.filter(paciente => pacientesIdsComRegiao.has(paciente.id));
+        }
+        
         setDadosFiltrados({ pacientes, agendamentos, fechamentos });
         setKpisPrincipais({
           totalPacientes: pacientes.length,
@@ -392,14 +437,20 @@ const Dashboard = () => {
 
       // Filtrar dados por período
       const agendamentosPeriodo = dataInicio ? agendamentos.filter(a => {
-        const data = new Date(a.data_agendamento);
-        return data >= dataInicio && data <= dataFim;
+        // Corrigir problema de timezone: interpretar data como local
+        const [ano, mes, dia] = a.data_agendamento.split('-');
+        const data = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+        const isInRange = data >= dataInicio && data <= dataFim;
+        
+        return isInRange;
       }).length : agendamentos.length;
 
       const fechamentosPeriodo = dataInicio ? fechamentos
         .filter(f => f.aprovado !== 'reprovado')
         .filter(f => {
-          const data = new Date(f.data_fechamento);
+          // Corrigir problema de timezone: interpretar data como local
+          const [ano, mes, dia] = f.data_fechamento.split('-');
+          const data = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
           return data >= dataInicio && data <= dataFim;
         }) : fechamentos.filter(f => f.aprovado !== 'reprovado');
 
@@ -408,6 +459,7 @@ const Dashboard = () => {
       );
 
       const novosLeadsPeriodo = dataInicio ? pacientes.filter(p => {
+        // Para created_at, usar a data completa (já inclui horário)
         const data = new Date(p.created_at);
         return data >= dataInicio && data <= dataFim && p.status === 'lead';
       }).length : pacientes.filter(p => p.status === 'lead').length;
@@ -415,12 +467,23 @@ const Dashboard = () => {
 
       // Calcular estatísticas por dia da semana (apenas para visualização semanal)
       let estatisticasPorDia = {};
-      if (periodo === 'semanal' && !subPeriodo) {
+      if (periodo === 'semanal') {
         const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
         
+        // Sempre calcular baseado na semana completa, não no subPeriodo
+        let dataInicioSemana = new Date(hoje);
+        
+        if (semanaOpcao === 'proxima') {
+          // Próxima semana
+          dataInicioSemana.setDate(hoje.getDate() + 7 - hoje.getDay()); // Próximo domingo
+        } else {
+          // Semana atual
+          dataInicioSemana.setDate(hoje.getDate() - hoje.getDay()); // Domingo atual
+        }
+        
         for (let i = 0; i < 7; i++) {
-          const diaData = new Date(dataInicio);
-          diaData.setDate(dataInicio.getDate() + i);
+          const diaData = new Date(dataInicioSemana);
+          diaData.setDate(dataInicioSemana.getDate() + i);
           const diaStr = diaData.toISOString().split('T')[0];
           
           estatisticasPorDia[diasSemana[i]] = {
@@ -906,7 +969,7 @@ const Dashboard = () => {
                 <button
                   key={dia}
                   onClick={() => setSubPeriodo(dados.data)}
-                  className={`btn ${subPeriodo && new Date(subPeriodo).getDay() === dados.data.getDay() ? 
+                  className={`btn ${subPeriodo && new Date(subPeriodo).toDateString() === dados.data.toDateString() ? 
                     'btn-primary' : 'btn-secondary'}`}
                   style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}
                 >
@@ -1100,13 +1163,6 @@ const Dashboard = () => {
             Análise do Período: {obterPeriodoTexto()}
           </h3>
           <div className="stats-grid">
-            <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
-              <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px' }}>Novos Leads</div>
-              <div className="stat-value" style={{ fontSize: '2.5rem' }}>{stats.novosLeadsPeriodo}</div>
-              <div className="stat-subtitle" style={{ color: '#6b7280', fontSize: '0.8rem', fontWeight: '500' }}>
-                No período selecionado
-              </div>
-            </div>
 
             <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
               <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px' }}>Agendamentos</div>
