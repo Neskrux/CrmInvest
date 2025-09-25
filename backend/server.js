@@ -834,7 +834,8 @@ app.post('/api/clinicas', authenticateToken, requireAdmin, async (req, res) => {
         email, 
         status: status || 'ativo', // Padrão: desbloqueado
         latitude,
-        longitude
+        longitude,
+        tipo_origem: 'direta' // Clínicas criadas diretamente por admin
       }])
       .select();
 
@@ -961,6 +962,9 @@ app.post('/api/consultores', authenticateToken, requireAdmin, async (req, res) =
 // === CADASTRO PÚBLICO DE CONSULTORES === (Sem autenticação)
 app.post('/api/consultores/cadastro', async (req, res) => {
   try {
+    console.log('📝 === NOVO CADASTRO DE CONSULTOR ===');
+    console.log('📋 Dados recebidos:', req.body);
+    
     const { nome, telefone, email, senha, cpf, pix } = req.body;
     
     // Validar campos obrigatórios
@@ -1018,7 +1022,8 @@ app.post('/api/consultores/cadastro', async (req, res) => {
         cpf, 
         pix,
         tipo: 'consultor',
-        ativo: true
+        ativo: true,
+        is_freelancer: true // Por padrão, consultores do cadastro público são freelancers
       }])
       .select();
 
@@ -1026,10 +1031,68 @@ app.post('/api/consultores/cadastro', async (req, res) => {
       console.error('❌ Erro ao inserir consultor:', error);
       throw error;
     }
+
+    const consultorId = data[0].id;
     
+    // Gerar código de referência automaticamente para freelancers
+    try {
+      console.log('🔄 Iniciando geração de código de referência para consultor ID:', consultorId);
+      
+      const nomeLimpo = nome
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+        .replace(/[^a-z0-9]/g, '') // Remove caracteres especiais
+        .substring(0, 10); // Limita a 10 caracteres
+      
+      const codigoReferencia = `${nomeLimpo}${consultorId}`;
+      
+      console.log('📝 Dados do código:', {
+        nomeOriginal: nome,
+        nomeLimpo: nomeLimpo,
+        consultorId: consultorId,
+        codigoReferencia: codigoReferencia
+      });
+      
+      // Atualizar o consultor com o código de referência
+      const { error: updateError } = await supabaseAdmin
+        .from('consultores')
+        .update({ codigo_referencia: codigoReferencia })
+        .eq('id', consultorId);
+      
+      if (updateError) {
+        console.error('⚠️ Erro ao gerar código de referência:', updateError);
+        console.error('⚠️ Detalhes do erro:', {
+          message: updateError.message,
+          details: updateError.details,
+          hint: updateError.hint,
+          code: updateError.code
+        });
+        // Não falhar o cadastro se não conseguir gerar o código
+      } else {
+        console.log('✅ Código de referência gerado automaticamente:', codigoReferencia);
+        
+        // Verificar se o código foi salvo corretamente
+        const { data: consultorVerificacao, error: verifError } = await supabaseAdmin
+          .from('consultores')
+          .select('id, nome, codigo_referencia')
+          .eq('id', consultorId)
+          .single();
+          
+        if (verifError) {
+          console.error('⚠️ Erro ao verificar código salvo:', verifError);
+        } else {
+          console.log('✅ Código verificado no banco:', consultorVerificacao);
+        }
+      }
+    } catch (codigoError) {
+      console.error('⚠️ Erro ao gerar código de referência:', codigoError);
+      console.error('⚠️ Stack trace:', codigoError.stack);
+      // Não falhar o cadastro se não conseguir gerar o código
+    }
     
     res.json({ 
-      id: data[0].id, 
+      id: consultorId, 
       message: 'Consultor cadastrado com sucesso! Agora você pode fazer login.',
       email: emailNormalizado
     });
@@ -1363,7 +1426,8 @@ app.post('/api/clinicas/cadastro-publico', async (req, res) => {
         status: 'tem_interesse',
         latitude,
         longitude,
-        criado_por_consultor_id: consultorId
+        criado_por_consultor_id: consultorId,
+        tipo_origem: 'aprovada' // Clínicas que se cadastraram pelo link público (serão aprovadas)
       }])
       .select();
 
@@ -1458,6 +1522,47 @@ app.put('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE - Excluir consultor (apenas admin)
+app.delete('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Verificar se o consultor existe
+    const { data: consultor, error: consultorError } = await supabaseAdmin
+      .from('consultores')
+      .select('id, nome, is_freelancer')
+      .eq('id', id)
+      .single();
+
+    if (consultorError) {
+      if (consultorError.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Consultor não encontrado' });
+      }
+      throw consultorError;
+    }
+
+    // Verificar se é o próprio admin tentando se excluir
+    if (req.user.id === parseInt(id)) {
+      return res.status(400).json({ error: 'Você não pode excluir a si mesmo' });
+    }
+
+    // Excluir consultor
+    const { error: deleteError } = await supabaseAdmin
+      .from('consultores')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) throw deleteError;
+
+    res.json({ 
+      message: `Consultor ${consultor.nome} excluído com sucesso!`
+    });
+  } catch (error) {
+    console.error('Erro ao excluir consultor:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
@@ -2191,7 +2296,7 @@ app.post('/api/novas-clinicas', authenticateToken, async (req, res) => {
     
     // Preparar dados para inserção
     const clinicaData = {
-      nome, 
+      nome,
       endereco,
       bairro,
       cidade,
@@ -2203,7 +2308,8 @@ app.post('/api/novas-clinicas', authenticateToken, async (req, res) => {
       observacoes,
       latitude,
       longitude,
-      criado_por_consultor_id: req.user.tipo === 'consultor' ? req.user.id : null
+      criado_por_consultor_id: req.user.tipo === 'consultor' ? req.user.id : null,
+      tipo_origem: 'aprovada' // Todas as novas clínicas serão aprovadas
     };
     
     const { data, error } = await supabaseAdmin
@@ -2281,7 +2387,8 @@ app.put('/api/novas-clinicas/:id/pegar', authenticateToken, async (req, res) => 
       telefone: clinicaAtual.telefone,
       email: clinicaAtual.email,
       status: 'ativo',
-      consultor_id: clinicaAtual.criado_por_consultor_id // Definir consultor_id baseado em quem criou
+      consultor_id: clinicaAtual.criado_por_consultor_id, // Definir consultor_id baseado em quem criou
+      tipo_origem: 'aprovada' // Clínicas aprovadas da aba "Novas Clínicas"
     };
 
     // Excluir o campo id para evitar conflitos de chave primária
@@ -2311,6 +2418,72 @@ app.put('/api/novas-clinicas/:id/pegar', authenticateToken, async (req, res) => 
 
     res.json({ message: 'Clínica aprovada e movida para clínicas parceiras com sucesso!' });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === ATUALIZAR STATUS DE NOVA CLÍNICA ===
+app.put('/api/novas-clinicas/:id/status', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    console.log('🔧 PUT /api/novas-clinicas/:id/status recebido');
+    console.log('🔧 ID da clínica:', id);
+    console.log('🔧 Novo status:', status);
+    console.log('🔧 Usuário autenticado:', req.user);
+    
+    // Verificar se o status é válido
+    const statusValidos = ['tem_interesse', 'nao_tem_interesse', 'em_contato', 'nao_fechou'];
+    if (!status || !statusValidos.includes(status)) {
+      return res.status(400).json({ error: 'Status inválido! Status válidos: ' + statusValidos.join(', ') });
+    }
+    
+    // Verificar permissões: admin ou consultor com permissão
+    const podeAlterarStatus = req.user.tipo === 'admin' || 
+      (req.user.tipo === 'consultor' && req.user.podealterarstatus === true);
+    
+    if (!podeAlterarStatus) {
+      return res.status(403).json({ error: 'Você não tem permissão para alterar o status de clínicas!' });
+    }
+    
+    // Verificar se a clínica existe
+    const { data: clinicaAtual, error: checkError } = await supabaseAdmin
+      .from('novas_clinicas')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (checkError) {
+      console.error('❌ Erro ao buscar clínica:', checkError);
+      return res.status(404).json({ error: 'Clínica não encontrada!' });
+    }
+    
+    if (!clinicaAtual) {
+      return res.status(404).json({ error: 'Clínica não encontrada!' });
+    }
+    
+    // Atualizar o status
+    const { data, error } = await supabaseAdmin
+      .from('novas_clinicas')
+      .update({ status })
+      .eq('id', id)
+      .select();
+
+    if (error) {
+      console.error('❌ Erro do Supabase:', error);
+      return res.status(500).json({ error: error.message });
+    }
+    
+    if (!data || data.length === 0) {
+      console.error('❌ Nenhuma linha foi atualizada!');
+      return res.status(403).json({ error: 'Nenhuma linha atualizada! Verifique as policies do Supabase.' });
+    }
+    
+    console.log('✅ Status da clínica atualizado com sucesso:', data[0]);
+    res.json({ id: data[0].id, message: 'Status atualizado com sucesso!' });
+  } catch (error) {
+    console.error('❌ Erro geral:', error);
     res.status(500).json({ error: error.message });
   }
 });

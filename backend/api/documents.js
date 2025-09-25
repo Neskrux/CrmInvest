@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const sqlite3 = require('sqlite3').verbose();
+/*const Database = require('better-sqlite3');*/
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
@@ -104,9 +104,6 @@ const uploadToSupabaseStorage = async (file, clinicaId, docType) => {
     throw error;
   }
 };
-
-// Conectar ao banco de dados
-const db = new sqlite3.Database(path.join(__dirname, '..', 'database.sqlite'));
 
 // Upload de documento específico
 router.post('/upload/:clinicaId/:docType', upload.single('document'), async (req, res) => {
