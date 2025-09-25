@@ -20,6 +20,7 @@ const Clinicas = () => {
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroCity, setFiltroCity] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
+  const [filtroOrigem, setFiltroOrigem] = useState('');
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewingClinica, setViewingClinica] = useState(null);
   const [viewNovaClinicaModalOpen, setViewNovaClinicaModalOpen] = useState(false);
@@ -816,7 +817,8 @@ const Clinicas = () => {
     const matchEstado = !filtroEstado || clinica.estado === filtroEstado;
     const matchCidade = !filtroCity || clinica.cidade?.toLowerCase().includes(filtroCity.toLowerCase());
     const matchStatus = !filtroStatus || clinica.status === filtroStatus;
-    return matchEstado && matchCidade && matchStatus;
+    const matchOrigem = !filtroOrigem || clinica.tipo_origem === filtroOrigem;
+    return matchEstado && matchCidade && matchStatus && matchOrigem;
   });
 
   // Obter listas únicas para filtros
@@ -1330,6 +1332,28 @@ const Clinicas = () => {
               <div className="stat-label">Ambos</div>
               <div className="stat-value">{clinicas.filter(c => c.nicho === 'Ambos').length}</div>
             </div>
+            
+            <div className="stat-card" style={{ borderLeft: '4px solid #10b981' }}>
+              <div className="stat-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
+                Criadas Diretamente
+              </div>
+              <div className="stat-value">{clinicas.filter(c => c.tipo_origem === 'direta').length}</div>
+            </div>
+            
+            <div className="stat-card" style={{ borderLeft: '4px solid #3b82f6' }}>
+              <div className="stat-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 12l2 2 4-4"/>
+                  <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"/>
+                </svg>
+                Aprovadas
+              </div>
+              <div className="stat-value">{clinicas.filter(c => c.tipo_origem === 'aprovada').length}</div>
+            </div>
+            
           </div>
 
           <div className="card">
@@ -1370,12 +1394,13 @@ const Clinicas = () => {
             }}>
               Filtros de Busca
             </h3>
-            {(filtroEstado || filtroCity || filtroStatus) && (
+            {(filtroEstado || filtroCity || filtroStatus || filtroOrigem) && (
               <button 
                 onClick={() => {
                   setFiltroEstado('');
                   setFiltroCity('');
                   setFiltroStatus('');
+                  setFiltroOrigem('');
                 }}
                 className="btn btn-secondary"
                 style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
@@ -1385,7 +1410,7 @@ const Clinicas = () => {
             )}
           </div>
           
-          <div className="grid grid-3">
+          <div className="grid grid-4">
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Estado</label>
               <select
@@ -1437,9 +1462,22 @@ const Clinicas = () => {
                 <option value="nao_fechou">Não Fechou</option>
               </select>
             </div>
+
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Origem</label>
+              <select
+                value={filtroOrigem}
+                onChange={(e) => setFiltroOrigem(e.target.value)}
+                className="form-select"
+              >
+                <option value="">Todas as origens</option>
+                <option value="direta">Criadas Diretamente</option>
+                <option value="aprovada">Aprovadas</option>
+              </select>
+            </div>
           </div>
 
-          {(filtroEstado || filtroCity || filtroStatus) && (
+          {(filtroEstado || filtroCity || filtroStatus || filtroOrigem) && (
             <div style={{ 
               marginTop: '1rem', 
               padding: '0.75rem', 
@@ -1459,7 +1497,7 @@ const Clinicas = () => {
           </div>
         ) : clinicasFiltradas.length === 0 ? (
           <p style={{ textAlign: 'center', color: '#6b7280', padding: '2rem' }}>
-            {filtroEstado || filtroCity || filtroStatus
+            {filtroEstado || filtroCity || filtroStatus || filtroOrigem
               ? 'Nenhuma clínica encontrada com os filtros aplicados.'
               : 'Nenhuma clínica cadastrada ainda.'
             }
@@ -1520,7 +1558,53 @@ const Clinicas = () => {
                 {clinicasFiltradas.map(clinica => (
                   <tr key={clinica.id} className={clinica.status === 'inativa' ? 'clinica-bloqueada' : ''}>
                     <td>
-                      <strong>{clinica.nome}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {/* Indicador de origem da clínica */}
+                        {clinica.tipo_origem === 'aprovada' && (
+                          <span 
+                            className="badge" 
+                            style={{ 
+                              backgroundColor: '#3b82f6', 
+                              color: 'white',
+                              fontSize: '0.7rem',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                            title="Clínica aprovada da aba 'Novas Clínicas'"
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M9 12l2 2 4-4"/>
+                              <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"/>
+                            </svg>
+                            Aprovada
+                          </span>
+                        )}
+                        {clinica.tipo_origem === 'direta' && (
+                          <span 
+                            className="badge" 
+                            style={{ 
+                              backgroundColor: '#10b981', 
+                              color: 'white',
+                              fontSize: '0.7rem',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                            title="Clínica criada diretamente por administrador"
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                            Direta
+                          </span>
+                        )}
+                        <strong>{clinica.nome}</strong>
+                      </div>
                     </td>
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>{clinica.endereco || '-'}</td>
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>{clinica.bairro || '-'}</td>
