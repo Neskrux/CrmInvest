@@ -6,6 +6,7 @@ const Consultores = () => {
   const { makeRequest, isAdmin } = useAuth();
   const { showErrorToast, showSuccessToast } = useToast();
   const [consultores, setConsultores] = useState([]);
+  const [consultoresFiltrados, setConsultoresFiltrados] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingConsultor, setEditingConsultor] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -18,6 +19,15 @@ const Consultores = () => {
   const [viewingConsultor, setViewingConsultor] = useState(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkConsultor, setLinkConsultor] = useState(null);
+  
+  // Estados para filtros
+  const [filtros, setFiltros] = useState({
+    busca: '',
+    tipo: 'todos', // 'todos', 'freelancer', 'interno'
+    statusSenha: 'todos', // 'todos', 'com_senha', 'sem_senha'
+    statusPix: 'todos', // 'todos', 'com_pix', 'sem_pix'
+    statusLink: 'todos' // 'todos', 'com_link', 'sem_link'
+  });
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
@@ -35,6 +45,7 @@ const Consultores = () => {
       
       if (response.ok) {
         setConsultores(data);
+        setConsultoresFiltrados(data);
       } else {
         console.error('Erro ao carregar consultores:', data.error);
         showErrorToast('Erro ao carregar consultores: ' + data.error);
@@ -50,6 +61,93 @@ const Consultores = () => {
   useEffect(() => {
     fetchConsultores();
   }, [fetchConsultores]);
+
+  // Função para aplicar filtros
+  const aplicarFiltros = useCallback(() => {
+    let filtrados = [...consultores];
+
+    // Filtro por busca (nome)
+    if (filtros.busca.trim()) {
+      const busca = filtros.busca.toLowerCase();
+      filtrados = filtrados.filter(consultor => 
+        consultor.nome.toLowerCase().includes(busca)
+      );
+    }
+
+    // Filtro por tipo
+    if (filtros.tipo !== 'todos') {
+      filtrados = filtrados.filter(consultor => {
+        if (filtros.tipo === 'freelancer') {
+          return consultor.is_freelancer !== false;
+        } else if (filtros.tipo === 'interno') {
+          return consultor.is_freelancer === false;
+        }
+        return true;
+      });
+    }
+
+    // Filtro por status de senha
+    if (filtros.statusSenha !== 'todos') {
+      filtrados = filtrados.filter(consultor => {
+        if (filtros.statusSenha === 'com_senha') {
+          return consultor.senha && consultor.senha.trim() !== '';
+        } else if (filtros.statusSenha === 'sem_senha') {
+          return !consultor.senha || consultor.senha.trim() === '';
+        }
+        return true;
+      });
+    }
+
+    // Filtro por status de PIX
+    if (filtros.statusPix !== 'todos') {
+      filtrados = filtrados.filter(consultor => {
+        if (filtros.statusPix === 'com_pix') {
+          return consultor.pix && consultor.pix.trim() !== '';
+        } else if (filtros.statusPix === 'sem_pix') {
+          return !consultor.pix || consultor.pix.trim() === '';
+        }
+        return true;
+      });
+    }
+
+    // Filtro por status de link personalizado
+    if (filtros.statusLink !== 'todos') {
+      filtrados = filtrados.filter(consultor => {
+        if (filtros.statusLink === 'com_link') {
+          return consultor.codigo_referencia && consultor.codigo_referencia.trim() !== '';
+        } else if (filtros.statusLink === 'sem_link') {
+          return !consultor.codigo_referencia || consultor.codigo_referencia.trim() === '';
+        }
+        return true;
+      });
+    }
+
+    setConsultoresFiltrados(filtrados);
+  }, [consultores, filtros]);
+
+  // Aplicar filtros quando os dados ou filtros mudarem
+  useEffect(() => {
+    aplicarFiltros();
+  }, [aplicarFiltros]);
+
+  // Função para atualizar filtros
+  const atualizarFiltro = (campo, valor) => {
+    setFiltros(prev => ({
+      ...prev,
+      [campo]: valor
+    }));
+  };
+
+  // Função para limpar filtros
+  const limparFiltros = () => {
+    setFiltros({
+      busca: '',
+      tipo: 'todos',
+      statusSenha: 'todos',
+      statusPix: 'todos',
+      statusLink: 'todos'
+    });
+  };
 
   // Detectar mudanças de tamanho da tela
   useEffect(() => {
@@ -531,11 +629,63 @@ const Consultores = () => {
     }
   };
 
+  const excluirConsultor = async (consultor) => {
+    if (!window.confirm(`Tem certeza que deseja excluir o consultor "${consultor.nome}"?\n\nEsta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    try {
+      const response = await makeRequest(`/consultores/${consultor.id}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        showSuccessToast(data.message);
+        fetchConsultores(); // Recarregar lista
+      } else {
+        showErrorToast('Erro ao excluir consultor: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao excluir consultor:', error);
+      showErrorToast('Erro ao conectar com o servidor');
+    }
+  };
+
   return (
     <div>
       <div className="page-header">
         <h1 className="page-title">Gerenciar Consultores</h1>
         <p className="page-subtitle">Gerencie a equipe de consultores</p>
+      </div>
+
+      {/* Resumo de Estatísticas */}
+      <div className="stats-grid" style={{ marginBottom: '2rem' }}>
+        <div className="stat-card">
+          <div className="stat-label">Total</div>
+          <div className="stat-value">{consultores.length}</div>
+        </div>
+        
+        <div className="stat-card">
+          <div className="stat-label">Freelancers</div>
+          <div className="stat-value">{consultores.filter(c => c.is_freelancer !== false).length}</div>
+        </div>
+        
+        <div className="stat-card">
+          <div className="stat-label">Internos</div>
+          <div className="stat-value">{consultores.filter(c => c.is_freelancer === false).length}</div>
+        </div>
+        
+        <div className="stat-card">
+          <div className="stat-label">Com Link</div>
+          <div className="stat-value">{consultores.filter(c => c.codigo_referencia && c.codigo_referencia.trim() !== '').length}</div>
+        </div>
+        
+        <div className="stat-card">
+          <div className="stat-label">Sem Link</div>
+          <div className="stat-value">{consultores.filter(c => !c.codigo_referencia || c.codigo_referencia.trim() === '').length}</div>
+        </div>
       </div>
 
       <div className="card">
@@ -565,13 +715,130 @@ const Consultores = () => {
           </div>
         </div>
 
+        {/* Seção de Filtros */}
+        <div className="filters-section" style={{ 
+          marginBottom: '1.5rem', 
+          padding: '1rem', 
+          backgroundColor: '#f8fafc', 
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+            {/* Campo de busca */}
+            <div style={{ flex: '1', minWidth: '200px' }}>
+              <input
+                type="text"
+                placeholder="Buscar por nome..."
+                value={filtros.busca}
+                onChange={(e) => atualizarFiltro('busca', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem'
+                }}
+              />
+            </div>
+
+            {/* Filtro por tipo */}
+            <div>
+              <select
+                value={filtros.tipo}
+                onChange={(e) => atualizarFiltro('tipo', e.target.value)}
+                style={{
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  backgroundColor: 'white'
+                }}
+              >
+                <option value="todos">Todos os tipos</option>
+                <option value="freelancer">Freelancer</option>
+                <option value="interno">Interno</option>
+              </select>
+            </div>
+
+            {/* Filtro por status de link */}
+            <div>
+              <select
+                value={filtros.statusLink}
+                onChange={(e) => atualizarFiltro('statusLink', e.target.value)}
+                style={{
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  backgroundColor: 'white'
+                }}
+              >
+                <option value="todos">Link personalizado</option>
+                <option value="com_link">Com link</option>
+                <option value="sem_link">Sem link</option>
+              </select>
+            </div>
+
+            {/* Botão para limpar filtros */}
+            <button
+              onClick={limparFiltros}
+              style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: '#6b7280',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+              </svg>
+              Limpar
+            </button>
+          </div>
+
+          {/* Contador de resultados */}
+          <div style={{ 
+            marginTop: '0.75rem', 
+            fontSize: '0.875rem', 
+            color: '#6b7280',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <span>
+              Mostrando {consultoresFiltrados.length} de {consultores.length} consultores
+            </span>
+            {(filtros.busca || filtros.tipo !== 'todos' || filtros.statusSenha !== 'todos' || 
+              filtros.statusPix !== 'todos' || filtros.statusLink !== 'todos') && (
+              <span style={{ 
+                backgroundColor: '#3b82f6', 
+                color: 'white', 
+                padding: '0.25rem 0.5rem', 
+                borderRadius: '4px',
+                fontSize: '0.75rem'
+              }}>
+                Filtros ativos
+              </span>
+            )}
+          </div>
+        </div>
+
         {loading ? (
           <div className="loading">
             <div className="spinner"></div>
           </div>
-        ) : consultores.length === 0 ? (
+        ) : consultoresFiltrados.length === 0 ? (
           <p style={{ textAlign: 'center', color: '#6b7280', padding: '2rem' }}>
-            Nenhum consultor cadastrado ainda.
+            {consultores.length === 0 
+              ? 'Nenhum consultor cadastrado ainda.'
+              : 'Nenhum consultor encontrado com os filtros aplicados.'
+            }
           </p>
         ) : (
           <div className="table-container">
@@ -587,7 +854,7 @@ const Consultores = () => {
                 </tr>
               </thead>
               <tbody>
-                {consultores.map(consultor => (
+                {consultoresFiltrados.map(consultor => (
                   <tr key={consultor.id}>
                     <td>
                       <strong>{consultor.nome}</strong>
@@ -659,18 +926,6 @@ const Consultores = () => {
                             </svg>
                           </button>
                         )}
-                        {isAdmin && (
-                          <button
-                            onClick={() => visualizarSenha(consultor)}
-                            className="btn-action"
-                            title="Gerenciar senha"
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                            </svg>
-                          </button>
-                        )}
                         <button
                           onClick={() => visualizarLinkPersonalizado(consultor)}
                           className="btn-action"
@@ -682,6 +937,18 @@ const Consultores = () => {
                             <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                           </svg>
                         </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => excluirConsultor(consultor)}
+                            className="btn-action"
+                            title="Excluir consultor"
+                            style={{ color: '#ef4444' }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                            </svg>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

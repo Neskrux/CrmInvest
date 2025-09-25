@@ -186,7 +186,12 @@ const CadastroConsultor = () => {
     setLoading(true);
     
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://crminvest-backend.fly.dev/api'}/consultores/cadastro`, {
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 
+        (process.env.NODE_ENV === 'production' 
+          ? 'https://crminvest-backend.fly.dev/api'
+          : 'http://localhost:5000/api');
+      
+      const response = await fetch(`${API_BASE_URL}/consultores/cadastro`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -549,7 +554,7 @@ const CadastroConsultor = () => {
             lineHeight: '1.4'
           }}>
             <li>Seu PIX deve ser o mesmo CPF informado</li>
-            <li>Você receberá R$ 5 de comissão a cada R$ 1.000 fechados</li>
+            <li>Você receberá R$ 10 de comissão a cada R$ 1.000 fechados</li>
             <li>Seu login será feito com o e-mail informado</li>
           </ul>
         </div>

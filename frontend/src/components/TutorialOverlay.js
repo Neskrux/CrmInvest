@@ -76,15 +76,15 @@ const TutorialOverlay = ({ isOpen, onClose, onComplete }) => {
         element.scrollIntoView({ behavior: 'smooth', block: 'start' });
         // Scroll adicional para cima para não ir tão para baixo
         setTimeout(() => {
-          window.scrollBy(0, -150);
+          window.scrollBy(0, -70);
         }, 500);
       }
       // Para cidades (step 4), fazer scroll menos para baixo
       else if (currentStep === 3) { // Step 4 - cidades
-        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         // Scroll adicional menor para cima para não ir tão para baixo
         setTimeout(() => {
-          window.scrollBy(0, -100);
+          window.scrollBy(0, -200);
         }, 500);
       }
       else if (currentStep === 4) { // Step 5 - ranking
@@ -134,47 +134,10 @@ const TutorialOverlay = ({ isOpen, onClose, onComplete }) => {
       };
     }
 
-    // Posicionamento especial para pipeline de vendas (step 3) - apenas desktop
     if (!isMobile && currentStep === 2) { // Step 3 - pipeline de vendas
-      top = Math.max(rect.top - tooltipHeight - 480, 480);
-      left = Math.max(rect.left + (rect.width / 2) - (tooltipWidth / 2), 20);
-      if (left + tooltipWidth > window.innerWidth - 20) {
-        left = window.innerWidth - tooltipWidth - 20;
-      }
-      return {
-        top: `${top}px`,
-        left: `${left}px`,
-        transform: 'none'
-      };
+      return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
     }
 
-    // Posicionamento especial para cidades (step 4) - apenas desktop
-    if (!isMobile && currentStep === 3) { // Step 4 - cidades
-      top = Math.max(rect.top - tooltipHeight - 200, 200);
-      left = Math.max(rect.left + (rect.width / 2) - (tooltipWidth / 2), 20);
-      if (left + tooltipWidth > window.innerWidth - 20) {
-        left = window.innerWidth - tooltipWidth - 20;
-      }
-      return {
-        top: `${top}px`,
-        left: `${left}px`,
-        transform: 'none'
-      };
-    }
-
-    // Posicionamento especial para ranking (step 5) - apenas desktop
-    if (!isMobile && currentStep === 4) { // Step 5 - ranking
-      top = Math.max(rect.top - tooltipHeight - 400, 400);
-      left = Math.max(rect.left + (rect.width / 2) - (tooltipWidth / 2), 20);
-      if (left + tooltipWidth > window.innerWidth - 20) {
-        left = window.innerWidth - tooltipWidth - 20;
-      }
-      return {
-        top: `${top}px`,
-        left: `${left}px`,
-        transform: 'none'
-      };
-    }
 
     switch (position) {
       case 'top':

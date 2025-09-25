@@ -1308,9 +1308,33 @@ const Clinicas = () => {
       )}
       {/* Conteúdo da aba Clínicas */}
       {activeTab === 'clinicas' && (
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Lista de Clínicas</h2>
+        <>
+          {/* Resumo de Estatísticas */}
+          <div className="stats-grid" style={{ marginBottom: '2rem' }}>
+            <div className="stat-card">
+              <div className="stat-label">Total</div>
+              <div className="stat-value">{clinicas.length}</div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">Odontológica</div>
+              <div className="stat-value">{clinicas.filter(c => c.nicho === 'Odontológico').length}</div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">Estética</div>
+              <div className="stat-value">{clinicas.filter(c => c.nicho === 'Estético').length}</div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">Ambos</div>
+              <div className="stat-value">{clinicas.filter(c => c.nicho === 'Ambos').length}</div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Lista de Clínicas</h2>
             {!isConsultor && (
               <button 
                 className="btn btn-primary"
@@ -1650,6 +1674,7 @@ const Clinicas = () => {
           </div>
         )}
         </div>
+        </>
       )}
 
       {/* Conteúdo da aba Novas Clínicas */}
