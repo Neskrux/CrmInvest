@@ -75,7 +75,38 @@ const WelcomeModal = ({ isOpen, onClose, onStartTutorial }) => {
   const pages = [
     {
       title: 'Boas-vindas ao CRM Investmoney!',
-      content: 'Ganhe dinheiro indicando pacientes ou clínicas odontológicas e estéticas!',
+      content: (
+        <div>
+          <div style={{ 
+            textAlign: 'center', 
+            marginBottom: '20px',
+            borderRadius: '12px',
+            overflow: 'hidden'
+          }}>
+            <video 
+              controls 
+              style={{ 
+                width: '100%', 
+                maxWidth: '250px',
+                borderRadius: '8px'
+              }}
+              poster="/logo.png"
+            >
+              <source src="/IMG_6744.MOV" type="video/quicktime" />
+              <source src="/IMG_6744.MOV" type="video/mp4" />
+              Seu navegador não suporta o elemento de vídeo.
+            </video>
+          </div>
+          <p style={{ 
+            textAlign: 'center', 
+            fontSize: '16px', 
+            color: '#374151',
+            margin: '0'
+          }}>
+            Ganhe dinheiro indicando pacientes ou clínicas odontológicas e estéticas!
+          </p>
+        </div>
+      ),
       buttonText: 'Próxima Página',
       onButtonClick: () => setCurrentPage(1)
     },

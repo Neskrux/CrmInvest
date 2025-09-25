@@ -785,6 +785,7 @@
     
     .main-content {
       margin-left: 0;
+      zoom: 85% !important;
     }
     
     .page-content {
