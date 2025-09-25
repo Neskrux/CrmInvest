@@ -1529,11 +1529,12 @@ app.put('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res
 app.delete('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const { transferir_para_consultor_id, apenas_desativar } = req.body;
     
     // Verificar se o consultor existe
     const { data: consultor, error: consultorError } = await supabaseAdmin
       .from('consultores')
-      .select('id, nome, is_freelancer')
+      .select('id, nome, is_freelancer, ativo')
       .eq('id', id)
       .single();
 
@@ -1549,19 +1550,90 @@ app.delete('/api/consultores/:id', authenticateToken, requireAdmin, async (req, 
       return res.status(400).json({ error: 'Você não pode excluir a si mesmo' });
     }
 
-    // Excluir consultor
-    const { error: deleteError } = await supabaseAdmin
-      .from('consultores')
-      .delete()
-      .eq('id', id);
+    // Verificar se o consultor tem pacientes associados
+    const { data: pacientesAssociados, error: pacientesError } = await supabaseAdmin
+      .from('pacientes')
+      .select('id, nome')
+      .eq('consultor_id', id);
 
-    if (deleteError) throw deleteError;
+    if (pacientesError) throw pacientesError;
 
-    res.json({ 
-      message: `Consultor ${consultor.nome} excluído com sucesso!`
-    });
+    // Se tem pacientes associados e não foi especificado como lidar com eles
+    if (pacientesAssociados && pacientesAssociados.length > 0) {
+      if (!transferir_para_consultor_id && !apenas_desativar) {
+        return res.status(400).json({ 
+          error: 'Este consultor possui pacientes associados. É necessário especificar como lidar com eles.',
+          pacientes_associados: pacientesAssociados.length,
+          opcoes: {
+            transferir_para_consultor_id: 'ID do consultor para transferir os pacientes',
+            apenas_desativar: 'true para apenas desativar o consultor em vez de excluir'
+          }
+        });
+      }
+
+      // Se foi solicitado transferir pacientes
+      if (transferir_para_consultor_id) {
+        // Verificar se o consultor de destino existe
+        const { data: consultorDestino, error: destinoError } = await supabaseAdmin
+          .from('consultores')
+          .select('id, nome')
+          .eq('id', transferir_para_consultor_id)
+          .single();
+
+        if (destinoError || !consultorDestino) {
+          return res.status(400).json({ error: 'Consultor de destino não encontrado' });
+        }
+
+        // Transferir pacientes para o novo consultor
+        const { error: transferError } = await supabaseAdmin
+          .from('pacientes')
+          .update({ consultor_id: transferir_para_consultor_id })
+          .eq('consultor_id', id);
+
+        if (transferError) throw transferError;
+
+        console.log(`📋 ${pacientesAssociados.length} pacientes transferidos de ${consultor.nome} para ${consultorDestino.nome}`);
+      }
+    }
+
+    // Se foi solicitado apenas desativar
+    if (apenas_desativar) {
+      const { error: deactivateError } = await supabaseAdmin
+        .from('consultores')
+        .update({ ativo: false })
+        .eq('id', id);
+
+      if (deactivateError) throw deactivateError;
+
+      res.json({ 
+        message: `Consultor ${consultor.nome} desativado com sucesso!`,
+        desativado: true
+      });
+    } else {
+      // Excluir consultor (após transferir pacientes se necessário)
+      const { error: deleteError } = await supabaseAdmin
+        .from('consultores')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) throw deleteError;
+
+      res.json({ 
+        message: `Consultor ${consultor.nome} excluído com sucesso!`,
+        pacientes_transferidos: pacientesAssociados ? pacientesAssociados.length : 0
+      });
+    }
   } catch (error) {
     console.error('Erro ao excluir consultor:', error);
+    
+    // Se for erro de foreign key constraint, retornar erro mais específico
+    if (error.code === '23503') {
+      return res.status(400).json({ 
+        error: 'Não é possível excluir este consultor pois ele possui pacientes associados. Use as opções de transferência ou desativação.',
+        code: 'FOREIGN_KEY_CONSTRAINT'
+      });
+    }
+    
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -2142,6 +2214,7 @@ app.get('/api/novos-leads', authenticateToken, async (req, res) => {
 app.put('/api/novos-leads/:id/pegar', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
+    const { consultor_id } = req.body;
     
     // Verificar se o lead ainda está disponível
     const { data: pacienteAtual, error: checkError } = await supabaseAdmin
@@ -2156,10 +2229,24 @@ app.put('/api/novos-leads/:id/pegar', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Este lead já foi atribuído a outro consultor!' });
     }
 
-    // Atribuir o lead ao consultor atual
+    // Determinar qual consultor_id usar
+    let consultorIdParaAtribuir;
+    
+    if (consultor_id) {
+      // Se foi fornecido consultor_id no body (admin escolhendo consultor)
+      consultorIdParaAtribuir = consultor_id;
+    } else if (req.user.consultor_id) {
+      // Se o usuário tem consultor_id (consultor normal)
+      consultorIdParaAtribuir = req.user.consultor_id;
+    } else {
+      // Se não tem consultor_id e não foi fornecido no body
+      return res.status(400).json({ error: 'É necessário especificar um consultor para atribuir o lead!' });
+    }
+
+    // Atribuir o lead ao consultor
     const { error } = await supabaseAdmin
       .from('pacientes')
-      .update({ consultor_id: req.user.id })
+      .update({ consultor_id: consultorIdParaAtribuir })
       .eq('id', id);
 
     if (error) throw error;

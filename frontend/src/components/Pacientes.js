@@ -78,6 +78,12 @@ const Pacientes = () => {
   });
   const [salvandoAgendamento, setSalvandoAgendamento] = useState(false);
 
+  // Estados para modal de atribuir consultor (para admins)
+  const [showAtribuirConsultorModal, setShowAtribuirConsultorModal] = useState(false);
+  const [leadParaAtribuir, setLeadParaAtribuir] = useState(null);
+  const [consultorSelecionado, setConsultorSelecionado] = useState('');
+  const [salvandoAtribuicao, setSalvandoAtribuicao] = useState(false);
+
   // Estados brasileiros
   const estadosBrasileiros = [
     { sigla: 'AC', nome: 'Acre' },
@@ -213,7 +219,7 @@ const Pacientes = () => {
 
   // Controlar scroll do body quando modal estiver aberto
   useEffect(() => {
-    if (showModal || showViewModal || showObservacoesModal || showAgendamentoModal || showPermissaoModal) {
+    if (showModal || showViewModal || showObservacoesModal || showAgendamentoModal || showPermissaoModal || showAtribuirConsultorModal) {
       // Bloquear scroll da página
       document.body.style.overflow = 'hidden';
     } else {
@@ -225,7 +231,7 @@ const Pacientes = () => {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [showModal, showViewModal, showObservacoesModal, showAgendamentoModal, showFechamentoModal, showPermissaoModal]);
+  }, [showModal, showViewModal, showObservacoesModal, showAgendamentoModal, showFechamentoModal, showPermissaoModal, showAtribuirConsultorModal]);
   
   //Sempre que filtros ou a lista mudarem, voltar para a primeira página
   useEffect(() => {
@@ -309,6 +315,18 @@ const Pacientes = () => {
   };
 
   const pegarLead = async (leadId) => {
+    // Se for admin, abrir modal para escolher consultor
+    if (isAdmin) {
+      const lead = novosLeads.find(l => l.id === leadId);
+      if (lead) {
+        setLeadParaAtribuir(lead);
+        setConsultorSelecionado('');
+        setShowAtribuirConsultorModal(true);
+      }
+      return;
+    }
+
+    // Para consultores, usar o fluxo normal
     try {
       const response = await makeRequest(`/novos-leads/${leadId}/pegar`, {
         method: 'PUT'
@@ -884,6 +902,44 @@ const Pacientes = () => {
     setTipoTratamentoFechamento('');
     setObservacoesFechamento('');
     setDataFechamento(new Date().toISOString().split('T')[0]);
+  };
+
+  // Funções do modal de atribuir consultor
+  const fecharModalAtribuirConsultor = () => {
+    setShowAtribuirConsultorModal(false);
+    setLeadParaAtribuir(null);
+    setConsultorSelecionado('');
+  };
+
+  const confirmarAtribuicaoConsultor = async () => {
+    if (!consultorSelecionado) {
+      showErrorToast('Por favor, selecione um consultor!');
+      return;
+    }
+
+    setSalvandoAtribuicao(true);
+    try {
+      const response = await makeRequest(`/novos-leads/${leadParaAtribuir.id}/pegar`, {
+        method: 'PUT',
+        body: JSON.stringify({ consultor_id: parseInt(consultorSelecionado) })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        showSuccessToast('Lead atribuído com sucesso!');
+        fecharModalAtribuirConsultor();
+        fetchNovosLeads();
+        fetchPacientes();
+      } else {
+        showErrorToast('Erro ao atribuir lead: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao atribuir lead:', error);
+      showErrorToast('Erro ao atribuir lead');
+    } finally {
+      setSalvandoAtribuicao(false);
+    }
   };
 
   const formatarValorInput = (valor) => {
@@ -1646,23 +1702,21 @@ const Pacientes = () => {
                               flexWrap: 'wrap',
                               justifyContent: 'flex-start'
                             }}>
-                              {window.innerWidth <= 768 && (
-                                <button
-                                  onClick={() => handleView(lead)}
-                                  className="btn-action"
-                                  title="Visualizar"
-                                  style={{ 
-                                    padding: '0.375rem',
-                                    minWidth: '32px',
-                                    height: '32px'
-                                  }}
-                                >
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                                    <circle cx="12" cy="12" r="3" />
-                                  </svg>
-                                </button>
-                              )}
+                              <button
+                                onClick={() => handleView(lead)}
+                                className="btn-action"
+                                title="Visualizar"
+                                style={{ 
+                                  padding: '0.375rem',
+                                  minWidth: '32px',
+                                  height: '32px'
+                                }}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                  <circle cx="12" cy="12" r="3" />
+                                </svg>
+                              </button>
                               <button
                                 onClick={() => pegarLead(lead.id)}
                                 className="btn btn-primary"
@@ -2295,6 +2349,89 @@ const Pacientes = () => {
                   onClick={() => setShowPermissaoModal(false)}
                 >
                   Entendi
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Atribuir Consultor */}
+      {showAtribuirConsultorModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Atribuir Lead a Consultor</h2>
+              <button className="close-btn" onClick={fecharModalAtribuirConsultor}>
+                ×
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem' }}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <p style={{ 
+                  color: '#374151', 
+                  marginBottom: '1rem',
+                  lineHeight: '1.5'
+                }}>
+                  <strong>Lead:</strong> {leadParaAtribuir?.nome}
+                </p>
+                <p style={{ 
+                  color: '#6b7280', 
+                  fontSize: '0.875rem',
+                  lineHeight: '1.5'
+                }}>
+                  Selecione o consultor que irá atender este lead:
+                </p>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Consultor *</label>
+                <select 
+                  className="form-select"
+                  value={consultorSelecionado}
+                  onChange={(e) => setConsultorSelecionado(e.target.value)}
+                >
+                  <option value="">Selecione um consultor</option>
+                  {consultores.map(consultor => (
+                    <option key={consultor.id} value={consultor.id}>
+                      {consultor.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ 
+                display: 'flex', 
+                gap: '1rem', 
+                justifyContent: 'flex-end' 
+              }}>
+                <button 
+                  type="button"
+                  className="btn btn-secondary" 
+                  onClick={fecharModalAtribuirConsultor}
+                  disabled={salvandoAtribuicao}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={confirmarAtribuicaoConsultor}
+                  disabled={salvandoAtribuicao || !consultorSelecionado}
+                >
+                  {salvandoAtribuicao ? (
+                    <>
+                      <span className="loading-spinner" style={{ 
+                        display: 'inline-block', 
+                        verticalAlign: 'middle', 
+                        marginRight: 8 
+                      }}></span>
+                      Atribuindo...
+                    </>
+                  ) : (
+                    'Atribuir Lead'
+                  )}
                 </button>
               </div>
             </div>
