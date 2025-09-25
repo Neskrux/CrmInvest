@@ -1715,6 +1715,7 @@ app.get('/api/novos-leads', authenticateToken, async (req, res) => {
 app.put('/api/novos-leads/:id/pegar', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
+    const { consultor_id } = req.body;
     
     // Verificar se o lead ainda está disponível
     const { data: pacienteAtual, error: checkError } = await supabase
@@ -1729,10 +1730,24 @@ app.put('/api/novos-leads/:id/pegar', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Este lead já foi atribuído a outro consultor!' });
     }
 
-    // Atribuir o lead ao consultor atual
+    // Determinar qual consultor_id usar
+    let consultorIdParaAtribuir;
+    
+    if (consultor_id) {
+      // Se foi fornecido consultor_id no body (admin escolhendo consultor)
+      consultorIdParaAtribuir = consultor_id;
+    } else if (req.user.consultor_id) {
+      // Se o usuário tem consultor_id (consultor normal)
+      consultorIdParaAtribuir = req.user.consultor_id;
+    } else {
+      // Se não tem consultor_id e não foi fornecido no body
+      return res.status(400).json({ error: 'É necessário especificar um consultor para atribuir o lead!' });
+    }
+
+    // Atribuir o lead ao consultor
     const { error } = await supabase
       .from('pacientes')
-      .update({ consultor_id: req.user.consultor_id })
+      .update({ consultor_id: consultorIdParaAtribuir })
       .eq('id', id);
 
     if (error) throw error;

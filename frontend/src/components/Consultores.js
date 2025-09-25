@@ -630,10 +630,6 @@ const Consultores = () => {
   };
 
   const excluirConsultor = async (consultor) => {
-    if (!window.confirm(`Tem certeza que deseja excluir o consultor "${consultor.nome}"?\n\nEsta ação não pode ser desfeita.`)) {
-      return;
-    }
-
     try {
       const response = await makeRequest(`/consultores/${consultor.id}`, {
         method: 'DELETE'
@@ -645,10 +641,89 @@ const Consultores = () => {
         showSuccessToast(data.message);
         fetchConsultores(); // Recarregar lista
       } else {
-        showErrorToast('Erro ao excluir consultor: ' + data.error);
+        // Se o erro indica que há pacientes associados
+        if (data.pacientes_associados !== undefined) {
+          mostrarModalOpcoesExclusao(consultor, data);
+        } else {
+          showErrorToast('Erro ao excluir consultor: ' + data.error);
+        }
       }
     } catch (error) {
       console.error('Erro ao excluir consultor:', error);
+      showErrorToast('Erro ao conectar com o servidor');
+    }
+  };
+
+  const mostrarModalOpcoesExclusao = (consultor, dadosErro) => {
+    const opcoes = `
+Este consultor possui ${dadosErro.pacientes_associados} paciente(s) associado(s).
+
+Escolha uma opção:
+1. Transferir pacientes para outro consultor
+2. Apenas desativar o consultor (não excluir)
+3. Cancelar
+
+Digite o número da opção desejada:`;
+
+    const opcao = prompt(opcoes);
+    
+    if (opcao === '1') {
+      // Transferir pacientes
+      mostrarModalTransferencia(consultor);
+    } else if (opcao === '2') {
+      // Apenas desativar
+      if (window.confirm(`Tem certeza que deseja desativar o consultor "${consultor.nome}"?\n\nO consultor será desativado mas não excluído.`)) {
+        excluirConsultorComOpcoes(consultor, { apenas_desativar: true });
+      }
+    }
+    // Se opcao === '3' ou qualquer outra coisa, cancela
+  };
+
+  const mostrarModalTransferencia = (consultor) => {
+    // Criar modal simples para seleção de consultor
+    const consultoresDisponiveis = consultores.filter(c => c.id !== consultor.id && c.ativo !== false);
+    
+    if (consultoresDisponiveis.length === 0) {
+      showErrorToast('Não há outros consultores disponíveis para transferir os pacientes.');
+      return;
+    }
+
+    let opcoesTexto = 'Selecione o consultor para transferir os pacientes:\n\n';
+    consultoresDisponiveis.forEach((c, index) => {
+      opcoesTexto += `${index + 1}. ${c.nome}\n`;
+    });
+    opcoesTexto += '\nDigite o número do consultor:';
+
+    const selecao = prompt(opcoesTexto);
+    const indice = parseInt(selecao) - 1;
+
+    if (indice >= 0 && indice < consultoresDisponiveis.length) {
+      const consultorDestino = consultoresDisponiveis[indice];
+      if (window.confirm(`Transferir todos os pacientes de "${consultor.nome}" para "${consultorDestino.nome}" e excluir o consultor?`)) {
+        excluirConsultorComOpcoes(consultor, { 
+          transferir_para_consultor_id: consultorDestino.id 
+        });
+      }
+    }
+  };
+
+  const excluirConsultorComOpcoes = async (consultor, opcoes) => {
+    try {
+      const response = await makeRequest(`/consultores/${consultor.id}`, {
+        method: 'DELETE',
+        body: JSON.stringify(opcoes)
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        showSuccessToast(data.message);
+        fetchConsultores(); // Recarregar lista
+      } else {
+        showErrorToast('Erro ao processar exclusão: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao processar exclusão:', error);
       showErrorToast('Erro ao conectar com o servidor');
     }
   };
