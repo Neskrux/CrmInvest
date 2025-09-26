@@ -349,7 +349,7 @@ const Clinicas = () => {
         // Para consultores freelancers, filtrar apenas as clínicas que eles indicaram
         if (isConsultor && !isAdmin) {
           const clinicasFiltradas = data.filter(clinica => 
-            clinica.consultor_id && clinica.consultor_id === user?.consultor_id
+            clinica.criado_por_consultor_id && clinica.criado_por_consultor_id === user?.id
           );
           setNovasClinicas(clinicasFiltradas);
         } else {
