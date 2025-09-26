@@ -2304,6 +2304,12 @@ app.delete('/api/novos-leads/:id', authenticateToken, requireAdmin, async (req, 
 // === NOVAS CLÍNICAS === (Funcionalidade para pegar clínicas encontradas nas missões)
 app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
   try {
+    console.log('🔍 DEBUG /api/novas-clinicas - Dados do usuário:');
+    console.log('🔍 Tipo:', req.user.tipo);
+    console.log('🔍 pode_ver_todas_novas_clinicas:', req.user.pode_ver_todas_novas_clinicas);
+    console.log('🔍 podealterarstatus:', req.user.podealterarstatus);
+    console.log('🔍 is_freelancer:', req.user.is_freelancer);
+    
     let query = supabase
       .from('novas_clinicas')
       .select(`
@@ -2312,13 +2318,29 @@ app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
       `)
       .order('created_at', { ascending: false });
 
-    // Se for consultor, mostrar apenas clínicas disponíveis (sem proprietário) ou suas próprias
-    if (req.user.tipo === 'consultor') {
-      query = query.or(`consultor_id.is.null,consultor_id.eq.${req.user.id}`);
+    // Se for consultor freelancer (não tem as duas permissões), mostrar apenas clínicas disponíveis (sem proprietário) ou suas próprias
+    // Consultores internos (com pode_ver_todas_novas_clinicas=true E podealterarstatus=true) veem todas as novas clínicas
+    const isFreelancer = req.user.tipo === 'consultor' && !(req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true);
+    console.log('🔍 É freelancer?', isFreelancer);
+    
+    if (isFreelancer) {
+      console.log('🔍 Aplicando filtro para freelancer - ID:', req.user.id);
+      query = query.or(`criado_por_consultor_id.is.null,criado_por_consultor_id.eq.${req.user.id}`);
+      console.log('🔍 Query filtrada aplicada');
+    } else {
+      console.log('🔍 Usuário tem acesso a todas as novas clínicas');
     }
-    // Admin vê todas as novas clínicas (com ou sem consultor_id)
+    // Admin e consultores internos veem todas as novas clínicas (com ou sem consultor_id)
 
     const { data, error } = await query;
+    
+    console.log('🔍 Total de clínicas retornadas:', data ? data.length : 0);
+    if (data && data.length > 0) {
+      console.log('🔍 Primeiras 3 clínicas:');
+      data.slice(0, 3).forEach((clinica, index) => {
+        console.log(`🔍 Clínica ${index + 1}: ID=${clinica.id}, Nome=${clinica.nome}, criado_por_consultor_id=${clinica.criado_por_consultor_id}`);
+      });
+    }
 
     if (error) throw error;
     
@@ -2521,7 +2543,15 @@ app.put('/api/novas-clinicas/:id/status', authenticateToken, async (req, res) =>
     console.log('🔧 Usuário autenticado:', req.user);
     
     // Verificar se o status é válido
-    const statusValidos = ['tem_interesse', 'nao_tem_interesse', 'em_contato', 'nao_fechou'];
+    const statusValidos = [
+      'sem_primeiro_contato', 
+      'tem_interesse', 
+      'nao_tem_interesse', 
+      'em_contato', 
+      'reuniao_marcada', 
+      'aguardando_documentacao', 
+      'nao_fechou'
+    ];
     if (!status || !statusValidos.includes(status)) {
       return res.status(400).json({ error: 'Status inválido! Status válidos: ' + statusValidos.join(', ') });
     }
@@ -3973,6 +4003,232 @@ if (io) {
   });
 }
 
+
+// ==================== ROTAS PARA MATERIAIS ====================
+
+// Middleware para servir arquivos de materiais
+app.use('/uploads/materiais', express.static(path.join(__dirname, 'uploads', 'materiais')));
+
+// Configuração do multer para upload de arquivos de materiais
+const materiaisStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(__dirname, 'uploads', 'materiais');
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const materiaisUpload = multer({ 
+  storage: materiaisStorage,
+  limits: {
+    fileSize: 200 * 1024 * 1024 // 200MB
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      // Documentos
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain',
+      'application/zip',
+      'application/x-rar-compressed',
+      // Vídeos
+      'video/mp4',
+      'video/quicktime',
+      'video/x-msvideo',
+      'video/x-matroska',
+      'video/x-ms-wmv',
+      'video/x-flv',
+      'video/webm'
+    ];
+    
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Tipo de arquivo não permitido. Apenas documentos e vídeos são aceitos.'), false);
+    }
+  }
+});
+
+// GET /api/materiais - Listar todos os materiais
+app.get('/api/materiais', authenticateToken, async (req, res) => {
+  try {
+    console.log('🔧 GET /api/materiais recebido');
+    console.log('🔧 Usuário autenticado:', req.user);
+
+    const { data, error } = await supabaseAdmin
+      .from('materiais')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Erro ao buscar materiais:', error);
+      return res.status(500).json({ error: 'Erro ao buscar materiais' });
+    }
+
+    console.log('🔧 Materiais encontrados:', data.length);
+    res.json(data);
+  } catch (error) {
+    console.error('Erro ao buscar materiais:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// POST /api/materiais - Criar novo material
+app.post('/api/materiais', authenticateToken, requireAdmin, (req, res, next) => {
+  materiaisUpload.single('arquivo')(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'Arquivo muito grande! Tamanho máximo permitido: 200MB' });
+      }
+      return res.status(400).json({ error: 'Erro no upload do arquivo: ' + err.message });
+    }
+    next();
+  });
+}, async (req, res) => {
+  try {
+    console.log('🔧 POST /api/materiais recebido');
+    console.log('🔧 Headers:', req.headers);
+    console.log('🔧 Body:', req.body);
+    console.log('🔧 File:', req.file);
+    console.log('🔧 Usuário autenticado:', req.user);
+
+    const { titulo, descricao, tipo } = req.body;
+
+    if (!titulo || !tipo) {
+      return res.status(400).json({ error: 'Título e tipo são obrigatórios' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Arquivo é obrigatório' });
+    }
+
+    const materialData = {
+      titulo,
+      descricao: descricao || '',
+      tipo,
+      url: null,
+      arquivo_nome: req.file.originalname,
+      arquivo_url: `/uploads/materiais/${req.file.filename}`,
+      created_by: req.user.id
+    };
+
+    const { data, error } = await supabaseAdmin
+      .from('materiais')
+      .insert([materialData])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao criar material:', error);
+      return res.status(500).json({ error: 'Erro ao criar material' });
+    }
+
+    console.log('🔧 Material criado com sucesso:', data.id);
+    res.status(201).json(data);
+  } catch (error) {
+    console.error('Erro ao criar material:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// GET /api/materiais/:id/download - Download de arquivo
+app.get('/api/materiais/:id/download', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('🔧 GET /api/materiais/:id/download recebido');
+    console.log('🔧 ID do material:', id);
+
+    const { data, error } = await supabaseAdmin
+      .from('materiais')
+      .select('arquivo_url, arquivo_nome, titulo')
+      .eq('id', id)
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ error: 'Material não encontrado' });
+    }
+
+    if (!data.arquivo_url) {
+      return res.status(400).json({ error: 'Este material não possui arquivo para download' });
+    }
+
+    const filePath = path.join(__dirname, data.arquivo_url);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Arquivo não encontrado no servidor' });
+    }
+
+    const fileName = data.arquivo_nome || data.titulo;
+    res.download(filePath, fileName);
+  } catch (error) {
+    console.error('Erro ao fazer download do material:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// DELETE /api/materiais/:id - Excluir material
+app.delete('/api/materiais/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('🔧 DELETE /api/materiais/:id recebido');
+    console.log('🔧 ID do material:', id);
+    console.log('🔧 Usuário autenticado:', req.user);
+
+    // Buscar o material para obter informações do arquivo
+    const { data: material, error: fetchError } = await supabaseAdmin
+      .from('materiais')
+      .select('arquivo_url')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !material) {
+      return res.status(404).json({ error: 'Material não encontrado' });
+    }
+
+    // Excluir o material do banco
+    const { error: deleteError } = await supabaseAdmin
+      .from('materiais')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) {
+      console.error('Erro ao excluir material:', deleteError);
+      return res.status(500).json({ error: 'Erro ao excluir material' });
+    }
+
+    // Excluir o arquivo físico se existir
+    if (material.arquivo_url) {
+      const filePath = path.join(__dirname, material.arquivo_url);
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+          console.log('🔧 Arquivo físico excluído:', filePath);
+        } catch (fileError) {
+          console.error('Erro ao excluir arquivo físico:', fileError);
+        }
+      }
+    }
+
+    console.log('🔧 Material excluído com sucesso:', id);
+    res.json({ message: 'Material excluído com sucesso' });
+  } catch (error) {
+    console.error('Erro ao excluir material:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// ==================== FIM DAS ROTAS PARA MATERIAIS ====================
 
 // Inicializar servidor
 server.listen(PORT, async () => {
