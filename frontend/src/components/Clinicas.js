@@ -25,6 +25,9 @@ const Clinicas = () => {
   const [viewingClinica, setViewingClinica] = useState(null);
   const [viewNovaClinicaModalOpen, setViewNovaClinicaModalOpen] = useState(false);
   const [viewingNovaClinica, setViewingNovaClinica] = useState(null);
+  const [activeViewTab, setActiveViewTab] = useState('informacoes');
+  const [pacientesClinica, setPacientesClinica] = useState([]);
+  const [loadingPacientes, setLoadingPacientes] = useState(false);
   const [clinicasGeo, setClinicasGeo] = useState([]);
   const [novasClinicasGeo, setNovasClinicasGeo] = useState([]);
   const [geocoding, setGeocoding] = useState(false);
@@ -599,11 +602,56 @@ const Clinicas = () => {
   const handleView = (clinica) => {
     setViewingClinica(clinica);
     setViewModalOpen(true);
+    // Buscar pacientes quando abrir o modal (será carregado quando clicar na aba)
   };
 
   const closeViewModal = () => {
     setViewModalOpen(false);
     setViewingClinica(null);
+    setActiveViewTab('informacoes');
+    setPacientesClinica([]);
+  };
+
+  const fetchPacientesClinica = async (clinicaId) => {
+    setLoadingPacientes(true);
+    try {
+      const response = await makeRequest('/pacientes');
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Filtrar apenas pacientes que tenham agendamentos nesta clínica
+        const responseAgendamentos = await makeRequest('/agendamentos');
+        const agendamentos = await responseAgendamentos.json();
+        
+        if (responseAgendamentos.ok) {
+          const pacientesIds = agendamentos
+            .filter(agendamento => agendamento.clinica_id === clinicaId)
+            .map(agendamento => agendamento.paciente_id);
+          
+          const pacientesFiltrados = data.filter(paciente => 
+            pacientesIds.includes(paciente.id)
+          );
+          
+          setPacientesClinica(pacientesFiltrados);
+        }
+      } else {
+        showErrorToast('Erro ao carregar pacientes: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar pacientes:', error);
+      showErrorToast('Erro ao carregar pacientes');
+    } finally {
+      setLoadingPacientes(false);
+    }
+  };
+
+  const handleTabChange = (tab) => {
+    setActiveViewTab(tab);
+    
+    // Carregar dados específicos da aba quando necessário
+    if (tab === 'pacientes' && viewingClinica && pacientesClinica.length === 0) {
+      fetchPacientesClinica(viewingClinica.id);
+    }
   };
 
   const handleViewNovaClinica = (clinica) => {
@@ -2884,13 +2932,13 @@ const Clinicas = () => {
         </div>
       )}
 
-             {/* Modal de Visualização */}
+             {/* Modal de Visualização com Abas */}
        {viewModalOpen && viewingClinica && (
          <div className="modal-overlay">
-           <div className="modal" style={{ maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto' }}>
+           <div className="modal" style={{ maxWidth: '1000px', maxHeight: '90vh', overflowY: 'auto' }}>
              <div className="modal-header">
                <h2 className="modal-title">
-                 Detalhes da Clínica
+                 {viewingClinica.nome}
                </h2>
                <button 
                  className="close-btn"
@@ -2900,144 +2948,242 @@ const Clinicas = () => {
                </button>
              </div>
  
-             <div style={{ padding: '1.5rem' }}>
-               <div style={{ display: 'grid', gap: '1rem' }}>
-                 <div>
-                   <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Nome da Clínica</label>
-                   <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.nome}</p>
-                 </div>
-                 
-                 {viewingClinica.cnpj && (
-                   <div>
-                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>CNPJ</label>
-                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937', fontFamily: 'monospace' }}>
-                       {viewingClinica.cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')}
-                     </p>
-                   </div>
-                 )}
-
-                 {viewingClinica.responsavel && (
-                   <div>
-                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Responsável</label>
-                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.responsavel}</p>
-                   </div>
-                 )}
-                 
-                 {viewingClinica.endereco && (
-                   <div>
-                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Endereço</label>
-                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.endereco}</p>
-                   </div>
-                 )}
-                 
-                 {viewingClinica.bairro && (
-                   <div>
-                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Bairro</label>
-                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.bairro}</p>
-                   </div>
-                 )}
-                 
-                 {(viewingClinica.cidade || viewingClinica.estado) && (
-                   <div>
-                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Localização</label>
-                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
-                       {viewingClinica.cidade && viewingClinica.estado 
-                         ? `${viewingClinica.cidade}, ${viewingClinica.estado}`
-                         : viewingClinica.cidade || viewingClinica.estado
-                       }
-                     </p>
-                   </div>
-                 )}
-                 
-                 {viewingClinica.nicho && (
-                   <div>
-                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Nicho</label>
-                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.nicho}</p>
-                   </div>
-                 )}
-                 
-                 {viewingClinica.telefone && (
-                   <div>
-                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Telefone</label>
-                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{formatarTelefone(viewingClinica.telefone)}</p>
-                   </div>
-                 )}
-                 
-                 {viewingClinica.email && (
-                   <div>
-                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>E-mail</label>
-                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.email}</p>
-                   </div>
-                 )}
-                 
-                 {viewingClinica.status && (
-                   <div>
-                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Status</label>
-                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
-                       <span className={`badge ${
-                         viewingClinica.status === 'ativa' ? 'badge-success' : 
-                         viewingClinica.status === 'inativa' ? 'badge-danger' :
-                         viewingClinica.status === 'em_contato' ? 'badge-primary' :
-                         viewingClinica.status === 'nao_fechou' ? 'badge-warning' : 'badge-secondary'
-                       }`}>
-                         {viewingClinica.status === 'ativa' ? 'Ativa' : 
-                          viewingClinica.status === 'inativa' ? 'Inativa' :
-                          viewingClinica.status === 'em_contato' ? 'Em Contato' :
-                          viewingClinica.status === 'nao_fechou' ? 'Não Fechou' : viewingClinica.status}
-                       </span>
-                     </p>
-                   </div>
-                 )}
-                 
-                 {viewingClinica.consultor_nome && (
-                   <div>
-                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Indicado por</label>
-                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
-                       <span className="badge" style={{ backgroundColor: '#3b82f6', color: 'white' }}>
-                         {viewingClinica.consultor_nome}
-                       </span>
-                     </p>
-                   </div>
-                 )}
-                 
-                 {viewingClinica.created_at && (
-                   <div>
-                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Data de Cadastro</label>
-                     <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>{formatarData(viewingClinica.created_at)}</p>
-                   </div>
-                 )}
-               </div>
-               
-               {/* Seção de Documentos */}
+             {/* Abas de Navegação */}
+             <div style={{ 
+               borderBottom: '1px solid #e5e7eb',
+               padding: '0 1.5rem'
+             }}>
                <div style={{ 
-                 marginTop: '2rem', 
-                 paddingTop: '2rem', 
-                 borderTop: '2px solid #e5e7eb' 
+                 display: 'flex',
+                 gap: '2rem'
                }}>
-                 <h3 style={{ 
-                   fontSize: '1.125rem', 
-                   fontWeight: '700', 
-                   color: '#1a1d23', 
-                   marginBottom: '1.5rem',
-                   display: 'flex',
-                   alignItems: 'center',
-                   gap: '0.5rem'
-                 }}>
-                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                 <button
+                   onClick={() => handleTabChange('informacoes')}
+                   style={{
+                     padding: '1rem 0',
+                     border: 'none',
+                     background: 'none',
+                     fontSize: '0.875rem',
+                     fontWeight: '500',
+                     color: activeViewTab === 'informacoes' ? '#3b82f6' : '#6b7280',
+                     borderBottom: activeViewTab === 'informacoes' ? '2px solid #3b82f6' : '2px solid transparent',
+                     cursor: 'pointer',
+                     transition: 'all 0.2s'
+                   }}
+                 >
+                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
+                     <circle cx="12" cy="12" r="3"></circle>
+                     <path d="M12 1v6m0 6v6"></path>
+                     <path d="m21 12-6-6-6 6-6-6"></path>
+                   </svg>
+                   Informações Gerais
+                 </button>
+                 
+                 <button
+                   onClick={() => handleTabChange('documentos')}
+                   style={{
+                     padding: '1rem 0',
+                     border: 'none',
+                     background: 'none',
+                     fontSize: '0.875rem',
+                     fontWeight: '500',
+                     color: activeViewTab === 'documentos' ? '#3b82f6' : '#6b7280',
+                     borderBottom: activeViewTab === 'documentos' ? '2px solid #3b82f6' : '2px solid transparent',
+                     cursor: 'pointer',
+                     transition: 'all 0.2s'
+                   }}
+                 >
+                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                      <polyline points="14 2 14 8 20 8"></polyline>
                      <line x1="16" y1="13" x2="8" y2="13"></line>
                      <line x1="16" y1="17" x2="8" y2="17"></line>
-                     <polyline points="10 9 9 9 8 9"></polyline>
                    </svg>
-                   Documentação da Clínica
-                 </h3>
+                   Documentos
+                 </button>
                  
-                 <div style={{ 
-                   display: 'grid', 
-                   gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                   gap: '1rem'
-                 }}>
+                 <button
+                   onClick={() => handleTabChange('pacientes')}
+                   style={{
+                     padding: '1rem 0',
+                     border: 'none',
+                     background: 'none',
+                     fontSize: '0.875rem',
+                     fontWeight: '500',
+                     color: activeViewTab === 'pacientes' ? '#3b82f6' : '#6b7280',
+                     borderBottom: activeViewTab === 'pacientes' ? '2px solid #3b82f6' : '2px solid transparent',
+                     cursor: 'pointer',
+                     transition: 'all 0.2s'
+                   }}
+                 >
+                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
+                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                     <circle cx="12" cy="7" r="4"></circle>
+                   </svg>
+                   Pacientes
+                 </button>
+                 
+                 <button
+                   onClick={() => handleTabChange('historico')}
+                   style={{
+                     padding: '1rem 0',
+                     border: 'none',
+                     background: 'none',
+                     fontSize: '0.875rem',
+                     fontWeight: '500',
+                     color: activeViewTab === 'historico' ? '#3b82f6' : '#6b7280',
+                     borderBottom: activeViewTab === 'historico' ? '2px solid #3b82f6' : '2px solid transparent',
+                     cursor: 'pointer',
+                     transition: 'all 0.2s'
+                   }}
+                 >
+                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
+                     <circle cx="12" cy="12" r="10"></circle>
+                     <polyline points="12 6 12 12 16 14"></polyline>
+                   </svg>
+                   Histórico
+                 </button>
+               </div>
+             </div>
+
+             <div style={{ padding: '1.5rem' }}>
+               {/* Aba de Informações Gerais */}
+               {activeViewTab === 'informacoes' && (
+                 <div style={{ display: 'grid', gap: '1rem' }}>
+                   <div>
+                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Nome da Clínica</label>
+                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.nome}</p>
+                   </div>
+                   
+                   {viewingClinica.cnpj && (
+                     <div>
+                       <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>CNPJ</label>
+                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937', fontFamily: 'monospace' }}>
+                         {viewingClinica.cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')}
+                       </p>
+                     </div>
+                   )}
+
+                   {viewingClinica.responsavel && (
+                     <div>
+                       <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Responsável</label>
+                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.responsavel}</p>
+                     </div>
+                   )}
+                   
+                   {viewingClinica.endereco && (
+                     <div>
+                       <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Endereço</label>
+                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.endereco}</p>
+                     </div>
+                   )}
+                   
+                   {viewingClinica.bairro && (
+                     <div>
+                       <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Bairro</label>
+                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.bairro}</p>
+                     </div>
+                   )}
+                   
+                   {(viewingClinica.cidade || viewingClinica.estado) && (
+                     <div>
+                       <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Localização</label>
+                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                         {viewingClinica.cidade && viewingClinica.estado 
+                           ? `${viewingClinica.cidade}, ${viewingClinica.estado}`
+                           : viewingClinica.cidade || viewingClinica.estado
+                         }
+                       </p>
+                     </div>
+                   )}
+                   
+                   {viewingClinica.nicho && (
+                     <div>
+                       <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Nicho</label>
+                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.nicho}</p>
+                     </div>
+                   )}
+                   
+                   {viewingClinica.telefone && (
+                     <div>
+                       <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Telefone</label>
+                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{formatarTelefone(viewingClinica.telefone)}</p>
+                     </div>
+                   )}
+                   
+                   {viewingClinica.email && (
+                     <div>
+                       <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>E-mail</label>
+                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.email}</p>
+                     </div>
+                   )}
+                   
+                   {viewingClinica.status && (
+                     <div>
+                       <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Status</label>
+                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                         <span className={`badge ${
+                           viewingClinica.status === 'ativa' ? 'badge-success' : 
+                           viewingClinica.status === 'inativa' ? 'badge-danger' :
+                           viewingClinica.status === 'em_contato' ? 'badge-primary' :
+                           viewingClinica.status === 'nao_fechou' ? 'badge-warning' : 'badge-secondary'
+                         }`}>
+                           {viewingClinica.status === 'ativa' ? 'Ativa' : 
+                            viewingClinica.status === 'inativa' ? 'Inativa' :
+                            viewingClinica.status === 'em_contato' ? 'Em Contato' :
+                            viewingClinica.status === 'nao_fechou' ? 'Não Fechou' : viewingClinica.status}
+                         </span>
+                       </p>
+                     </div>
+                   )}
+                   
+                   {viewingClinica.consultor_nome && (
+                     <div>
+                       <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Indicado por</label>
+                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                         <span className="badge" style={{ backgroundColor: '#3b82f6', color: 'white' }}>
+                           {viewingClinica.consultor_nome}
+                         </span>
+                       </p>
+                     </div>
+                   )}
+                   
+                   {viewingClinica.created_at && (
+                     <div>
+                       <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Data de Cadastro</label>
+                       <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>{formatarData(viewingClinica.created_at)}</p>
+                     </div>
+                   )}
+                 </div>
+               )}
+
+               {/* Aba de Documentos */}
+               {activeViewTab === 'documentos' && (
+                 <div>
+                   <h3 style={{ 
+                     fontSize: '1.125rem', 
+                     fontWeight: '700', 
+                     color: '#1a1d23', 
+                     marginBottom: '1.5rem',
+                     display: 'flex',
+                     alignItems: 'center',
+                     gap: '0.5rem'
+                   }}>
+                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                       <polyline points="14 2 14 8 20 8"></polyline>
+                       <line x1="16" y1="13" x2="8" y2="13"></line>
+                       <line x1="16" y1="17" x2="8" y2="17"></line>
+                       <polyline points="10 9 9 9 8 9"></polyline>
+                     </svg>
+                     Documentação da Clínica
+                   </h3>
+                   
+                   <div style={{ 
+                     display: 'grid', 
+                     gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                     gap: '1rem'
+                   }}>
                    {/* 1 - Cartão CNPJ */}
                    <div style={{
                      padding: '1rem',
@@ -3347,17 +3493,183 @@ const Clinicas = () => {
                      </div>
                    </div>
                  </div>
-               </div>
-               
-               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem' }}>
-                 <button 
-                   type="button"
-                   className="btn btn-secondary"
-                   onClick={closeViewModal}
-                 >
-                   Fechar
-                 </button>
-               </div>
+                 </div>
+               )}
+
+               {/* Aba de Pacientes */}
+               {activeViewTab === 'pacientes' && (
+                 <div>
+                   <div style={{ 
+                     display: 'flex', 
+                     justifyContent: 'space-between', 
+                     alignItems: 'center',
+                     marginBottom: '1.5rem'
+                   }}>
+                     <h3 style={{ 
+                       fontSize: '1.125rem', 
+                       fontWeight: '700', 
+                       color: '#1a1d23',
+                       display: 'flex',
+                       alignItems: 'center',
+                       gap: '0.5rem',
+                       margin: 0
+                     }}>
+                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                         <circle cx="12" cy="7" r="4"></circle>
+                       </svg>
+                       Pacientes Atendidos
+                     </h3>
+                     <span style={{
+                       padding: '0.25rem 0.75rem',
+                       backgroundColor: '#3b82f6',
+                       color: 'white',
+                       borderRadius: '9999px',
+                       fontSize: '0.875rem',
+                       fontWeight: '500'
+                     }}>
+                       {pacientesClinica.length} paciente{pacientesClinica.length !== 1 ? 's' : ''}
+                     </span>
+                   </div>
+
+                   {loadingPacientes ? (
+                     <div style={{ textAlign: 'center', padding: '2rem' }}>
+                       <div className="loading-spinner"></div>
+                       <p style={{ marginTop: '1rem', color: '#6b7280' }}>Carregando pacientes...</p>
+                     </div>
+                   ) : pacientesClinica.length === 0 ? (
+                     <div style={{
+                       textAlign: 'center',
+                       padding: '3rem',
+                       backgroundColor: '#f9fafb',
+                       borderRadius: '8px',
+                       border: '1px solid #e5e7eb'
+                     }}>
+                       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ margin: '0 auto', color: '#9ca3af' }}>
+                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                         <circle cx="12" cy="7" r="4"></circle>
+                       </svg>
+                       <h4 style={{ color: '#6b7280', margin: '1rem 0 0.5rem 0' }}>Nenhum paciente encontrado</h4>
+                       <p style={{ color: '#9ca3af', fontSize: '0.875rem' }}>
+                         Esta clínica ainda não tem pacientes agendados no sistema.
+                       </p>
+                     </div>
+                   ) : (
+                     <div style={{ overflowX: 'auto' }}>
+                       <table className="data-table" style={{ width: '100%' }}>
+                         <thead>
+                           <tr>
+                             <th>Nome</th>
+                             <th>Telefone</th>
+                             <th>Status</th>
+                             <th>Data Cadastro</th>
+                           </tr>
+                         </thead>
+                         <tbody>
+                           {pacientesClinica.map((paciente) => (
+                             <tr key={paciente.id}>
+                               <td>
+                                 <strong>{paciente.nome}</strong>
+                               </td>
+                               <td>
+                                 {paciente.telefone ? 
+                                   formatarTelefone(paciente.telefone) : 
+                                   'Não informado'
+                                 }
+                               </td>
+                               <td>
+                                 <span style={{
+                                   padding: '0.25rem 0.75rem',
+                                   borderRadius: '9999px',
+                                   fontSize: '0.875rem',
+                                   fontWeight: '500',
+                                   backgroundColor: 
+                                     paciente.status === 'fechado' ? '#10b98120' :
+                                     paciente.status === 'agendado' ? '#3b82f620' :
+                                     paciente.status === 'lead' ? '#f59e0b20' : '#6b728020',
+                                   color:
+                                     paciente.status === 'fechado' ? '#10b981' :
+                                     paciente.status === 'agendado' ? '#3b82f6' :
+                                     paciente.status === 'lead' ? '#f59e0b' : '#6b7280'
+                                 }}>
+                                   {paciente.status === 'fechado' ? 'Fechado' :
+                                    paciente.status === 'agendado' ? 'Agendado' :
+                                    paciente.status === 'lead' ? 'Lead' : paciente.status}
+                                 </span>
+                               </td>
+                               <td style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                 {formatarData(paciente.created_at)}
+                               </td>
+                             </tr>
+                           ))}
+                         </tbody>
+                       </table>
+                     </div>
+                   )}
+                 </div>
+               )}
+
+               {/* Aba de Histórico */}
+               {activeViewTab === 'historico' && (
+                 <div>
+                   <h3 style={{ 
+                     fontSize: '1.125rem', 
+                     fontWeight: '700', 
+                     color: '#1a1d23', 
+                     marginBottom: '1.5rem',
+                     display: 'flex',
+                     alignItems: 'center',
+                     gap: '0.5rem'
+                   }}>
+                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                       <circle cx="12" cy="12" r="10"></circle>
+                       <polyline points="12 6 12 12 16 14"></polyline>
+                     </svg>
+                     Histórico de Atividades
+                   </h3>
+                   
+                   <div style={{
+                     textAlign: 'center',
+                     padding: '3rem',
+                     backgroundColor: '#f9fafb',
+                     borderRadius: '8px',
+                     border: '1px solid #e5e7eb'
+                   }}>
+                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ margin: '0 auto', color: '#9ca3af' }}>
+                       <circle cx="12" cy="12" r="10"></circle>
+                       <polyline points="12 6 12 12 16 14"></polyline>
+                     </svg>
+                     <h4 style={{ color: '#6b7280', margin: '1rem 0 0.5rem 0' }}>Histórico em Desenvolvimento</h4>
+                     <p style={{ color: '#9ca3af', fontSize: '0.875rem' }}>
+                       Em breve você poderá visualizar todas as atividades relacionadas a esta clínica:
+                     </p>
+                     <ul style={{ 
+                       color: '#9ca3af', 
+                       fontSize: '0.875rem', 
+                       textAlign: 'left', 
+                       maxWidth: '300px', 
+                       margin: '1rem auto',
+                       paddingLeft: '1rem'
+                     }}>
+                       <li>Alterações nos dados</li>
+                       <li>Upload de documentos</li>
+                       <li>Mudanças de status</li>
+                       <li>Agendamentos realizados</li>
+                       <li>Comunicações registradas</li>
+                     </ul>
+                   </div>
+                 </div>
+               )}
+              
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem' }}>
+                <button 
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={closeViewModal}
+                >
+                  Fechar
+                </button>
+              </div>
              </div>
            </div>
          </div>

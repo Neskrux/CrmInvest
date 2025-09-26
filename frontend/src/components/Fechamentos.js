@@ -33,6 +33,14 @@ const Fechamentos = () => {
   const [showObservacoesModal, setShowObservacoesModal] = useState(false);
   const [observacoesAtual, setObservacoesAtual] = useState('');
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  
+  // Estados para sistema de abas no modal de visualização de paciente
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewPaciente, setViewPaciente] = useState(null);
+  const [activeViewTab, setActiveViewTab] = useState('informacoes');
+  const [pacienteBoletos, setPacienteBoletos] = useState([]);
+  const [loadingBoletos, setLoadingBoletos] = useState(false);
+  const [estatisticasBoletos, setEstatisticasBoletos] = useState(null);
   const { error: showErrorToast, success: showSuccessToast, warning: showWarningToast, info: showInfoToast } = useToast();
 
   // Estados para controlar o tutorial
@@ -91,7 +99,7 @@ const Fechamentos = () => {
 
   // Controlar scroll do body quando modal estiver aberto
   useEffect(() => {
-    if (modalAberto || showObservacoesModal) {
+    if (modalAberto || showObservacoesModal || showViewModal) {
       // Bloquear scroll da página
       document.body.style.overflow = 'hidden';
     } else {
@@ -103,7 +111,7 @@ const Fechamentos = () => {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [modalAberto, showObservacoesModal]);
+  }, [modalAberto, showObservacoesModal, showViewModal]);
 
   const carregarDados = async () => {
     try {
@@ -243,6 +251,89 @@ const Fechamentos = () => {
   const handleViewObservacoes = (observacoes) => {
     setObservacoesAtual(observacoes || 'Nenhuma observação cadastrada.');
     setShowObservacoesModal(true);
+  };
+
+  // Função para visualizar paciente
+  const handleViewPaciente = (paciente) => {
+    setViewPaciente(paciente);
+    setActiveViewTab('informacoes'); // Reset para aba de informações
+    setShowViewModal(true);
+  };
+
+  // Função para fechar modal de visualização e resetar estados
+  const closeViewModal = () => {
+    setShowViewModal(false);
+    setViewPaciente(null);
+    setActiveViewTab('informacoes');
+    setPacienteBoletos([]);
+    setEstatisticasBoletos(null);
+  };
+
+  // Função para trocar de aba
+  const handleTabChange = (tab) => {
+    setActiveViewTab(tab);
+    
+    // Se for a aba de boletos e o paciente estiver fechado, buscar boletos
+    if (tab === 'boletos' && viewPaciente?.status === 'fechado') {
+      fetchBoletosPaciente();
+    }
+  };
+
+  // Função para buscar boletos do paciente
+  const fetchBoletosPaciente = async () => {
+    if (!viewPaciente) return;
+    
+    setLoadingBoletos(true);
+    try {
+      // Buscar boletos do paciente
+      const boletosResponse = await makeRequest(`/api/boletos/paciente/${viewPaciente.id}`);
+      if (boletosResponse.success) {
+        setPacienteBoletos(boletosResponse.data || []);
+      }
+
+      // Buscar estatísticas dos boletos
+      const statsResponse = await makeRequest(`/api/boletos/estatisticas/${viewPaciente.id}`);
+      if (statsResponse.success) {
+        setEstatisticasBoletos(statsResponse.data);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar boletos:', error);
+      showErrorToast('Erro ao carregar boletos do paciente');
+    } finally {
+      setLoadingBoletos(false);
+    }
+  };
+
+  // Função para formatar moeda
+  const formatarMoeda = (valor) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(valor || 0);
+  };
+
+  // Função para obter cor do status do boleto
+  const getStatusBoletoColor = (status) => {
+    switch (status) {
+      case 'pago': return '#10b981';
+      case 'vencido': return '#ef4444';
+      case 'pendente': return '#f59e0b';
+      case 'cancelado': return '#6b7280';
+      case 'processando': return '#3b82f6';
+      default: return '#6b7280';
+    }
+  };
+
+  // Função para obter label do status do boleto
+  const getStatusBoletoLabel = (status) => {
+    switch (status) {
+      case 'pago': return 'Pago';
+      case 'vencido': return 'Vencido';
+      case 'pendente': return 'Pendente';
+      case 'cancelado': return 'Cancelado';
+      case 'processando': return 'Processando';
+      default: return 'Desconhecido';
+    }
   };
 
   const abrirModal = (fechamento = null) => {
@@ -481,13 +572,6 @@ const Fechamentos = () => {
       console.error('Erro na requisição:', error);
       showErrorToast('Erro de conexão: ' + error.message);
     }
-  };
-
-  const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(valor);
   };
 
   const formatarData = (data) => {
@@ -878,7 +962,7 @@ const Fechamentos = () => {
                         </button>
                       )}
                     </th>
-                    <th style={{ width: '180px' }}>Ações</th>
+                    <th style={{ width: '240px' }}>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -956,6 +1040,17 @@ const Fechamentos = () => {
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button
+                              onClick={() => handleViewPaciente(paciente)}
+                              className="btn-action"
+                              title="Visualizar paciente"
+                              style={{ color: '#3b82f6' }}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                              </svg>
+                            </button>
                             {fechamento.contrato_arquivo && (
                               <button 
                                 onClick={() => downloadContrato(fechamento)}
@@ -1241,6 +1336,428 @@ const Fechamentos = () => {
                   onClick={() => setShowPermissaoModal(false)}
                 >
                   Entendi
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de visualização de paciente com abas */}
+      {showViewModal && viewPaciente && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ 
+            maxWidth: '1200px', 
+            width: '95vw',
+            maxHeight: '90vh', 
+            overflowY: 'auto',
+            margin: '2rem auto'
+          }}>
+            <div className="modal-header" style={{ padding: '1.5rem 2rem 1rem 2rem' }}>
+              <h2 className="modal-title" style={{ margin: 0, fontSize: '1.5rem' }}>
+                {viewPaciente.nome}
+              </h2>
+              <button
+                className="close-btn"
+                onClick={closeViewModal}
+                style={{ fontSize: '1.5rem', padding: '0.5rem' }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Abas de Navegação */}
+            <div style={{
+              borderBottom: '1px solid #e5e7eb',
+              padding: '0 2rem',
+              backgroundColor: '#f8fafc'
+            }}>
+              <div style={{
+                display: 'flex',
+                gap: '1rem',
+                justifyContent: 'flex-start',
+                marginBottom: '0'
+              }}>
+                <button 
+                  onClick={() => handleTabChange('informacoes')}
+                  style={{
+                    padding: '1rem 1.5rem',
+                    border: 'none',
+                    background: 'none',
+                    borderBottom: activeViewTab === 'informacoes' ? '3px solid #3b82f6' : '3px solid transparent',
+                    color: activeViewTab === 'informacoes' ? '#3b82f6' : '#6b7280',
+                    fontWeight: activeViewTab === 'informacoes' ? '600' : '500',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.875rem',
+                    transition: 'all 0.3s ease',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                  Informações Gerais
+                </button>
+                
+                {viewPaciente.status === 'fechado' && (
+                  <button 
+                    onClick={() => handleTabChange('boletos')}
+                    style={{
+                      padding: '1rem 1.5rem',
+                      border: 'none',
+                      background: 'none',
+                      borderBottom: activeViewTab === 'boletos' ? '3px solid #3b82f6' : '3px solid transparent',
+                      color: activeViewTab === 'boletos' ? '#3b82f6' : '#6b7280',
+                      fontWeight: activeViewTab === 'boletos' ? '600' : '500',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      fontSize: '0.875rem',
+                      transition: 'all 0.3s ease',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                      <line x1="8" y1="21" x2="16" y2="21"></line>
+                      <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                    Boletos
+                  </button>
+                )}
+                
+                <button 
+                  onClick={() => handleTabChange('historico')}
+                  style={{
+                    padding: '1rem 1.5rem',
+                    border: 'none',
+                    background: 'none',
+                    borderBottom: activeViewTab === 'historico' ? '3px solid #3b82f6' : '3px solid transparent',
+                    color: activeViewTab === 'historico' ? '#3b82f6' : '#6b7280',
+                    fontWeight: activeViewTab === 'historico' ? '600' : '500',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.875rem',
+                    transition: 'all 0.3s ease',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 3h6l6 18 3-9h6"></path>
+                  </svg>
+                  Histórico
+                </button>
+              </div>
+            </div>
+
+            <div style={{ padding: '2rem' }}>
+              {/* Aba de Informações Gerais */}
+              {activeViewTab === 'informacoes' && (
+                <div style={{ 
+                  display: 'grid', 
+                  gap: '1.5rem',
+                  maxWidth: '800px',
+                  margin: '0 auto'
+                }}>
+                  <div className="form-group">
+                    <label className="form-label">Nome Completo</label>
+                    <input type="text" className="form-input" value={viewPaciente.nome || '-'} readOnly />
+                  </div>
+                  <div className="grid grid-2">
+                    <div className="form-group">
+                      <label className="form-label">Telefone</label>
+                      <input type="text" className="form-input" value={viewPaciente.telefone || '-'} readOnly />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">CPF</label>
+                      <input type="text" className="form-input" value={viewPaciente.cpf || '-'} readOnly />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Cidade</label>
+                    <input type="text" className="form-input" value={viewPaciente.cidade || '-'} readOnly />
+                  </div>
+
+                  <div className="grid grid-2">
+                    <div className="form-group">
+                      <label className="form-label">Tipo de Tratamento</label>
+                      <input type="text" className="form-input" value={viewPaciente.tipo_tratamento || '-'} readOnly />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Status</label>
+                      <input type="text" className="form-input" value={viewPaciente.status || '-'} readOnly />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Consultor Responsável</label>
+                    <input type="text" className="form-input" value={consultores.find(c => String(c.id) === String(viewPaciente.consultor_id))?.nome || '-'} readOnly />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Observações</label>
+                    <textarea className="form-textarea" value={viewPaciente.observacoes || '-'} readOnly rows="3" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Cadastrado em</label>
+                    <input type="text" className="form-input" value={viewPaciente.created_at ? new Date(viewPaciente.created_at).toLocaleDateString('pt-BR') : '-'} readOnly />
+                  </div>
+                </div>
+              )}
+
+              {/* Aba de Boletos */}
+              {activeViewTab === 'boletos' && viewPaciente.status === 'fechado' && (
+                <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+                  <h3 style={{ 
+                    fontSize: '1.25rem', 
+                    fontWeight: '700', 
+                    color: '#1a1d23', 
+                    marginBottom: '2rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    paddingBottom: '1rem',
+                    borderBottom: '2px solid #e5e7eb'
+                  }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                      <line x1="8" y1="21" x2="16" y2="21"></line>
+                      <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                    Boletos do Paciente
+                  </h3>
+
+                  {loadingBoletos ? (
+                    <div style={{ textAlign: 'center', padding: '2rem' }}>
+                      <div style={{ 
+                        display: 'inline-block',
+                        width: '32px',
+                        height: '32px',
+                        border: '3px solid #f3f4f6',
+                        borderTop: '3px solid #3b82f6',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                      }}></div>
+                      <p style={{ marginTop: '1rem', color: '#6b7280' }}>Carregando boletos...</p>
+                    </div>
+                  ) : pacienteBoletos.length > 0 ? (
+                    <div>
+                      {/* Estatísticas dos boletos */}
+                      {estatisticasBoletos && (
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                          gap: '1rem',
+                          marginBottom: '2rem'
+                        }}>
+                          <div style={{
+                            padding: '1rem',
+                            backgroundColor: '#f0f9ff',
+                            borderRadius: '8px',
+                            border: '1px solid #bae6fd'
+                          }}>
+                            <div style={{ fontSize: '0.875rem', color: '#0369a1', fontWeight: '500' }}>Total de Boletos</div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#0c4a6e' }}>
+                              {estatisticasBoletos.total_boletos}
+                            </div>
+                          </div>
+                          <div style={{
+                            padding: '1rem',
+                            backgroundColor: '#f0fdf4',
+                            borderRadius: '8px',
+                            border: '1px solid #bbf7d0'
+                          }}>
+                            <div style={{ fontSize: '0.875rem', color: '#166534', fontWeight: '500' }}>Valor Total</div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#14532d' }}>
+                              {formatarMoeda(estatisticasBoletos.valor_total)}
+                            </div>
+                          </div>
+                          <div style={{
+                            padding: '1rem',
+                            backgroundColor: '#fef3c7',
+                            borderRadius: '8px',
+                            border: '1px solid #fde68a'
+                          }}>
+                            <div style={{ fontSize: '0.875rem', color: '#92400e', fontWeight: '500' }}>Pendentes</div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#78350f' }}>
+                              {estatisticasBoletos.boletos_pendentes}
+                            </div>
+                          </div>
+                          <div style={{
+                            padding: '1rem',
+                            backgroundColor: '#dcfce7',
+                            borderRadius: '8px',
+                            border: '1px solid #86efac'
+                          }}>
+                            <div style={{ fontSize: '0.875rem', color: '#166534', fontWeight: '500' }}>Pagos</div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#14532d' }}>
+                              {estatisticasBoletos.boletos_pagos}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Lista de boletos */}
+                      <div style={{
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '8px',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr',
+                          gap: '1rem',
+                          padding: '1rem',
+                          backgroundColor: '#f3f4f6',
+                          fontWeight: '600',
+                          fontSize: '0.875rem',
+                          color: '#374151'
+                        }}>
+                          <div>Parcela</div>
+                          <div>Valor</div>
+                          <div>Vencimento</div>
+                          <div>Status</div>
+                          <div>Ações</div>
+                        </div>
+                        
+                        {pacienteBoletos.map((boleto) => (
+                          <div key={boleto.id} style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr',
+                            gap: '1rem',
+                            padding: '1rem',
+                            borderBottom: '1px solid #e5e7eb',
+                            alignItems: 'center'
+                          }}>
+                            <div style={{ fontWeight: '500' }}>
+                              {boleto.numero_parcela}/{boleto.total_parcelas}
+                            </div>
+                            <div style={{ fontWeight: '500' }}>
+                              {formatarMoeda(boleto.valor)}
+                            </div>
+                            <div>
+                              {new Date(boleto.data_vencimento).toLocaleDateString('pt-BR')}
+                            </div>
+                            <div>
+                              <span style={{
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                fontWeight: '500',
+                                backgroundColor: getStatusBoletoColor(boleto.status) + '20',
+                                color: getStatusBoletoColor(boleto.status)
+                              }}>
+                                {getStatusBoletoLabel(boleto.status)}
+                              </span>
+                            </div>
+                            <div>
+                              {boleto.url_boleto && (
+                                <a
+                                  href={boleto.url_boleto}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    padding: '0.25rem 0.5rem',
+                                    backgroundColor: '#3b82f6',
+                                    color: 'white',
+                                    textDecoration: 'none',
+                                    borderRadius: '4px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '500'
+                                  }}
+                                >
+                                  Ver Boleto
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{
+                      textAlign: 'center',
+                      padding: '3rem 1rem',
+                      color: '#6b7280'
+                    }}>
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ margin: '0 auto 1rem' }}>
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                      </svg>
+                      <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                        Nenhum boleto encontrado
+                      </h3>
+                      <p style={{ fontSize: '0.875rem' }}>
+                        Este paciente ainda não possui boletos gerados.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Aba de Histórico */}
+              {activeViewTab === 'historico' && (
+                <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+                  <h3 style={{ 
+                    fontSize: '1.25rem', 
+                    fontWeight: '700', 
+                    color: '#1a1d23', 
+                    marginBottom: '2rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    paddingBottom: '1rem',
+                    borderBottom: '2px solid #e5e7eb'
+                  }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M3 3h6l6 18 3-9h6"></path>
+                    </svg>
+                    Histórico do Paciente
+                  </h3>
+                  
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '3rem 1rem',
+                    color: '#6b7280'
+                  }}>
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ margin: '0 auto 1rem' }}>
+                      <path d="M3 3h6l6 18 3-9h6"></path>
+                    </svg>
+                    <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                      Histórico em desenvolvimento
+                    </h3>
+                    <p style={{ fontSize: '0.875rem' }}>
+                      Esta funcionalidade será implementada em breve.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                marginTop: '3rem',
+                paddingTop: '2rem',
+                borderTop: '1px solid #e5e7eb'
+              }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={closeViewModal}
+                  style={{
+                    padding: '0.75rem 2rem',
+                    fontSize: '1rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  Fechar
                 </button>
               </div>
             </div>
