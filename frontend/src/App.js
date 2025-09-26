@@ -20,7 +20,7 @@ import Clinicas from './components/Clinicas';
 import Agendamentos from './components/Agendamentos';
 import Fechamentos from './components/Fechamentos';
 import MetaAds from './components/MetaAds';
-import WhatsApp from './components/WhatsApp';
+// import WhatsApp from './components/WhatsApp'; // Temporariamente removido
 import Perfil from './components/Perfil';
 import logoBrasao from './images/logobrasao.png';
 import logoHorizontal from './images/logohorizontal.png';
@@ -137,7 +137,8 @@ const AppContentWithNotifications = () => {
         <Route path="/agendamentos" element={<Agendamentos />} />
         <Route path="/fechamentos" element={<Fechamentos />} />
         <Route path="/meta-ads" element={<MetaAds />} />
-        <Route path="/whatsapp" element={<WhatsApp />} />
+        {/* Rota WhatsApp temporariamente removida */}
+        {/* <Route path="/whatsapp" element={<WhatsApp />} /> */}
         <Route path="/perfil" element={<Perfil />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -325,7 +326,8 @@ const AppContentWithNotifications = () => {
             </div>
           )}
 
-          <div className="nav-item">
+          {/* Botão de conversas temporariamente oculto */}
+          {/* <div className="nav-item">
             <Link
               to="/whatsapp"
               className={`nav-link ${activeTab === 'whatsapp' ? 'active' : ''}`}
@@ -336,7 +338,7 @@ const AppContentWithNotifications = () => {
               </svg>
               Conversas
             </Link>
-          </div>
+          </div> */}
 
           <div className="nav-item">
             <Link
