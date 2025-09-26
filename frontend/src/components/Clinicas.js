@@ -6,7 +6,7 @@ import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 const Clinicas = () => {
-  const { makeRequest, user, isAdmin, podeAlterarStatus } = useAuth();
+  const { makeRequest, user, isAdmin, podeAlterarStatus, isFreelancer } = useAuth();
   const { showSuccessToast, showErrorToast } = useToast();
   const [clinicas, setClinicas] = useState([]);
   const [novasClinicas, setNovasClinicas] = useState([]);
@@ -28,6 +28,11 @@ const Clinicas = () => {
   const [clinicasGeo, setClinicasGeo] = useState([]);
   const [novasClinicasGeo, setNovasClinicasGeo] = useState([]);
   const [geocoding, setGeocoding] = useState(false);
+
+  // Estados para links personalizados
+  const [linkPersonalizado, setLinkPersonalizado] = useState(null);
+  const [linkClinicas, setLinkClinicas] = useState(null);
+  const [loadingLink, setLoadingLink] = useState(true);
   const [formData, setFormData] = useState({
     nome: '',
     cnpj: '',
@@ -82,11 +87,24 @@ const Clinicas = () => {
   // Estado para modal de explicação de permissões
   const [showPermissaoModal, setShowPermissaoModal] = useState(false);
 
+  // Status disponíveis para clínicas gerais
+  const statusClinicaOptions = [
+    { value: 'ativa', label: 'Ativa', color: '#10b981' },
+    { value: 'inativa', label: 'Inativa', color: '#ef4444' },
+    { value: 'em_contato', label: 'Em Contato', color: '#3b82f6' },
+    { value: 'reuniao_marcada', label: 'Reunião Marcada', color: '#8b5cf6' },
+    { value: 'aguardando_documentacao', label: 'Aguardando Documentação', color: '#f59e0b' },
+    { value: 'nao_fechou', label: 'Não Fechou', color: '#f59e0b' }
+  ];
+
   // Status disponíveis para novas clínicas
   const statusNovaClinicaOptions = [
+    { value: 'sem_primeiro_contato', label: 'Sem Primeiro Contato', color: '#6b7280' },
     { value: 'tem_interesse', label: 'Tem Interesse', color: '#10b981' },
     { value: 'nao_tem_interesse', label: 'Não tem Interesse', color: '#ef4444' },
     { value: 'em_contato', label: 'Em Contato', color: '#3b82f6' },
+    { value: 'reuniao_marcada', label: 'Reunião Marcada', color: '#8b5cf6' },
+    { value: 'aguardando_documentacao', label: 'Aguardando Documentação', color: '#f59e0b' },
     { value: 'nao_fechou', label: 'Não Fechou', color: '#f59e0b' }
   ];
 
@@ -158,6 +176,13 @@ const Clinicas = () => {
   useEffect(() => {
     fetchClinicas();
     fetchNovasClinicas(); // Sempre carregar novas clínicas
+    
+    // Buscar links personalizados se for consultor
+    if (isConsultor) {
+      buscarLinkPersonalizado();
+    } else {
+      setLoadingLink(false);
+    }
     
     // Verificar se tutorial foi completado
     const completed = localStorage.getItem('tutorial-clinicas-completed');
@@ -334,6 +359,47 @@ const Clinicas = () => {
     } catch (error) {
       console.error('Erro ao carregar novas clínicas:', error);
       showErrorToast('Erro ao conectar com o servidor');
+    }
+  };
+
+  const buscarLinkPersonalizado = async () => {
+    try {
+      // Usar a rota de perfil que o consultor pode acessar
+      const consultorResponse = await makeRequest('/consultores/perfil');
+      const responseData = await consultorResponse.json();
+      
+      if (consultorResponse.ok && responseData.consultor) {
+        const consultorData = responseData.consultor;
+        
+        // Verificar se é consultor interno (tem as duas permissões)
+        const isConsultorInterno = consultorData.pode_ver_todas_novas_clinicas === true && consultorData.podealterarstatus === true;
+        
+        if (!isConsultorInterno) {
+          // Freelancer: buscar link personalizado baseado no código de referência
+          if (consultorData.codigo_referencia) {
+            setLinkPersonalizado(`https://crm.investmoneysa.com.br/captura-lead?ref=${consultorData.codigo_referencia}`);
+            setLinkClinicas(`https://crm.investmoneysa.com.br/captura-clinica?ref=${consultorData.codigo_referencia}`);
+          } else {
+            // Se não tem código de referência, mostrar mensagem
+            setLinkPersonalizado(null);
+            setLinkClinicas(null);
+          }
+        } else {
+          // Interno: usar link geral
+          setLinkPersonalizado('https://crm.investmoneysa.com.br/captura-lead');
+          setLinkClinicas('https://crm.investmoneysa.com.br/captura-clinica');
+        }
+      } else {
+        console.error('Erro ao buscar dados do consultor:', responseData);
+        setLinkPersonalizado(null);
+        setLinkClinicas(null);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar link personalizado:', error);
+      setLinkPersonalizado(null);
+      setLinkClinicas(null);
+    } finally {
+      setLoadingLink(false);
     }
   };
 
@@ -746,6 +812,10 @@ const Clinicas = () => {
     }
   };
 
+  const getStatusClinicaInfo = (status) => {
+    return statusClinicaOptions.find(option => option.value === status) || statusClinicaOptions[0];
+  };
+
   const getStatusNovaClinicaInfo = (status) => {
     return statusNovaClinicaOptions.find(option => option.value === status) || statusNovaClinicaOptions[0];
   };
@@ -878,6 +948,23 @@ const Clinicas = () => {
     setShowTutorial(true);
   };
 
+  // Função para copiar link personalizado
+  const copiarLink = async (link) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      showSuccessToast('Link copiado para a área de transferência!');
+    } catch (error) {
+      // Fallback para navegadores mais antigos
+      const textArea = document.createElement('textarea');
+      textArea.value = link;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      showSuccessToast('Link copiado para a área de transferência!');
+    }
+  };
+
   return (
     <div>
       <div className="page-header">
@@ -934,6 +1021,106 @@ const Clinicas = () => {
             • <strong>Dica:</strong> → Lembre-se de indicar clínicas que queiram antecipar seus boletos, ou que ainda não ofereçam parcelamento no boleto como método de pagamento<br/>
             • <strong>Dica de Argumento:</strong> → Nós levamos pacientes pré-aprovados até a sua clinica, você só precisa atender
           </div>
+          
+          {/* Links personalizados para consultores */}
+          {isConsultor && (
+            <div style={{ 
+              marginTop: '1rem', 
+              padding: '0.75rem',  
+              borderRadius: '6px' 
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'blue' }}>
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                </svg>
+                <strong style={{ color: 'blue' }}>Meu Link de Indicação</strong>
+              </div>
+              
+              {loadingLink ? (
+                <div style={{ textAlign: 'center', padding: '1rem', color: '#6b7280' }}>
+                  <div style={{ 
+                    width: '1.5rem', 
+                    height: '1.5rem', 
+                    border: '2px solid #f0fdf4', 
+                    borderTop: '2px solid #f0fdf4', 
+                    borderRadius: '50%', 
+                    animation: 'spin 1s linear infinite', 
+                    margin: '0 auto 0.5rem' 
+                  }}></div>
+                  Carregando links...
+                </div>
+              ) : (linkPersonalizado || linkClinicas) ? (
+                <div>
+                  {/* Link para Clínicas */}
+                  {linkClinicas && (
+                    <div style={{ 
+                      backgroundColor: '#eff6ff', 
+                      border: '1px solid #93c5fd', 
+                      borderRadius: '8px', 
+                      padding: '1rem'
+                    }}>
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        marginBottom: '0.5rem'
+                      }}>
+                        <span style={{ 
+                          color: '#1d4ed8', 
+                          fontWeight: '600',
+                          fontSize: '0.9rem'
+                        }}>
+                          Link para Clínicas:
+                        </span>
+                        <button
+                          onClick={() => copiarLink(linkClinicas)}
+                          style={{
+                            background: '#2563eb',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '6px 10px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            fontWeight: '500'
+                          }}
+                        >
+                          Copiar
+                        </button>
+                      </div>
+                      <div style={{ 
+                        color: '#1d4ed8', 
+                        fontSize: '12px',
+                        fontFamily: 'monospace',
+                        wordBreak: 'break-all',
+                        lineHeight: '1.4',
+                        backgroundColor: 'rgba(255,255,255,0.7)',
+                        padding: '8px',
+                        borderRadius: '6px'
+                      }}>
+                        {linkClinicas}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ 
+                  backgroundColor: '#fef2f2', 
+                  border: '1px solid #fecaca', 
+                  borderRadius: '6px', 
+                  padding: '1rem',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: '#dc2626', fontSize: '14px', marginBottom: '4px' }}>
+                    ⚠️ Links personalizados não encontrados
+                  </div>
+                  <div style={{ color: '#6b7280', fontSize: '12px' }}>
+                    Entre em contato com o administrador para gerar seus links.
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1704,36 +1891,29 @@ const Clinicas = () => {
                             fontSize: '0.75rem',
                             padding: '0.25rem 0.5rem',
                             border: 'none',
-                            backgroundColor: 
-                              clinica.status === 'ativa' ? '#dcfce7' : 
-                              clinica.status === 'inativa' ? '#fef2f2' :
-                              clinica.status === 'em_contato' ? '#dbeafe' :
-                              clinica.status === 'nao_fechou' ? '#fef3c7' : '#f3f4f6',
-                            color: 
-                              clinica.status === 'ativa' ? '#166534' : 
-                              clinica.status === 'inativa' ? '#dc2626' :
-                              clinica.status === 'em_contato' ? '#1d4ed8' :
-                              clinica.status === 'nao_fechou' ? '#d97706' : '#374151',
+                            backgroundColor: getStatusClinicaInfo(clinica.status).color + '20',
+                            color: getStatusClinicaInfo(clinica.status).color,
                             fontWeight: '600',
                             borderRadius: '0.375rem'
                           }}
                         >
-                          <option value="ativa">Ativa</option>
-                          <option value="inativa">Inativa</option>
-                          <option value="em_contato">Em Contato</option>
-                          <option value="nao_fechou">Não Fechou</option>
+                          {statusClinicaOptions.map(option => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
                         </select>
                       ) : (
-                        <span className={`badge ${
-                          clinica.status === 'ativa' ? 'badge-success' : 
-                          clinica.status === 'inativa' ? 'badge-danger' :
-                          clinica.status === 'em_contato' ? 'badge-primary' :
-                          clinica.status === 'nao_fechou' ? 'badge-warning' : 'badge-secondary'
-                        }`}>
-                          {clinica.status === 'ativa' ? 'Ativa' : 
-                           clinica.status === 'inativa' ? 'Inativa' :
-                           clinica.status === 'em_contato' ? 'Em Contato' :
-                           clinica.status === 'nao_fechou' ? 'Não Fechou' : clinica.status}
+                        <span 
+                          className="badge"
+                          style={{
+                            backgroundColor: getStatusClinicaInfo(clinica.status).color + '20',
+                            color: getStatusClinicaInfo(clinica.status).color,
+                            fontWeight: '600',
+                            borderRadius: '0.375rem'
+                          }}
+                        >
+                          {getStatusClinicaInfo(clinica.status).label}
                         </span>
                       )}
                     </td>
@@ -2974,16 +3154,16 @@ const Clinicas = () => {
                    <div>
                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Status</label>
                      <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
-                       <span className={`badge ${
-                         viewingClinica.status === 'ativa' ? 'badge-success' : 
-                         viewingClinica.status === 'inativa' ? 'badge-danger' :
-                         viewingClinica.status === 'em_contato' ? 'badge-primary' :
-                         viewingClinica.status === 'nao_fechou' ? 'badge-warning' : 'badge-secondary'
-                       }`}>
-                         {viewingClinica.status === 'ativa' ? 'Ativa' : 
-                          viewingClinica.status === 'inativa' ? 'Inativa' :
-                          viewingClinica.status === 'em_contato' ? 'Em Contato' :
-                          viewingClinica.status === 'nao_fechou' ? 'Não Fechou' : viewingClinica.status}
+                       <span 
+                         className="badge"
+                         style={{
+                           backgroundColor: getStatusClinicaInfo(viewingClinica.status).color + '20',
+                           color: getStatusClinicaInfo(viewingClinica.status).color,
+                           fontWeight: '600',
+                           borderRadius: '0.375rem'
+                         }}
+                       >
+                         {getStatusClinicaInfo(viewingClinica.status).label}
                        </span>
                      </p>
                    </div>

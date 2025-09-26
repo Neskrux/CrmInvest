@@ -4,7 +4,7 @@ import { useToast } from '../components/Toast';
 import TutorialPacientes from './TutorialPacientes';
 
 const Pacientes = () => {
-  const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor } = useAuth();
+  const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isFreelancer } = useAuth();
   // Verificar se usuário é consultor
   const isConsultor = user?.tipo === 'consultor';
   const [pacientes, setPacientes] = useState([]);
@@ -82,6 +82,11 @@ const Pacientes = () => {
   const [leadParaAtribuir, setLeadParaAtribuir] = useState(null);
   const [consultorSelecionado, setConsultorSelecionado] = useState('');
   const [salvandoAtribuicao, setSalvandoAtribuicao] = useState(false);
+
+  // Estados para links personalizados
+  const [linkPersonalizado, setLinkPersonalizado] = useState(null);
+  const [linkClinicas, setLinkClinicas] = useState(null);
+  const [loadingLink, setLoadingLink] = useState(true);
 
   // Estados brasileiros
   const estadosBrasileiros = [
@@ -182,6 +187,13 @@ const Pacientes = () => {
     // Aplicar filtro automático por consultor se necessário
     if (deveFiltrarPorConsultor && user?.consultor_id) {
       setFiltroConsultor(String(user.consultor_id));
+    }
+    
+    // Buscar links personalizados se for consultor
+    if (isConsultor) {
+      buscarLinkPersonalizado();
+    } else {
+      setLoadingLink(false);
     }
     
   // Verificar se tutorial foi completado
@@ -314,6 +326,47 @@ const Pacientes = () => {
       }
     } catch (error) {
       console.error('Erro ao carregar clínicas:', error);
+    }
+  };
+
+  const buscarLinkPersonalizado = async () => {
+    try {
+      // Usar a rota de perfil que o consultor pode acessar
+      const consultorResponse = await makeRequest('/consultores/perfil');
+      const responseData = await consultorResponse.json();
+      
+      if (consultorResponse.ok && responseData.consultor) {
+        const consultorData = responseData.consultor;
+        
+        // Verificar se é consultor interno (tem as duas permissões)
+        const isConsultorInterno = consultorData.pode_ver_todas_novas_clinicas === true && consultorData.podealterarstatus === true;
+        
+        if (!isConsultorInterno) {
+          // Freelancer: buscar link personalizado baseado no código de referência
+          if (consultorData.codigo_referencia) {
+            setLinkPersonalizado(`https://crm.investmoneysa.com.br/captura-lead?ref=${consultorData.codigo_referencia}`);
+            setLinkClinicas(`https://crm.investmoneysa.com.br/captura-clinica?ref=${consultorData.codigo_referencia}`);
+          } else {
+            // Se não tem código de referência, mostrar mensagem
+            setLinkPersonalizado(null);
+            setLinkClinicas(null);
+          }
+        } else {
+          // Interno: usar link geral
+          setLinkPersonalizado('https://crm.investmoneysa.com.br/captura-lead');
+          setLinkClinicas('https://crm.investmoneysa.com.br/captura-clinica');
+        }
+      } else {
+        console.error('Erro ao buscar dados do consultor:', responseData);
+        setLinkPersonalizado(null);
+        setLinkClinicas(null);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar link personalizado:', error);
+      setLinkPersonalizado(null);
+      setLinkClinicas(null);
+    } finally {
+      setLoadingLink(false);
     }
   };
 
@@ -1140,6 +1193,23 @@ const Pacientes = () => {
     setShowTutorial(true);
   };
 
+  // Função para copiar link personalizado
+  const copiarLink = async (link) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      showSuccessToast('Link copiado para a área de transferência!');
+    } catch (error) {
+      // Fallback para navegadores mais antigos
+      const textArea = document.createElement('textarea');
+      textArea.value = link;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      showSuccessToast('Link copiado para a área de transferência!');
+    }
+  };
+
   // Paginação em memória
   const totalPages = Math.max(1, Math.ceil(pacientesFiltrados.length / PAGE_SIZE));
   const startIndex = (currentPage - 1) * PAGE_SIZE;
@@ -1208,6 +1278,108 @@ const Pacientes = () => {
               </>
             )}
           </div>
+          
+          {/* Links personalizados para consultores */}
+          {isConsultor && (
+            <div style={{ 
+              marginTop: '1rem', 
+              padding: '0.75rem', 
+              backgroundColor: '#f0fdf4', 
+              borderRadius: '6px' 
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#16a34a' }}>
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                </svg>
+                <strong style={{ color: '#16a34a' }}>Meu Link de Indicação</strong>
+              </div>
+              
+              {loadingLink ? (
+                <div style={{ textAlign: 'center', padding: '1rem', color: '#6b7280' }}>
+                  <div style={{ 
+                    width: '1.5rem', 
+                    height: '1.5rem', 
+                    border: '2px solid #e5e7eb', 
+                    borderTop: '2px solid #3b82f6', 
+                    borderRadius: '50%', 
+                    animation: 'spin 1s linear infinite', 
+                    margin: '0 auto 0.5rem' 
+                  }}></div>
+                  Carregando links...
+                </div>
+              ) : (linkPersonalizado || linkClinicas) ? (
+                <div>
+                  {/* Link para Pacientes */}
+                  {linkPersonalizado && (
+                    <div style={{ 
+                      backgroundColor: '#f0fdf4', 
+                      border: '1px solid #86efac', 
+                      borderRadius: '8px', 
+                      padding: '1rem', 
+                      marginBottom: '0.75rem'
+                    }}>
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        marginBottom: '0.5rem'
+                      }}>
+                        <span style={{ 
+                          color: '#166534', 
+                          fontWeight: '600',
+                          fontSize: '0.9rem'
+                        }}>
+                          Link para Pacientes:
+                        </span>
+                        <button
+                          onClick={() => copiarLink(linkPersonalizado)}
+                          style={{
+                            background: '#16a34a',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '6px 10px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            fontWeight: '500'
+                          }}
+                        >
+                          Copiar
+                        </button>
+                      </div>
+                      <div style={{ 
+                        color: '#166534', 
+                        fontSize: '12px',
+                        fontFamily: 'monospace',
+                        wordBreak: 'break-all',
+                        lineHeight: '1.4',
+                        backgroundColor: 'rgba(255,255,255,0.7)',
+                        padding: '8px',
+                        borderRadius: '6px'
+                      }}>
+                        {linkPersonalizado}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ 
+                  backgroundColor: '#fef2f2', 
+                  border: '1px solid #fecaca', 
+                  borderRadius: '6px', 
+                  padding: '1rem',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: '#dc2626', fontSize: '14px', marginBottom: '4px' }}>
+                    ⚠️ Links personalizados não encontrados
+                  </div>
+                  <div style={{ color: '#6b7280', fontSize: '12px' }}>
+                    Entre em contato com o administrador para gerar seus links.
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
