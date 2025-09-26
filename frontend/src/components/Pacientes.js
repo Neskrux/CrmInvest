@@ -5,7 +5,6 @@ import TutorialPacientes from './TutorialPacientes';
 
 const Pacientes = () => {
   const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor } = useAuth();
-  
   // Verificar se usuário é consultor
   const isConsultor = user?.tipo === 'consultor';
   const [pacientes, setPacientes] = useState([]);
@@ -157,7 +156,8 @@ const Pacientes = () => {
     { value: 'nao_existe', label: 'Paciente não existe', color: '#9ca3af', description: 'Cliente não existe' },
     { value: 'nao_tem_interesse', label: 'Paciente não tem interesse', color: '#9ca3af', description: 'Cliente não tem interesse' },
     { value: 'nao_reconhece', label: 'Paciente não reconhece', color: '#9ca3af', description: 'Cliente não reconhece' },
-    { value: 'sem_cedente', label: 'Sem clínica (CPF Aprovado)', color: '#fbbf24', description: 'CPF aprovado mas sem cedente' },
+    { value: 'sem_cedente', label: 'Sem clínica (CPF Aprovado)', color: '#fbbf24', description: 'CPF aprovado mas sem clínica' },
+    { value: 'sem_clinica', label: 'Sem clínica (CPF Reprovado)', color: '#fbbf24', description: 'CPF reprovado e sem clínica' },
     // Demais status no final
     { value: 'agendado', label: 'Agendado', color: '#3b82f6', description: 'Abre modal para criar agendamento' },
     { value: 'compareceu', label: 'Compareceu', color: '#10b981', description: 'Cliente compareceu ao agendamento' },

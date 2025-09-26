@@ -19,7 +19,6 @@ const Consultores = () => {
   const [viewingConsultor, setViewingConsultor] = useState(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkConsultor, setLinkConsultor] = useState(null);
-  
   // Estados para filtros
   const [filtros, setFiltros] = useState({
     busca: '',
