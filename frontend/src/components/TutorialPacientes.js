@@ -6,18 +6,13 @@ const TutorialPacientes = ({ isOpen, onClose, onComplete }) => {
 
   const tutorialSteps = [
     {
-      id: 'welcome-pacientes',
-      title: 'Boas-vindas à Área de Pacientes!',
-      content: 'Aqui você pode cadastrar novos pacientes, gerenciar leads e acompanhar todo o pipeline de vendas. Vamos conhecer as principais funcionalidades!',
+      id: 'video-tutorial',
+      title: 'Tutorial em Vídeo',
+      content: 'Assista ao vídeo para entender como usar a área de pacientes:',
       selector: '.page-header',
-      position: 'center'
-    },
-    {
-      id: 'tabs-pacientes',
-      title: 'Abas de Navegação',
-      content: 'Use as abas para alternar entre "Pacientes" (seus pacientes cadastrados) e "Novos Leads" (leads disponíveis para você pegar).',
-      selector: '.tabs',
-      position: 'left'
+      position: 'center',
+      hasVideo: true,
+      videoSrc: '/IMG_6823.MOV'
     },
     {
       id: 'stats-pacientes',
@@ -41,16 +36,9 @@ const TutorialPacientes = ({ isOpen, onClose, onComplete }) => {
       position: 'top'
     },
     {
-      id: 'novos-leads',
-      title: 'Novos Leads Disponíveis',
-      content: 'Na aba "Novos Leads", você encontra leads que ainda não foram atribuídos a nenhum consultor. Clique em "Pegar Lead" para assumir a responsabilidade.',
-      selector: '.tabs button:nth-child(2)',
-      position: 'top'
-    },
-    {
       id: 'final-pacientes',
       title: 'Pronto!',
-      content: 'Agora você sabe como gerenciar seus pacientes e leads. Use os filtros para organizar, acompanhe o pipeline através dos status e não esqueça de verificar novos leads regularmente!',
+      content: 'Agora você sabe como gerenciar seus pacientes e leads. Use os filtros para organizar, acompanhe o pipeline através dos status e não esqueça de verificar seus novos leads regularmente!',
       selector: '.page-header',
       position: 'center'
     }
@@ -122,6 +110,11 @@ const TutorialPacientes = ({ isOpen, onClose, onComplete }) => {
   const getTooltipPosition = (selector, position) => {
     const element = document.querySelector(selector);
     if (!element) {
+      return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
+    }
+
+    // Para vídeo, sempre centralizar
+    if (currentStepData.hasVideo) {
       return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
     }
 
@@ -200,8 +193,8 @@ const TutorialPacientes = ({ isOpen, onClose, onComplete }) => {
           padding: '1.5rem',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
           border: '1px solid #e5e7eb',
-          maxWidth: '400px',
-          minWidth: window.innerWidth <= 768 ? '400px' : 'auto',
+          maxWidth: currentStepData.hasVideo ? '420px' : '400px',
+          minWidth: window.innerWidth <= 768 ? '350px' : 'auto',
           zIndex: 10001
         }}
       >
@@ -303,6 +296,28 @@ const TutorialPacientes = ({ isOpen, onClose, onComplete }) => {
           {currentStepData.content}
         </p>
 
+        {/* Video Player */}
+        {currentStepData.hasVideo && (
+          <div style={{ 
+            marginBottom: '1.5rem',
+            textAlign: 'center'
+          }}>
+            <video
+              controls
+              style={{
+                width: '100%',
+                maxWidth: '280px',
+                height: 'auto',
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+              }}
+            >
+              <source src={currentStepData.videoSrc} type="video/mp4" />
+              Seu navegador não suporta o elemento de vídeo.
+            </video>
+          </div>
+        )}
+
         {/* Progress Bar */}
         <div style={{ 
           width: '100%', 
@@ -328,7 +343,7 @@ const TutorialPacientes = ({ isOpen, onClose, onComplete }) => {
           alignItems: 'center'
         }}>
           <button
-            onClick={skipTutorial}
+            onClick={currentStep === 0 ? skipTutorial : () => setCurrentStep(currentStep - 1)}
             style={{
               background: 'none',
               border: '1px solid #d1d5db',
@@ -348,7 +363,7 @@ const TutorialPacientes = ({ isOpen, onClose, onComplete }) => {
               e.target.style.borderColor = '#d1d5db';
             }}
           >
-            Pular
+            {currentStep === 0 ? 'Pular' : 'Voltar'}
           </button>
 
           <button

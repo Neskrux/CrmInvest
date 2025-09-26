@@ -222,9 +222,11 @@ const Dashboard = () => {
     }
     
     // Mostrar modal do grupo do WhatsApp para consultores (não admins)
+    // Só após completar o tutorial de boas-vindas
     if (user?.tipo === 'consultor' && !isAdmin) {
       const whatsappModalShown = localStorage.getItem('whatsapp-group-modal-shown');
-      if (!whatsappModalShown) {
+      const welcomeCompleted = localStorage.getItem('welcome-completed');
+      if (!whatsappModalShown && welcomeCompleted) {
         setShowWhatsAppGroupModal(true);
       }
     }

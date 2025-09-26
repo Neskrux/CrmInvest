@@ -88,9 +88,12 @@ const WelcomeModal = ({ isOpen, onClose, onStartTutorial }) => {
               style={{ 
                 width: '100%', 
                 maxWidth: '250px',
-                borderRadius: '8px'
+                height: 'auto',
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                backgroundColor: '#f3f4f6'
               }}
-              poster="/logo.png"
+              preload="metadata"
             >
               <source src="/IMG_6744.MOV" type="video/quicktime" />
               <source src="/IMG_6744.MOV" type="video/mp4" />

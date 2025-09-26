@@ -321,7 +321,7 @@ const TutorialFechamentos = ({ isOpen, onClose, onComplete }) => {
           alignItems: 'center'
         }}>
           <button
-            onClick={skipTutorial}
+            onClick={currentStep === 0 ? skipTutorial : () => setCurrentStep(currentStep - 1)}
             style={{
               background: 'none',
               border: '1px solid #d1d5db',
@@ -341,7 +341,7 @@ const TutorialFechamentos = ({ isOpen, onClose, onComplete }) => {
               e.target.style.borderColor = '#d1d5db';
             }}
           >
-            Pular
+            {currentStep === 0 ? 'Pular' : 'Voltar'}
           </button>
 
           <button

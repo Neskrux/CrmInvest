@@ -6,11 +6,13 @@ const TutorialClinicas = ({ isOpen, onClose, onComplete }) => {
 
   const tutorialSteps = [
     {
-      id: 'welcome-clinicas',
-      title: 'Boas-vindas às Clínicas!',
-      content: 'Aqui você visualiza todas as clínicas parceiras, cadastra novas clínicas e visualiza sua distribuição geográfica. Vamos explorar!',
+      id: 'video-tutorial',
+      title: 'Tutorial em Vídeo',
+      content: 'Assista ao vídeo para entender como usar a área de clínicas:',
       selector: '.page-header',
-      position: 'center'
+      position: 'center',
+      hasVideo: true,
+      videoSrc: '/IMG_6824.MOV'
     },
     {
       id: 'tabs-clinicas',
@@ -23,7 +25,7 @@ const TutorialClinicas = ({ isOpen, onClose, onComplete }) => {
       id: 'filtros-clinicas',
       title: 'Filtros de Localização',
       content: 'Filtre clínicas por estado, cidade ou status (desbloqueadas/bloqueadas) para encontrar rapidamente o que precisa.',
-      selector: '.grid.grid-3',
+      selector: '.card .card-header',
       position: 'bottom'
     },
     {
@@ -31,7 +33,7 @@ const TutorialClinicas = ({ isOpen, onClose, onComplete }) => {
       title: 'Lista de Clínicas Parceiras',
       content: 'Visualize todas as clínicas disponíveis com informações completas: localização, nicho, contatos e status de propriedade.',
       selector: '.table-container',
-      position: 'top'
+      position: 'bottom'
     },
     {
       id: 'novas-clinicas',
@@ -124,6 +126,11 @@ const TutorialClinicas = ({ isOpen, onClose, onComplete }) => {
       return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
     }
 
+    // Para vídeo, sempre centralizar
+    if (currentStepData.hasVideo) {
+      return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
+    }
+
     const rect = element.getBoundingClientRect();
     const tooltipWidth = window.innerWidth <= 768 ? 400 : 400;
     const tooltipHeight = 200;
@@ -132,12 +139,12 @@ const TutorialClinicas = ({ isOpen, onClose, onComplete }) => {
 
     let top, left;
 
-    if (isMobile && (currentStep === 4 || currentStep === 5 || currentStep === 6)) {
+    if (isMobile && (currentStep === 3 || currentStep === 4 || currentStep === 5)) {
       return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
     }
 
-    // Posicionamento especial para desktop nos steps 5 e 6
-    if (!isMobile && currentStep === 4) {
+    // Posicionamento especial para desktop nos steps 4 e 5
+    if (!isMobile && currentStep === 3) {
        top = Math.max(rect.top - tooltipHeight - 200, 200);
        left = Math.max(rect.left + (rect.width / 2) - (tooltipWidth / 2), 20);
        if (left + tooltipWidth > window.innerWidth - 20) {
@@ -149,7 +156,7 @@ const TutorialClinicas = ({ isOpen, onClose, onComplete }) => {
          transform: 'none'
        };
      }
-     if (!isMobile && currentStep === 5) {
+     if (!isMobile && currentStep === 4) {
          top = Math.max(rect.top - tooltipHeight - 200, 200);
          left = Math.max(rect.left + (rect.width / 2) - (tooltipWidth / 2), 20);
          if (left + tooltipWidth > window.innerWidth - 20) {
@@ -230,13 +237,13 @@ const TutorialClinicas = ({ isOpen, onClose, onComplete }) => {
           padding: '1.5rem',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
           border: '1px solid #e5e7eb',
-          maxWidth: '400px',
-          minWidth: window.innerWidth <= 768 ? '400px' : 'auto',
+          maxWidth: currentStepData.hasVideo ? '420px' : '400px',
+          minWidth: window.innerWidth <= 768 ? '350px' : 'auto',
           zIndex: 10001
         }}
       >
         {/* Arrow */}
-        {!(window.innerWidth <= 768 && (currentStep === 4 || currentStep === 5)) && (
+        {!(window.innerWidth <= 768 && (currentStep === 3 || currentStep === 4)) && (
           <div
             style={{
               position: 'absolute',
@@ -335,6 +342,28 @@ const TutorialClinicas = ({ isOpen, onClose, onComplete }) => {
           {currentStepData.content}
         </p>
 
+        {/* Video Player */}
+        {currentStepData.hasVideo && (
+          <div style={{ 
+            marginBottom: '1.5rem',
+            textAlign: 'center'
+          }}>
+            <video
+              controls
+              style={{
+                width: '100%',
+                maxWidth: '280px',
+                height: 'auto',
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+              }}
+            >
+              <source src={currentStepData.videoSrc} type="video/mp4" />
+              Seu navegador não suporta o elemento de vídeo.
+            </video>
+          </div>
+        )}
+
         {/* Progress Bar */}
         <div style={{ 
           width: '100%', 
@@ -360,7 +389,7 @@ const TutorialClinicas = ({ isOpen, onClose, onComplete }) => {
           alignItems: 'center'
         }}>
           <button
-            onClick={skipTutorial}
+            onClick={currentStep === 0 ? skipTutorial : () => setCurrentStep(currentStep - 1)}
             style={{
               background: 'none',
               border: '1px solid #d1d5db',
@@ -380,7 +409,7 @@ const TutorialClinicas = ({ isOpen, onClose, onComplete }) => {
               e.target.style.borderColor = '#d1d5db';
             }}
           >
-            Pular
+            {currentStep === 0 ? 'Pular' : 'Voltar'}
           </button>
 
           <button

@@ -184,10 +184,30 @@ const Pacientes = () => {
       setFiltroConsultor(String(user.consultor_id));
     }
     
-    // Verificar se tutorial foi completado
-    const completed = localStorage.getItem('tutorial-pacientes-completed');
-    setTutorialCompleted(!!completed);
+  // Verificar se tutorial foi completado
+  const completed = localStorage.getItem('tutorial-pacientes-completed');
+  setTutorialCompleted(!!completed);
   }, [podeAlterarStatus, isConsultorInterno, deveFiltrarPorConsultor, user?.consultor_id]);
+
+  // Verificar se deve mostrar tutorial no primeiro acesso
+  useEffect(() => {
+    if (!user) return; // Aguardar usuário estar logado
+    
+    const completed = localStorage.getItem('tutorial-pacientes-completed');
+    const tutorialDismissed = localStorage.getItem('tutorial-pacientes-dismissed');
+    const welcomeCompleted = localStorage.getItem('welcome-completed');
+    const dashboardTutorialCompleted = localStorage.getItem('tutorial-completed');
+    
+    // Só mostrar tutorial se:
+    // 1. É consultor
+    // 2. Tutorial não foi completado
+    // 3. Tutorial não foi dispensado
+    // 4. Tutorial não está já aberto
+    // 5. Usuário já passou pelo fluxo inicial (welcome + dashboard tutorial)
+    if (isConsultor && !completed && !tutorialDismissed && !showTutorial && welcomeCompleted && dashboardTutorialCompleted) {
+      setShowTutorial(true);
+    }
+  }, [user, isConsultor]);
 
   // Garantir que freelancers fiquem na aba "Pacientes"
   useEffect(() => {
@@ -1113,6 +1133,7 @@ const Pacientes = () => {
 
   const handleTutorialClose = () => {
     setShowTutorial(false);
+    localStorage.setItem('tutorial-pacientes-dismissed', 'true');
   };
 
   const startTutorial = () => {
