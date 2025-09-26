@@ -164,6 +164,25 @@ const Clinicas = () => {
     setTutorialCompleted(!!completed);
   }, []);
 
+  // Verificar se deve mostrar tutorial no primeiro acesso
+  useEffect(() => {
+    if (!user) return; // Aguardar usuário estar logado
+    
+    const completed = localStorage.getItem('tutorial-clinicas-completed');
+    const tutorialDismissed = localStorage.getItem('tutorial-clinicas-dismissed');
+    const welcomeCompleted = localStorage.getItem('welcome-completed');
+    const dashboardTutorialCompleted = localStorage.getItem('tutorial-completed');
+    
+    // Só mostrar tutorial se:
+    // 1. É consultor
+    // 2. Tutorial não foi completado
+    // 3. Tutorial não foi dispensado
+    // 4. Usuário já passou pelo fluxo inicial (welcome + dashboard tutorial)
+    if (isConsultor && !completed && !tutorialDismissed && !showTutorial && welcomeCompleted && dashboardTutorialCompleted) {
+      setShowTutorial(true);
+    }
+  }, [user, isConsultor]);
+
   // Detectar mudanças de tamanho da tela
   useEffect(() => {
     const handleResize = () => {
@@ -299,7 +318,15 @@ const Clinicas = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setNovasClinicas(data);
+        // Para consultores freelancers, filtrar apenas as clínicas que eles indicaram
+        if (isConsultor && !isAdmin) {
+          const clinicasFiltradas = data.filter(clinica => 
+            clinica.consultor_id && clinica.consultor_id === user?.consultor_id
+          );
+          setNovasClinicas(clinicasFiltradas);
+        } else {
+          setNovasClinicas(data);
+        }
       } else {
         console.error('Erro ao carregar novas clínicas:', data.error);
         showErrorToast('Erro ao carregar novas clínicas: ' + data.error);
@@ -844,6 +871,7 @@ const Clinicas = () => {
 
   const handleTutorialClose = () => {
     setShowTutorial(false);
+    localStorage.setItem('tutorial-clinicas-dismissed', 'true');
   };
 
   const startTutorial = () => {
