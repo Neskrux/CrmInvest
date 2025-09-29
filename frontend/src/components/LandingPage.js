@@ -53,7 +53,7 @@ const LandingPage = () => {
             color: '#4b5563',
             lineHeight: '1.5'
           }}>
-            Sistema profissional de gestão de consultores e vendas
+            Sistema profissional de gestão empresarial
           </p>
         </div>
 
