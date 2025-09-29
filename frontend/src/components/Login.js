@@ -9,6 +9,10 @@ const Login = () => {
   const [formData, setFormData] = useState({ email: '', senha: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [forgotPasswordMessage, setForgotPasswordMessage] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -25,6 +29,40 @@ const Login = () => {
 
   const handleDemoLogin = () => {
     setFormData({ email: 'admin@investmoneysa.com.br', senha: '123456' });
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setForgotPasswordMessage('');
+    setForgotPasswordLoading(true);
+
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/forgot-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: forgotPasswordEmail }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setForgotPasswordMessage('Instruções para redefinir sua senha foram enviadas para seu email.');
+        setForgotPasswordEmail('');
+        setTimeout(() => {
+          setShowForgotPassword(false);
+          setForgotPasswordMessage('');
+        }, 3000);
+      } else {
+        setForgotPasswordMessage(data.error || 'Erro ao enviar email. Tente novamente.');
+      }
+    } catch (error) {
+      console.error('Erro ao solicitar redefinição de senha:', error);
+      setForgotPasswordMessage('Erro ao conectar com o servidor. Tente novamente.');
+    } finally {
+      setForgotPasswordLoading(false);
+    }
   };
 
   return (
@@ -110,6 +148,24 @@ const Login = () => {
             {loading ? 'Entrando...' : 'Entrar'}
           </button>
 
+          <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+            <button
+              type="button"
+              onClick={() => setShowForgotPassword(true)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#3b82f6',
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                padding: '0.5rem'
+              }}
+            >
+              Esqueci minha senha
+            </button>
+          </div>
+
           <div style={{
             textAlign: 'center',
             paddingTop: '1rem',
@@ -149,6 +205,122 @@ const Login = () => {
       }}>
         <p>&copy; 2025 GIMTECH Solutions. Todos os direitos reservados.</p>
       </div>
+
+      {/* Modal Esqueci Minha Senha */}
+      {showForgotPassword && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowForgotPassword(false);
+              setForgotPasswordMessage('');
+            }
+          }}
+        >
+          <div 
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              maxWidth: '400px',
+              width: '100%',
+              padding: '2rem',
+              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)'
+            }}
+          >
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600', color: '#1a1d23' }}>
+                Esqueci minha senha
+              </h3>
+              <p style={{ margin: '0.5rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>
+                Digite seu email para receber instruções de redefinição de senha.
+              </p>
+            </div>
+
+            <form onSubmit={handleForgotPassword}>
+              <div className="form-group">
+                <label className="form-label">E-mail</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  placeholder="seu@email.com"
+                  value={forgotPasswordEmail}
+                  onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+
+              {forgotPasswordMessage && (
+                <div 
+                  className="alert" 
+                  style={{ 
+                    marginBottom: '1rem',
+                    backgroundColor: forgotPasswordMessage.includes('enviadas') ? '#d1fae5' : '#fee2e2',
+                    color: forgotPasswordMessage.includes('enviadas') ? '#065f46' : '#dc2626',
+                    border: `1px solid ${forgotPasswordMessage.includes('enviadas') ? '#a7f3d0' : '#fecaca'}`,
+                    padding: '0.75rem',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  {forgotPasswordMessage}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotPassword(false);
+                    setForgotPasswordMessage('');
+                    setForgotPasswordEmail('');
+                  }}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: 'white',
+                    color: '#374151',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={forgotPasswordLoading}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    border: 'none',
+                    borderRadius: '6px',
+                    backgroundColor: forgotPasswordLoading ? '#9ca3af' : '#3b82f6',
+                    color: 'white',
+                    cursor: forgotPasswordLoading ? 'not-allowed' : 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  {forgotPasswordLoading ? 'Enviando...' : 'Enviar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

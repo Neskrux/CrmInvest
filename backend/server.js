@@ -10,6 +10,7 @@ const { createClient } = require('@supabase/supabase-js');
 const MetaAdsAPI = require('./meta-ads-api');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
+const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 
@@ -88,6 +89,52 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey); // Cliente admin para Storage
+
+// Configurar Nodemailer para envio de emails
+const getEmailTransporter = () => {
+  const service = process.env.EMAIL_SERVICE || 'gmail';
+  
+  switch (service) {
+    case 'sendgrid':
+      return nodemailer.createTransporter({
+        host: 'smtp.sendgrid.net',
+        port: 587,
+        secure: false,
+        auth: {
+          user: 'apikey',
+          pass: process.env.EMAIL_PASS
+        }
+      });
+    
+    case 'mailgun':
+      return nodemailer.createTransporter({
+        host: 'smtp.mailgun.org',
+        port: 587,
+        secure: false,
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS
+        }
+      });
+    
+    case 'gmail':
+    default:
+      return nodemailer.createTransporter({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS
+        }
+      });
+  }
+};
+
+const transporter = getEmailTransporter();
+
+// Log da configuração de email (para debug)
+console.log(`📧 Email configurado: ${process.env.EMAIL_SERVICE || 'gmail'}`);
+console.log(`📧 Email user: ${process.env.EMAIL_USER || 'seu-email@gmail.com'}`);
+console.log(`📧 Email from: ${process.env.EMAIL_FROM || 'noreply@crm.com'}`);
 
 // Configurar Supabase Storage
 const STORAGE_BUCKET = 'contratos';
@@ -2358,7 +2405,7 @@ app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
 
 app.post('/api/novas-clinicas', authenticateToken, async (req, res) => {
   try {
-    const { nome, endereco, bairro, cidade, estado, nicho, telefone, email, status, observacoes } = req.body;
+    const { nome, cnpj, responsavel, endereco, bairro, cidade, estado, nicho, telefone, email, status, observacoes } = req.body;
     
     // Normalizar telefone (remover formatação)
     const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
@@ -2406,6 +2453,8 @@ app.post('/api/novas-clinicas', authenticateToken, async (req, res) => {
     // Preparar dados para inserção
     const clinicaData = {
       nome,
+      cnpj,
+      responsavel,
       endereco,
       bairro,
       cidade,
@@ -4003,6 +4052,256 @@ if (io) {
   });
 }
 
+
+// ==================== ROTA ESQUECI MINHA SENHA ====================
+
+// POST /api/forgot-password - Solicitar redefinição de senha
+app.post('/api/forgot-password', async (req, res) => {
+  try {
+    console.log('🔧 POST /api/forgot-password recebido');
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email é obrigatório' });
+    }
+
+    // Verificar se o consultor existe
+    console.log('🔧 Buscando consultor com email:', email);
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('consultores')
+      .select('id, nome, email')
+      .eq('email', email)
+      .single();
+
+    console.log('🔧 Resultado da busca:', { user, userError });
+
+    if (userError || !user) {
+      console.log('🔧 Consultor não encontrado, retornando mensagem de segurança');
+      // Por segurança, sempre retorna sucesso mesmo se o email não existir
+      return res.json({ 
+        message: 'Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.' 
+      });
+    }
+
+    console.log('✅ Consultor encontrado:', user);
+
+    // Gerar token de redefinição com timestamp para expiração
+    const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
+    
+    // Salvar token no banco de dados
+    console.log('🔧 Tentando salvar token no banco...');
+    const { error: tokenError } = await supabaseAdmin
+      .from('password_reset_tokens')
+      .insert([{
+        user_id: user.id,
+        token: resetToken,
+        expires_at: expiresAt.toISOString(),
+        used: false
+      }]);
+
+    if (tokenError) {
+      console.error('❌ Erro ao salvar token de reset:', tokenError);
+      console.log('🔧 Continuando mesmo com erro no banco...');
+    } else {
+      console.log('✅ Token salvo no banco com sucesso');
+    }
+
+    // Enviar email real
+    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+    console.log('🔧 Preparando envio de email...');
+    console.log('🔧 Reset link:', resetLink);
+    
+    const mailOptions = {
+      from: `"Solumn - Sistema CRM" <${process.env.EMAIL_USER}>`,
+      replyTo: process.env.EMAIL_FROM || 'noreply@solumn.com',
+      to: email,
+      subject: 'Redefinição de Senha - Solumn',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #1a1d23;">Redefinição de Senha</h2>
+          <p>Olá ${user.nome},</p>
+          <p>Você solicitou a redefinição de sua senha. Clique no botão abaixo para criar uma nova senha:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetLink}" style="background-color: #1a1d23; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              Redefinir Senha
+            </a>
+          </div>
+          <p>Ou copie e cole este link no seu navegador:</p>
+          <p style="word-break: break-all; color: #666;">${resetLink}</p>
+          <p><strong>Este link expira em 24 horas.</strong></p>
+          <p>Se você não solicitou esta redefinição, ignore este email.</p>
+          <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+          <p style="color: #666; font-size: 12px;">Este é um email automático, não responda.</p>
+        </div>
+      `
+    };
+
+    try {
+      // Verificar se está em ambiente de desenvolvimento e se email não está configurado
+      const isEmailConfigured = process.env.EMAIL_USER && 
+                                process.env.EMAIL_USER !== 'your-email@gmail.com' && 
+                                process.env.EMAIL_PASS && 
+                                process.env.EMAIL_PASS !== 'your-app-password';
+
+      if (!isEmailConfigured && process.env.NODE_ENV === 'development') {
+        console.log('🔧 EMAIL NÃO CONFIGURADO - MODO DESENVOLVIMENTO');
+        console.log('📧 ========================================');
+        console.log('📧 LINK DE REDEFINIÇÃO DE SENHA:');
+        console.log(`📧 ${resetLink}`);
+        console.log('📧 ========================================');
+        console.log('📧 Copie o link acima e cole no navegador para redefinir a senha');
+        console.log('📧 Para configurar o envio de email, veja o arquivo EMAIL_SETUP.md');
+      } else {
+        console.log('🔧 Tentando enviar email...');
+        console.log('🔧 Configuração do transporter:', {
+          service: process.env.EMAIL_SERVICE,
+          host: process.env.EMAIL_SERVICE === 'mailgun' ? 'smtp.mailgun.org' : undefined,
+          port: process.env.EMAIL_SERVICE === 'mailgun' ? 587 : undefined,
+          user: process.env.EMAIL_USER
+        });
+        
+        await transporter.sendMail(mailOptions);
+        console.log(`✅ Email de redefinição enviado para ${email}`);
+      }
+    } catch (emailError) {
+      console.error('❌ Erro ao enviar email:', emailError);
+      console.error('❌ Detalhes do erro:', emailError.message);
+      
+      // Em desenvolvimento, mostrar o link mesmo se o email falhar
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔧 FALHA NO EMAIL - MODO DESENVOLVIMENTO');
+        console.log('📧 ========================================');
+        console.log('📧 LINK DE REDEFINIÇÃO DE SENHA:');
+        console.log(`📧 ${resetLink}`);
+        console.log('📧 ========================================');
+        console.log('📧 Copie o link acima e cole no navegador para redefinir a senha');
+      }
+    }
+    
+    res.json({ 
+      message: 'Instruções para redefinição de senha foram enviadas para seu email.' 
+    });
+
+  } catch (error) {
+    console.error('Erro ao processar solicitação de redefinição de senha:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Validar token de redefinição de senha
+app.post('/api/validate-reset-token', async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: 'Token é obrigatório' });
+    }
+
+    // Buscar token no banco de dados
+    const { data: tokenData, error: tokenError } = await supabaseAdmin
+      .from('password_reset_tokens')
+      .select('*')
+      .eq('token', token)
+      .eq('used', false)
+      .single();
+
+    if (tokenError || !tokenData) {
+      return res.status(400).json({ error: 'Token inválido ou não encontrado' });
+    }
+
+    // Verificar se o token não expirou
+    const now = new Date();
+    const expiresAt = new Date(tokenData.expires_at);
+
+    if (now > expiresAt) {
+      return res.status(400).json({ error: 'Token expirado' });
+    }
+
+    res.json({ message: 'Token válido' });
+
+  } catch (error) {
+    console.error('Erro ao validar token:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Redefinir senha usando token
+app.post('/api/reset-password', async (req, res) => {
+  try {
+    const { token, novaSenha } = req.body;
+
+    if (!token || !novaSenha) {
+      return res.status(400).json({ error: 'Token e nova senha são obrigatórios' });
+    }
+
+    if (novaSenha.length < 6) {
+      return res.status(400).json({ error: 'A senha deve ter pelo menos 6 caracteres' });
+    }
+
+    // Buscar token no banco de dados
+    const { data: tokenData, error: tokenError } = await supabaseAdmin
+      .from('password_reset_tokens')
+      .select('*')
+      .eq('token', token)
+      .eq('used', false)
+      .single();
+
+    if (tokenError || !tokenData) {
+      return res.status(400).json({ error: 'Token inválido ou não encontrado' });
+    }
+
+    // Verificar se o token não expirou
+    const now = new Date();
+    const expiresAt = new Date(tokenData.expires_at);
+
+    if (now > expiresAt) {
+      return res.status(400).json({ error: 'Token expirado' });
+    }
+
+    // Buscar o consultor
+    const { data: consultor, error: consultorError } = await supabaseAdmin
+      .from('consultores')
+      .select('*')
+      .eq('id', tokenData.user_id)
+      .single();
+
+    if (consultorError || !consultor) {
+      return res.status(404).json({ error: 'Consultor não encontrado' });
+    }
+
+    // Hash da nova senha
+    const hashedPassword = await bcrypt.hash(novaSenha, 10);
+
+    // Atualizar senha do consultor
+    const { error: updateError } = await supabaseAdmin
+      .from('consultores')
+      .update({ senha: hashedPassword })
+      .eq('id', tokenData.user_id);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    // Marcar token como usado
+    const { error: tokenUpdateError } = await supabaseAdmin
+      .from('password_reset_tokens')
+      .update({ used: true })
+      .eq('token', token);
+
+    if (tokenUpdateError) {
+      console.error('Erro ao marcar token como usado:', tokenUpdateError);
+      // Não parar o processo, apenas logar o erro
+    }
+
+    console.log(`✅ Senha redefinida com sucesso para o consultor ${consultor.nome}`);
+    res.json({ message: 'Senha redefinida com sucesso' });
+
+  } catch (error) {
+    console.error('Erro ao redefinir senha:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
 
 // ==================== ROTAS PARA MATERIAIS ====================
 

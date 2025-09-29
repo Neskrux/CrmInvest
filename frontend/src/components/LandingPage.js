@@ -1,18 +1,30 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logoHorizontalPreto from '../images/logohorizontalpreto.png';
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   return (
     <div style={{
-      minHeight: '100vh',
-      background: '#f9fafb',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '2rem'
-    }}>
+        minHeight: '100vh',
+        background: '#f9fafb',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '2rem'
+      }}>
       <div style={{
         background: 'white',
         borderRadius: '8px',
@@ -69,7 +81,12 @@ const LandingPage = () => {
               alignItems: 'center'
             }}
           >
-            <span style={{ textAlign: 'left', width: '100%', maxWidth: '200px', marginLeft: '2rem' }}>
+            <span style={{ 
+              textAlign: isMobile ? 'center' : 'left', 
+              width: '100%', 
+              maxWidth: isMobile ? '100%' : '200px', 
+              marginLeft: isMobile ? '0' : '2rem'
+            }}>
               Cadastrar como Clínica
             </span>
           </button>
@@ -99,7 +116,12 @@ const LandingPage = () => {
               e.target.style.transform = 'translateY(0)';
             }}
           >
-            <span style={{ textAlign: 'left', width: '100%', maxWidth: '200px', marginLeft: '2rem' }}>
+            <span style={{ 
+              textAlign: isMobile ? 'center' : 'left', 
+              width: '100%', 
+              maxWidth: isMobile ? '100%' : '200px', 
+              marginLeft: isMobile ? '0' : '2rem'
+            }}>
               Cadastrar como Paciente
             </span>
           </button>
@@ -129,7 +151,12 @@ const LandingPage = () => {
               e.target.style.transform = 'translateY(0)';
             }}
           >
-            <span style={{ textAlign: 'left', width: '100%', maxWidth: '200px', marginLeft: '2rem' }}>
+            <span style={{ 
+              textAlign: isMobile ? 'center' : 'left', 
+              width: '100%', 
+              maxWidth: isMobile ? '100%' : '200px', 
+              marginLeft: isMobile ? '0' : '2rem'
+            }}>
               Cadastrar como Consultor
             </span>
           </button>

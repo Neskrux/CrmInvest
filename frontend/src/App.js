@@ -13,6 +13,7 @@ import CapturaSucesso from './components/CapturaSucesso';
 import CapturaClinica from './components/CapturaClinica';
 import CapturaClinicaSucesso from './components/CapturaClinicaSucesso';
 import Login from './components/Login';
+import ResetPassword from './components/ResetPassword';
 import Dashboard from './components/Dashboard';
 import Pacientes from './components/Pacientes';
 import Consultores from './components/Consultores';
@@ -121,6 +122,7 @@ const AppContentWithNotifications = () => {
         <Route path="/cadastro" element={<CadastroConsultor />} />
         <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/" element={<LandingPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
