@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import logoBrasaoPreto from '../images/logobrasaopreto.png';
+import logoBrasaoPreto from '../images/logohorizontalpreto.png';
 
 const CadastroConsultor = () => {
   const navigate = useNavigate();
@@ -250,9 +250,7 @@ const CadastroConsultor = () => {
             src={logoBrasaoPreto} 
             alt="Solumn" 
             style={{ 
-              width: '70px', 
-              height: '70px', 
-              marginBottom: '1rem',
+              height: '180px', 
               objectFit: 'contain'
             }} 
           />

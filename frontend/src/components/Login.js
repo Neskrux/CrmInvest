@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import logoBrasaoPreto from '../images/logobrasaopreto.png';
+import logoBrasaoPreto from '../images/logohorizontalpreto.png';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -82,9 +82,7 @@ const Login = () => {
             src={logoBrasaoPreto} 
             alt="Solumn" 
             style={{ 
-              width: '80px', 
-              height: '80px', 
-              marginBottom: '2rem',
+              height: '180px', 
               objectFit: 'contain'
             }} 
           />
