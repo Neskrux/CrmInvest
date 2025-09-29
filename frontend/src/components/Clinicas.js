@@ -3222,15 +3222,15 @@ const Clinicas = () => {
                  </button>
                </div>
              </div>
-
+ 
              <div style={{ padding: '1.5rem' }}>
                {/* Aba de Informações Gerais */}
                {activeViewTab === 'informacoes' && (
-                 <div style={{ display: 'grid', gap: '1rem' }}>
-                   <div>
-                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Nome da Clínica</label>
-                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.nome}</p>
-                   </div>
+               <div style={{ display: 'grid', gap: '1rem' }}>
+                 <div>
+                   <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Nome da Clínica</label>
+                   <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.nome}</p>
+                 </div>
                  
                  {viewingClinica.cnpj && (
                    <div>
@@ -3337,7 +3337,7 @@ const Clinicas = () => {
                {/* Aba de Documentos */}
                {activeViewTab === 'documentos' && (
                  <div>
-                   <h3 style={{ 
+                 <h3 style={{ 
                    fontSize: '1.125rem', 
                    fontWeight: '700', 
                    color: '#1a1d23', 
@@ -3670,7 +3670,7 @@ const Clinicas = () => {
                      </div>
                    </div>
                  </div>
-                 </div>
+               </div>
                )}
 
                {/* Aba de Pacientes */}
