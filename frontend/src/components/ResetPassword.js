@@ -124,7 +124,7 @@ const ResetPassword = () => {
           <div style={{ marginBottom: '2rem' }}>
             <img 
               src={logoBrasaoPreto} 
-              alt="CRM System" 
+              alt="Solumn" 
               style={{ 
                 width: '80px', 
                 height: '80px', 
@@ -160,7 +160,7 @@ const ResetPassword = () => {
           <div style={{ marginBottom: '2rem' }}>
             <img 
               src={logoBrasaoPreto} 
-              alt="CRM System" 
+              alt="Solumn" 
               style={{ 
                 width: '80px', 
                 height: '80px', 
@@ -202,7 +202,7 @@ const ResetPassword = () => {
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <img 
             src={logoBrasaoPreto} 
-            alt="CRM System" 
+            alt="Solumn" 
             style={{ 
               width: '80px', 
               height: '80px', 
