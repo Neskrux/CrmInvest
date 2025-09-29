@@ -472,7 +472,7 @@ const AppContentWithNotifications = () => {
               src={logoHorizontalPreto} 
               alt="Solumn" 
               style={{ 
-                height: '90px', 
+                height: '140px', 
                 objectFit: 'contain'
               }} 
             />

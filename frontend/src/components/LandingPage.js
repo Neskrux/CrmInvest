@@ -44,7 +44,6 @@ const LandingPage = () => {
               width: '250px',
               maxWidth: '80%',
               height: 'auto',
-              marginBottom: '1.5rem',
               objectFit: 'contain'
             }} 
           />
