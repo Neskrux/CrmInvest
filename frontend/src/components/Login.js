@@ -48,7 +48,7 @@ const Login = () => {
       const data = await response.json();
 
       if (response.ok) {
-        setForgotPasswordMessage('Instruções para redefinir sua senha foram enviadas para seu email.');
+        setForgotPasswordMessage('Instruções para redefinir sua senha foram enviadas para seu email. Caso não veja o e-mail, verifique sua caixa de spam.');
         setForgotPasswordEmail('');
         setTimeout(() => {
           setShowForgotPassword(false);
