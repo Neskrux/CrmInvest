@@ -37,9 +37,14 @@ app.get('/', (req, res) => {
   });
 });
 
-// Configuração CORS para Vercel
+// Configuração CORS para produção e desenvolvimento
 const corsOptions = {
-  origin: true,  // ← Temporariamente permitir todos os domínios
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3001', 
+    'https://crm.investmoneysa.com.br',
+    'https://www.crm.investmoneysa.com.br'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -96,7 +101,7 @@ const getEmailTransporter = () => {
   
   switch (service) {
     case 'sendgrid':
-      return nodemailer.createTransporter({
+      return nodemailer.createTransport({
         host: 'smtp.sendgrid.net',
         port: 587,
         secure: false,
@@ -107,7 +112,7 @@ const getEmailTransporter = () => {
       });
     
     case 'mailgun':
-      return nodemailer.createTransporter({
+      return nodemailer.createTransport({
         host: 'smtp.mailgun.org',
         port: 587,
         secure: false,
@@ -119,7 +124,7 @@ const getEmailTransporter = () => {
     
     case 'gmail':
     default:
-      return nodemailer.createTransporter({
+      return nodemailer.createTransport({
         service: 'gmail',
         auth: {
           user: process.env.EMAIL_USER,
@@ -4113,8 +4118,7 @@ app.post('/api/forgot-password', async (req, res) => {
     console.log('🔧 Reset link:', resetLink);
     
     const mailOptions = {
-      from: `"Solumn - Sistema CRM" <${process.env.EMAIL_USER}>`,
-      replyTo: process.env.EMAIL_FROM || 'noreply@solumn.com',
+      from: `"Solumn" <${process.env.EMAIL_FROM}>`,
       to: email,
       subject: 'Redefinição de Senha - Solumn',
       html: `
@@ -4144,6 +4148,14 @@ app.post('/api/forgot-password', async (req, res) => {
                                 process.env.EMAIL_PASS && 
                                 process.env.EMAIL_PASS !== 'your-app-password';
 
+      console.log('🔧 Verificação de configuração de email:', {
+        EMAIL_SERVICE: process.env.EMAIL_SERVICE,
+        EMAIL_USER: process.env.EMAIL_USER,
+        EMAIL_FROM: process.env.EMAIL_FROM,
+        isEmailConfigured,
+        NODE_ENV: process.env.NODE_ENV
+      });
+
       if (!isEmailConfigured && process.env.NODE_ENV === 'development') {
         console.log('🔧 EMAIL NÃO CONFIGURADO - MODO DESENVOLVIMENTO');
         console.log('📧 ========================================');
@@ -4153,20 +4165,22 @@ app.post('/api/forgot-password', async (req, res) => {
         console.log('📧 Copie o link acima e cole no navegador para redefinir a senha');
         console.log('📧 Para configurar o envio de email, veja o arquivo EMAIL_SETUP.md');
       } else {
-        console.log('🔧 Tentando enviar email...');
+        console.log('🔧 Tentando enviar email via SendGrid...');
         console.log('🔧 Configuração do transporter:', {
           service: process.env.EMAIL_SERVICE,
-          host: process.env.EMAIL_SERVICE === 'mailgun' ? 'smtp.mailgun.org' : undefined,
-          port: process.env.EMAIL_SERVICE === 'mailgun' ? 587 : undefined,
-          user: process.env.EMAIL_USER
+          to: email,
+          from: mailOptions.from
         });
         
-        await transporter.sendMail(mailOptions);
+        console.log('🔧 Chamando transporter.sendMail...');
+        const result = await transporter.sendMail(mailOptions);
+        console.log('✅ Email enviado com sucesso!', result);
         console.log(`✅ Email de redefinição enviado para ${email}`);
       }
     } catch (emailError) {
       console.error('❌ Erro ao enviar email:', emailError);
       console.error('❌ Detalhes do erro:', emailError.message);
+      console.error('❌ Stack completo:', emailError.stack);
       
       // Em desenvolvimento, mostrar o link mesmo se o email falhar
       if (process.env.NODE_ENV === 'development') {
