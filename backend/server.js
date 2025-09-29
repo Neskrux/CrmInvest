@@ -4320,12 +4320,18 @@ app.post('/api/reset-password', async (req, res) => {
 // ==================== ROTAS PARA MATERIAIS ====================
 
 // Middleware para servir arquivos de materiais
-app.use('/uploads/materiais', express.static(path.join(__dirname, 'uploads', 'materiais')));
+app.use('/uploads/materiais', express.static(
+  process.env.NODE_ENV === 'production' 
+    ? path.join('/tmp', 'uploads', 'materiais')
+    : path.join(__dirname, 'uploads', 'materiais')
+));
 
 // Configuração do multer para upload de arquivos de materiais
 const materiaisStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, 'uploads', 'materiais');
+    const uploadPath = process.env.NODE_ENV === 'production' 
+      ? path.join('/tmp', 'uploads', 'materiais')
+      : path.join(__dirname, 'uploads', 'materiais');
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
