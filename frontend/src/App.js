@@ -192,7 +192,7 @@ const AppContentWithNotifications = () => {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
             <img 
               src={logoBrasao} 
-              alt="CRM System" 
+              alt="Solumn" 
               style={{ 
                 width: '60px', 
                 height: '60px', 
@@ -470,7 +470,7 @@ const AppContentWithNotifications = () => {
             )}
             <img 
               src={logoHorizontalPreto} 
-              alt="CRM System" 
+              alt="Solumn" 
               style={{ 
                 height: '90px', 
                 objectFit: 'contain'

@@ -36,7 +36,7 @@ const TutorialWhatsApp = ({ isOpen, onClose, onComplete }) => {
     {
       id: 'vincular-lead',
       title: 'Vincular Lead',
-      content: 'Dentro de uma conversa, clique em "Vincular Lead" para transformar uma conversa do WhatsApp em um paciente no seu CRM. Muito útil para captar leads!',
+      content: 'Dentro de uma conversa, clique em "Vincular Lead" para transformar uma conversa do WhatsApp em um paciente no sistema. Muito útil para captar leads!',
       selector: '.btn-outline',
       position: 'left'
     },
@@ -57,7 +57,7 @@ const TutorialWhatsApp = ({ isOpen, onClose, onComplete }) => {
     {
       id: 'final-whatsapp',
       title: 'Incrível!',
-      content: 'Agora você pode usar o WhatsApp integrado ao CRM. Conecte, converse, vincule leads e automatize respostas para ser mais eficiente!',
+      content: 'Agora você pode usar o WhatsApp integrado ao Solumn. Conecte, converse, vincule leads e automatize respostas para ser mais eficiente!',
       selector: '.page-header',
       position: 'center'
     }

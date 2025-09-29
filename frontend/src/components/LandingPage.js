@@ -39,7 +39,7 @@ const LandingPage = () => {
         <div style={{ marginBottom: '3rem' }}>
           <img 
             src={logoHorizontalPreto} 
-            alt="CRM System" 
+            alt="Solumn" 
             style={{ 
               width: '250px',
               maxWidth: '80%',

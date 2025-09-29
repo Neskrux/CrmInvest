@@ -12,7 +12,7 @@
     "NODE_ENV": "production",
     "DISABLE_ESLINT_PLUGIN": "true",
     "CI": "false",
-    "REACT_APP_API_URL": "https://crminvest-backend.fly.dev"
+    "REACT_APP_API_URL": "https://crminvest-backend.fly.dev/api"
   },
   "regions": ["gru1"]
 } 

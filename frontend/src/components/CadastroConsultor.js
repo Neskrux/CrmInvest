@@ -248,7 +248,7 @@ const CadastroConsultor = () => {
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <img 
             src={logoBrasaoPreto} 
-            alt="CRM System" 
+            alt="Solumn" 
             style={{ 
               width: '70px', 
               height: '70px', 

@@ -74,7 +74,7 @@ const WelcomeModal = ({ isOpen, onClose, onStartTutorial }) => {
 
   const pages = [
     {
-      title: 'Boas-vindas ao CRM Investmoney!',
+      title: 'Boas-vindas ao Solumn!',
       content: (
         <div>
           <div style={{ 
