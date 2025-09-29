@@ -3096,7 +3096,7 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
       }
     }
     
-    const { data, error } = await supabaseAdminAdmin
+    const { data, error } = await supabaseAdmin
       .from('fechamentos')
       .insert([{
         paciente_id: parseInt(paciente_id),
@@ -3116,7 +3116,7 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
     if (error) {
       // Se houve erro, remover o arquivo do Supabase Storage
       if (contratoArquivo) {
-        await supabaseAdminAdmin.storage
+        await supabaseAdmin.storage
           .from(STORAGE_BUCKET)
           .remove([contratoArquivo]);
       }
@@ -3125,7 +3125,7 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
 
     // Atualizar status do paciente para "fechado"
     if (paciente_id) {
-      await supabaseAdminAdmin
+      await supabaseAdmin
         .from('pacientes')
         .update({ status: 'fechado' })
         .eq('id', paciente_id);
@@ -3182,7 +3182,7 @@ app.put('/api/fechamentos/:id', authenticateUpload, upload.single('contrato'), a
       });
     }
     
-    const { data, error } = await supabaseAdminAdmin
+    const { data, error } = await supabaseAdmin
       .from('fechamentos')
       .update({ 
         paciente_id: parseInt(paciente_id), 
@@ -3208,7 +3208,7 @@ app.delete('/api/fechamentos/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     
     // Buscar dados do fechamento antes de deletar para remover arquivo
-    const { data: fechamento, error: selectError } = await supabaseAdminAdmin
+    const { data: fechamento, error: selectError } = await supabaseAdmin
       .from('fechamentos')
       .select('contrato_arquivo')
       .eq('id', id)
@@ -3217,7 +3217,7 @@ app.delete('/api/fechamentos/:id', authenticateToken, async (req, res) => {
     if (selectError) throw selectError;
 
     // Deletar fechamento do banco
-    const { error } = await supabaseAdminAdmin
+    const { error } = await supabaseAdmin
       .from('fechamentos')
       .delete()
       .eq('id', id);
@@ -3227,7 +3227,7 @@ app.delete('/api/fechamentos/:id', authenticateToken, async (req, res) => {
     // Remover arquivo de contrato do Supabase Storage se existir
     if (fechamento?.contrato_arquivo) {
       try {
-        await supabaseAdminAdmin.storage
+        await supabaseAdmin.storage
           .from(STORAGE_BUCKET)
           .remove([fechamento.contrato_arquivo]);
       } catch (storageError) {
@@ -3247,7 +3247,7 @@ app.get('/api/fechamentos/:id/contrato', authenticateToken, async (req, res) => 
     const { id } = req.params;
 
     // Buscar dados do fechamento
-    const { data: fechamento, error } = await supabaseAdminAdmin
+    const { data: fechamento, error } = await supabaseAdmin
       .from('fechamentos')
       .select('contrato_arquivo, contrato_nome_original')
       .eq('id', id)
@@ -3260,7 +3260,7 @@ app.get('/api/fechamentos/:id/contrato', authenticateToken, async (req, res) => 
     }
 
     // Fazer download do arquivo do Supabase Storage
-    const { data, error: downloadError } = await supabaseAdminAdmin.storage
+    const { data, error: downloadError } = await supabaseAdmin.storage
       .from(STORAGE_BUCKET)
       .download(fechamento.contrato_arquivo);
 
@@ -3287,7 +3287,7 @@ app.put('/api/fechamentos/:id/aprovar', authenticateToken, requireAdmin, async (
     const { id } = req.params;
     
     // Primeiro, verificar se o fechamento existe
-    const { data: fechamento, error: fetchError } = await supabaseAdminAdmin
+    const { data: fechamento, error: fetchError } = await supabaseAdmin
       .from('fechamentos')
       .select('*')
       .eq('id', id)
@@ -3298,7 +3298,7 @@ app.put('/api/fechamentos/:id/aprovar', authenticateToken, requireAdmin, async (
     }
     
     // Tentar atualizar o campo aprovado
-    const { data, error } = await supabaseAdminAdmin
+    const { data, error } = await supabaseAdmin
       .from('fechamentos')
       .update({ aprovado: 'aprovado' })
       .eq('id', id)
@@ -3321,7 +3321,7 @@ app.put('/api/fechamentos/:id/reprovar', authenticateToken, requireAdmin, async 
     const { id } = req.params;
     
     // Primeiro, verificar se o fechamento existe
-    const { data: fechamento, error: fetchError } = await supabaseAdminAdmin
+    const { data: fechamento, error: fetchError } = await supabaseAdmin
       .from('fechamentos')
       .select('*')
       .eq('id', id)
@@ -3332,7 +3332,7 @@ app.put('/api/fechamentos/:id/reprovar', authenticateToken, requireAdmin, async 
     }
     
     // Tentar atualizar o campo aprovado
-    const { data, error } = await supabaseAdminAdmin
+    const { data, error } = await supabaseAdmin
       .from('fechamentos')
       .update({ aprovado: 'reprovado' })
       .eq('id', id)
