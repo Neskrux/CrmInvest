@@ -202,14 +202,18 @@ const Clinicas = () => {
     const dashboardTutorialCompleted = localStorage.getItem('tutorial-completed');
     
     // Só mostrar tutorial se:
-    // 1. É consultor
+    // 1. É consultor OU admin
     // 2. Tutorial não foi completado
     // 3. Tutorial não foi dispensado
-    // 4. Usuário já passou pelo fluxo inicial (welcome + dashboard tutorial)
-    if (isConsultor && !completed && !tutorialDismissed && !showTutorial && welcomeCompleted && dashboardTutorialCompleted) {
+    // 4. Tutorial não está já aberto
+    // 5. Usuário já passou pelo fluxo inicial OU é admin (admins podem ver direto)
+    const deveExibirTutorial = (isConsultor || isAdmin) && !completed && !tutorialDismissed && !showTutorial;
+    const fluxoInicialCompleto = welcomeCompleted && dashboardTutorialCompleted;
+    
+    if (deveExibirTutorial && (fluxoInicialCompleto || isAdmin)) {
       setShowTutorial(true);
     }
-  }, [user, isConsultor]);
+  }, [user, isConsultor, isAdmin]);
 
   // Detectar mudanças de tamanho da tela
   useEffect(() => {

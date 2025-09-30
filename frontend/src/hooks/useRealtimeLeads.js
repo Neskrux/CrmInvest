@@ -16,7 +16,6 @@ const useRealtimeLeads = () => {
   useEffect(() => {
     if (!user) return;
 
-    console.log('🔌 Iniciando conexão Socket.IO com:', config.BACKEND_URL);
     const socketInstance = io(config.BACKEND_URL, {
       transports: ['websocket', 'polling'],
       timeout: 20000,
@@ -24,13 +23,8 @@ const useRealtimeLeads = () => {
     });
 
     socketInstance.on('connect', () => {
-      console.log('✅ Socket.IO conectado com sucesso!');
       setIsConnected(true);
       
-      console.log('📢 Entrando no grupo de notificações de leads:', {
-        userId: user.id,
-        userType: user.tipo
-      });
       socketInstance.emit('join-lead-notifications', {
         userId: user.id,
         userType: user.tipo
@@ -38,12 +32,10 @@ const useRealtimeLeads = () => {
     });
 
     socketInstance.on('disconnect', () => {
-      console.log('❌ Socket.IO desconectado');
       setIsConnected(false);
     });
 
     socketInstance.on('new-lead', (data) => {
-      console.log('🎉 Evento new-lead recebido:', data);
       setNewLeadCount(prev => prev + 1);
       
       // Apenas admins devem receber notificações sonoras
@@ -54,17 +46,13 @@ const useRealtimeLeads = () => {
         }
         
         notificationTimeoutRef.current = setTimeout(() => {
-          console.log('🔊 Admin detectado - tocando som de notificação');
           playNotificationSound('lead', data);
           notificationTimeoutRef.current = null;
         }, 100); // 100ms de debounce
-      } else {
-        console.log('👤 Usuário não é admin - som não será tocado');
       }
     });
 
     socketInstance.on('lead-count-update', (data) => {
-      console.log('📊 Evento lead-count-update recebido:', data);
       setNewLeadCount(data.count);
       
       // Não tocar som aqui - apenas no evento new-lead
@@ -73,14 +61,12 @@ const useRealtimeLeads = () => {
     });
 
     socketInstance.on('connect_error', (error) => {
-      console.error('❌ Erro de conexão Socket.IO:', error);
       setIsConnected(false);
     });
 
     setSocket(socketInstance);
 
     return () => {
-      // Limpar timeout ao desmontar
       if (notificationTimeoutRef.current) {
         clearTimeout(notificationTimeoutRef.current);
       }

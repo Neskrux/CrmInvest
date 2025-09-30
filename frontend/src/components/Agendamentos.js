@@ -133,11 +133,9 @@ const Agendamentos = () => {
       if (response.ok) {
         setAgendamentos(data);
       } else {
-        console.error('Erro ao carregar agendamentos:', data.error);
         showErrorToast('Erro ao carregar agendamentos: ' + data.error);
       }
     } catch (error) {
-      console.error('Erro ao carregar agendamentos:', error);
       showErrorToast('Erro ao conectar com o servidor');
     } finally {
       setLoading(false);
@@ -152,10 +150,10 @@ const Agendamentos = () => {
       if (response.ok) {
         setPacientes(data);
       } else {
-        console.error('Erro ao carregar pacientes:', data.error);
+        showErrorToast('Erro ao carregar pacientes: ' + data.error);
       }
     } catch (error) {
-      console.error('Erro ao carregar pacientes:', error);
+      showErrorToast('Erro ao conectar com o servidor');
     }
   };
 
@@ -167,10 +165,10 @@ const Agendamentos = () => {
       if (response.ok) {
         setConsultores(data);
       } else {
-        console.error('Erro ao carregar consultores:', data.error);
+        showErrorToast('Erro ao carregar consultores: ' + data.error);
       }
     } catch (error) {
-      console.error('Erro ao carregar consultores:', error);
+      showErrorToast('Erro ao conectar com o servidor');
     }
   };
 
@@ -182,10 +180,10 @@ const Agendamentos = () => {
       if (response.ok) {
         setClinicas(data);
       } else {
-        console.error('Erro ao carregar clínicas:', data.error);
+        showErrorToast('Erro ao carregar clínicas: ' + data.error);
       }
     } catch (error) {
-      console.error('Erro ao carregar clínicas:', error);
+      showErrorToast('Erro ao conectar com o servidor');
     }
   };
 
@@ -225,7 +223,6 @@ const Agendamentos = () => {
         showErrorToast('Erro ao salvar agendamento: ' + data.error);
       }
     } catch (error) {
-      console.error('Erro ao salvar agendamento:', error);
       showErrorToast('Erro ao salvar agendamento');
     }
   };
@@ -342,7 +339,6 @@ const Agendamentos = () => {
         showErrorToast('Erro ao atualizar status: ' + data.error);
       }
     } catch (error) {
-      console.error('Erro ao atualizar status:', error);
       showErrorToast('Erro ao atualizar status');
     }
   };
@@ -379,7 +375,6 @@ const Agendamentos = () => {
         showErrorToast('Erro ao excluir agendamento: ' + (data.error || 'Erro desconhecido'));
       }
     } catch (error) {
-      console.error('Erro ao excluir agendamento:', error);
       showErrorToast('Erro ao excluir agendamento');
     }
   };
@@ -457,7 +452,6 @@ const Agendamentos = () => {
         showErrorToast('Erro ao atualizar status: ' + data.error);
       }
     } catch (error) {
-      console.error('Erro ao confirmar fechamento:', error);
       showErrorToast('Erro ao confirmar fechamento: ' + error.message);
     } finally {
       setSalvandoFechamento(false);

@@ -30,8 +30,22 @@ export const AuthProvider = ({ children }) => {
   const clearAllData = () => {
     setUser(null);
     setToken(null);
+    
+    // Limpar apenas dados sensíveis do usuário, mantendo preferências de UI (tutoriais)
+    // Dados de autenticação
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    
+    // Caches que podem conter dados de outros usuários
+    localStorage.removeItem('metaAds_campaigns');
+    localStorage.removeItem('metaAds_adSets');
+    localStorage.removeItem('metaAds_selectedCampaign');
+    localStorage.removeItem('metaAds_timestamp');
+    localStorage.removeItem('geocodeCache');
+    localStorage.removeItem('data_sync_trigger');
+    
+    // Manter: tutorial-*-completed, tutorial-*-dismissed, welcome-completed, whatsapp-group-modal-shown
+    // Essas são preferências de UI por navegador/máquina, não por usuário
   };
 
   const makeRequest = async (url, options = {}) => {
