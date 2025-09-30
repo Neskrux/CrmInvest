@@ -108,7 +108,9 @@ const Perfil = () => {
     const buscarPerfilCompleto = async () => {
       try {
         // Determinar qual rota usar baseado no tipo de usuário
-        const endpoint = user?.tipo === 'consultor' ? '/consultores/perfil' : '/usuarios/perfil';
+        const endpoint = user?.tipo === 'consultor' ? '/consultores/perfil' : 
+                        user?.tipo === 'empresa' ? '/empresas/perfil' : 
+                        '/usuarios/perfil';
         
         const response = await makeRequest(endpoint, {
           method: 'GET'
@@ -117,7 +119,9 @@ const Perfil = () => {
         if (response.ok) {
           const data = await response.json();
           // Usar a chave correta baseada no tipo de usuário
-          const perfilData = user?.tipo === 'consultor' ? data.consultor : data.usuario;
+          const perfilData = user?.tipo === 'consultor' ? data.consultor : 
+                            user?.tipo === 'empresa' ? data.empresa : 
+                            data.usuario;
           
           setPerfilCompleto(perfilData);
           
@@ -152,14 +156,16 @@ const Perfil = () => {
         if (consultorResponse.ok && responseData.consultor) {
           const consultorData = responseData.consultor;
           
-          // Verificar se é consultor interno (tem as duas permissões)
-          const isConsultorInterno = consultorData.pode_ver_todas_novas_clinicas === true && consultorData.podealterarstatus === true;
+          // Verificar se é consultor interno Invest Money (tem as duas permissões E não tem empresa)
+          const isConsultorInterno = consultorData.pode_ver_todas_novas_clinicas === true && 
+                                     consultorData.podealterarstatus === true &&
+                                     !consultorData.empresa_id;
           
           if (!isConsultorInterno) {
-            // Freelancer: buscar link personalizado baseado no código de referência
+            // Freelancer (solo ou empresa) ou Funcionário de empresa: link personalizado
             if (consultorData.codigo_referencia) {
-              setLinkPersonalizado(`https://crm.investmoneysa.com.br/captura-lead?ref=${consultorData.codigo_referencia}`);
-              setLinkClinicas(`https://crm.investmoneysa.com.br/captura-clinica?ref=${consultorData.codigo_referencia}`);
+              setLinkPersonalizado(`https://solumn.com.br/captura-lead?ref=${consultorData.codigo_referencia}`);
+              setLinkClinicas(`https://solumn.com.br/captura-clinica?ref=${consultorData.codigo_referencia}`);
             } else {
               // Se não tem código de referência, mostrar mensagem
               setLinkPersonalizado(null);
@@ -167,8 +173,8 @@ const Perfil = () => {
             }
           } else {
             // Interno: usar link geral
-            setLinkPersonalizado('https://crm.investmoneysa.com.br/captura-lead');
-            setLinkClinicas('https://crm.investmoneysa.com.br/captura-clinica');
+            setLinkPersonalizado('https://solumn.com.br/captura-lead');
+            setLinkClinicas('https://solumn.com.br/captura-clinica');
           }
         } else {
           console.error('Erro ao buscar dados do consultor:', responseData);
@@ -303,14 +309,17 @@ const Perfil = () => {
         newErrors.email = 'E-mail inválido';
       }
       
-      // Validações específicas para consultores
-      if (user?.tipo === 'consultor') {
+      // Validações de telefone para consultores e empresas
+      if (user?.tipo === 'consultor' || user?.tipo === 'empresa') {
         if (!formData.telefone.trim()) {
           newErrors.telefone = 'Telefone é obrigatório';
         } else if (!validatePhone(formData.telefone)) {
           newErrors.telefone = 'Telefone inválido';
         }
-        
+      }
+      
+      // Validação de PIX apenas para consultores
+      if (user?.tipo === 'consultor') {
         if (!formData.pix.trim()) {
           newErrors.pix = 'PIX é obrigatório';
         } else if (!validateCPF(formData.pix)) {
@@ -349,10 +358,15 @@ const Perfil = () => {
         tipo: formData.tipo
       };
 
-      // Adicionar campos específicos de consultor se aplicável
+      // Adicionar campos específicos de consultor
       if (user?.tipo === 'consultor') {
         updateData.telefone = formData.telefone.trim() || null;
         updateData.pix = formData.pix.trim() || null;
+      }
+      
+      // Adicionar campos específicos de empresa
+      if (user?.tipo === 'empresa') {
+        updateData.telefone = formData.telefone.trim() || null;
       }
 
       // Incluir senhas se estiver alterando
@@ -362,7 +376,9 @@ const Perfil = () => {
       }
 
       // Determinar qual rota usar baseado no tipo de usuário
-      const endpoint = user?.tipo === 'consultor' ? '/consultores/perfil' : '/usuarios/perfil';
+      const endpoint = user?.tipo === 'consultor' ? '/consultores/perfil' : 
+                      user?.tipo === 'empresa' ? '/empresas/perfil' : 
+                      '/usuarios/perfil';
       
       const response = await makeRequest(endpoint, {
         method: 'PUT',
@@ -530,53 +546,54 @@ const Perfil = () => {
             )}
           </div>
 
-          {/* Campos específicos para consultores */}
-          {user?.tipo === 'consultor' && (
-            <>
-              <div className="form-group">
-                <label className="form-label">Telefone *</label>
-                <input
-                  type="tel"
-                  name="telefone"
-                  className="form-input"
-                  value={formData.telefone}
-                  onChange={handleInputChange}
-                  placeholder="(11) 99999-9999"
-                  maxLength="15"
-                  required
-                  style={{
-                    borderColor: errors.telefone ? '#ef4444' : '#d1d5db'
-                  }}
-                />
-                {errors.telefone && (
-                  <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>
-                    {errors.telefone}
-                  </span>
-                )}
-              </div>
+          {/* Campo Telefone - para consultores e empresas */}
+          {(user?.tipo === 'consultor' || user?.tipo === 'empresa') && (
+            <div className="form-group">
+              <label className="form-label">Telefone *</label>
+              <input
+                type="tel"
+                name="telefone"
+                className="form-input"
+                value={formData.telefone}
+                onChange={handleInputChange}
+                placeholder="(11) 99999-9999"
+                maxLength="15"
+                required
+                style={{
+                  borderColor: errors.telefone ? '#ef4444' : '#d1d5db'
+                }}
+              />
+              {errors.telefone && (
+                <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>
+                  {errors.telefone}
+                </span>
+              )}
+            </div>
+          )}
 
-              <div className="form-group">
-                <label className="form-label">Chave PIX (CPF) *</label>
-                <input
-                  type="text"
-                  name="pix"
-                  className="form-input"
-                  value={formData.pix}
-                  onChange={handleInputChange}
-                  placeholder="000.000.000-00"
-                  maxLength="14"
-                  required
-                  style={{
-                    borderColor: errors.pix ? '#ef4444' : '#d1d5db'
-                  }}
-                />
-                {errors.pix && (
-                  <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>
-                    {errors.pix}
-                  </span>
-                )}
-              </div>
-            </>
+          {/* Campo PIX - apenas para consultores */}
+          {user?.tipo === 'consultor' && (
+            <div className="form-group">
+              <label className="form-label">Chave PIX (CPF) *</label>
+              <input
+                type="text"
+                name="pix"
+                className="form-input"
+                value={formData.pix}
+                onChange={handleInputChange}
+                placeholder="000.000.000-00"
+                maxLength="14"
+                required
+                style={{
+                  borderColor: errors.pix ? '#ef4444' : '#d1d5db'
+                }}
+              />
+              {errors.pix && (
+                <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>
+                  {errors.pix}
+                </span>
+              )}
+            </div>
           )}
 
           <div className="form-group">
@@ -586,6 +603,15 @@ const Perfil = () => {
                 type="text"
                 className="form-input"
                 value="Consultor"
+                disabled
+                readOnly
+                style={{ backgroundColor: '#f3f4f6', color: '#6b7280' }}
+              />
+            ) : user?.tipo === 'empresa' ? (
+              <input
+                type="text"
+                className="form-input"
+                value="Empresa"
                 disabled
                 readOnly
                 style={{ backgroundColor: '#f3f4f6', color: '#6b7280' }}
@@ -715,7 +741,29 @@ const Perfil = () => {
       {user?.tipo === 'consultor' && (
         <div className="card" style={{ maxWidth: '600px', margin: '2rem auto 0' }}>
           <div className="card-header">
-            <h2 className="card-title">Meus Links de Divulgação</h2>
+            <h2 className="card-title">
+              {perfilCompleto?.empresa_id ? 'Meus Links de Divulgação' : 'Meus Links de Divulgação'}
+            </h2>
+            {perfilCompleto?.empresa_id && perfilCompleto?.empresas?.nome && (
+              <div style={{ 
+                fontSize: '0.875rem', 
+                color: '#6b7280',
+                marginTop: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <span className="badge" style={{ 
+                  backgroundColor: '#8b5cf6', 
+                  color: 'white',
+                  fontSize: '0.75rem',
+                  padding: '4px 10px'
+                }}>
+                  {perfilCompleto.empresas.nome}
+                </span>
+                <span>Empresa vinculada</span>
+              </div>
+            )}
           </div>
           
           <div className="card-body">
@@ -734,8 +782,8 @@ const Perfil = () => {
               </div>
             ) : (linkPersonalizado || linkClinicas) ? (
               <div>
-                {/* Link para Pacientes */}
-                {linkPersonalizado && (
+                {/* Link para Pacientes - Apenas para consultores SEM empresa */}
+                {linkPersonalizado && !perfilCompleto?.empresa_id && (
                   <div style={{ 
                     backgroundColor: '#f0fdf4', 
                     border: '2px solid #86efac', 
@@ -850,32 +898,35 @@ const Perfil = () => {
                   </div>
                 )}
                 
-                <div style={{ 
-                  backgroundColor: '#f8fafc', 
-                  border: '1px solid #e2e8f0', 
-                  borderRadius: '8px', 
-                  padding: '1rem'
-                }}>
-                  <div style={{ fontSize: '14px', color: '#374151', fontWeight: '600', marginBottom: '8px' }}>
-                    Como usar seus links:
+                {/* Caixinha de instruções - Apenas para consultores SEM empresa */}
+                {!perfilCompleto?.empresa_id && (
+                  <div style={{ 
+                    backgroundColor: '#f8fafc', 
+                    border: '1px solid #e2e8f0', 
+                    borderRadius: '8px', 
+                    padding: '1rem'
+                  }}>
+                    <div style={{ fontSize: '14px', color: '#374151', fontWeight: '600', marginBottom: '8px' }}>
+                      Como usar seus links:
+                    </div>
+                    <ul style={{ fontSize: '13px', color: '#374151', margin: '0', paddingLeft: '1.5rem', lineHeight: '1.6' }}>
+                      <li><strong>Link Verde (Pacientes):</strong> Para indicar pessoas que querem fazer tratamentos parcelados no boleto</li>
+                      <li><strong>Link Azul (Clínicas):</strong> Para indicar clínicas que querem receber o valor à vista dos tratamentos</li>
+                      <li>Compartilhe os links em suas redes sociais e WhatsApp</li>
+                      {linkPersonalizado?.includes('?ref=') ? (
+                        <>
+                          <li>Todos os cadastros através destes links serão automaticamente associados a você</li>
+                          <li>Acompanhe seus leads na tela de "Pacientes" e clínicas na tela de "Clínicas"</li>
+                        </>
+                      ) : (
+                        <>
+                          <li>Os cadastros aparecerão nas telas de "Novos Leads" e "Novas Clínicas"</li>
+                          <li>Você pode "pegar" os leads e clínicas que desejar atender</li>
+                        </>
+                      )}
+                    </ul>
                   </div>
-                  <ul style={{ fontSize: '13px', color: '#374151', margin: '0', paddingLeft: '1.5rem', lineHeight: '1.6' }}>
-                    <li><strong>Link Verde (Pacientes):</strong> Para indicar pessoas que querem fazer tratamentos parcelados no boleto</li>
-                    <li><strong>Link Azul (Clínicas):</strong> Para indicar clínicas que querem receber o valor à vista dos tratamentos</li>
-                    <li>Compartilhe os links em suas redes sociais e WhatsApp</li>
-                    {linkPersonalizado?.includes('?ref=') ? (
-                      <>
-                        <li>Todos os cadastros através destes links serão automaticamente associados a você</li>
-                        <li>Acompanhe seus leads na tela de "Pacientes" e clínicas na tela de "Clínicas"</li>
-                      </>
-                    ) : (
-                      <>
-                        <li>Os cadastros aparecerão nas telas de "Novos Leads" e "Novas Clínicas"</li>
-                        <li>Você pode "pegar" os leads e clínicas que desejar atender</li>
-                      </>
-                    )}
-                  </ul>
-                </div>
+                )}
               </div>
             ) : (
               <div style={{ 
@@ -897,8 +948,8 @@ const Perfil = () => {
         </div>
       )}
 
-      {/* Seção do Grupo do WhatsApp - Apenas para consultores */}
-      {user?.tipo === 'consultor' && (
+      {/* Seção do Grupo do WhatsApp - Apenas para consultores SEM empresa */}
+      {user?.tipo === 'consultor' && !perfilCompleto?.empresa_id && (
         <div className="card" style={{ maxWidth: '600px', margin: '2rem auto 0' }}>
           <div className="card-header">
             <h2 className="card-title">Grupo dos Consultores</h2>

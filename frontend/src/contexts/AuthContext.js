@@ -188,6 +188,7 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated: !!user && !!token,
     isAdmin: user?.tipo === 'admin',
     isConsultor: user?.tipo === 'consultor',
+    isEmpresa: user?.tipo === 'empresa',
     isFreelancer: user?.is_freelancer === true,
     // Consultor interno: tem pode_ver_todas_novas_clinicas=true E podealterarstatus=true
     isConsultorInterno: user?.tipo === 'consultor' && user?.pode_ver_todas_novas_clinicas === true && user?.podealterarstatus === true,
