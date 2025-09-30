@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 
 const Consultores = () => {
-  const { makeRequest, isAdmin } = useAuth();
+  const { makeRequest, isAdmin, user } = useAuth();
   const { showErrorToast, showSuccessToast } = useToast();
   const [consultores, setConsultores] = useState([]);
   const [consultoresFiltrados, setConsultoresFiltrados] = useState([]);
@@ -888,27 +888,43 @@ Digite o número da opção desejada:`;
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Gerenciar Consultores</h1>
-        <p className="page-subtitle">Gerencie a equipe de consultores</p>
+        <h1 className="page-title">
+          {user?.tipo === 'empresa' ? 'Minha Equipe de Consultores' : 'Gerenciar Consultores'}
+        </h1>
+        <p className="page-subtitle">
+          {user?.tipo === 'empresa' ? 'Gerencie os consultores da sua empresa' : 'Gerencie a equipe de consultores'}
+        </p>
       </div>
 
       {/* Resumo de Estatísticas */}
-      <div className="stats-grid" style={{ marginBottom: '2rem' }}>
+      <div className="stats-grid" style={{ 
+        marginBottom: '2rem',
+        gridTemplateColumns: user?.tipo === 'empresa' 
+          ? 'repeat(3, 1fr)'  // Grid 3 colunas para empresas
+          : 'repeat(auto-fit, minmax(150px, 1fr))' // Grid responsivo para admin
+      }}>
         <div className="stat-card">
           <div className="stat-label">Total</div>
           <div className="stat-value">{consultores.length}</div>
         </div>
         
         <div className="stat-card">
-          <div className="stat-label">Freelancers</div>
+          <div className="stat-label">
+            {user?.tipo === 'empresa' ? 'Freelancers' : 'Freelancers'}
+          </div>
           <div className="stat-value">{consultores.filter(c => c.is_freelancer !== false).length}</div>
         </div>
         
         <div className="stat-card">
-          <div className="stat-label">Internos</div>
+          <div className="stat-label">
+            {user?.tipo === 'empresa' ? 'Funcionários' : 'Internos'}
+          </div>
           <div className="stat-value">{consultores.filter(c => c.is_freelancer === false).length}</div>
         </div>
         
+        {/* KPIs de link - apenas para admin */}
+        {isAdmin && (
+          <>
         <div className="stat-card">
           <div className="stat-label">Com Link</div>
           <div className="stat-value">{consultores.filter(c => c.codigo_referencia && c.codigo_referencia.trim() !== '').length}</div>
@@ -918,12 +934,16 @@ Digite o número da opção desejada:`;
           <div className="stat-label">Sem Link</div>
           <div className="stat-value">{consultores.filter(c => !c.codigo_referencia || c.codigo_referencia.trim() === '').length}</div>
         </div>
+          </>
+        )}
       </div>
 
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Equipe de Consultores</h2>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            {/* Botão de gerar links - apenas para admin */}
+            {isAdmin && (
             <button 
               className="btn btn-secondary"
               onClick={gerarCodigosFaltantes}
@@ -935,6 +955,7 @@ Digite o número da opção desejada:`;
               </svg>
               Gerar Links Freelancers
             </button>
+            )}
             <button 
               className="btn btn-primary"
               onClick={() => setShowModal(true)}
@@ -1092,9 +1113,28 @@ Digite o número da opção desejada:`;
                       <strong>{consultor.nome}</strong>
                     </td>
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                      {consultor.empresa_id ? (
+                        // Consultor de empresa (mostra se é freelancer ou funcionário)
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <span className={`status-badge ${consultor.is_freelancer !== false ? 'freelancer' : 'interno'}`}>
+                            {consultor.is_freelancer !== false ? 'Freelancer' : 'Funcionário'}
+                          </span>
+                          <span className="badge" style={{ 
+                            backgroundColor: '#8b5cf6', 
+                            color: 'white',
+                            fontSize: '0.75rem',
+                            padding: '2px 8px',
+                            borderRadius: '4px'
+                          }}>
+                            Empresa
+                          </span>
+                        </div>
+                      ) : (
+                        // Consultor sem empresa (Invest Money)
                       <span className={`status-badge ${consultor.is_freelancer !== false ? 'freelancer' : 'interno'}`}>
                         {consultor.is_freelancer !== false ? 'Freelancer' : 'Interno'}
                       </span>
+                      )}
                     </td>
                     <td className="text-wrap" style={{ display: isMobile ? 'none' : 'table-cell' }}>
                       <span className="email-cell">
@@ -1146,7 +1186,7 @@ Digite o número da opção desejada:`;
                             <circle cx="12" cy="12" r="3" />
                           </svg>
                         </button>
-                        {isAdmin && (
+                        {(isAdmin || user?.tipo === 'empresa') && (
                           <button
                             onClick={() => handleEdit(consultor)}
                             className="btn-action"
@@ -1169,7 +1209,7 @@ Digite o número da opção desejada:`;
                             <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                           </svg>
                         </button>
-                        {isAdmin && (
+                        {(isAdmin || user?.tipo === 'empresa') && (
                           <button
                             onClick={() => excluirConsultor(consultor)}
                             className="btn-action"
@@ -1274,6 +1314,37 @@ Digite o número da opção desejada:`;
                     </div>
                   </div>
                 )}
+                
+                {/* Tipo de Vínculo - Para consultores de empresa */}
+                <div>
+                  <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>
+                    {viewingConsultor.empresa_id ? 'Tipo de Vínculo' : 'Tipo'}
+                  </label>
+                  <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                    {viewingConsultor.empresa_id ? (
+                      // Consultor de empresa
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <span className={`status-badge ${viewingConsultor.is_freelancer !== false ? 'freelancer' : 'interno'}`}>
+                          {viewingConsultor.is_freelancer !== false ? 'Freelancer (terceirizado)' : 'Funcionário (fixo)'}
+                        </span>
+                        <span className="badge" style={{ 
+                          backgroundColor: '#8b5cf6', 
+                          color: 'white',
+                          fontSize: '0.75rem',
+                          padding: '4px 10px',
+                          borderRadius: '4px'
+                        }}>
+                          Empresa
+                        </span>
+                      </div>
+                    ) : (
+                      // Consultor Invest Money
+                      <span className={`status-badge ${viewingConsultor.is_freelancer !== false ? 'freelancer' : 'interno'}`}>
+                        {viewingConsultor.is_freelancer !== false ? 'Freelancer' : 'Interno'}
+                      </span>
+                    )}
+                  </p>
+                </div>
                 
                 {viewingConsultor.created_at && (
                   <div>
@@ -1518,7 +1589,9 @@ Digite o número da opção desejada:`;
               </div>
 
               <div className="form-group">
-                <label className="form-label">Tipo de Consultor</label>
+                <label className="form-label">
+                  {user?.tipo === 'empresa' ? 'Tipo de Vínculo' : 'Tipo de Consultor'}
+                </label>
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
                     <input
@@ -1526,9 +1599,9 @@ Digite o número da opção desejada:`;
                       name="is_freelancer"
                       value="true"
                       checked={formData.is_freelancer === true}
-                      onChange={(e) => setFormData(prev => ({ ...prev, is_freelancer: e.target.value === 'true' }))}
+                      onChange={() => setFormData(prev => ({ ...prev, is_freelancer: true }))}
                     />
-                    <span>Freelancer (link personalizado)</span>
+                    <span>{user?.tipo === 'empresa' ? 'Freelancer (terceirizado)' : 'Freelancer (link personalizado)'}</span>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
                     <input
@@ -1536,13 +1609,15 @@ Digite o número da opção desejada:`;
                       name="is_freelancer"
                       value="false"
                       checked={formData.is_freelancer === false}
-                      onChange={(e) => setFormData(prev => ({ ...prev, is_freelancer: e.target.value === 'false' }))}
+                      onChange={() => setFormData(prev => ({ ...prev, is_freelancer: false }))}
                     />
-                    <span>Interno (link geral)</span>
+                    <span>{user?.tipo === 'empresa' ? 'Funcionário (fixo)' : 'Interno (link geral)'}</span>
                   </label>
                 </div>
                 <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
-                  Freelancers veem apenas leads do seu código. Internos veem leads gerais.
+                  {user?.tipo === 'empresa' 
+                    ? 'Ambos os tipos veem as clínicas da empresa. Diferença apenas para controle interno.'
+                    : 'Freelancers veem apenas leads do seu código. Internos veem leads gerais.'}
                 </small>
               </div>
 
@@ -1726,7 +1801,7 @@ Digite o número da opção desejada:`;
             </div>
 
             <div style={{ padding: '1.5rem' }}>
-              {linkConsultor.link_personalizado ? (
+              {linkConsultor.link_personalizado || linkConsultor.link_clinicas ? (
                 <div>
                   <div style={{ 
                     padding: '1rem',
@@ -1736,10 +1811,12 @@ Digite o número da opção desejada:`;
                     marginBottom: '1.5rem'
                   }}>
                     <div style={{ fontSize: '0.875rem', color: '#166534', fontWeight: '600' }}>
-                      Link Personalizado Ativo
+                      {linkConsultor.empresa_id ? 'Links de Indicação da Empresa' : 'Link Personalizado Ativo'}
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                      Use este link para divulgar e capturar leads com sua referência
+                      {linkConsultor.empresa_id 
+                        ? 'Use estes links para indicar clínicas em nome da empresa'
+                        : 'Use este link para divulgar e capturar leads com sua referência'}
                     </div>
                   </div>
 
@@ -1760,15 +1837,17 @@ Digite o número da opção desejada:`;
                     </div>
                   </div>
 
+                  {/* Link para Pacientes - Apenas para consultores SEM empresa */}
+                  {linkConsultor.link_personalizado && !linkConsultor.empresa_id && (
                   <div style={{ marginBottom: '1.5rem' }}>
                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem', display: 'block', marginBottom: '0.5rem' }}>
-                      Link Personalizado
+                        Link para Pacientes
                     </label>
                     <div style={{ 
                       padding: '0.75rem',
                       borderRadius: '8px',
-                      backgroundColor: '#f3f4f6',
-                      border: '1px solid #e5e7eb',
+                        backgroundColor: '#ecfdf5',
+                        border: '1px solid #86efac',
                       fontFamily: 'monospace',
                       fontSize: '0.875rem',
                       color: '#1f2937',
@@ -1777,7 +1856,54 @@ Digite o número da opção desejada:`;
                     }}>
                       {linkConsultor.link_personalizado}
                     </div>
+                      <button 
+                        type="button"
+                        className="btn btn-sm btn-secondary"
+                        onClick={() => copiarLink(linkConsultor.link_personalizado)}
+                        style={{ marginTop: '0.5rem', fontSize: '0.75rem' }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.25rem' }}>
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        Copiar Link de Pacientes
+                      </button>
                   </div>
+                  )}
+
+                  {/* Link para Clínicas - Para TODOS os consultores com link */}
+                  {linkConsultor.link_clinicas && (
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem', display: 'block', marginBottom: '0.5rem' }}>
+                        Link para Clínicas
+                      </label>
+                      <div style={{ 
+                        padding: '0.75rem',
+                        borderRadius: '8px',
+                        backgroundColor: '#eff6ff',
+                        border: '1px solid #93c5fd',
+                        fontFamily: 'monospace',
+                        fontSize: '0.875rem',
+                        color: '#1f2937',
+                        wordBreak: 'break-all',
+                        lineHeight: '1.5'
+                      }}>
+                        {linkConsultor.link_clinicas}
+                      </div>
+                      <button 
+                        type="button"
+                        className="btn btn-sm btn-secondary"
+                        onClick={() => copiarLink(linkConsultor.link_clinicas)}
+                        style={{ marginTop: '0.5rem', fontSize: '0.75rem' }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.25rem' }}>
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        Copiar Link de Clínicas
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div>

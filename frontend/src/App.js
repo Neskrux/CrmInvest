@@ -131,7 +131,39 @@ const AppContentWithNotifications = () => {
   }
 
   // Se o usuário está autenticado, mostrar a aplicação principal
-  const renderContent = () => {
+  const RenderContent = () => {
+    const { isEmpresa } = useAuth();
+    
+    // Empresas têm acesso limitado: consultores (da empresa), clínicas, materiais e perfil
+    if (isEmpresa) {
+      return (
+        <Routes>
+          <Route path="/consultores" element={<Consultores />} />
+          <Route path="/clinicas" element={<Clinicas />} />
+          <Route path="/materiais" element={<Materiais />} />
+          <Route path="/perfil" element={<Perfil />} />
+          {/* Redirecionar qualquer outra rota para clínicas */}
+          <Route path="/" element={<Navigate to="/clinicas" replace />} />
+          <Route path="*" element={<Navigate to="/clinicas" replace />} />
+        </Routes>
+      );
+    }
+    
+    // Consultores de empresa também têm acesso limitado: clínicas, materiais e perfil
+    if (user.tipo === 'consultor' && user.empresa_id) {
+      return (
+        <Routes>
+          <Route path="/clinicas" element={<Clinicas />} />
+          <Route path="/materiais" element={<Materiais />} />
+          <Route path="/perfil" element={<Perfil />} />
+          {/* Redirecionar qualquer outra rota para clínicas */}
+          <Route path="/" element={<Navigate to="/clinicas" replace />} />
+          <Route path="*" element={<Navigate to="/clinicas" replace />} />
+        </Routes>
+      );
+    }
+    
+    // Rotas normais para admin e consultores Invest Money
     return (
       <Routes>
         <Route path="/dashboard" element={<Dashboard />} />
@@ -223,67 +255,79 @@ const AppContentWithNotifications = () => {
         </div>
 
         <nav className="sidebar-nav">
-          <div className="nav-item">
-            <Link
-              to="/dashboard"
-              className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`}
-              onClick={handleMobileNavigation}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="7" height="7" />
-                <rect x="14" y="3" width="7" height="7" />
-                <rect x="14" y="14" width="7" height="7" />
-                <rect x="3" y="14" width="7" height="7" />
-              </svg>
-              Dashboard
-            </Link>
-          </div>
+          {/* Dashboard - Apenas para Admin e Consultores Invest Money */}
+          {user.tipo !== 'empresa' && !user.empresa_id && (
+            <div className="nav-item">
+              <Link
+                to="/dashboard"
+                className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`}
+                onClick={handleMobileNavigation}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="7" height="7" />
+                  <rect x="14" y="3" width="7" height="7" />
+                  <rect x="14" y="14" width="7" height="7" />
+                  <rect x="3" y="14" width="7" height="7" />
+                </svg>
+                Dashboard
+              </Link>
+            </div>
+          )}
 
-          <div className="nav-item">
-            <Link
-              to="/pacientes"
-              className={`nav-link ${activeTab === 'pacientes' ? 'active' : ''}`}
-              onClick={handleMobileNavigation}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-              Pacientes
-            </Link>
-          </div>
+          {/* Pacientes - Apenas para Admin e Consultores Invest Money */}
+          {user.tipo !== 'empresa' && !user.empresa_id && (
+            <div className="nav-item">
+              <Link
+                to="/pacientes"
+                className={`nav-link ${activeTab === 'pacientes' ? 'active' : ''}`}
+                onClick={handleMobileNavigation}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                Pacientes
+              </Link>
+            </div>
+          )}
 
-          <div className="nav-item">
-            <Link
-              to="/agendamentos"
-              className={`nav-link ${activeTab === 'agendamentos' ? 'active' : ''}`}
-              onClick={handleMobileNavigation}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                <line x1="16" y1="2" x2="16" y2="6" />
-                <line x1="8" y1="2" x2="8" y2="6" />
-                <line x1="3" y1="10" x2="21" y2="10" />
-              </svg>
-              Agendamentos
-            </Link>
-          </div>
+          {/* Agendamentos - Apenas para Admin e Consultores Invest Money */}
+          {user.tipo !== 'empresa' && !user.empresa_id && (
+            <div className="nav-item">
+              <Link
+                to="/agendamentos"
+                className={`nav-link ${activeTab === 'agendamentos' ? 'active' : ''}`}
+                onClick={handleMobileNavigation}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                Agendamentos
+              </Link>
+            </div>
+          )}
 
-          <div className="nav-item">
-            <Link
-              to="/fechamentos"
-              className={`nav-link ${activeTab === 'fechamentos' ? 'active' : ''}`}
-              onClick={handleMobileNavigation}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="12" y1="1" x2="12" y2="23" />
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-              </svg>
-              Fechamentos
-            </Link>
-          </div>
+          {/* Fechamentos - Apenas para Admin e Consultores Invest Money */}
+          {user.tipo !== 'empresa' && !user.empresa_id && (
+            <div className="nav-item">
+              <Link
+                to="/fechamentos"
+                className={`nav-link ${activeTab === 'fechamentos' ? 'active' : ''}`}
+                onClick={handleMobileNavigation}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="12" y1="1" x2="12" y2="23" />
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+                Fechamentos
+              </Link>
+            </div>
+          )}
 
 
           <div className="nav-item">
@@ -317,7 +361,8 @@ const AppContentWithNotifications = () => {
             </Link>
           </div>
 
-          {user.tipo === 'admin' && (
+          {/* Consultores - Admin e Empresas */}
+          {(user.tipo === 'admin' || user.tipo === 'empresa') && (
             <div className="nav-item">
               <Link
                 to="/consultores"
@@ -402,7 +447,7 @@ const AppContentWithNotifications = () => {
             </div>
             <div className="user-details">
               <h3>{user.nome}</h3>
-              <p>{user.tipo === 'admin' ? 'Administrador' : 'Consultor'}</p>
+              <p>{user.tipo === 'admin' ? 'Administrador' : user.tipo === 'empresa' ? 'Empresa' : 'Consultor'}</p>
             </div>
           </div>
           <Link
@@ -523,7 +568,7 @@ const AppContentWithNotifications = () => {
                   {user.nome}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                  {user.tipo === 'admin' ? 'Administrador' : 'Consultor'}
+                  {user.tipo === 'admin' ? 'Administrador' : user.tipo === 'empresa' ? 'Empresa' : 'Consultor'}
                 </div>
               </div>
               <svg 
@@ -628,7 +673,7 @@ const AppContentWithNotifications = () => {
         </header>
 
         <div className="page-content">
-          {renderContent()}
+          {RenderContent()}
         </div>
       </main>
     </div>
