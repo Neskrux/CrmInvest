@@ -33,23 +33,11 @@ export const LeadNotificationProvider = ({ children }) => {
   }, [clinicasConnected, isAdmin, requestClinicasCount]);
 
   useEffect(() => {
-    // Notificar apenas quando há novos leads (contagem aumentou)
-    if (isAdmin && newLeadCount > previousLeadCountRef.current && previousLeadCountRef.current > 0) {
-      // A notificação sonora e visual já é gerenciada pelo useRealtimeLeads
-      console.log(`🎉 ${newLeadCount - previousLeadCountRef.current} novo(s) lead(s) detectado(s)!`);
-    }
-    
     // Atualizar contagem de leads
     previousLeadCountRef.current = newLeadCount;
   }, [newLeadCount, isAdmin]);
 
   useEffect(() => {
-    // Notificar apenas quando há novas clínicas (contagem aumentou)
-    if (isAdmin && newClinicasCount > previousClinicasCountRef.current && previousClinicasCountRef.current > 0) {
-      // A notificação sonora e visual já é gerenciada pelo useRealtimeClinicas
-      console.log(`🏥 ${newClinicasCount - previousClinicasCountRef.current} nova(s) clínica(s) detectada(s)!`);
-    }
-    
     // Atualizar contagem de clínicas
     previousClinicasCountRef.current = newClinicasCount;
   }, [newClinicasCount, isAdmin]);

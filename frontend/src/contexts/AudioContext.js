@@ -35,11 +35,9 @@ export const AudioProvider = ({ children }) => {
   const playNotificationSound = (type = 'lead', data = null) => {
     // Evitar múltiplas notificações simultâneas
     if (isNotificationActive) {
-      console.log('⚠️ Notificação já ativa - ignorando nova chamada');
       return;
     }
     
-    console.log('🔊 AudioContext: Iniciando notificação sonora e visual para:', type);
     setIsNotificationActive(true);
     setNotificationType(type);
     setNotificationData(data);
@@ -48,14 +46,12 @@ export const AudioProvider = ({ children }) => {
   };
 
   const hideNotification = () => {
-    console.log('🔇 AudioContext: Parando notificação');
     setIsNotificationActive(false);
     setShowNotification(false);
     setNotificationData(null);
     setNotificationType('lead');
     audioHook.stopNotificationSound();
     
-    // Limpar timeout se existir
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;

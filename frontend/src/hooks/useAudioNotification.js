@@ -37,14 +37,10 @@ const useAudioNotification = () => {
       const handleEnded = () => {
         if (isPlayingRef.current) {
           audio.currentTime = 0;
-          audio.play().catch(err => {
-            console.error('❌ Erro ao reiniciar loop:', err);
-          });
         }
       };
 
       const handleError = (e) => {
-        console.error('❌ Erro no áudio:', e);
         isPlayingRef.current = false;
       };
 
@@ -78,9 +74,7 @@ const useAudioNotification = () => {
         
         // Tentar reproduzir
         audio.play().then(() => {
-          console.log('🔊 Som de notificação iniciado');
         }).catch(error => {
-          console.error('❌ Erro ao tocar áudio:', error);
           isPlayingRef.current = false;
           
           // Tentar novamente após um pequeno delay
@@ -89,19 +83,14 @@ const useAudioNotification = () => {
               isPlayingRef.current = true;
               audioRef.current.loop = true;
               audioRef.current.play().then(() => {
-                console.log('🔊 Som de notificação iniciado (retry)');
               }).catch(err => {
-                console.error('❌ Falhou novamente:', err);
                 isPlayingRef.current = false;
               });
             }
           }, 100);
         });
-      } else {
-        console.log('❌ AudioRef não disponível');
       }
     } catch (error) {
-      console.error('❌ Erro ao executar playNotificationSound:', error);
     }
   }, [audioEnabled]);
 
@@ -113,10 +102,8 @@ const useAudioNotification = () => {
         audio.currentTime = 0;
         audio.loop = false;
         isPlayingRef.current = false;
-        console.log('🔇 Som de notificação parado');
       }
     } catch (error) {
-      console.error('❌ Erro ao parar áudio:', error);
       isPlayingRef.current = false;
     }
   }, []);

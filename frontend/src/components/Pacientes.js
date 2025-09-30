@@ -211,15 +211,18 @@ const Pacientes = () => {
     const dashboardTutorialCompleted = localStorage.getItem('tutorial-completed');
     
     // Só mostrar tutorial se:
-    // 1. É consultor
+    // 1. É consultor OU admin
     // 2. Tutorial não foi completado
     // 3. Tutorial não foi dispensado
     // 4. Tutorial não está já aberto
-    // 5. Usuário já passou pelo fluxo inicial (welcome + dashboard tutorial)
-    if (isConsultor && !completed && !tutorialDismissed && !showTutorial && welcomeCompleted && dashboardTutorialCompleted) {
+    // 5. Usuário já passou pelo fluxo inicial OU é admin (admins podem ver direto)
+    const deveExibirTutorial = (isConsultor || isAdmin) && !completed && !tutorialDismissed && !showTutorial;
+    const fluxoInicialCompleto = welcomeCompleted && dashboardTutorialCompleted;
+    
+    if (deveExibirTutorial && (fluxoInicialCompleto || isAdmin)) {
       setShowTutorial(true);
     }
-  }, [user, isConsultor]);
+  }, [user, isConsultor, isAdmin]);
 
   // Garantir que freelancers fiquem na aba "Pacientes"
   useEffect(() => {
@@ -1138,8 +1141,14 @@ const Pacientes = () => {
   };
 
   const pacientesFiltrados = pacientes.filter(p => {
-    // Consultores internos veem todos os pacientes, freelancers veem apenas os atribuídos
-    if (!isConsultorInterno && (!p.consultor_id || p.consultor_id === '' || p.consultor_id === null || p.consultor_id === undefined || Number(p.consultor_id) === 0)) return false;
+    // Admins e consultores internos veem todos os pacientes
+    // Freelancers veem apenas os atribuídos a eles
+    // Leads não atribuídos (sem consultor_id) NÃO devem aparecer aqui para ninguém
+    if (!isAdmin && !isConsultorInterno && (!p.consultor_id || p.consultor_id === '' || p.consultor_id === null || p.consultor_id === undefined || Number(p.consultor_id) === 0)) return false;
+    
+    // Para consultores internos e admins, também remover leads não atribuídos da aba "Geral"
+    // (eles devem aparecer apenas em "Novos Leads")
+    if ((isAdmin || isConsultorInterno) && (!p.consultor_id || p.consultor_id === '' || p.consultor_id === null || p.consultor_id === undefined || Number(p.consultor_id) === 0)) return false;
     
     const matchNome = !filtroNome || p.nome.toLowerCase().includes(filtroNome.toLowerCase());
     const matchTelefone = !filtroTelefone || (p.telefone || '').includes(filtroTelefone);
