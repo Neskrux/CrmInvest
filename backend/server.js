@@ -54,8 +54,8 @@ const corsOptions = {
 
 // Middleware
 app.use(cors(corsOptions));
-app.use(bodyParser.json({ limit: '10mb' }));
-app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+app.use(bodyParser.json({ limit: '250mb' })); // Aumentado para suportar vídeos grandes
+app.use(bodyParser.urlencoded({ extended: true, limit: '250mb' }));
 
 // Servir arquivos estáticos da pasta uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -4321,26 +4321,9 @@ app.post('/api/reset-password', async (req, res) => {
 
 // ==================== ROTAS PARA MATERIAIS ====================
 
-// Middleware para servir arquivos de materiais
-app.use('/uploads/materiais', express.static(path.join(__dirname, 'uploads', 'materiais')));
-
-// Configuração do multer para upload de arquivos de materiais
-const materiaisStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, 'uploads', 'materiais');
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
+// Configuração do multer para upload de arquivos de materiais (em memória para Supabase)
 const materiaisUpload = multer({ 
-  storage: materiaisStorage,
+  storage: multer.memoryStorage(), // Usar memória ao invés de disco local
   limits: {
     fileSize: 200 * 1024 * 1024 // 200MB
   },
@@ -4374,6 +4357,9 @@ const materiaisUpload = multer({
     }
   }
 });
+
+// Nome do bucket do Supabase Storage para materiais
+const MATERIAIS_STORAGE_BUCKET = 'materiais-apoio';
 
 // GET /api/materiais - Listar todos os materiais
 app.get('/api/materiais', authenticateToken, async (req, res) => {
@@ -4413,10 +4399,8 @@ app.post('/api/materiais', authenticateToken, requireAdmin, (req, res, next) => 
 }, async (req, res) => {
   try {
     console.log('🔧 POST /api/materiais recebido');
-    console.log('🔧 Headers:', req.headers);
     console.log('🔧 Body:', req.body);
-    console.log('🔧 File:', req.file);
-    console.log('🔧 Usuário autenticado:', req.user);
+    console.log('🔧 File:', req.file ? req.file.originalname : 'nenhum');
 
     const { titulo, descricao, tipo } = req.body;
 
@@ -4428,13 +4412,62 @@ app.post('/api/materiais', authenticateToken, requireAdmin, (req, res, next) => 
       return res.status(400).json({ error: 'Arquivo é obrigatório' });
     }
 
+    // Gerar nome único para o arquivo no Supabase Storage
+    const timestamp = Date.now();
+    const randomId = Math.round(Math.random() * 1E9);
+    const fileExt = path.extname(req.file.originalname);
+    const fileName = `${tipo}_${timestamp}_${randomId}${fileExt}`;
+
+    const fileSizeMB = (req.file.size / (1024 * 1024)).toFixed(2);
+    console.log('📤 Fazendo upload para Supabase Storage:', fileName);
+    console.log('📦 Tamanho do arquivo:', fileSizeMB, 'MB');
+    console.log('🎬 Tipo:', req.file.mimetype);
+
+    // Fazer upload para Supabase Storage com timeout de 4 minutos
+    const uploadPromise = supabaseAdmin.storage
+      .from(MATERIAIS_STORAGE_BUCKET)
+      .upload(fileName, req.file.buffer, {
+        contentType: req.file.mimetype,
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    // Timeout de 4 minutos para uploads grandes (vídeos)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Upload timeout - arquivo muito grande ou conexão lenta')), 240000);
+    });
+
+    let uploadData, uploadError;
+    try {
+      const result = await Promise.race([uploadPromise, timeoutPromise]);
+      uploadData = result.data;
+      uploadError = result.error;
+    } catch (error) {
+      console.error('Erro ou timeout no upload:', error.message);
+      return res.status(500).json({ 
+        error: 'Tempo de upload excedido. Tente com um arquivo menor ou verifique sua conexão.' 
+      });
+    }
+
+    if (uploadError) {
+      console.error('Erro ao fazer upload no Supabase Storage:', uploadError);
+      return res.status(500).json({ error: 'Erro ao fazer upload do arquivo: ' + uploadError.message });
+    }
+
+    console.log('✅ Upload realizado com sucesso:', uploadData.path);
+
+    // Obter URL pública do arquivo
+    const { data: publicUrlData } = supabaseAdmin.storage
+      .from(MATERIAIS_STORAGE_BUCKET)
+      .getPublicUrl(fileName);
+
     const materialData = {
       titulo,
       descricao: descricao || '',
       tipo,
       url: null,
       arquivo_nome: req.file.originalname,
-      arquivo_url: `/uploads/materiais/${req.file.filename}`,
+      arquivo_url: fileName, // Salvar apenas o nome do arquivo no Storage
       created_by: req.user.id
     };
 
@@ -4446,6 +4479,8 @@ app.post('/api/materiais', authenticateToken, requireAdmin, (req, res, next) => 
 
     if (error) {
       console.error('Erro ao criar material:', error);
+      // Tentar remover arquivo do storage se falhou salvar no banco
+      await supabaseAdmin.storage.from(MATERIAIS_STORAGE_BUCKET).remove([fileName]);
       return res.status(500).json({ error: 'Erro ao criar material' });
     }
 
@@ -4464,28 +4499,58 @@ app.get('/api/materiais/:id/download', authenticateToken, async (req, res) => {
     console.log('🔧 GET /api/materiais/:id/download recebido');
     console.log('🔧 ID do material:', id);
 
-    const { data, error } = await supabaseAdmin
+    const { data: material, error } = await supabaseAdmin
       .from('materiais')
       .select('arquivo_url, arquivo_nome, titulo')
       .eq('id', id)
       .single();
 
-    if (error || !data) {
+    if (error || !material) {
       return res.status(404).json({ error: 'Material não encontrado' });
     }
 
-    if (!data.arquivo_url) {
+    if (!material.arquivo_url) {
       return res.status(400).json({ error: 'Este material não possui arquivo para download' });
     }
 
-    const filePath = path.join(__dirname, data.arquivo_url);
-    
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'Arquivo não encontrado no servidor' });
+    console.log('📥 Baixando arquivo do Supabase Storage:', material.arquivo_url);
+
+    // Baixar arquivo do Supabase Storage
+    const { data: fileData, error: downloadError } = await supabaseAdmin.storage
+      .from(MATERIAIS_STORAGE_BUCKET)
+      .download(material.arquivo_url);
+
+    if (downloadError) {
+      console.error('Erro ao baixar arquivo do Supabase Storage:', downloadError);
+      return res.status(500).json({ error: 'Erro ao baixar arquivo' });
     }
 
-    const fileName = data.arquivo_nome || data.titulo;
-    res.download(filePath, fileName);
+    // Detectar tipo de conteúdo baseado na extensão
+    const ext = path.extname(material.arquivo_nome || material.arquivo_url).toLowerCase();
+    const contentTypes = {
+      '.pdf': 'application/pdf',
+      '.doc': 'application/msword',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.ppt': 'application/vnd.ms-powerpoint',
+      '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      '.xls': 'application/vnd.ms-excel',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.txt': 'text/plain',
+      '.mp4': 'video/mp4',
+      '.mov': 'video/quicktime'
+    };
+
+    const contentType = contentTypes[ext] || 'application/octet-stream';
+    const fileName = material.arquivo_nome || material.titulo;
+
+    // Configurar headers para download
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    
+    // Converter blob para buffer e enviar
+    const arrayBuffer = await fileData.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    res.send(buffer);
   } catch (error) {
     console.error('Erro ao fazer download do material:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
@@ -4498,7 +4563,6 @@ app.delete('/api/materiais/:id', authenticateToken, requireAdmin, async (req, re
     const { id } = req.params;
     console.log('🔧 DELETE /api/materiais/:id recebido');
     console.log('🔧 ID do material:', id);
-    console.log('🔧 Usuário autenticado:', req.user);
 
     // Buscar o material para obter informações do arquivo
     const { data: material, error: fetchError } = await supabaseAdmin
@@ -4509,6 +4573,21 @@ app.delete('/api/materiais/:id', authenticateToken, requireAdmin, async (req, re
 
     if (fetchError || !material) {
       return res.status(404).json({ error: 'Material não encontrado' });
+    }
+
+    // Excluir arquivo do Supabase Storage se existir
+    if (material.arquivo_url) {
+      console.log('🗑️ Deletando arquivo do Supabase Storage:', material.arquivo_url);
+      const { error: storageError } = await supabaseAdmin.storage
+        .from(MATERIAIS_STORAGE_BUCKET)
+        .remove([material.arquivo_url]);
+      
+      if (storageError) {
+        console.error('Erro ao deletar arquivo do storage:', storageError);
+        // Continuar mesmo se falhar a exclusão do arquivo
+      } else {
+        console.log('✅ Arquivo deletado do Supabase Storage com sucesso');
+      }
     }
 
     // Excluir o material do banco
@@ -4546,12 +4625,18 @@ app.delete('/api/materiais/:id', authenticateToken, requireAdmin, async (req, re
 // ==================== FIM DAS ROTAS PARA MATERIAIS ====================
 
 // Inicializar servidor
+// Configurar timeouts para uploads grandes
+server.timeout = 300000; // 5 minutos
+server.keepAliveTimeout = 310000; // 5min + 10s
+server.headersTimeout = 320000; // 5min + 20s
+
 server.listen(PORT, async () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
   console.log(`🌐 Acesse: http://localhost:${PORT}`);
   console.log(`📱 WhatsApp API: http://localhost:${PORT}/api/whatsapp`);
   console.log(`🔗 Webhook WhatsApp: http://localhost:${PORT}/api/whatsapp/webhook`);
   console.log(`🗄️ Usando Supabase como banco de dados`);
+  console.log(`⏱️ Timeout configurado: ${server.timeout}ms (${server.timeout/1000}s)`);
   
   // Verificar conexão com Supabase
   try {

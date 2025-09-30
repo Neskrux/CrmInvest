@@ -87,6 +87,7 @@ const AppContentWithNotifications = () => {
     if (path.includes('/fechamentos')) return 'fechamentos';
     if (path.includes('/meta-ads')) return 'meta-ads';
     if (path.includes('/whatsapp')) return 'whatsapp';
+    if (path.includes('/materiais')) return 'materiais';
     if (path.includes('/perfil')) return 'perfil';
     return 'dashboard';
   };
