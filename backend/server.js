@@ -543,7 +543,7 @@ app.get('/api/usuarios/perfil', authenticateToken, async (req, res) => {
 app.put('/api/consultores/perfil', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { nome, telefone, email, senhaAtual, novaSenha, pix } = req.body;
+    const { nome, telefone, email, senhaAtual, novaSenha, pix, cidade, estado } = req.body;
 
     // Validações básicas
     if (!nome || !email) {
@@ -591,7 +591,9 @@ app.put('/api/consultores/perfil', authenticateToken, async (req, res) => {
       nome,
       email,
       telefone: telefone || null,
-      pix: pix || null
+      pix: pix || null,
+      cidade: cidade || null,
+      estado: estado || null
     };
 
     // Se nova senha foi fornecida, incluir na atualização
@@ -966,7 +968,7 @@ app.get('/api/consultores', authenticateToken, async (req, res) => {
 
 app.post('/api/consultores', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { nome, telefone, email, senha, pix } = req.body;
+    const { nome, telefone, email, senha, pix, cidade, estado, is_freelancer } = req.body;
     
     // Validar campos obrigatórios
     if (!senha || senha.trim() === '') {
@@ -999,7 +1001,16 @@ app.post('/api/consultores', authenticateToken, requireAdmin, async (req, res) =
     
     const { data, error } = await supabaseAdmin
       .from('consultores')
-      .insert([{ nome, telefone, email: emailNormalizado, senha: senhaHash, pix }])
+      .insert([{ 
+        nome, 
+        telefone, 
+        email: emailNormalizado, 
+        senha: senhaHash, 
+        pix,
+        cidade,
+        estado,
+        is_freelancer
+      }])
       .select();
 
     if (error) throw error;
@@ -1019,7 +1030,7 @@ app.post('/api/consultores/cadastro', async (req, res) => {
     console.log('📝 === NOVO CADASTRO DE CONSULTOR ===');
     console.log('📋 Dados recebidos:', req.body);
     
-    const { nome, telefone, email, senha, cpf, pix } = req.body;
+    const { nome, telefone, email, senha, cpf, pix, cidade, estado } = req.body;
     
     // Validar campos obrigatórios
     if (!nome || !telefone || !email || !senha || !cpf || !pix) {
@@ -1075,6 +1086,8 @@ app.post('/api/consultores/cadastro', async (req, res) => {
         senha: senhaHash, 
         cpf, 
         pix,
+        cidade,
+        estado,
         tipo: 'consultor',
         ativo: true,
         is_freelancer: true // Por padrão, consultores do cadastro público são freelancers
@@ -1530,10 +1543,10 @@ app.post('/api/clinicas/cadastro-publico', async (req, res) => {
 app.put('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, telefone, email, senha, pix } = req.body;
+    const { nome, telefone, email, senha, pix, cidade, estado, is_freelancer } = req.body;
     
     // Preparar dados para atualização
-    const updateData = { nome, telefone, pix };
+    const updateData = { nome, telefone, pix, cidade, estado, is_freelancer };
     
     // Atualizar email se fornecido
     if (email && email.trim() !== '') {
@@ -2052,9 +2065,9 @@ app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado } = req.body;
     
-    // Verificar se é consultor interno - consultores internos não podem editar pacientes
-    if (req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true) {
-      return res.status(403).json({ error: 'Consultores internos não podem editar pacientes.' });
+    // Verificar se é consultor freelancer - freelancers não podem editar pacientes completamente
+    if (req.user.tipo === 'consultor' && req.user.podealterarstatus !== true) {
+      return res.status(403).json({ error: 'Você não tem permissão para editar pacientes.' });
     }
     
     // Normalizar telefone e CPF (remover formatação)
@@ -2137,9 +2150,9 @@ app.put('/api/pacientes/:id/status', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     
-    // Verificar se é consultor interno - consultores internos não podem editar pacientes
-    if (req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true) {
-      return res.status(403).json({ error: 'Consultores internos não podem editar pacientes.' });
+    // Verificar se é consultor freelancer - freelancers não podem alterar status
+    if (req.user.tipo === 'consultor' && req.user.podealterarstatus !== true) {
+      return res.status(403).json({ error: 'Você não tem permissão para alterar o status dos pacientes.' });
     }
     
     // Buscar dados do paciente primeiro
