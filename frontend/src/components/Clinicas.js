@@ -239,7 +239,16 @@ const Clinicas = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setClinicas(data);
+        // Para consultores freelancers, filtrar apenas as clínicas que eles indicaram
+        if (isFreelancer && !isAdmin) {
+          const clinicasFiltradas = data.filter(clinica => 
+            clinica.consultor_id && clinica.consultor_id === user?.id
+          );
+          setClinicas(clinicasFiltradas);
+        } else {
+          // Admin e consultores internos veem todas
+          setClinicas(data);
+        }
       } else {
         console.error('Erro ao carregar clínicas:', data.error);
         showErrorToast('Erro ao carregar clínicas: ' + data.error);
