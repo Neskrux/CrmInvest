@@ -2770,6 +2770,79 @@ app.delete('/api/novos-leads/:id', authenticateToken, requireAdmin, async (req, 
   }
 });
 
+// === ATUALIZAR STATUS DE NOVO LEAD ===
+app.put('/api/novos-leads/:id/status', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    console.log('🔧 PUT /api/novos-leads/:id/status recebido');
+    console.log('🔧 ID do lead:', id);
+    console.log('🔧 Novo status:', status);
+    console.log('🔧 Usuário autenticado:', req.user);
+    
+    // Verificar se o status é válido (usando os mesmos status da tela de pacientes)
+    const statusValidos = [
+      'lead', 'em_conversa', 'cpf_aprovado', 'cpf_reprovado', 'nao_passou_cpf',
+      'nao_tem_outro_cpf', 'nao_existe', 'nao_tem_interesse', 'nao_reconhece',
+      'nao_responde', 'sem_clinica', 'agendado', 'compareceu', 'fechado',
+      'nao_fechou', 'nao_compareceu', 'reagendado'
+    ];
+    if (!status || !statusValidos.includes(status)) {
+      return res.status(400).json({ error: 'Status inválido! Status válidos: ' + statusValidos.join(', ') });
+    }
+    
+    // Verificar permissões: admin ou consultor com permissão
+    const podeAlterarStatus = req.user.tipo === 'admin' || 
+      (req.user.tipo === 'consultor' && req.user.podealterarstatus === true);
+    
+    if (!podeAlterarStatus) {
+      return res.status(403).json({ error: 'Você não tem permissão para alterar o status de leads!' });
+    }
+    
+    // Verificar se o lead existe
+    const { data: leadAtual, error: checkError } = await supabaseAdmin
+      .from('pacientes')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (checkError) {
+      console.error('❌ Erro ao buscar lead:', checkError);
+      return res.status(404).json({ error: 'Lead não encontrado!' });
+    }
+    
+    if (!leadAtual) {
+      return res.status(404).json({ error: 'Lead não encontrado!' });
+    }
+    
+    console.log('✅ Lead encontrado:', leadAtual.nome);
+    
+    // Atualizar o status do lead
+    const { data: leadAtualizado, error: updateError } = await supabaseAdmin
+      .from('pacientes')
+      .update({ status: status })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('❌ Erro ao atualizar status:', updateError);
+      throw updateError;
+    }
+    
+    console.log('✅ Status atualizado com sucesso!');
+    
+    res.json({ 
+      message: 'Status atualizado com sucesso!',
+      lead: leadAtualizado
+    });
+  } catch (error) {
+    console.error('❌ Erro geral:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // === NOVAS CLÍNICAS === (Funcionalidade para pegar clínicas encontradas nas missões)
 app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
   try {

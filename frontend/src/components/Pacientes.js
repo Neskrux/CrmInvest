@@ -156,13 +156,13 @@ const Pacientes = () => {
     { value: 'em_conversa', label: 'Em conversa', color: '#0ea5e9', description: 'Conversando com o cliente' },
     { value: 'cpf_aprovado', label: 'CPF Aprovado', color: '#10b981', description: 'CPF foi aprovado' },
     { value: 'cpf_reprovado', label: 'CPF Reprovado', color: '#ef4444', description: 'CPF foi reprovado' },
-    { value: 'nao_passou_cpf', label: 'Não passou CPF', color: '#6366f1', description: 'Cliente não forneceu CPF' },
+    { value: 'nao_passou_cpf', label: 'Não forneceu CPF', color: '#6366f1', description: 'Cliente não forneceu CPF' },
     { value: 'nao_tem_outro_cpf', label: 'Não tem outro CPF', color: '#a3a3a3', description: 'Cliente não tem CPF alternativo' },
     { value: 'nao_existe', label: 'Paciente não existe', color: '#9ca3af', description: 'Cliente não existe' },
     { value: 'nao_tem_interesse', label: 'Paciente não tem interesse', color: '#9ca3af', description: 'Cliente não tem interesse' },
     { value: 'nao_reconhece', label: 'Paciente não reconhece', color: '#9ca3af', description: 'Cliente não reconhece' },
-    { value: 'sem_cedente', label: 'Sem clínica (CPF Aprovado)', color: '#fbbf24', description: 'CPF aprovado mas sem clínica' },
-    { value: 'sem_clinica', label: 'Sem clínica (CPF Reprovado)', color: '#fbbf24', description: 'CPF reprovado e sem clínica' },
+    { value: 'nao_responde', label: 'Paciente não responde', color: '#9ca3af', description: 'Cliente não responde' },
+    { value: 'sem_clinica', label: 'Sem clínica', color: '#fbbf24', description: 'Sem clínica' },
     // Demais status no final
     { value: 'agendado', label: 'Agendado', color: '#3b82f6', description: 'Abre modal para criar agendamento' },
     { value: 'compareceu', label: 'Compareceu', color: '#10b981', description: 'Cliente compareceu ao agendamento' },
@@ -415,11 +415,11 @@ const Pacientes = () => {
         fetchNovosLeads();
         fetchPacientes();
       } else {
-        showErrorToast('Erro ao pegar lead: ' + data.error);
+        showErrorToast('Erro ao atribuir lead: ' + data.error);
       }
     } catch (error) {
-      console.error('Erro ao pegar lead:', error);
-      showErrorToast('Erro ao pegar lead');
+      console.error('Erro ao atribuir lead:', error);
+      showErrorToast('Erro ao atribuir lead');
     }
   };
 
@@ -445,6 +445,27 @@ const Pacientes = () => {
     } catch (error) {
       console.error('Erro ao excluir lead:', error);
       showErrorToast('Erro ao conectar com o servidor');
+    }
+  };
+
+  const alterarStatusNovoLead = async (leadId, novoStatus) => {
+    try {
+      const response = await makeRequest(`/novos-leads/${leadId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: novoStatus })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        showSuccessToast('Status atualizado com sucesso!');
+        fetchNovosLeads();
+      } else {
+        showErrorToast('Erro ao alterar status: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao alterar status:', error);
+      showErrorToast('Erro ao alterar status do lead');
     }
   };
 
@@ -1891,9 +1912,32 @@ const Pacientes = () => {
                             )}
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                            <span className="badge badge-warning">
-                              {statusInfo.label}
-                            </span>
+                            {(isAdmin || podeAlterarStatus) ? (
+                              <select
+                                value={lead.status}
+                                onChange={(e) => alterarStatusNovoLead(lead.id, e.target.value)}
+                                className="form-select"
+                                style={{
+                                  fontSize: '0.75rem',
+                                  padding: '0.25rem 0.5rem',
+                                  border: 'none',
+                                  backgroundColor: statusInfo.color + '20',
+                                  color: statusInfo.color,
+                                  fontWeight: '600',
+                                  borderRadius: '0.375rem'
+                                }}
+                              >
+                                {statusOptions.map(option => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="badge badge-warning">
+                                {statusInfo.label}
+                              </span>
+                            )}
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarData(lead.created_at)}</td>
                           <td style={{ padding: '0.5rem', minWidth: '200px' }}>
@@ -1930,7 +1974,7 @@ const Pacientes = () => {
                                   whiteSpace: 'nowrap'
                                 }}
                               >
-                                {window.innerWidth <= 768 ? 'Pegar' : 'Pegar Lead'}
+                                {window.innerWidth <= 768 ? 'Atribuir' : 'Atribuir Lead'}
                               </button>
                               {/* Botão de excluir - apenas para admin */}
                               {isAdmin && (
