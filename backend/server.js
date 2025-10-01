@@ -32,7 +32,9 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/health',
       api: '/api',
-      whatsapp: '/api/whatsapp'
+      whatsapp: '/api/whatsapp',
+      documents: '/api/documents',
+      idsf: '/api/idsf'
     }
   });
 });
@@ -4922,3 +4924,7 @@ app.use('/api/whatsapp', whatsappRoutes);
 // ===== ROTAS DE DOCUMENTOS =====
 const documentsRoutes = require('./api/documents');
 app.use('/api/documents', documentsRoutes);
+
+// ===== ROTAS IDSF API =====
+const idsfRoutes = require('./api/idsf-api');
+app.use('/api/idsf', idsfRoutes);
