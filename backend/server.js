@@ -325,50 +325,72 @@ app.post('/api/login', async (req, res) => {
       return res.status(400).json({ error: 'Nome/Email e senha são obrigatórios' });
     }
 
-    console.log('🔐 Tentativa de login:', email);
+    const emailNormalizado = normalizarEmail(email);
+    console.log('🔐 ==========================================');
+    console.log('🔐 TENTATIVA DE LOGIN');
+    console.log('🔐 Email original:', email);
+    console.log('🔐 Email normalizado:', emailNormalizado);
+    console.log('🔐 Timestamp:', new Date().toISOString());
+    console.log('🔐 ==========================================');
 
     let usuario = null;
     let tipoLogin = null;
 
   // Primeiro, tentar login como admin (por email)
   if (typeof email === 'string' && email.includes('@')) {
+      console.log('🔍 [1/3] Buscando em ADMIN...');
       const { data: usuarios, error } = await supabaseAdmin
         .from('usuarios')
         .select(`
           *,
           consultores(nome, telefone)
         `)
-        .eq('email', email)
-        .eq('ativo', true)
-        .limit(1);
+        .eq('email', emailNormalizado)
+        .eq('ativo', true);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erro ao buscar em usuarios:', error);
+        throw error;
+      }
+
+      console.log('🔍 Resultados em ADMIN:', usuarios ? usuarios.length : 0);
 
       if (usuarios && usuarios.length > 0) {
+        if (usuarios.length > 1) {
+          console.error('⚠️ ALERTA: Múltiplos admins com o mesmo email!', usuarios.map(u => ({ id: u.id, email: u.email })));
+        }
         usuario = usuarios[0];
         tipoLogin = 'admin';
         console.log('✅ Usuário encontrado em: ADMIN');
+        console.log('📋 ID:', usuario.id, '| Nome:', usuario.nome);
       }
     }
 
   // Se não encontrou admin, tentar login como empresa (antes de consultor, pois é mais específico)
   if (!usuario && typeof email === 'string' && email.includes('@')) {
-      const emailNormalizado = normalizarEmail(email);
-      console.log('🔍 Buscando em EMPRESAS com email:', emailNormalizado);
+      console.log('🔍 [2/3] Buscando em EMPRESAS...');
       
       const { data: empresas, error } = await supabaseAdmin
         .from('empresas')
         .select('*')
         .eq('email', emailNormalizado)
-        .eq('ativo', true)
-        .limit(1);
+        .eq('ativo', true);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erro ao buscar em empresas:', error);
+        throw error;
+      }
+
+      console.log('🔍 Resultados em EMPRESAS:', empresas ? empresas.length : 0);
 
       if (empresas && empresas.length > 0) {
+        if (empresas.length > 1) {
+          console.error('⚠️ ALERTA: Múltiplas empresas com o mesmo email!', empresas.map(e => ({ id: e.id, email: e.email })));
+        }
         usuario = empresas[0];
         tipoLogin = 'empresa';
         console.log('✅ Usuário encontrado em: EMPRESA');
+        console.log('📋 ID:', usuario.id, '| Nome:', usuario.nome);
       } else {
         console.log('❌ Não encontrado em empresas');
       }
@@ -376,23 +398,29 @@ app.post('/api/login', async (req, res) => {
 
   // Se não encontrou admin nem empresa, tentar login como consultor
   if (!usuario && typeof email === 'string' && email.includes('@')) {
-      // Normalizar email para busca
-      const emailNormalizado = normalizarEmail(email);
-      console.log('🔍 Buscando em CONSULTORES com email:', emailNormalizado);
+      console.log('🔍 [3/3] Buscando em CONSULTORES...');
       
       const { data: consultores, error } = await supabaseAdmin
         .from('consultores')
         .select('*')
         .eq('email', emailNormalizado)
-        .eq('ativo', true)
-        .limit(1);
+        .eq('ativo', true);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erro ao buscar em consultores:', error);
+        throw error;
+      }
+
+      console.log('🔍 Resultados em CONSULTORES:', consultores ? consultores.length : 0);
 
       if (consultores && consultores.length > 0) {
+        if (consultores.length > 1) {
+          console.error('⚠️ ALERTA CRÍTICO: Múltiplos consultores com o mesmo email!', consultores.map(c => ({ id: c.id, nome: c.nome, email: c.email })));
+        }
         usuario = consultores[0];
         tipoLogin = 'consultor';
         console.log('✅ Usuário encontrado em: CONSULTOR');
+        console.log('📋 ID:', usuario.id, '| Nome:', usuario.nome);
       } else {
         console.log('❌ Não encontrado em consultores');
       }
@@ -401,6 +429,7 @@ app.post('/api/login', async (req, res) => {
     console.log('📋 Tipo de login detectado:', tipoLogin);
 
     if (!usuario) {
+      console.log('❌ FALHA DE LOGIN: Usuário não encontrado');
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
@@ -749,25 +778,44 @@ app.put('/api/consultores/:id/permissao', authenticateToken, async (req, res) =>
 
 app.get('/api/verify-token', authenticateToken, async (req, res) => {
   try {
-    // Buscar dados atualizados do usuário na tabela usuarios
+    console.log('🔍 Verificando token para usuário ID:', req.user.id, '| Tipo:', req.user.tipo);
+    
     let usuario = null;
-    let tipo = null;
-    let consultor_nome = null;
+    let tipo = req.user.tipo; // Usar tipo do token
     let consultor_id = null;
 
-    const { data: usuarioData, error: errorUsuario } = await supabaseAdmin
-      .from('usuarios')
-      .select('*')
-      .eq('id', req.user.id)
-      .eq('ativo', true)
-      .single();
+    // CRÍTICO: Usar o tipo do token para buscar na tabela correta
+    if (req.user.tipo === 'admin') {
+      console.log('🔍 Buscando em USUARIOS (admin)...');
+      const { data: usuarioData, error: errorUsuario } = await supabaseAdmin
+        .from('usuarios')
+        .select('*')
+        .eq('id', req.user.id)
+        .eq('ativo', true)
+        .single();
 
-    if (usuarioData) {
-      usuario = usuarioData;
-      tipo = usuario.tipo || 'admin';
-      consultor_id = usuario.consultor_id || null;
-    } else {
-      // Se não achou em usuarios, buscar em consultores
+      if (usuarioData) {
+        usuario = usuarioData;
+        consultor_id = usuario.consultor_id || null;
+        console.log('✅ Admin encontrado:', usuario.nome);
+      }
+    } else if (req.user.tipo === 'empresa') {
+      console.log('🔍 Buscando em EMPRESAS...');
+      const { data: empresaData, error: errorEmpresa } = await supabaseAdmin
+        .from('empresas')
+        .select('*')
+        .eq('id', req.user.id)
+        .eq('ativo', true)
+        .single();
+
+      if (empresaData) {
+        usuario = empresaData;
+        tipo = 'empresa';
+        consultor_id = null;
+        console.log('✅ Empresa encontrada:', usuario.nome);
+      }
+    } else if (req.user.tipo === 'consultor') {
+      console.log('🔍 Buscando em CONSULTORES...');
       const { data: consultorData, error: errorConsultor } = await supabaseAdmin
         .from('consultores')
         .select('*')
@@ -777,11 +825,27 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
 
       if (consultorData) {
         usuario = consultorData;
-        tipo = usuario.tipo || 'consultor';
+        tipo = 'consultor';
         consultor_id = usuario.id;
+        console.log('✅ Consultor encontrado:', usuario.nome);
+      }
+    } else {
+      // Fallback: tentar buscar em todas as tabelas (não deveria chegar aqui)
+      console.warn('⚠️ Tipo desconhecido no token:', req.user.tipo);
+      
+      const { data: usuarioData } = await supabaseAdmin
+        .from('usuarios')
+        .select('*')
+        .eq('id', req.user.id)
+        .eq('ativo', true)
+        .single();
+
+      if (usuarioData) {
+        usuario = usuarioData;
+        tipo = 'admin';
+        consultor_id = usuario.consultor_id || null;
       } else {
-        // Se não achou em consultores, buscar em empresas
-        const { data: empresaData, error: errorEmpresa } = await supabaseAdmin
+        const { data: empresaData } = await supabaseAdmin
           .from('empresas')
           .select('*')
           .eq('id', req.user.id)
@@ -792,13 +856,29 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
           usuario = empresaData;
           tipo = 'empresa';
           consultor_id = null;
+        } else {
+          const { data: consultorData } = await supabaseAdmin
+            .from('consultores')
+            .select('*')
+            .eq('id', req.user.id)
+            .eq('ativo', true)
+            .single();
+
+          if (consultorData) {
+            usuario = consultorData;
+            tipo = 'consultor';
+            consultor_id = usuario.id;
+          }
         }
       }
     }
 
     if (!usuario) {
+      console.error('❌ Usuário não encontrado ao verificar token');
       return res.status(401).json({ error: 'Usuário não encontrado' });
     }
+
+    console.log('✅ Token verificado com sucesso para:', usuario.email);
 
     // Remover senha do objeto antes de enviar para o front
     const { senha: _, ...dadosUsuario } = usuario;
@@ -808,12 +888,14 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
         ...dadosUsuario,
         tipo,
         consultor_id,
+        empresa_id: usuario.empresa_id || null, // Incluir empresa_id
         podealterarstatus: usuario.podealterarstatus || tipo === 'admin' || false,
         pode_ver_todas_novas_clinicas: usuario.pode_ver_todas_novas_clinicas || false,
-        is_freelancer: usuario.is_freelancer !== false // Por padrão, se não especificado, é freelancer
+        is_freelancer: tipo === 'empresa' ? false : (usuario.is_freelancer !== false) // Empresas não são freelancers
       }
     });
   } catch (error) {
+    console.error('❌ Erro ao verificar token:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -990,14 +1072,15 @@ app.get('/api/clinicas', authenticateToken, async (req, res) => {
     const formattedData = data.map(clinica => ({
       ...clinica,
       consultor_nome: clinica.consultores?.nome,
-      empresa_id: clinica.consultores?.empresa_id || null, // Derivar empresa_id do consultor
-      empresa_nome: clinica.consultores?.empresas?.nome || null // Nome da empresa
+      // empresa_id: pode vir diretamente da clínica (se empresa cadastrou) ou do consultor
+      empresa_id: clinica.empresa_id || clinica.consultores?.empresa_id || null,
+      empresa_nome: clinica.consultores?.empresas?.nome || null // Nome da empresa (do consultor)
     }));
     
     // Filtrar por empresa se necessário
     let finalData = formattedData;
     
-    // Se for empresa, filtrar apenas clínicas de consultores vinculados a ela
+    // Se for empresa, filtrar apenas clínicas de consultores vinculados a ela OU cadastradas diretamente pela empresa
     if (req.user.tipo === 'empresa') {
       finalData = formattedData.filter(clinica => 
         clinica.empresa_id === req.user.id
@@ -2901,14 +2984,15 @@ app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
     const formattedData = data.map(clinica => ({
       ...clinica,
       consultor_nome: clinica.consultores?.nome,
-      empresa_id: clinica.consultores?.empresa_id || null, // Derivar empresa_id do consultor
-      empresa_nome: clinica.consultores?.empresas?.nome || null // Nome da empresa
+      // empresa_id: pode vir diretamente da clínica (se empresa cadastrou) ou do consultor
+      empresa_id: clinica.empresa_id || clinica.consultores?.empresa_id || null,
+      empresa_nome: clinica.consultores?.empresas?.nome || null // Nome da empresa (do consultor)
     }));
     
     // Filtrar por empresa se necessário
     let finalData = formattedData;
     
-    // Se for empresa, filtrar apenas clínicas de consultores vinculados a ela
+    // Se for empresa, filtrar apenas clínicas de consultores vinculados a ela OU cadastradas diretamente pela empresa
     if (req.user.tipo === 'empresa') {
       console.log('🔍 Filtrando clínicas para empresa ID:', req.user.id);
       finalData = formattedData.filter(clinica => 
@@ -2998,7 +3082,7 @@ app.post('/api/novas-clinicas', authenticateToken, async (req, res) => {
       latitude,
       longitude,
       criado_por_consultor_id: req.user.tipo === 'consultor' ? req.user.id : null,
-      // empresa_id será derivado via consultor_id → empresa_id
+      empresa_id: req.user.tipo === 'empresa' ? req.user.id : null, // Setar empresa_id quando empresa cadastra diretamente
       tipo_origem: 'aprovada' // Todas as novas clínicas serão aprovadas
     };
     
@@ -3078,7 +3162,7 @@ app.put('/api/novas-clinicas/:id/pegar', authenticateToken, async (req, res) => 
       email: clinicaAtual.email,
       status: 'ativo',
       consultor_id: clinicaAtual.criado_por_consultor_id, // Definir consultor_id baseado em quem criou
-      // empresa_id será derivado via consultor_id → empresa_id (não precisa salvar)
+      empresa_id: clinicaAtual.empresa_id, // Transferir empresa_id se foi empresa que cadastrou
       tipo_origem: 'aprovada' // Clínicas aprovadas da aba "Novas Clínicas"
     };
 
