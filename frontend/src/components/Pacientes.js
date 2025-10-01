@@ -268,11 +268,10 @@ const Pacientes = () => {
     };
   }, [showModal, showViewModal, showObservacoesModal, showAgendamentoModal, showFechamentoModal, showPermissaoModal, showAtribuirConsultorModal]);
   
-  //Sempre que filtros ou a lista mudarem, voltar para a primeira página
+  //Sempre que FILTROS mudarem, voltar para a primeira página
   useEffect(() => {
     setCurrentPage(1);
   }, [
-    pacientes,
     filtroNome,
     filtroTelefone,
     filtroCPF,
