@@ -18,6 +18,11 @@ const Fechamentos = () => {
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
   const [fechamentoEditando, setFechamentoEditando] = useState(null);
+  
+  // Estados para modal de visualização com abas
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [viewingFechamento, setViewingFechamento] = useState(null);
+  const [activeViewTab, setActiveViewTab] = useState('informacoes');
   const [novoFechamento, setNovoFechamento] = useState({
     paciente_id: '',
     consultor_id: '',
@@ -91,7 +96,7 @@ const Fechamentos = () => {
 
   // Controlar scroll do body quando modal estiver aberto
   useEffect(() => {
-    if (modalAberto || showObservacoesModal) {
+    if (modalAberto || showObservacoesModal || viewModalOpen) {
       // Bloquear scroll da página
       document.body.style.overflow = 'hidden';
     } else {
@@ -103,7 +108,7 @@ const Fechamentos = () => {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [modalAberto, showObservacoesModal]);
+  }, [modalAberto, showObservacoesModal, viewModalOpen]);
 
   const carregarDados = async () => {
     try {
@@ -307,6 +312,23 @@ const Fechamentos = () => {
       tipo_tratamento: '',
       observacoes: ''
     });
+  };
+
+  // Funções para modal de visualização
+  const abrirViewModal = (fechamento) => {
+    setViewingFechamento(fechamento);
+    setActiveViewTab('informacoes');
+    setViewModalOpen(true);
+  };
+
+  const fecharViewModal = () => {
+    setViewModalOpen(false);
+    setViewingFechamento(null);
+    setActiveViewTab('informacoes');
+  };
+
+  const handleTabChange = (tab) => {
+    setActiveViewTab(tab);
   };
 
   const salvarFechamento = async () => {
@@ -956,21 +978,17 @@ const Fechamentos = () => {
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            {fechamento.contrato_arquivo && (
-                              <button 
-                                onClick={() => downloadContrato(fechamento)}
-                                className="btn btn-sm btn-success"
-                                title={`Baixar contrato: ${fechamento.contrato_nome_original || 'contrato.pdf'}`}
-                                style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-                              >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                  <polyline points="7 10 12 15 17 10"></polyline>
-                                  <line x1="12" y1="15" x2="12" y2="3"></line>
-                                </svg>
-                                PDF
-                              </button>
-                            )}
+                            <button 
+                              className="btn-action"
+                              onClick={() => abrirViewModal(fechamento)}
+                              title="Visualizar fechamento"
+                              style={{ color: '#3b82f6' }}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                              </svg>
+                            </button>
                             {!isConsultor && (
                               <button 
                                 className="btn-action"
@@ -1161,6 +1179,351 @@ const Fechamentos = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Visualização com Abas */}
+      {viewModalOpen && viewingFechamento && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '900px', maxHeight: '90vh' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">
+                Fechamento - {viewingFechamento.paciente_nome}
+              </h2>
+              <button className="close-btn" onClick={fecharViewModal}>
+                ×
+              </button>
+            </div>
+
+            {/* Navegação por abas */}
+            <div style={{ 
+              display: 'flex', 
+              gap: '2rem',
+              padding: '1.5rem 1.5rem 0 1.5rem'
+            }}>
+              <button
+                onClick={() => handleTabChange('informacoes')}
+                style={{
+                  padding: '1rem 0',
+                  border: 'none',
+                  background: 'none',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: activeViewTab === 'informacoes' ? '#3b82f6' : '#6b7280',
+                  borderBottom: activeViewTab === 'informacoes' ? '2px solid #3b82f6' : '2px solid transparent',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Informações
+              </button>
+              
+              <button
+                onClick={() => handleTabChange('documentos')}
+                style={{
+                  padding: '1rem 0',
+                  border: 'none',
+                  background: 'none',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: activeViewTab === 'documentos' ? '#3b82f6' : '#6b7280',
+                  borderBottom: activeViewTab === 'documentos' ? '2px solid #3b82f6' : '2px solid transparent',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Documentos
+              </button>
+              
+              <button
+                onClick={() => handleTabChange('historico')}
+                style={{
+                  padding: '1rem 0',
+                  border: 'none',
+                  background: 'none',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: activeViewTab === 'historico' ? '#3b82f6' : '#6b7280',
+                  borderBottom: activeViewTab === 'historico' ? '2px solid #3b82f6' : '2px solid transparent',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Histórico
+              </button>
+            </div>
+
+            <div style={{ padding: '0 1.5rem 1.5rem 1.5rem', maxHeight: '60vh', overflowY: 'auto' }}>
+              {/* Aba de Informações */}
+              {activeViewTab === 'informacoes' && (
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Paciente</label>
+                    <div style={{ 
+                      padding: '0.75rem', 
+                      backgroundColor: '#f9fafb', 
+                      borderRadius: '6px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      {viewingFechamento.paciente_nome}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Valor Fechado</label>
+                    <div style={{ 
+                      padding: '0.75rem', 
+                      backgroundColor: '#f9fafb', 
+                      borderRadius: '6px',
+                      border: '1px solid #e5e7eb',
+                      fontWeight: '600',
+                      color: '#059669'
+                    }}>
+                      R$ {parseFloat(viewingFechamento.valor_fechado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Consultor</label>
+                    <div style={{ 
+                      padding: '0.75rem', 
+                      backgroundColor: '#f9fafb', 
+                      borderRadius: '6px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      {viewingFechamento.consultor_nome || 'Não informado'}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Clínica</label>
+                    <div style={{ 
+                      padding: '0.75rem', 
+                      backgroundColor: '#f9fafb', 
+                      borderRadius: '6px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      {viewingFechamento.clinica_nome || 'Não informado'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Data do Fechamento</label>
+                    <div style={{ 
+                      padding: '0.75rem', 
+                      backgroundColor: '#f9fafb', 
+                      borderRadius: '6px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      {new Date(viewingFechamento.data_fechamento).toLocaleDateString('pt-BR')}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Tipo de Tratamento</label>
+                    <div style={{ 
+                      padding: '0.75rem', 
+                      backgroundColor: '#f9fafb', 
+                      borderRadius: '6px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      {viewingFechamento.tipo_tratamento || 'Não informado'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Status de Aprovação</label>
+                    <div style={{ 
+                      padding: '0.75rem', 
+                      backgroundColor: '#f9fafb', 
+                      borderRadius: '6px',
+                      border: '1px solid #e5e7eb',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}>
+                      <span style={{
+                        padding: '0.25rem 0.5rem',
+                        borderRadius: '4px',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        backgroundColor: viewingFechamento.aprovado === 1 ? '#dcfce7' : '#fef3c7',
+                        color: viewingFechamento.aprovado === 1 ? '#166534' : '#92400e'
+                      }}>
+                        {viewingFechamento.aprovado === 1 ? 'Aprovado' : 'Pendente'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {viewingFechamento.observacoes && (
+                    <div>
+                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Observações</label>
+                      <div style={{ 
+                        padding: '0.75rem', 
+                        backgroundColor: '#f9fafb', 
+                        borderRadius: '6px',
+                        border: '1px solid #e5e7eb',
+                        whiteSpace: 'pre-wrap'
+                      }}>
+                        {viewingFechamento.observacoes}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Aba de Documentos */}
+              {activeViewTab === 'documentos' && (
+                <div>
+                  <h3 style={{ 
+                    fontSize: '1.125rem', 
+                    fontWeight: '600', 
+                    color: '#374151', 
+                    marginBottom: '1rem' 
+                  }}>
+                    Documentos do Fechamento
+                  </h3>
+                  
+                  {viewingFechamento.contrato_arquivo ? (
+                    <div style={{
+                      padding: '1rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#dc2626' }}>
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                          <polyline points="14,2 14,8 20,8"></polyline>
+                        </svg>
+                        <div>
+                          <div style={{ fontWeight: '600', color: '#374151' }}>
+                            {viewingFechamento.contrato_nome_original || 'contrato.pdf'}
+                          </div>
+                          <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                            Contrato anexado ao fechamento
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <a
+                        href={`/api/fechamentos/download-contrato/${viewingFechamento.id}`}
+                        download
+                        className="btn btn-primary"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                          <polyline points="7 10 12 15 17 10"></polyline>
+                          <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Baixar Contrato
+                      </a>
+                    </div>
+                  ) : (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#9ca3af', margin: '0 auto 1rem' }}>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14,2 14,8 20,8"></polyline>
+                      </svg>
+                      <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                        Nenhum contrato foi anexado a este fechamento
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Aba de Histórico */}
+              {activeViewTab === 'historico' && (
+                <div>
+                  <h3 style={{ 
+                    fontSize: '1.125rem', 
+                    fontWeight: '600', 
+                    color: '#374151', 
+                    marginBottom: '1rem' 
+                  }}>
+                    Histórico do Fechamento
+                  </h3>
+                  
+                  <div style={{
+                    backgroundColor: '#f9fafb',
+                    borderRadius: '8px',
+                    border: '1px solid #e5e7eb',
+                    padding: '1rem'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                      <div style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: '#10b981'
+                      }}></div>
+                      <div>
+                        <div style={{ fontWeight: '600', color: '#374151' }}>
+                          Fechamento criado
+                        </div>
+                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                          {new Date(viewingFechamento.created_at).toLocaleString('pt-BR')}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {viewingFechamento.aprovado === 1 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: '#3b82f6'
+                        }}></div>
+                        <div>
+                          <div style={{ fontWeight: '600', color: '#374151' }}>
+                            Fechamento aprovado
+                          </div>
+                          <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                            {viewingFechamento.updated_at && new Date(viewingFechamento.updated_at).toLocaleString('pt-BR')}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ 
+              padding: '1rem 1.5rem', 
+              borderTop: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '1rem'
+            }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={fecharViewModal}
+              >
+                Fechar
+              </button>
+              {!isConsultor && (
+                <button 
+                  className="btn btn-primary" 
+                  onClick={() => {
+                    fecharViewModal();
+                    abrirModal(viewingFechamento);
+                  }}
+                >
+                  Editar Fechamento
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

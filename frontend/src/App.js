@@ -24,6 +24,7 @@ import MetaAds from './components/MetaAds';
 // import WhatsApp from './components/WhatsApp'; // Temporariamente removido
 import Perfil from './components/Perfil';
 import Materiais from './components/Materiais';
+import IDSFIntegration from './components/IDSFIntegration';
 import logoBrasao from './images/logobrasao.png';
 import logoHorizontal from './images/logohorizontal.png';
 import logoHorizontalPreto from './images/logohorizontalpreto.png';
@@ -176,6 +177,7 @@ const AppContentWithNotifications = () => {
         {/* Rota WhatsApp temporariamente removida */}
         {/* <Route path="/whatsapp" element={<WhatsApp />} /> */}
         <Route path="/materiais" element={<Materiais />} />
+        <Route path="/idsf" element={<IDSFIntegration />} />
         <Route path="/perfil" element={<Perfil />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -358,6 +360,19 @@ const AppContentWithNotifications = () => {
                 <polyline points="10,9 9,9 8,9"/>
               </svg>
               Materiais de Apoio
+            </Link>
+          </div>
+
+          <div className="nav-item">
+            <Link
+              to="/idsf"
+              className={`nav-link ${activeTab === 'idsf' ? 'active' : ''}`}
+              onClick={handleMobileNavigation}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+              </svg>
+              Integração IDSF
             </Link>
           </div>
 

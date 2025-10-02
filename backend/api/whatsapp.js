@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const { createClient } = require('@supabase/supabase-js');
 const WhatsAppWebService = require('../whatsapp/whatsapp-web');
-const WhatsAppFallback = require('../whatsapp-fallback');
+const WhatsAppFallback = require('../whatsapp-fallback.js');
 const { validateFile } = require('../utils/fileValidator');
 
 // Configuração do Supabase
