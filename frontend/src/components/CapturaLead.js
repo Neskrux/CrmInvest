@@ -884,7 +884,6 @@ const CapturaLead = () => {
           justify-content: space-around;
           margin-bottom: 40px;
           flex-wrap: wrap;
-          gap: 15px;
         }
 
         .benefit-item {

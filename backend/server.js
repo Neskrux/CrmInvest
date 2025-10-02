@@ -1061,12 +1061,50 @@ app.get('/api/clinicas', authenticateToken, async (req, res) => {
     const isConsultorInterno = req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true;
     const isFreelancer = req.user.tipo === 'consultor' && !isConsultorInterno && req.user.is_freelancer === true;
     
+    console.log('🔍 GET /api/clinicas - Verificando usuário:');
+    console.log('   - ID:', req.user.id);
+    console.log('   - Nome:', req.user.nome);
+    console.log('   - Tipo:', req.user.tipo);
+    console.log('   - is_freelancer:', req.user.is_freelancer);
+    console.log('   - É consultor interno?', isConsultorInterno);
+    console.log('   - É freelancer?', isFreelancer);
+    
+    let data, error;
+    
     if (isFreelancer) {
-      // Freelancer (com ou sem empresa): só vê suas próprias clínicas
-      query = query.eq('consultor_id', req.user.id);
+      console.log('👥 Buscando clínicas do freelancer ID:', req.user.id);
+      // Freelancer: buscar clínicas através da tabela de relacionamento
+      const { data: relacoes, error: relError } = await supabaseAdmin
+        .from('consultor_clinica')
+        .select('clinica_id')
+        .eq('consultor_id', req.user.id);
+      
+      if (relError) {
+        console.error('❌ Erro ao buscar relações:', relError);
+        throw relError;
+      }
+      
+      console.log('🔗 Relações encontradas:', relacoes?.length || 0);
+      
+      if (relacoes && relacoes.length > 0) {
+        const clinicaIds = relacoes.map(r => r.clinica_id);
+        console.log('   IDs das clínicas:', clinicaIds);
+        query = query.in('id', clinicaIds);
+        const result = await query;
+        data = result.data;
+        error = result.error;
+        console.log('   Clínicas encontradas:', data?.length || 0);
+      } else {
+        // Freelancer sem clínicas ainda
+        console.log('   ⚠️ Freelancer ainda não tem clínicas indicadas');
+        data = [];
+        error = null;
+      }
+    } else {
+      const result = await query;
+      data = result.data;
+      error = result.error;
     }
-
-    const { data, error } = await query;
 
     if (error) throw error;
     
@@ -1839,40 +1877,55 @@ app.post('/api/clinicas/cadastro-publico', async (req, res) => {
     // Normalizar telefone (remover formatação)
     const telefoneNumeros = telefone.replace(/\D/g, '');
     
-    // Verificar se telefone já existe
-    const { data: telefoneExistente, error: telefoneError } = await supabaseAdmin
+    // Verificar se telefone já existe em novas_clinicas
+    const { data: telefoneNovas, error: telefoneErrorNovas } = await supabaseAdmin
       .from('novas_clinicas')
       .select('id, nome, created_at')
       .eq('telefone', telefoneNumeros)
       .limit(1);
 
-    if (telefoneError) {
-      console.error('❌ Erro ao verificar telefone:', telefoneError);
-      throw telefoneError;
+    if (telefoneErrorNovas) {
+      console.error('❌ Erro ao verificar telefone em novas_clinicas:', telefoneErrorNovas);
+      throw telefoneErrorNovas;
     }
     
-    if (telefoneExistente && telefoneExistente.length > 0) {
-      const clinicaExistente = telefoneExistente[0];
-      const dataCadastro = new Date(clinicaExistente.created_at).toLocaleDateString('pt-BR');
+    // Verificar se telefone já existe em clinicas
+    const { data: telefoneClinicas, error: telefoneErrorClinicas } = await supabaseAdmin
+      .from('clinicas')
+      .select('id, nome, created_at')
+      .eq('telefone', telefoneNumeros)
+      .limit(1);
+
+    if (telefoneErrorClinicas) {
+      console.error('❌ Erro ao verificar telefone em clinicas:', telefoneErrorClinicas);
+      throw telefoneErrorClinicas;
+    }
+    
+    const telefoneExistente = telefoneNovas?.length > 0 ? telefoneNovas[0] : (telefoneClinicas?.length > 0 ? telefoneClinicas[0] : null);
+    
+    if (telefoneExistente) {
+      const dataCadastro = new Date(telefoneExistente.created_at).toLocaleDateString('pt-BR');
       console.log('❌ Telefone já cadastrado:', { 
         telefone: telefoneNumeros, 
-        clinica: clinicaExistente.nome,
+        clinica: telefoneExistente.nome,
         data: dataCadastro
       });
       return res.status(400).json({ 
-        error: `Este número de telefone já está cadastrado para ${clinicaExistente.nome} (cadastrado em ${dataCadastro}).` 
+        error: `Este número de telefone já está cadastrado para ${telefoneExistente.nome} (cadastrado em ${dataCadastro}).` 
       });
     }
     
     // Buscar consultor pelo código de referência se fornecido
     let consultorId = null;
     let consultorNome = null;
+    let isFreelancer = false;
     if (ref_consultor && ref_consultor.trim() !== '') {
       console.log('🔍 Buscando consultor pelo código de referência:', ref_consultor);
+      console.log('📋 ref_consultor recebido:', { ref_consultor, tipo: typeof ref_consultor });
       
       const { data: consultorData, error: consultorError } = await supabaseAdmin
         .from('consultores')
-        .select('id, nome, codigo_referencia, ativo')
+        .select('id, nome, codigo_referencia, ativo, is_freelancer')
         .eq('codigo_referencia', ref_consultor.trim())
         .eq('ativo', true)
         .single();
@@ -1883,11 +1936,13 @@ app.post('/api/clinicas/cadastro-publico', async (req, res) => {
       } else if (consultorData) {
         consultorId = consultorData.id;
         consultorNome = consultorData.nome;
+        isFreelancer = consultorData.is_freelancer === true;
         console.log('✅ Consultor encontrado:', { 
           id: consultorData.id, 
           nome: consultorData.nome,
           codigo_referencia: consultorData.codigo_referencia,
-          ativo: consultorData.ativo
+          ativo: consultorData.ativo,
+          is_freelancer: isFreelancer
         });
       } else {
         console.log('⚠️ Consultor não encontrado para o código:', ref_consultor);
@@ -1917,37 +1972,90 @@ app.post('/api/clinicas/cadastro-publico', async (req, res) => {
       }
     }
     
-    // Inserir clínica na tabela novas_clinicas
-    console.log('💾 Inserindo clínica com consultor_id:', consultorId);
+    // Decidir em qual tabela inserir baseado se é freelancer
+    const tabelaDestino = isFreelancer ? 'clinicas' : 'novas_clinicas';
+    console.log(`💾 Inserindo clínica na tabela ${tabelaDestino} com consultor_id:`, consultorId);
     
-    const { data, error } = await supabaseAdmin
-      .from('novas_clinicas')
-      .insert([{ 
-        nome: nome.trim(), 
-        cnpj: cnpjNumeros,
-        endereco: endereco ? endereco.trim() : null,
-        bairro: bairro ? bairro.trim() : null,
-        cidade: cidade ? cidade.trim() : null,
-        estado: estado ? estado.trim() : null,
-        telefone: telefoneNumeros,
-        email: email.trim(),
-        nicho: nicho || null,
-        responsavel: responsavel.trim(),
-        observacoes: observacoes ? observacoes.trim() : null,
-        status: 'tem_interesse',
-        latitude,
-        longitude,
-        criado_por_consultor_id: consultorId,
-        tipo_origem: 'aprovada' // Clínicas que se cadastraram pelo link público (serão aprovadas)
-      }])
-      .select();
+    // Preparar dados base
+    const dadosBase = {
+      nome: nome.trim(), 
+      cnpj: cnpjNumeros,
+      endereco: endereco ? endereco.trim() : null,
+      bairro: bairro ? bairro.trim() : null,
+      cidade: cidade ? cidade.trim() : null,
+      estado: estado ? estado.trim() : null,
+      telefone: telefoneNumeros,
+      email: email.trim(),
+      nicho: nicho || null,
+      latitude,
+      longitude
+    };
+
+    let data, error;
+    
+    if (isFreelancer) {
+      // Inserir direto na tabela clinicas (para freelancers)
+      const result = await supabaseAdmin
+        .from('clinicas')
+        .insert([{ 
+          ...dadosBase,
+          responsavel: responsavel.trim(),
+          status: 'em_contato', // Clínicas de freelancers entram com status "Em contato"
+          tipo_origem: 'freelancer' // Identificar origem
+        }])
+        .select();
+      data = result.data;
+      error = result.error;
+      
+      // Criar relacionamento consultor-clínica se a inserção foi bem-sucedida
+      if (!error && data && data[0] && consultorId) {
+        console.log('🔗 Criando relacionamento consultor-clínica para:');
+        console.log('   - Consultor ID:', consultorId);
+        console.log('   - Clínica ID:', data[0].id);
+        console.log('   - Clínica Nome:', data[0].nome);
+        
+        const { data: relData, error: relError } = await supabaseAdmin
+          .from('consultor_clinica')
+          .insert([{
+            consultor_id: consultorId,
+            clinica_id: data[0].id,
+            observacoes: `Clínica indicada via link personalizado - ${new Date().toLocaleDateString('pt-BR')}`
+          }])
+          .select();
+        
+        if (relError) {
+          console.error('❌ Erro ao criar relacionamento:', relError);
+          console.error('   Detalhes do erro:', JSON.stringify(relError, null, 2));
+          // Não falhar a operação principal por causa disso
+        } else {
+          console.log('✅ Relacionamento consultor-clínica criado com sucesso');
+          console.log('   ID do relacionamento:', relData?.[0]?.id);
+        }
+      }
+    } else {
+      // Inserir na tabela novas_clinicas (para não-freelancers)
+      const result = await supabaseAdmin
+        .from('novas_clinicas')
+        .insert([{ 
+          ...dadosBase,
+          responsavel: responsavel.trim(),
+          observacoes: observacoes ? observacoes.trim() : null,
+          status: 'tem_interesse',
+          criado_por_consultor_id: consultorId,
+          tipo_origem: 'aprovada'
+        }])
+        .select();
+      data = result.data;
+      error = result.error;
+    }
 
     if (error) {
       console.error('❌ Erro ao inserir clínica:', error);
       throw error;
     }
     
-    console.log('✅ Clínica inserida com sucesso:', data[0]);
+    console.log(`✅ Clínica inserida com sucesso na tabela ${tabelaDestino}:`, data[0]);
+    console.log(`📊 Status da clínica: ${data[0].status} | Origem: ${data[0].tipo_origem}`);
     
     // Emitir evento Socket.IO para notificar admins sobre nova clínica (cadastro público)
     if (io) {

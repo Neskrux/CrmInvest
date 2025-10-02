@@ -44,7 +44,8 @@ const LandingPage = () => {
               width: '250px',
               maxWidth: '80%',
               height: 'auto',
-              objectFit: 'contain'
+              objectFit: 'contain',
+              marginBottom: '1rem'
             }} 
           />
           <p style={{
@@ -187,74 +188,6 @@ const LandingPage = () => {
         </div>
 
         {/* Informações do Sistema */}
-        <div style={{
-          marginTop: '3rem',
-          paddingTop: '2rem',
-          borderTop: '1px solid #e5e7eb'
-        }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: '1rem',
-            textAlign: 'center'
-          }}>
-            <div>
-              <div style={{
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                color: '#1a1d23',
-                marginBottom: '0.25rem'
-              }}>
-                R$ 10
-              </div>
-              <div style={{
-                fontSize: '0.75rem',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
-                Por mil
-              </div>
-            </div>
-            <div>
-              <div style={{
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                color: '#1a1d23',
-                marginBottom: '0.25rem'
-              }}>
-                100%
-              </div>
-              <div style={{
-                fontSize: '0.75rem',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
-                Online
-              </div>
-            </div>
-            <div>
-              <div style={{
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                color: '#1a1d23',
-                marginBottom: '0.25rem'
-              }}>
-                24/7
-              </div>
-              <div style={{
-                fontSize: '0.75rem',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
-                Suporte
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Footer */}
         <div style={{
           marginTop: '2rem',

@@ -25,6 +25,7 @@ import MetaAds from './components/MetaAds';
 import Perfil from './components/Perfil';
 import Materiais from './components/Materiais';
 import IDSFIntegration from './components/IDSFIntegration';
+import ComoFazer from './components/ComoFazer';
 import logoBrasao from './images/logobrasao.png';
 import logoHorizontal from './images/logohorizontal.png';
 import logoHorizontalPreto from './images/logohorizontalpreto.png';
@@ -56,6 +57,9 @@ const AppContentWithNotifications = () => {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const navRef = React.useRef(null);
+  const [showLeftArrow, setShowLeftArrow] = useState(false);
+  const [showRightArrow, setShowRightArrow] = useState(false);
 
   // Função para fechar sidebar ao navegar no mobile
   const handleMobileNavigation = () => {
@@ -81,6 +85,7 @@ const AppContentWithNotifications = () => {
   // Determinar aba ativa baseada na rota atual
   const getActiveTab = () => {
     const path = location.pathname;
+    if (path.includes('/como-fazer')) return 'como-fazer';
     if (path.includes('/pacientes')) return 'pacientes';
     if (path.includes('/consultores')) return 'consultores';
     if (path.includes('/clinicas')) return 'clinicas';
@@ -94,6 +99,33 @@ const AppContentWithNotifications = () => {
   };
   
   const activeTab = getActiveTab();
+
+  // Função para verificar se precisa mostrar as setas
+  const checkScrollArrows = () => {
+    if (navRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = navRef.current;
+      setShowLeftArrow(scrollLeft > 0);
+      setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 10);
+    }
+  };
+
+  // Função para scroll da navegação
+  const scrollNav = (direction) => {
+    if (navRef.current) {
+      const scrollAmount = 200;
+      navRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  // Verificar setas ao carregar e ao redimensionar
+  useEffect(() => {
+    checkScrollArrows();
+    window.addEventListener('resize', checkScrollArrows);
+    return () => window.removeEventListener('resize', checkScrollArrows);
+  }, [user]);
 
   // Fechar dropdown quando clicar fora
   useEffect(() => {
@@ -133,7 +165,34 @@ const AppContentWithNotifications = () => {
 
   // Se o usuário está autenticado, mostrar a aplicação principal
   const RenderContent = () => {
-    const { isEmpresa } = useAuth();
+    const { isEmpresa, isFreelancer } = useAuth();
+    
+    // Interface simplificada para Freelancers Consultores
+    if (isFreelancer && user?.tipo === 'consultor') {
+      return (
+        <Routes>
+          <Route path="/como-fazer" element={<ComoFazer />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/pacientes" element={<Pacientes />} />
+          <Route path="/clinicas" element={<Clinicas />} />
+          <Route path="/materiais" element={<Materiais />} />
+          <Route path="/perfil" element={<Perfil />} />
+          {/* Redirecionar para Como Fazer como página inicial */}
+          <Route path="/" element={<Navigate to="/como-fazer" replace />} />
+          <Route path="*" element={<Navigate to="/como-fazer" replace />} />
+        </Routes>
+      );
+    }
+
+    // Rota específica para Como Fazer - APENAS freelancers consultores
+    if (isFreelancer && user?.tipo === 'consultor') {
+      return (
+        <Routes>
+          <Route path="/como-fazer" element={<ComoFazer />} />
+          <Route path="*" element={<Navigate to="/como-fazer" replace />} />
+        </Routes>
+      );
+    }
     
     // Empresas têm acesso limitado: consultores (da empresa), clínicas, materiais e perfil
     if (isEmpresa) {
@@ -196,6 +255,159 @@ const AppContentWithNotifications = () => {
     return 'U';
   };
 
+    // Interface para Freelancers Consultores - Navegação Horizontal
+    if (user?.is_freelancer === true && user?.tipo === 'consultor') {
+    return (
+      <div className="app-freelancer">
+        {/* Header com navegação horizontal */}
+        <header className="freelancer-header">
+          <div className="freelancer-nav-container">
+            <div className="freelancer-logo">
+              <img src={logoHorizontalPreto} alt="Solumn" />
+            </div>
+            
+            <div className="nav-scroll-container">
+              {showLeftArrow && (
+                <button className="nav-arrow nav-arrow-left" onClick={() => scrollNav('left')}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="15 18 9 12 15 6"/>
+                  </svg>
+                </button>
+              )}
+              
+              <nav className="freelancer-nav" ref={navRef} onScroll={checkScrollArrows}>
+              <Link
+                to="/como-fazer"
+                className={`freelancer-nav-item ${activeTab === 'como-fazer' ? 'active' : ''}`}
+              >
+                <svg className="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+                <span>Indicações</span>
+              </Link>
+
+              <Link
+                to="/dashboard"
+                className={`freelancer-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+              >
+                <svg className="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="7" height="7"/>
+                  <rect x="14" y="3" width="7" height="7"/>
+                  <rect x="14" y="14" width="7" height="7"/>
+                  <rect x="3" y="14" width="7" height="7"/>
+                </svg>
+                <span>Dashboard</span>
+              </Link>
+
+              <Link
+                to="/pacientes"
+                className={`freelancer-nav-item ${activeTab === 'pacientes' ? 'active' : ''}`}
+              >
+                <svg className="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                </svg>
+                <span>Pacientes</span>
+              </Link>
+
+              <Link
+                to="/clinicas"
+                className={`freelancer-nav-item ${activeTab === 'clinicas' ? 'active' : ''}`}
+              >
+                <svg className="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                  <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+                <span>Clínicas</span>
+              </Link>
+
+              <Link
+                to="/materiais"
+                className={`freelancer-nav-item ${activeTab === 'materiais' ? 'active' : ''}`}
+              >
+                <svg className="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14,2 14,8 20,8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/>
+                  <line x1="16" y1="17" x2="8" y2="17"/>
+                  <polyline points="10,9 9,9 8,9"/>
+                </svg>
+                <span>Materiais</span>
+              </Link>
+
+              {/* Links externos mais profissionais */}
+              <div className="nav-separator"></div>
+
+              <a
+                href="https://chat.whatsapp.com/H58PhHmVQpj1mRSj7wlZgs"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="freelancer-nav-item external"
+              >
+                <svg className="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                <span>Comunidade</span>
+              </a>
+
+              <a
+                href="https://wa.me/554199647120"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="freelancer-nav-item external"
+              >
+                <svg className="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                </svg>
+                <span>Suporte</span>
+              </a>
+
+              <div className="nav-separator"></div>
+
+              <Link
+                to="/perfil"
+                className={`freelancer-nav-item ${activeTab === 'perfil' ? 'active' : ''}`}
+              >
+                <svg className="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+                <span>Perfil</span>
+              </Link>
+
+              <button
+                onClick={logout}
+                className="freelancer-nav-item logout-button"
+              >
+                <svg className="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                  <polyline points="16 17 21 12 16 7"/>
+                  <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                <span>Sair</span>
+              </button>
+            </nav>
+            
+            {showRightArrow && (
+              <button className="nav-arrow nav-arrow-right" onClick={() => scrollNav('right')}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+              </button>
+            )}
+          </div>
+          </div>
+        </header>
+        
+        {/* Conteúdo principal */}
+        <main className="freelancer-main">
+          {RenderContent()}
+        </main>
+      </div>
+    );
+    }
+
+    // Interface padrão com sidebar lateral (Admin e outros)
   return (
     <div className="App">
       {/* Overlay para mobile */}
