@@ -82,7 +82,8 @@ const Login = () => {
             src={logoBrasaoPreto} 
             alt="Solumn" 
             style={{ 
-              height: '180px', 
+              height: '85px', 
+              marginBottom: '1rem',
               objectFit: 'contain'
             }} 
           />

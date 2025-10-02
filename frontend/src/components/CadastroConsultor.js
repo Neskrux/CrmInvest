@@ -385,8 +385,9 @@ const CadastroConsultor = () => {
             src={logoBrasaoPreto} 
             alt="Solumn" 
             style={{ 
-              height: '180px', 
-              objectFit: 'contain'
+              height: '85px', 
+              objectFit: 'contain',
+              marginBottom: '1rem'
             }} 
           />
           <h1 style={{

@@ -1250,8 +1250,8 @@ const Pacientes = () => {
       <div className="page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h1 className="page-title">Gestão de Pacientes</h1>
-            <p className="page-subtitle">Cadastre e acompanhe seus pacientes e leads</p>
+            <h1 className="page-title">Meus Pacientes</h1>
+            <p className="page-subtitle">Acompanhe o status de seus pacientes indicados</p>
           </div>
           <button
             onClick={startTutorial}
@@ -1291,22 +1291,6 @@ const Pacientes = () => {
           marginTop: '1rem',
           fontSize: '0.875rem'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-            <strong style={{ color: '#0c4a6e' }}>Ações</strong>
-          </div>
-          <div style={{ color: '#0c4a6e', lineHeight: '1.4' }}>
-            {podeAlterarStatus ? (
-              <>
-                • Na aba <strong>"Pacientes"</strong> → Você pode cadastrar novos pacientes ou leads<br/>
-                • Na aba <strong>"Novos Leads"</strong> → Você pode pegar novos os leads disponíveis para você
-              </>
-            ) : (
-              <>
-                • Na aba <strong>"Pacientes"</strong> → Verifique seus novos leads, ou cadastre novos pacientes<br/>
-                • <strong>Dica:</strong> → Indique apenas pacientes que desejam fazer tratamentos estéticos ou odontológicos, parcelados no boleto
-              </>
-            )}
-          </div>
           
           {/* Links personalizados para consultores */}
           {isConsultor && (

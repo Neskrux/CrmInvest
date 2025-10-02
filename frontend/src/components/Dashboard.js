@@ -1313,7 +1313,7 @@ const Dashboard = () => {
 
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header" style={{padding: '1.5rem'}}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h1 className="page-title">Dashboard</h1>
@@ -1322,7 +1322,7 @@ const Dashboard = () => {
               {(filtroRegiao.cidade || filtroRegiao.estado) && (
                 <span style={{ 
                   marginLeft: '1rem',
-                  padding: '0.25rem 0.5rem',
+                  padding: '1rem',
                   backgroundColor: '#dbeafe',
                   color: '#1e40af',
                   borderRadius: '12px',
@@ -1638,7 +1638,7 @@ const Dashboard = () => {
 
       {/* KPIs do Período - Apenas quando não é Total */}
       {periodo !== 'total' && (
-        <div style={{ marginBottom: '2rem' }}>
+        <div style={{ marginBottom: '2rem', padding: '2rem' }}>
           <h3 style={{ 
             fontSize: '1.25rem', 
             fontWeight: '700', 
@@ -1680,7 +1680,7 @@ const Dashboard = () => {
       )}
 
       {/* KPIs Principais */}
-      <div style={{ marginBottom: '2rem' }} data-tutorial="main-kpis">
+      <div style={{ marginBottom: '2rem', padding: '2rem' }} data-tutorial="main-kpis">
         <h3 style={{ 
           fontSize: '1.25rem', 
           fontWeight: '700', 
@@ -1738,7 +1738,7 @@ const Dashboard = () => {
       </div>
 
       {/* Cards de Comissão (dados filtrados) */}
-      <div className="stats-grid" style={{ marginTop: '2rem', gridTemplateColumns: 'repeat(2, 1fr)' }}>
+      <div className="stats-grid" style={{ marginTop: '2rem', gridTemplateColumns: 'repeat(2, 1fr)', padding: '2rem' }}>
         <div className="stat-card" style={{ 
           background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
           border: '2px solid #f97316'

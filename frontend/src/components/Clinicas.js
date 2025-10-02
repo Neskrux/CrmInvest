@@ -17,6 +17,7 @@ const Clinicas = () => {
   const [submitting, setSubmitting] = useState(false); // Estado para prevenir cliques duplos
   const [submittingNovaClinica, setSubmittingNovaClinica] = useState(false); // Estado para nova clínica
   const [activeTab, setActiveTab] = useState('clinicas');
+  const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroCity, setFiltroCity] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
@@ -1076,8 +1077,8 @@ const Clinicas = () => {
       <div className="page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h1 className="page-title">{isConsultor ? 'Visualizar Clínicas' : 'Gerenciar Clínicas'}</h1>
-            <p className="page-subtitle">{isConsultor ? 'Visualize as clínicas parceiras' : 'Gerencie as clínicas parceiras'}</p>
+            <h1 className="page-title">{isConsultor ? 'Minhas Clínicas' : 'Gerenciar Clínicas'}</h1>
+            <p className="page-subtitle">{isConsultor ? 'Visualize as clínicas indicadas' : 'Gerencie as clínicas parceiras'}</p>
           </div>
           <button
             onClick={startTutorial}
@@ -1117,16 +1118,7 @@ const Clinicas = () => {
           marginTop: '1rem',
           fontSize: '0.875rem'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-            <strong style={{ color: '#0c4a6e' }}>Ações</strong>
-          </div>
-          <div style={{ color: '#0c4a6e', lineHeight: '1.4' }}>
-            • Na aba <strong>"Clínicas"</strong> → Você pode visualizar todas as clínicas parceiras<br/>
-            • Na aba <strong>"{isAdmin ? 'Novas Clínicas' : 'Indicar Clínicas'}"</strong> → Você pode cadastrar novas clínicas, que se aprovadas, você ganhará uma comissão e elas não poderão ser visualizadas por {user?.tipo === 'empresa' ? 'outras empresas' : 'outros consultores freelancers'}<br/>
-            • Na aba <strong>"Mapa"</strong> → Você pode visualizar todas as clínicas disponíveis e novas clínicas, que serão exibidas no mapa<br/>
-            • <strong>Dica:</strong> → Lembre-se de indicar clínicas que queiram antecipar seus boletos, ou que ainda não ofereçam parcelamento no boleto como método de pagamento<br/>
-            • <strong>Dica de Argumento:</strong> → Nós levamos pacientes pré-aprovados até a sua clinica, você só precisa atender
-          </div>
+          
           
           {/* Links personalizados para consultores */}
           {isConsultor && (
@@ -1238,22 +1230,28 @@ const Clinicas = () => {
         >
           Clínicas
         </button>
-        <button
-          className={`tab ${activeTab === 'novas-clinicas' ? 'active' : ''}`}
-          onClick={() => setActiveTab('novas-clinicas')}
-          style={{ position: 'relative' }}
-        >
-          {isAdmin ? 'Novas Clínicas' : 'Indicar Clínicas'}
-          {novasClinicas.length > 0 && (
-            <span className="tab-badge">{novasClinicas.length}</span>
-          )}
-        </button>
-        <button
-          className={`tab ${activeTab === 'mapa' ? 'active' : ''}`}
-          onClick={() => setActiveTab('mapa')}
-        >
-          Mapa
-        </button>
+        
+        {/* Esconder "Novas Clínicas" e "Mapa" para freelancers */}
+        {!isFreelancer && (
+          <>
+            <button
+              className={`tab ${activeTab === 'novas-clinicas' ? 'active' : ''}`}
+              onClick={() => setActiveTab('novas-clinicas')}
+              style={{ position: 'relative' }}
+            >
+              {isAdmin ? 'Novas Clínicas' : 'Indicar Clínicas'}
+              {novasClinicas.length > 0 && (
+                <span className="tab-badge">{novasClinicas.length}</span>
+              )}
+            </button>
+            <button
+              className={`tab ${activeTab === 'mapa' ? 'active' : ''}`}
+              onClick={() => setActiveTab('mapa')}
+            >
+              Mapa
+            </button>
+          </>
+        )}
       </div>
 
       {/* Conteúdo da aba Mapa */}
@@ -1709,7 +1707,6 @@ const Clinicas = () => {
 
         {/* Seção de Filtros */}
         <div style={{ 
-          padding: '1.5rem', 
           marginBottom: '1.5rem',
           backgroundColor: '#f9fafb',
           borderRadius: '8px',
@@ -1719,7 +1716,7 @@ const Clinicas = () => {
             display: 'flex', 
             justifyContent: 'space-between', 
             alignItems: 'center', 
-            marginBottom: '1rem' 
+            padding: '1rem 1.5rem'
           }}>
             <h3 style={{ 
               fontSize: '1.1rem', 
@@ -1727,25 +1724,35 @@ const Clinicas = () => {
               color: '#1a1d23', 
               margin: 0
             }}>
-              Filtros de Busca
+              Filtros
             </h3>
-            {(filtroEstado || filtroCity || filtroStatus || filtroOrigem) && (
-              <button 
-                onClick={() => {
-                  setFiltroEstado('');
-                  setFiltroCity('');
-                  setFiltroStatus('');
-                  setFiltroOrigem('');
-                }}
-                className="btn btn-secondary"
-                style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
-              >
-                Limpar Filtros
-              </button>
-            )}
+            <button 
+              className="btn btn-secondary"
+              onClick={() => setMostrarFiltros(!mostrarFiltros)}
+              style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+            >
+              {mostrarFiltros ? 'Ocultar Filtros' : 'Mostrar Filtros'}
+            </button>
           </div>
           
-          <div className="grid grid-4">
+          {mostrarFiltros && (
+            <div style={{ padding: '0 1.5rem 1.5rem 1.5rem' }}>
+              {(filtroEstado || filtroCity || filtroStatus || filtroOrigem) && (
+                <button 
+                  onClick={() => {
+                    setFiltroEstado('');
+                    setFiltroCity('');
+                    setFiltroStatus('');
+                    setFiltroOrigem('');
+                  }}
+                  className="btn btn-secondary"
+                  style={{ padding: '0.5rem 1rem', fontSize: '0.9rem', marginBottom: '1rem' }}
+                >
+                  Limpar Filtros
+                </button>
+              )}
+              
+              <div className="grid grid-4">
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Estado</label>
               <select
@@ -1814,10 +1821,14 @@ const Clinicas = () => {
               </div>
             )}
           </div>
+            </div>
+          )}
+        </div>
 
           {(filtroEstado || filtroCity || filtroStatus || filtroOrigem) && (
             <div style={{ 
-              marginTop: '1rem', 
+              marginTop: '-1rem',
+              marginBottom: '1rem', 
               padding: '0.75rem', 
               backgroundColor: '#f3f4f6', 
               borderRadius: '6px',
@@ -1827,7 +1838,6 @@ const Clinicas = () => {
               Mostrando <strong>{clinicasFiltradas.length}</strong> de {clinicas.length} clínica(s)
             </div>
           )}
-        </div>
 
         {loading ? (
           <div className="loading">
@@ -1893,56 +1903,75 @@ const Clinicas = () => {
                 {clinicasFiltradas.map(clinica => (
                   <tr key={clinica.id} className={clinica.status === 'inativa' ? 'clinica-bloqueada' : ''}>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {/* Indicador de origem da clínica - apenas para admin e consultor interno */}
-                        {(isAdmin || isConsultorInterno) && (
-                          <>
-                            {clinica.tipo_origem === 'aprovada' && (
-                              <span 
-                                className="badge" 
-                                style={{ 
-                                  backgroundColor: '#3b82f6', 
-                                  color: 'white',
-                                  fontSize: '0.7rem',
-                                  padding: '2px 6px',
-                                  borderRadius: '4px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}
-                                title="Clínica aprovada da aba 'Novas Clínicas'"
-                              >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M9 12l2 2 4-4"/>
-                                  <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"/>
-                                </svg>
-                                Aprovada
-                              </span>
-                            )}
-                            {clinica.tipo_origem === 'direta' && (
-                              <span 
-                                className="badge" 
-                                style={{ 
-                                  backgroundColor: '#10b981', 
-                                  color: 'white',
-                                  fontSize: '0.7rem',
-                                  padding: '2px 6px',
-                                  borderRadius: '4px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}
-                                title="Clínica criada diretamente por administrador"
-                              >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                </svg>
-                                Direta
-                              </span>
-                            )}
-                          </>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          {/* Indicador de origem da clínica - apenas para admin e consultor interno */}
+                          {(isAdmin || isConsultorInterno) && (
+                            <>
+                              {clinica.tipo_origem === 'aprovada' && (
+                                <span 
+                                  className="badge" 
+                                  style={{ 
+                                    backgroundColor: '#3b82f6', 
+                                    color: 'white',
+                                    fontSize: '0.7rem',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                  title="Clínica aprovada da aba 'Novas Clínicas'"
+                                >
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M9 12l2 2 4-4"/>
+                                    <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"/>
+                                  </svg>
+                                  Aprovada
+                                </span>
+                              )}
+                              {clinica.tipo_origem === 'direta' && (
+                                <span 
+                                  className="badge" 
+                                  style={{ 
+                                    backgroundColor: '#10b981', 
+                                    color: 'white',
+                                    fontSize: '0.7rem',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                  title="Clínica criada diretamente por administrador"
+                                >
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                  </svg>
+                                  Direta
+                                </span>
+                              )}
+                            </>
+                          )}
+                          <strong>{clinica.nome}</strong>
+                        </div>
+                        {/* Mostrar status no mobile */}
+                        {isMobile && (
+                          <span 
+                            className="badge"
+                            style={{
+                              backgroundColor: getStatusClinicaInfo(clinica.status).color + '20',
+                              color: getStatusClinicaInfo(clinica.status).color,
+                              fontWeight: '600',
+                              borderRadius: '0.375rem',
+                              fontSize: '0.75rem',
+                              padding: '0.25rem 0.5rem',
+                              width: 'fit-content'
+                            }}
+                          >
+                            {getStatusClinicaInfo(clinica.status).label}
+                          </span>
                         )}
-                        <strong>{clinica.nome}</strong>
                       </div>
                     </td>
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
