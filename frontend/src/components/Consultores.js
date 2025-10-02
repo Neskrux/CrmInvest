@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 
 const Consultores = () => {
-  const { makeRequest, isAdmin } = useAuth();
+  const { makeRequest, isAdmin, user } = useAuth();
   const { showErrorToast, showSuccessToast } = useToast();
   const [consultores, setConsultores] = useState([]);
   const [consultoresFiltrados, setConsultoresFiltrados] = useState([]);
@@ -33,8 +33,11 @@ const Consultores = () => {
     email: '',
     senha: '',
     pix: '',
+    cidade: '',
+    estado: '',
     is_freelancer: true // Por padrão, freelancer
   });
+  const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
   const [errors, setErrors] = useState({});
 
   const fetchConsultores = useCallback(async () => {
@@ -191,8 +194,11 @@ const Consultores = () => {
           email: '',
           senha: '',
           pix: '',
+          cidade: '',
+          estado: '',
           is_freelancer: true
         });
+        setCidadeCustomizada(false);
         setErrors({});
         fetchConsultores();
       } else {
@@ -212,8 +218,23 @@ const Consultores = () => {
       email: consultor.email || '',
       senha: consultor.senha || '',
       pix: consultor.pix || '',
+      cidade: consultor.cidade || '',
+      estado: consultor.estado || '',
       is_freelancer: consultor.is_freelancer !== undefined ? consultor.is_freelancer : true
     });
+    
+    // Se tem estado e cidade, verifica se precisa ativar cidade customizada
+    if (consultor.estado && consultor.cidade) {
+      const cidadesDoEstado = cidadesPorEstado[consultor.estado];
+      if (cidadesDoEstado && !cidadesDoEstado.includes(consultor.cidade)) {
+        setCidadeCustomizada(true);
+      } else {
+        setCidadeCustomizada(false);
+      }
+    } else {
+      setCidadeCustomizada(false);
+    }
+    
     setShowModal(true);
   };
 
@@ -237,6 +258,24 @@ const Consultores = () => {
       value = formatPhone(value);
     } else if (name === 'pix') {
       value = formatCPF(value);
+    } else if (name === 'cidade') {
+      value = formatarCidade(value);
+    } else if (name === 'estado') {
+      // Resetar cidade e cidadeCustomizada quando estado muda
+      setFormData({
+        ...formData,
+        [name]: value,
+        cidade: ''
+      });
+      setCidadeCustomizada(false);
+      // Limpar erro quando o usuário começa a digitar
+      if (errors[name]) {
+        setErrors(prev => ({
+          ...prev,
+          [name]: ''
+        }));
+      }
+      return; // Retorna aqui para não executar o setFormData novamente
     }
     
     setFormData({
@@ -356,6 +395,122 @@ const Consultores = () => {
     return value;
   };
 
+  // Estados brasileiros
+  const estadosBrasileiros = [
+    { sigla: 'AC', nome: 'Acre' },
+    { sigla: 'AL', nome: 'Alagoas' },
+    { sigla: 'AP', nome: 'Amapá' },
+    { sigla: 'AM', nome: 'Amazonas' },
+    { sigla: 'BA', nome: 'Bahia' },
+    { sigla: 'CE', nome: 'Ceará' },
+    { sigla: 'DF', nome: 'Distrito Federal' },
+    { sigla: 'ES', nome: 'Espírito Santo' },
+    { sigla: 'GO', nome: 'Goiás' },
+    { sigla: 'MA', nome: 'Maranhão' },
+    { sigla: 'MT', nome: 'Mato Grosso' },
+    { sigla: 'MS', nome: 'Mato Grosso do Sul' },
+    { sigla: 'MG', nome: 'Minas Gerais' },
+    { sigla: 'PA', nome: 'Pará' },
+    { sigla: 'PB', nome: 'Paraíba' },
+    { sigla: 'PR', nome: 'Paraná' },
+    { sigla: 'PE', nome: 'Pernambuco' },
+    { sigla: 'PI', nome: 'Piauí' },
+    { sigla: 'RJ', nome: 'Rio de Janeiro' },
+    { sigla: 'RN', nome: 'Rio Grande do Norte' },
+    { sigla: 'RS', nome: 'Rio Grande do Sul' },
+    { sigla: 'RO', nome: 'Rondônia' },
+    { sigla: 'RR', nome: 'Roraima' },
+    { sigla: 'SC', nome: 'Santa Catarina' },
+    { sigla: 'SP', nome: 'São Paulo' },
+    { sigla: 'SE', nome: 'Sergipe' },
+    { sigla: 'TO', nome: 'Tocantins' }
+  ];
+
+  // Principais cidades por estado
+  const cidadesPorEstado = {
+    'SP': ['São Paulo', 'Campinas', 'Santos', 'São Bernardo do Campo', 'Santo André', 'Osasco', 'Ribeirão Preto', 'Sorocaba'],
+    'RJ': ['Rio de Janeiro', 'Niterói', 'Nova Iguaçu', 'Duque de Caxias', 'Campos dos Goytacazes', 'Petrópolis', 'Volta Redonda'],
+    'MG': ['Belo Horizonte', 'Uberlândia', 'Contagem', 'Juiz de Fora', 'Betim', 'Montes Claros', 'Ribeirão das Neves'],
+    'ES': ['Vitória', 'Serra', 'Vila Velha', 'Cariacica', 'Linhares', 'Cachoeiro de Itapemirim', 'Colatina'],
+    'PR': ['Curitiba', 'Londrina', 'Maringá', 'Ponta Grossa', 'Cascavel', 'São José dos Pinhais', 'Foz do Iguaçu'],
+    'RS': ['Porto Alegre', 'Caxias do Sul', 'Pelotas', 'Canoas', 'Santa Maria', 'Gravataí', 'Viamão'],
+    'SC': ['Florianópolis', 'Joinville', 'Blumenau', 'São José', 'Criciúma', 'Chapecó', 'Itajaí'],
+    'BA': ['Salvador', 'Feira de Santana', 'Vitória da Conquista', 'Camaçari', 'Juazeiro', 'Ilhéus', 'Itabuna'],
+    'GO': ['Goiânia', 'Aparecida de Goiânia', 'Anápolis', 'Rio Verde', 'Luziânia', 'Águas Lindas de Goiás'],
+    'PE': ['Recife', 'Jaboatão dos Guararapes', 'Olinda', 'Caruaru', 'Petrolina', 'Paulista', 'Cabo de Santo Agostinho'],
+    'CE': ['Fortaleza', 'Caucaia', 'Juazeiro do Norte', 'Maracanaú', 'Sobral', 'Crato', 'Itapipoca'],
+    'DF': ['Brasília', 'Taguatinga', 'Ceilândia', 'Samambaia', 'Planaltina', 'Águas Claras', 'Guará'],
+    'MT': ['Cuiabá', 'Várzea Grande', 'Rondonópolis', 'Sinop', 'Tangará da Serra', 'Cáceres', 'Barra do Garças'],
+    'MS': ['Campo Grande', 'Dourados', 'Três Lagoas', 'Corumbá', 'Ponta Porã', 'Aquidauana', 'Naviraí'],
+    'AL': ['Maceió', 'Arapiraca', 'Rio Largo', 'Palmeira dos Índios', 'União dos Palmares', 'Penedo'],
+    'SE': ['Aracaju', 'Nossa Senhora do Socorro', 'Lagarto', 'Itabaiana', 'Estância', 'Tobias Barreto'],
+    'PB': ['João Pessoa', 'Campina Grande', 'Santa Rita', 'Patos', 'Bayeux', 'Sousa', 'Cajazeiras'],
+    'RN': ['Natal', 'Mossoró', 'Parnamirim', 'São Gonçalo do Amarante', 'Macaíba', 'Ceará-Mirim'],
+    'PI': ['Teresina', 'Parnaíba', 'Picos', 'Piripiri', 'Floriano', 'Campo Maior', 'Barras'],
+    'MA': ['São Luís', 'Imperatriz', 'São José de Ribamar', 'Timon', 'Caxias', 'Codó', 'Paço do Lumiar'],
+    'TO': ['Palmas', 'Araguaína', 'Gurupi', 'Porto Nacional', 'Paraíso do Tocantins', 'Colinas do Tocantins'],
+    'AC': ['Rio Branco', 'Cruzeiro do Sul', 'Sena Madureira', 'Tarauacá', 'Feijó', 'Brasileia'],
+    'RO': ['Porto Velho', 'Ji-Paraná', 'Ariquemes', 'Vilhena', 'Cacoal', 'Rolim de Moura'],
+    'RR': ['Boa Vista', 'Rorainópolis', 'Caracaraí', 'Alto Alegre', 'Mucajaí', 'Cantá'],
+    'AP': ['Macapá', 'Santana', 'Laranjal do Jari', 'Oiapoque', 'Mazagão', 'Porto Grande'],
+    'AM': ['Manaus', 'Parintins', 'Itacoatiara', 'Manacapuru', 'Coari', 'Tefé', 'Tabatinga'],
+    'PA': ['Belém', 'Ananindeua', 'Santarém', 'Marabá', 'Parauapebas', 'Castanhal', 'Abaetetuba']
+  };
+
+  const formatarCidade = (value) => {
+    if (!value) return '';
+    
+    // Remove apenas números e caracteres especiais perigosos, mantém letras, espaços, acentos e hífen
+    let cleanValue = value.replace(/[0-9!@#$%^&*()_+=\[\]{}|\\:";'<>?,./~`]/g, '');
+
+    // Não aplicar formatação completa se o usuário ainda está digitando (termina com espaço)
+    const isTyping = value.endsWith(' ') && value.length > 0;
+    
+    if (isTyping) {
+      // Durante a digitação, apenas remove caracteres inválidos
+      return cleanValue;
+    }
+    
+    // Remove espaços extras apenas quando não está digitando
+    cleanValue = cleanValue.replace(/\s+/g, ' ').trim();
+    
+    // Não permite string vazia
+    if (!cleanValue) return '';
+    
+    // Se tem menos de 2 caracteres, não formatar ainda
+    if (cleanValue.length < 2) return cleanValue;
+    
+    // Verifica se está todo em maiúscula (mais de 3 caracteres) e converte para title case
+    const isAllUpperCase = cleanValue.length > 3 && cleanValue === cleanValue.toUpperCase();
+    
+    if (isAllUpperCase) {
+      // Converte para title case
+      return cleanValue.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+    }
+    
+    // Para entradas normais, aplica title case
+    return cleanValue
+      .toLowerCase()
+      .split(' ')
+      .map((palavra, index) => {
+        // Palavras que devem ficar em minúscula (exceto se for a primeira)
+        const preposicoes = ['de', 'da', 'do', 'das', 'dos', 'e', 'em', 'na', 'no', 'nas', 'nos'];
+        
+        // Primeira palavra sempre maiúscula
+        if (index === 0) {
+          return palavra.charAt(0).toUpperCase() + palavra.slice(1);
+        }
+        
+        if (preposicoes.includes(palavra)) {
+          return palavra;
+        }
+        
+        // Primeira letra maiúscula
+        return palavra.charAt(0).toUpperCase() + palavra.slice(1);
+      })
+      .join(' ');
+  };
+
   // Função para formatar CPF
   const formatCPF = (value) => {
     value = value.replace(/\D/g, '');
@@ -410,8 +565,11 @@ const Consultores = () => {
       email: '',
       senha: '',
       pix: '',
+      cidade: '',
+      estado: '',
       is_freelancer: true
     });
+    setCidadeCustomizada(false);
     setErrors({});
     setEditingConsultor(null);
     setShowModal(false);
@@ -730,27 +888,43 @@ Digite o número da opção desejada:`;
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Gerenciar Consultores</h1>
-        <p className="page-subtitle">Gerencie a equipe de consultores</p>
+        <h1 className="page-title">
+          {user?.tipo === 'empresa' ? 'Minha Equipe de Consultores' : 'Gerenciar Consultores'}
+        </h1>
+        <p className="page-subtitle">
+          {user?.tipo === 'empresa' ? 'Gerencie os consultores da sua empresa' : 'Gerencie a equipe de consultores'}
+        </p>
       </div>
 
       {/* Resumo de Estatísticas */}
-      <div className="stats-grid" style={{ marginBottom: '2rem' }}>
+      <div className="stats-grid" style={{ 
+        marginBottom: '2rem',
+        gridTemplateColumns: user?.tipo === 'empresa' 
+          ? 'repeat(3, 1fr)'  // Grid 3 colunas para empresas
+          : 'repeat(auto-fit, minmax(150px, 1fr))' // Grid responsivo para admin
+      }}>
         <div className="stat-card">
           <div className="stat-label">Total</div>
           <div className="stat-value">{consultores.length}</div>
         </div>
         
         <div className="stat-card">
-          <div className="stat-label">Freelancers</div>
+          <div className="stat-label">
+            {user?.tipo === 'empresa' ? 'Freelancers' : 'Freelancers'}
+          </div>
           <div className="stat-value">{consultores.filter(c => c.is_freelancer !== false).length}</div>
         </div>
         
         <div className="stat-card">
-          <div className="stat-label">Internos</div>
+          <div className="stat-label">
+            {user?.tipo === 'empresa' ? 'Funcionários' : 'Internos'}
+          </div>
           <div className="stat-value">{consultores.filter(c => c.is_freelancer === false).length}</div>
         </div>
         
+        {/* KPIs de link - apenas para admin */}
+        {isAdmin && (
+          <>
         <div className="stat-card">
           <div className="stat-label">Com Link</div>
           <div className="stat-value">{consultores.filter(c => c.codigo_referencia && c.codigo_referencia.trim() !== '').length}</div>
@@ -760,12 +934,16 @@ Digite o número da opção desejada:`;
           <div className="stat-label">Sem Link</div>
           <div className="stat-value">{consultores.filter(c => !c.codigo_referencia || c.codigo_referencia.trim() === '').length}</div>
         </div>
+          </>
+        )}
       </div>
 
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Equipe de Consultores</h2>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            {/* Botão de gerar links - apenas para admin */}
+            {isAdmin && (
             <button 
               className="btn btn-secondary"
               onClick={gerarCodigosFaltantes}
@@ -777,6 +955,7 @@ Digite o número da opção desejada:`;
               </svg>
               Gerar Links Freelancers
             </button>
+            )}
             <button 
               className="btn btn-primary"
               onClick={() => setShowModal(true)}
@@ -934,9 +1113,28 @@ Digite o número da opção desejada:`;
                       <strong>{consultor.nome}</strong>
                     </td>
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                      {consultor.empresa_id ? (
+                        // Consultor de empresa (mostra se é freelancer ou funcionário)
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <span className={`status-badge ${consultor.is_freelancer !== false ? 'freelancer' : 'interno'}`}>
+                            {consultor.is_freelancer !== false ? 'Freelancer' : 'Funcionário'}
+                          </span>
+                          <span className="badge" style={{ 
+                            backgroundColor: '#8b5cf6', 
+                            color: 'white',
+                            fontSize: '0.75rem',
+                            padding: '2px 8px',
+                            borderRadius: '4px'
+                          }}>
+                            Empresa
+                          </span>
+                        </div>
+                      ) : (
+                        // Consultor sem empresa (Invest Money)
                       <span className={`status-badge ${consultor.is_freelancer !== false ? 'freelancer' : 'interno'}`}>
                         {consultor.is_freelancer !== false ? 'Freelancer' : 'Interno'}
                       </span>
+                      )}
                     </td>
                     <td className="text-wrap" style={{ display: isMobile ? 'none' : 'table-cell' }}>
                       <span className="email-cell">
@@ -988,7 +1186,7 @@ Digite o número da opção desejada:`;
                             <circle cx="12" cy="12" r="3" />
                           </svg>
                         </button>
-                        {isAdmin && (
+                        {(isAdmin || user?.tipo === 'empresa') && (
                           <button
                             onClick={() => handleEdit(consultor)}
                             className="btn-action"
@@ -1011,7 +1209,7 @@ Digite o número da opção desejada:`;
                             <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                           </svg>
                         </button>
-                        {isAdmin && (
+                        {(isAdmin || user?.tipo === 'empresa') && (
                           <button
                             onClick={() => excluirConsultor(consultor)}
                             className="btn-action"
@@ -1070,6 +1268,22 @@ Digite o número da opção desejada:`;
                   </div>
                 )}
                 
+                {viewingConsultor.estado && (
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Estado</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                      {viewingConsultor.estado} - {estadosBrasileiros.find(e => e.sigla === viewingConsultor.estado)?.nome || viewingConsultor.estado}
+                    </p>
+                  </div>
+                )}
+                
+                {viewingConsultor.cidade && (
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Cidade</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingConsultor.cidade}</p>
+                  </div>
+                )}
+                
                 {viewingConsultor.pix && (
                   <div>
                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>PIX</label>
@@ -1100,6 +1314,37 @@ Digite o número da opção desejada:`;
                     </div>
                   </div>
                 )}
+                
+                {/* Tipo de Vínculo - Para consultores de empresa */}
+                <div>
+                  <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>
+                    {viewingConsultor.empresa_id ? 'Tipo de Vínculo' : 'Tipo'}
+                  </label>
+                  <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                    {viewingConsultor.empresa_id ? (
+                      // Consultor de empresa
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <span className={`status-badge ${viewingConsultor.is_freelancer !== false ? 'freelancer' : 'interno'}`}>
+                          {viewingConsultor.is_freelancer !== false ? 'Freelancer (terceirizado)' : 'Funcionário (fixo)'}
+                        </span>
+                        <span className="badge" style={{ 
+                          backgroundColor: '#8b5cf6', 
+                          color: 'white',
+                          fontSize: '0.75rem',
+                          padding: '4px 10px',
+                          borderRadius: '4px'
+                        }}>
+                          Empresa
+                        </span>
+                      </div>
+                    ) : (
+                      // Consultor Invest Money
+                      <span className={`status-badge ${viewingConsultor.is_freelancer !== false ? 'freelancer' : 'interno'}`}>
+                        {viewingConsultor.is_freelancer !== false ? 'Freelancer' : 'Interno'}
+                      </span>
+                    )}
+                  </p>
+                </div>
                 
                 {viewingConsultor.created_at && (
                   <div>
@@ -1251,7 +1496,102 @@ Digite o número da opção desejada:`;
               </div>
 
               <div className="form-group">
-                <label className="form-label">Tipo de Consultor</label>
+                <label className="form-label">Estado</label>
+                <select
+                  name="estado"
+                  className="form-input"
+                  value={formData.estado}
+                  onChange={handleInputChange}
+                  autoComplete="off"
+                  style={{
+                    borderColor: errors.estado ? '#ef4444' : '#d1d5db'
+                  }}
+                >
+                  <option value="">Selecione o estado</option>
+                  {estadosBrasileiros.map(estado => (
+                    <option key={estado.sigla} value={estado.sigla}>
+                      {estado.sigla} - {estado.nome}
+                    </option>
+                  ))}
+                </select>
+                {errors.estado && (
+                  <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>
+                    {errors.estado}
+                  </span>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Cidade</label>
+                {formData.estado && cidadesPorEstado[formData.estado] && !cidadeCustomizada ? (
+                  <select
+                    name="cidade"
+                    className="form-input"
+                    value={formData.cidade}
+                    onChange={(e) => {
+                      if (e.target.value === 'OUTRA') {
+                        setCidadeCustomizada(true);
+                        setFormData(prev => ({ ...prev, cidade: '' }));
+                      } else {
+                        handleInputChange(e);
+                      }
+                    }}
+                    autoComplete="off"
+                    style={{
+                      borderColor: errors.cidade ? '#ef4444' : '#d1d5db'
+                    }}
+                  >
+                    <option value="">Selecione a cidade</option>
+                    {cidadesPorEstado[formData.estado].map(cidade => (
+                      <option key={cidade} value={cidade}>{cidade}</option>
+                    ))}
+                    <option value="OUTRA">Outra cidade</option>
+                  </select>
+                ) : (
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      name="cidade"
+                      className="form-input"
+                      value={formData.cidade}
+                      onChange={handleInputChange}
+                      placeholder="Digite o nome da cidade"
+                      disabled={!formData.estado}
+                      autoComplete="off"
+                      style={{
+                        borderColor: errors.cidade ? '#ef4444' : '#d1d5db',
+                        flex: 1
+                      }}
+                    />
+                    {formData.estado && cidadesPorEstado[formData.estado] && cidadeCustomizada && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ whiteSpace: 'nowrap', fontSize: '0.875rem', padding: '0.625rem 1rem' }}
+                        onClick={() => {
+                          setCidadeCustomizada(false);
+                          setFormData(prev => ({ ...prev, cidade: '' }));
+                        }}
+                      >
+                        Voltar
+                      </button>
+                    )}
+                  </div>
+                )}
+                <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                  Cidade onde o consultor reside ou atua
+                </small>
+                {errors.cidade && (
+                  <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>
+                    {errors.cidade}
+                  </span>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">
+                  {user?.tipo === 'empresa' ? 'Tipo de Vínculo' : 'Tipo de Consultor'}
+                </label>
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
                     <input
@@ -1259,9 +1599,9 @@ Digite o número da opção desejada:`;
                       name="is_freelancer"
                       value="true"
                       checked={formData.is_freelancer === true}
-                      onChange={(e) => setFormData(prev => ({ ...prev, is_freelancer: e.target.value === 'true' }))}
+                      onChange={() => setFormData(prev => ({ ...prev, is_freelancer: true }))}
                     />
-                    <span>Freelancer (link personalizado)</span>
+                    <span>{user?.tipo === 'empresa' ? 'Freelancer (terceirizado)' : 'Freelancer (link personalizado)'}</span>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
                     <input
@@ -1269,13 +1609,15 @@ Digite o número da opção desejada:`;
                       name="is_freelancer"
                       value="false"
                       checked={formData.is_freelancer === false}
-                      onChange={(e) => setFormData(prev => ({ ...prev, is_freelancer: e.target.value === 'false' }))}
+                      onChange={() => setFormData(prev => ({ ...prev, is_freelancer: false }))}
                     />
-                    <span>Interno (link geral)</span>
+                    <span>{user?.tipo === 'empresa' ? 'Funcionário (fixo)' : 'Interno (link geral)'}</span>
                   </label>
                 </div>
                 <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
-                  Freelancers veem apenas leads do seu código. Internos veem leads gerais.
+                  {user?.tipo === 'empresa' 
+                    ? 'Ambos os tipos veem as clínicas da empresa. Diferença apenas para controle interno.'
+                    : 'Freelancers veem apenas leads do seu código. Internos veem leads gerais.'}
                 </small>
               </div>
 
@@ -1459,7 +1801,7 @@ Digite o número da opção desejada:`;
             </div>
 
             <div style={{ padding: '1.5rem' }}>
-              {linkConsultor.link_personalizado ? (
+              {linkConsultor.link_personalizado || linkConsultor.link_clinicas ? (
                 <div>
                   <div style={{ 
                     padding: '1rem',
@@ -1469,10 +1811,12 @@ Digite o número da opção desejada:`;
                     marginBottom: '1.5rem'
                   }}>
                     <div style={{ fontSize: '0.875rem', color: '#166534', fontWeight: '600' }}>
-                      Link Personalizado Ativo
+                      {linkConsultor.empresa_id ? 'Links de Indicação da Empresa' : 'Link Personalizado Ativo'}
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                      Use este link para divulgar e capturar leads com sua referência
+                      {linkConsultor.empresa_id 
+                        ? 'Use estes links para indicar clínicas em nome da empresa'
+                        : 'Use este link para divulgar e capturar leads com sua referência'}
                     </div>
                   </div>
 
@@ -1493,15 +1837,17 @@ Digite o número da opção desejada:`;
                     </div>
                   </div>
 
+                  {/* Link para Pacientes - Apenas para consultores SEM empresa */}
+                  {linkConsultor.link_personalizado && !linkConsultor.empresa_id && (
                   <div style={{ marginBottom: '1.5rem' }}>
                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem', display: 'block', marginBottom: '0.5rem' }}>
-                      Link Personalizado
+                        Link para Pacientes
                     </label>
                     <div style={{ 
                       padding: '0.75rem',
                       borderRadius: '8px',
-                      backgroundColor: '#f3f4f6',
-                      border: '1px solid #e5e7eb',
+                        backgroundColor: '#ecfdf5',
+                        border: '1px solid #86efac',
                       fontFamily: 'monospace',
                       fontSize: '0.875rem',
                       color: '#1f2937',
@@ -1510,7 +1856,54 @@ Digite o número da opção desejada:`;
                     }}>
                       {linkConsultor.link_personalizado}
                     </div>
+                      <button 
+                        type="button"
+                        className="btn btn-sm btn-secondary"
+                        onClick={() => copiarLink(linkConsultor.link_personalizado)}
+                        style={{ marginTop: '0.5rem', fontSize: '0.75rem' }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.25rem' }}>
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        Copiar Link de Pacientes
+                      </button>
                   </div>
+                  )}
+
+                  {/* Link para Clínicas - Para TODOS os consultores com link */}
+                  {linkConsultor.link_clinicas && (
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem', display: 'block', marginBottom: '0.5rem' }}>
+                        Link para Clínicas
+                      </label>
+                      <div style={{ 
+                        padding: '0.75rem',
+                        borderRadius: '8px',
+                        backgroundColor: '#eff6ff',
+                        border: '1px solid #93c5fd',
+                        fontFamily: 'monospace',
+                        fontSize: '0.875rem',
+                        color: '#1f2937',
+                        wordBreak: 'break-all',
+                        lineHeight: '1.5'
+                      }}>
+                        {linkConsultor.link_clinicas}
+                      </div>
+                      <button 
+                        type="button"
+                        className="btn btn-sm btn-secondary"
+                        onClick={() => copiarLink(linkConsultor.link_clinicas)}
+                        style={{ marginTop: '0.5rem', fontSize: '0.75rem' }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.25rem' }}>
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        Copiar Link de Clínicas
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div>

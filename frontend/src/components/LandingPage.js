@@ -39,12 +39,11 @@ const LandingPage = () => {
         <div style={{ marginBottom: '3rem' }}>
           <img 
             src={logoHorizontalPreto} 
-            alt="CRM System" 
+            alt="Solumn" 
             style={{ 
               width: '250px',
               maxWidth: '80%',
               height: 'auto',
-              marginBottom: '1.5rem',
               objectFit: 'contain'
             }} 
           />
@@ -53,7 +52,7 @@ const LandingPage = () => {
             color: '#4b5563',
             lineHeight: '1.5'
           }}>
-            Sistema profissional de gestão de consultores e vendas
+            Sistema profissional de gestão empresarial
           </p>
         </div>
 

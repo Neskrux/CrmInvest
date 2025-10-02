@@ -15,8 +15,7 @@ const useRealtimeClinicas = () => {
 
   useEffect(() => {
     if (!user) return;
-
-    console.log('🔌 Iniciando conexão Socket.IO para clínicas com:', config.BACKEND_URL);
+    
     const socketInstance = io(config.BACKEND_URL, {
       transports: ['websocket', 'polling'],
       timeout: 20000,
@@ -24,20 +23,13 @@ const useRealtimeClinicas = () => {
     });
 
     socketInstance.on('connect', () => {
-      console.log('✅ Socket.IO conectado com sucesso para clínicas!');
       setIsConnected(true);
-      
-      console.log('📢 Entrando no grupo de notificações de clínicas:', {
-        userId: user.id,
-        userType: user.tipo
-      });
       
       socketInstance.emit('join-clinicas-notifications', {
         userId: user.id,
         userType: user.tipo
       });
-      
-      // Solicitar contagem atual de clínicas
+
       socketInstance.emit('request-clinicas-count', {
         userId: user.id,
         userType: user.tipo
@@ -45,7 +37,6 @@ const useRealtimeClinicas = () => {
     });
 
     socketInstance.on('new-clinica', (data) => {
-      console.log('🏥 Evento new-clinica recebido:', data);
       setNewClinicasCount(prev => prev + 1);
       
       // Apenas admins devem receber notificações sonoras
@@ -56,16 +47,12 @@ const useRealtimeClinicas = () => {
         }
         
         notificationTimeoutRef.current = setTimeout(() => {
-          console.log('🔊 Admin detectado - tocando som de notificação para nova clínica');
           playNotificationSound('clinica', data);
         }, 200);
-      } else {
-        console.log('👤 Usuário não é admin - som não será tocado para clínica');
       }
     });
 
     socketInstance.on('clinicas-count-update', (data) => {
-      console.log('📊 Evento clinicas-count-update recebido:', data);
       setNewClinicasCount(data.count);
       
       // Não tocar som aqui - apenas no evento new-clinica
@@ -74,19 +61,16 @@ const useRealtimeClinicas = () => {
     });
 
     socketInstance.on('disconnect', () => {
-      console.log('❌ Socket.IO desconectado (clínicas)');
       setIsConnected(false);
     });
 
     socketInstance.on('connect_error', (error) => {
-      console.error('❌ Erro de conexão Socket.IO (clínicas):', error);
       setIsConnected(false);
     });
 
     setSocket(socketInstance);
 
     return () => {
-      // Limpar timeout ao desmontar
       if (notificationTimeoutRef.current) {
         clearTimeout(notificationTimeoutRef.current);
       }

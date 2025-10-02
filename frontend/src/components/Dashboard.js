@@ -991,18 +991,18 @@ const Dashboard = () => {
       // Calcular pacientes, agendamentos e fechamentos por cidade
       const dadosPorCidade = {};
       
-      // Buscar todas as clínicas se não houver filtro de região
-      let todasClinicas = clinicasFiltradas;
-      if (!filtroRegiao.cidade && !filtroRegiao.estado) {
-        // Se não há filtro de região, buscar todas as clínicas do banco
-        try {
-          const todasClinicasRes = await makeRequest('/clinicas');
+      // Buscar TODAS as clínicas (sem filtro de consultor) para o gráfico de cidades
+      let todasClinicas = [];
+      try {
+        // Usar endpoint específico que retorna todas as clínicas sem filtro de consultor
+        const todasClinicasRes = await makeRequest('/dashboard/gerais/clinicas');
           if (todasClinicasRes.ok) {
             todasClinicas = await todasClinicasRes.json();
           }
         } catch (error) {
           console.error('Erro ao buscar todas as clínicas:', error);
-        }
+        // Fallback para clínicas filtradas se houver erro
+        todasClinicas = clinicasFiltradas;
       }
 
       // Criar mapa de clínicas por ID para facilitar a busca

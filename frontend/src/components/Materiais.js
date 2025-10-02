@@ -95,7 +95,7 @@ const Materiais = () => {
 
       // Usar fetch diretamente para FormData
       const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/materiais`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/materiais`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`

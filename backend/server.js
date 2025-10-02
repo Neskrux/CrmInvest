@@ -45,7 +45,9 @@ const corsOptions = {
     'http://localhost:3000',
     'http://localhost:3001', 
     'https://crm.investmoneysa.com.br',
-    'https://www.crm.investmoneysa.com.br'
+    'https://www.crm.investmoneysa.com.br',
+    'https://solumn.com.br',
+    'https://www.solumn.com.br'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -54,8 +56,8 @@ const corsOptions = {
 
 // Middleware
 app.use(cors(corsOptions));
-app.use(bodyParser.json({ limit: '10mb' }));
-app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+app.use(bodyParser.json({ limit: '250mb' })); // Aumentado para suportar vídeos grandes
+app.use(bodyParser.urlencoded({ extended: true, limit: '250mb' }));
 
 // Servir arquivos estáticos da pasta uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -291,6 +293,14 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+// Middleware para verificar se é admin ou empresa
+const requireAdminOrEmpresa = (req, res, next) => {
+  if (req.user.tipo !== 'admin' && req.user.tipo !== 'empresa') {
+    return res.status(403).json({ error: 'Acesso negado. Apenas administradores ou empresas.' });
+  }
+  next();
+};
+
 // Middleware para verificar se é o próprio consultor ou admin
 const requireOwnerOrAdmin = (req, res, next) => {
   const consultorId = req.params.consultorId || req.query.consultor_id || req.body.consultor_id;
@@ -317,51 +327,111 @@ app.post('/api/login', async (req, res) => {
       return res.status(400).json({ error: 'Nome/Email e senha são obrigatórios' });
     }
 
+    const emailNormalizado = normalizarEmail(email);
+    console.log('🔐 ==========================================');
+    console.log('🔐 TENTATIVA DE LOGIN');
+    console.log('🔐 Email original:', email);
+    console.log('🔐 Email normalizado:', emailNormalizado);
+    console.log('🔐 Timestamp:', new Date().toISOString());
+    console.log('🔐 ==========================================');
+
     let usuario = null;
     let tipoLogin = null;
 
   // Primeiro, tentar login como admin (por email)
   if (typeof email === 'string' && email.includes('@')) {
+      console.log('🔍 [1/3] Buscando em ADMIN...');
       const { data: usuarios, error } = await supabaseAdmin
         .from('usuarios')
         .select(`
           *,
           consultores(nome, telefone)
         `)
-        .eq('email', email)
-        .eq('ativo', true)
-        .limit(1);
+        .eq('email', emailNormalizado)
+        .eq('ativo', true);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erro ao buscar em usuarios:', error);
+        throw error;
+      }
+
+      console.log('🔍 Resultados em ADMIN:', usuarios ? usuarios.length : 0);
 
       if (usuarios && usuarios.length > 0) {
+        if (usuarios.length > 1) {
+          console.error('⚠️ ALERTA: Múltiplos admins com o mesmo email!', usuarios.map(u => ({ id: u.id, email: u.email })));
+        }
         usuario = usuarios[0];
         tipoLogin = 'admin';
+        console.log('✅ Usuário encontrado em: ADMIN');
+        console.log('📋 ID:', usuario.id, '| Nome:', usuario.nome);
       }
     }
 
-  // Se não encontrou admin, tentar login como consultor (apenas por email)
+  // Se não encontrou admin, tentar login como empresa (antes de consultor, pois é mais específico)
   if (!usuario && typeof email === 'string' && email.includes('@')) {
-      // Normalizar email para busca
-      const emailNormalizado = normalizarEmail(email);
+      console.log('🔍 [2/3] Buscando em EMPRESAS...');
+      
+      const { data: empresas, error } = await supabaseAdmin
+        .from('empresas')
+        .select('*')
+        .eq('email', emailNormalizado)
+        .eq('ativo', true);
+
+      if (error) {
+        console.error('❌ Erro ao buscar em empresas:', error);
+        throw error;
+      }
+
+      console.log('🔍 Resultados em EMPRESAS:', empresas ? empresas.length : 0);
+
+      if (empresas && empresas.length > 0) {
+        if (empresas.length > 1) {
+          console.error('⚠️ ALERTA: Múltiplas empresas com o mesmo email!', empresas.map(e => ({ id: e.id, email: e.email })));
+        }
+        usuario = empresas[0];
+        tipoLogin = 'empresa';
+        console.log('✅ Usuário encontrado em: EMPRESA');
+        console.log('📋 ID:', usuario.id, '| Nome:', usuario.nome);
+      } else {
+        console.log('❌ Não encontrado em empresas');
+      }
+    }
+
+  // Se não encontrou admin nem empresa, tentar login como consultor
+  if (!usuario && typeof email === 'string' && email.includes('@')) {
+      console.log('🔍 [3/3] Buscando em CONSULTORES...');
       
       const { data: consultores, error } = await supabaseAdmin
         .from('consultores')
         .select('*')
         .eq('email', emailNormalizado)
-        .limit(1);
+        .eq('ativo', true);
 
+      if (error) {
+        console.error('❌ Erro ao buscar em consultores:', error);
+        throw error;
+      }
 
-      if (error) throw error;
+      console.log('🔍 Resultados em CONSULTORES:', consultores ? consultores.length : 0);
 
       if (consultores && consultores.length > 0) {
+        if (consultores.length > 1) {
+          console.error('⚠️ ALERTA CRÍTICO: Múltiplos consultores com o mesmo email!', consultores.map(c => ({ id: c.id, nome: c.nome, email: c.email })));
+        }
         usuario = consultores[0];
         tipoLogin = 'consultor';
+        console.log('✅ Usuário encontrado em: CONSULTOR');
+        console.log('📋 ID:', usuario.id, '| Nome:', usuario.nome);
       } else {
+        console.log('❌ Não encontrado em consultores');
       }
     }
 
+    console.log('📋 Tipo de login detectado:', tipoLogin);
+
     if (!usuario) {
+      console.log('❌ FALHA DE LOGIN: Usuário não encontrado');
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
@@ -391,11 +461,12 @@ app.post('/api/login', async (req, res) => {
       id: usuario.id,
       nome: usuario.nome,
       email: usuario.email,
-      tipo: usuario.tipo,
+      tipo: tipoLogin === 'empresa' ? 'empresa' : usuario.tipo,
       consultor_id: usuario.consultor_id !== undefined ? usuario.consultor_id : (tipoLogin === 'consultor' ? usuario.id : null),
-      podealterarstatus: usuario.podealterarstatus || usuario.tipo === 'admin' || false,
-      pode_ver_todas_novas_clinicas: usuario.pode_ver_todas_novas_clinicas || false,
-      is_freelancer: usuario.is_freelancer !== false // Por padrão, se não especificado, é freelancer
+      empresa_id: usuario.empresa_id || null, // ID da empresa (para consultores vinculados ou login como empresa)
+      podealterarstatus: tipoLogin === 'empresa' ? false : (usuario.podealterarstatus || usuario.tipo === 'admin' || false),
+      pode_ver_todas_novas_clinicas: tipoLogin === 'empresa' ? false : (usuario.pode_ver_todas_novas_clinicas || false),
+      is_freelancer: tipoLogin === 'empresa' ? false : (usuario.is_freelancer !== false) // Empresas não são freelancers
     };
 
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
@@ -403,11 +474,15 @@ app.post('/api/login', async (req, res) => {
     // Remover senha do objeto antes de enviar para o front
     delete usuario.senha;
 
-    // Garante que usuario.consultor_id, podealterarstatus, pode_ver_todas_novas_clinicas e is_freelancer também estejam presentes no objeto de resposta
+    // Garante que usuario.tipo, consultor_id, empresa_id, podealterarstatus, pode_ver_todas_novas_clinicas e is_freelancer também estejam presentes no objeto de resposta
+    usuario.tipo = payload.tipo;
     usuario.consultor_id = payload.consultor_id;
+    usuario.empresa_id = payload.empresa_id;
     usuario.podealterarstatus = payload.podealterarstatus;
     usuario.pode_ver_todas_novas_clinicas = payload.pode_ver_todas_novas_clinicas;
     usuario.is_freelancer = payload.is_freelancer;
+
+    console.log('✅ Login bem-sucedido! Tipo:', usuario.tipo);
 
     res.json({ token, usuario });
 
@@ -543,7 +618,7 @@ app.get('/api/usuarios/perfil', authenticateToken, async (req, res) => {
 app.put('/api/consultores/perfil', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { nome, telefone, email, senhaAtual, novaSenha, pix } = req.body;
+    const { nome, telefone, email, senhaAtual, novaSenha, pix, cidade, estado } = req.body;
 
     // Validações básicas
     if (!nome || !email) {
@@ -591,7 +666,9 @@ app.put('/api/consultores/perfil', authenticateToken, async (req, res) => {
       nome,
       email,
       telefone: telefone || null,
-      pix: pix || null
+      pix: pix || null,
+      cidade: cidade || null,
+      estado: estado || null
     };
 
     // Se nova senha foi fornecida, incluir na atualização
@@ -637,10 +714,10 @@ app.get('/api/consultores/perfil', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Buscar dados completos do consultor
+    // Buscar dados completos do consultor incluindo dados da empresa se houver
     const { data: consultor, error } = await supabaseAdmin
       .from('consultores')
-      .select('id, nome, email, telefone, pix, ativo, created_at, codigo_referencia, pode_ver_todas_novas_clinicas, podealterarstatus, is_freelancer')
+      .select('id, nome, email, telefone, pix, ativo, created_at, codigo_referencia, pode_ver_todas_novas_clinicas, podealterarstatus, is_freelancer, empresa_id, empresas(nome)')
       .eq('id', userId)
       .single();
 
@@ -703,25 +780,44 @@ app.put('/api/consultores/:id/permissao', authenticateToken, async (req, res) =>
 
 app.get('/api/verify-token', authenticateToken, async (req, res) => {
   try {
-    // Buscar dados atualizados do usuário na tabela usuarios
+    console.log('🔍 Verificando token para usuário ID:', req.user.id, '| Tipo:', req.user.tipo);
+    
     let usuario = null;
-    let tipo = null;
-    let consultor_nome = null;
+    let tipo = req.user.tipo; // Usar tipo do token
     let consultor_id = null;
 
-    const { data: usuarioData, error: errorUsuario } = await supabaseAdmin
-      .from('usuarios')
-      .select('*')
-      .eq('id', req.user.id)
-      .eq('ativo', true)
-      .single();
+    // CRÍTICO: Usar o tipo do token para buscar na tabela correta
+    if (req.user.tipo === 'admin') {
+      console.log('🔍 Buscando em USUARIOS (admin)...');
+      const { data: usuarioData, error: errorUsuario } = await supabaseAdmin
+        .from('usuarios')
+        .select('*')
+        .eq('id', req.user.id)
+        .eq('ativo', true)
+        .single();
 
-    if (usuarioData) {
-      usuario = usuarioData;
-      tipo = usuario.tipo || 'admin';
-      consultor_id = usuario.consultor_id || null;
-    } else {
-      // Se não achou em usuarios, buscar em consultores
+      if (usuarioData) {
+        usuario = usuarioData;
+        consultor_id = usuario.consultor_id || null;
+        console.log('✅ Admin encontrado:', usuario.nome);
+      }
+    } else if (req.user.tipo === 'empresa') {
+      console.log('🔍 Buscando em EMPRESAS...');
+      const { data: empresaData, error: errorEmpresa } = await supabaseAdmin
+        .from('empresas')
+        .select('*')
+        .eq('id', req.user.id)
+        .eq('ativo', true)
+        .single();
+
+      if (empresaData) {
+        usuario = empresaData;
+        tipo = 'empresa';
+        consultor_id = null;
+        console.log('✅ Empresa encontrada:', usuario.nome);
+      }
+    } else if (req.user.tipo === 'consultor') {
+      console.log('🔍 Buscando em CONSULTORES...');
       const { data: consultorData, error: errorConsultor } = await supabaseAdmin
         .from('consultores')
         .select('*')
@@ -731,14 +827,60 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
 
       if (consultorData) {
         usuario = consultorData;
-        tipo = usuario.tipo || 'consultor';
+        tipo = 'consultor';
         consultor_id = usuario.id;
+        console.log('✅ Consultor encontrado:', usuario.nome);
+      }
+    } else {
+      // Fallback: tentar buscar em todas as tabelas (não deveria chegar aqui)
+      console.warn('⚠️ Tipo desconhecido no token:', req.user.tipo);
+      
+      const { data: usuarioData } = await supabaseAdmin
+        .from('usuarios')
+        .select('*')
+        .eq('id', req.user.id)
+        .eq('ativo', true)
+        .single();
+
+      if (usuarioData) {
+        usuario = usuarioData;
+        tipo = 'admin';
+        consultor_id = usuario.consultor_id || null;
+      } else {
+        const { data: empresaData } = await supabaseAdmin
+          .from('empresas')
+          .select('*')
+          .eq('id', req.user.id)
+          .eq('ativo', true)
+          .single();
+
+        if (empresaData) {
+          usuario = empresaData;
+          tipo = 'empresa';
+          consultor_id = null;
+        } else {
+          const { data: consultorData } = await supabaseAdmin
+            .from('consultores')
+            .select('*')
+            .eq('id', req.user.id)
+            .eq('ativo', true)
+            .single();
+
+          if (consultorData) {
+            usuario = consultorData;
+            tipo = 'consultor';
+            consultor_id = usuario.id;
+          }
+        }
       }
     }
 
     if (!usuario) {
+      console.error('❌ Usuário não encontrado ao verificar token');
       return res.status(401).json({ error: 'Usuário não encontrado' });
     }
+
+    console.log('✅ Token verificado com sucesso para:', usuario.email);
 
     // Remover senha do objeto antes de enviar para o front
     const { senha: _, ...dadosUsuario } = usuario;
@@ -748,17 +890,143 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
         ...dadosUsuario,
         tipo,
         consultor_id,
+        empresa_id: usuario.empresa_id || null, // Incluir empresa_id
         podealterarstatus: usuario.podealterarstatus || tipo === 'admin' || false,
         pode_ver_todas_novas_clinicas: usuario.pode_ver_todas_novas_clinicas || false,
-        is_freelancer: usuario.is_freelancer !== false // Por padrão, se não especificado, é freelancer
+        is_freelancer: tipo === 'empresa' ? false : (usuario.is_freelancer !== false) // Empresas não são freelancers
       }
     });
   } catch (error) {
+    console.error('❌ Erro ao verificar token:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // ROTAS DA API
+
+// === EMPRESAS === (Rotas para gerenciamento de empresas)
+
+// Buscar perfil da empresa
+app.get('/api/empresas/perfil', authenticateToken, async (req, res) => {
+  try {
+    const empresaId = req.user.id;
+
+    // Buscar dados completos da empresa
+    const { data: empresa, error } = await supabaseAdmin
+      .from('empresas')
+      .select('id, nome, cnpj, razao_social, email, telefone, cidade, estado, responsavel, ativo, created_at')
+      .eq('id', empresaId)
+      .single();
+
+    if (error || !empresa) {
+      return res.status(404).json({ error: 'Empresa não encontrada' });
+    }
+
+    res.json({
+      empresa: empresa
+    });
+
+  } catch (error) {
+    console.error('Erro ao buscar perfil da empresa:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Atualizar perfil da empresa
+app.put('/api/empresas/perfil', authenticateToken, async (req, res) => {
+  try {
+    const empresaId = req.user.id;
+    const { nome, telefone, email, senhaAtual, novaSenha, responsavel, cidade, estado } = req.body;
+
+    // Validações básicas
+    if (!nome || !email) {
+      return res.status(400).json({ error: 'Nome e email são obrigatórios' });
+    }
+
+    // Verificar se o email já está sendo usado por outra empresa
+    const { data: emailExistente } = await supabaseAdmin
+      .from('empresas')
+      .select('id')
+      .eq('email', email)
+      .neq('id', empresaId)
+      .single();
+
+    if (emailExistente) {
+      return res.status(400).json({ error: 'Este email já está sendo usado por outra empresa' });
+    }
+
+    // Se foi fornecida nova senha, verificar senha atual
+    if (novaSenha && novaSenha.trim() !== '') {
+      if (!senhaAtual) {
+        return res.status(400).json({ error: 'Senha atual é obrigatória para alterar a senha' });
+      }
+
+      // Buscar senha atual da empresa
+      const { data: empresa, error: empresaError } = await supabaseAdmin
+        .from('empresas')
+        .select('senha')
+        .eq('id', empresaId)
+        .single();
+
+      if (empresaError || !empresa) {
+        return res.status(404).json({ error: 'Empresa não encontrada' });
+      }
+
+      // Verificar se senha atual está correta
+      const senhaCorreta = await bcrypt.compare(senhaAtual, empresa.senha);
+      if (!senhaCorreta) {
+        return res.status(400).json({ error: 'Senha atual incorreta' });
+      }
+    }
+
+    // Preparar dados para atualização
+    const updateData = {
+      nome,
+      email,
+      telefone: telefone || null,
+      responsavel: responsavel || null,
+      cidade: cidade || null,
+      estado: estado || null,
+      updated_at: new Date().toISOString()
+    };
+
+    // Se nova senha foi fornecida, incluir na atualização
+    if (novaSenha && novaSenha.trim() !== '') {
+      const hashedPassword = await bcrypt.hash(novaSenha, 10);
+      updateData.senha = hashedPassword;
+    }
+
+    // Executar atualização
+    const { error: updateError } = await supabaseAdmin
+      .from('empresas')
+      .update(updateData)
+      .eq('id', empresaId);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    // Buscar dados atualizados da empresa
+    const { data: empresaAtualizada, error: fetchError } = await supabaseAdmin
+      .from('empresas')
+      .select('id, nome, cnpj, razao_social, email, telefone, cidade, estado, responsavel, ativo, created_at')
+      .eq('id', empresaId)
+      .single();
+
+    if (fetchError) {
+      throw fetchError;
+    }
+
+    res.json({
+      message: 'Perfil atualizado com sucesso',
+      empresa: empresaAtualizada
+    });
+
+  } catch (error) {
+    console.error('Erro ao atualizar perfil da empresa:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
 
 // === CLÍNICAS === (Admin vê todas, Consultores vêem apenas públicas ou suas próprias)
 app.get('/api/clinicas', authenticateToken, async (req, res) => {
@@ -769,7 +1037,11 @@ app.get('/api/clinicas', authenticateToken, async (req, res) => {
       .from('clinicas')
       .select(`
         *,
-        consultores!consultor_id(nome)
+        consultores!consultor_id(
+          nome, 
+          empresa_id,
+          empresas(nome)
+        )
       `)
       .order('nome');
 
@@ -783,23 +1055,49 @@ app.get('/api/clinicas', authenticateToken, async (req, res) => {
       query = query.ilike('cidade', `%${cidade}%`);
     }
 
-    // Se for consultor freelancer (não tem as duas permissões), mostrar apenas clínicas públicas (sem proprietário) ou suas próprias
+    // Se for consultor freelancer (não tem as duas permissões), mostrar apenas suas próprias clínicas
     // Consultores internos (com pode_ver_todas_novas_clinicas=true E podealterarstatus=true) veem todas as clínicas
-    if (req.user.tipo === 'consultor' && !(req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true)) {
-      query = query.or(`consultor_id.is.null,consultor_id.eq.${req.user.id}`);
+    // Funcionários de empresa veem clínicas da empresa (filtrado depois)
+    const isConsultorInterno = req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true;
+    const isFreelancer = req.user.tipo === 'consultor' && !isConsultorInterno && req.user.is_freelancer === true;
+    
+    if (isFreelancer) {
+      // Freelancer (com ou sem empresa): só vê suas próprias clínicas
+      query = query.eq('consultor_id', req.user.id);
     }
 
     const { data, error } = await query;
 
     if (error) throw error;
     
-    // Reformatar dados para incluir nome do consultor
+    // Reformatar dados para incluir nome do consultor, empresa_id e nome da empresa
     const formattedData = data.map(clinica => ({
       ...clinica,
-      consultor_nome: clinica.consultores?.nome
+      consultor_nome: clinica.consultores?.nome,
+      // empresa_id: pode vir diretamente da clínica (se empresa cadastrou) ou do consultor
+      empresa_id: clinica.empresa_id || clinica.consultores?.empresa_id || null,
+      empresa_nome: clinica.consultores?.empresas?.nome || null // Nome da empresa (do consultor)
     }));
     
-    res.json(formattedData);
+    // Filtrar por empresa se necessário
+    let finalData = formattedData;
+    
+    // Se for empresa, filtrar apenas clínicas de consultores vinculados a ela OU cadastradas diretamente pela empresa
+    if (req.user.tipo === 'empresa') {
+      finalData = formattedData.filter(clinica => 
+        clinica.empresa_id === req.user.id
+      );
+    }
+    // Se for FUNCIONÁRIO de empresa (não freelancer), filtrar clínicas de toda a empresa
+    else if (req.user.tipo === 'consultor' && req.user.empresa_id && req.user.is_freelancer === false) {
+      finalData = formattedData.filter(clinica => 
+        clinica.empresa_id === req.user.empresa_id && // Da mesma empresa
+        clinica.consultor_id !== null // E que tenha consultor (não públicas)
+      );
+    }
+    // Freelancer de empresa já foi filtrado acima (query.eq)
+    
+    res.json(finalData);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -949,13 +1247,114 @@ app.put('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) =
   }
 });
 
-// === CONSULTORES === (Apenas Admin pode gerenciar)
+// DELETE clínica - Apenas admin
+app.delete('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('🗑️ DELETE /api/clinicas/:id recebido');
+    console.log('🗑️ ID da clínica:', id);
+    console.log('🗑️ Usuário autenticado:', req.user);
+
+    // Verificar se existem pacientes associados a esta clínica
+    const { data: pacientes, error: pacientesError } = await supabaseAdmin
+      .from('pacientes')
+      .select('id')
+      .eq('clinica_id', id)
+      .limit(1);
+
+    if (pacientesError) throw pacientesError;
+
+    if (pacientes && pacientes.length > 0) {
+      return res.status(400).json({ error: 'Não é possível excluir a clínica pois existem pacientes associados.' });
+    }
+
+    // Verificar se existem agendamentos associados a esta clínica
+    const { data: agendamentos, error: agendamentosError } = await supabaseAdmin
+      .from('agendamentos')
+      .select('id')
+      .eq('clinica_id', id)
+      .limit(1);
+
+    if (agendamentosError) throw agendamentosError;
+
+    if (agendamentos && agendamentos.length > 0) {
+      return res.status(400).json({ error: 'Não é possível excluir a clínica pois existem agendamentos associados.' });
+    }
+
+    // Verificar se existem fechamentos associados a esta clínica
+    const { data: fechamentos, error: fechamentosError } = await supabaseAdmin
+      .from('fechamentos')
+      .select('id')
+      .eq('clinica_id', id)
+      .limit(1);
+
+    if (fechamentosError) throw fechamentosError;
+
+    if (fechamentos && fechamentos.length > 0) {
+      return res.status(400).json({ error: 'Não é possível excluir a clínica pois existem fechamentos associados.' });
+    }
+
+    // Se não há dados associados, pode excluir
+    const { error } = await supabaseAdmin
+      .from('clinicas')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('❌ Erro do Supabase:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    console.log('✅ Clínica excluída com sucesso:', id);
+    res.json({ message: 'Clínica excluída com sucesso!' });
+  } catch (error) {
+    console.error('❌ Erro geral:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE nova clínica - Apenas admin
+app.delete('/api/novas-clinicas/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('🗑️ DELETE /api/novas-clinicas/:id recebido');
+    console.log('🗑️ ID da nova clínica:', id);
+    console.log('🗑️ Usuário autenticado:', req.user);
+
+    // Excluir a nova clínica
+    const { error } = await supabaseAdmin
+      .from('novas_clinicas')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('❌ Erro do Supabase:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    console.log('✅ Nova clínica excluída com sucesso:', id);
+    res.json({ message: 'Nova clínica excluída com sucesso!' });
+  } catch (error) {
+    console.error('❌ Erro geral:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === CONSULTORES === (Admin vê todos, Empresa vê apenas seus consultores)
 app.get('/api/consultores', authenticateToken, async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('consultores')
       .select('*')
       .order('nome');
+    
+    // Se for empresa, filtrar apenas consultores vinculados a ela
+    if (req.user.tipo === 'empresa') {
+      query = query.eq('empresa_id', req.user.id);
+    }
+    // Admin vê todos os consultores
+
+    const { data, error } = await query;
 
     if (error) throw error;
     res.json(data);
@@ -964,9 +1363,9 @@ app.get('/api/consultores', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/consultores', authenticateToken, requireAdmin, async (req, res) => {
+app.post('/api/consultores', authenticateToken, requireAdminOrEmpresa, async (req, res) => {
   try {
-    const { nome, telefone, email, senha, pix } = req.body;
+    const { nome, telefone, email, senha, pix, cidade, estado, is_freelancer } = req.body;
     
     // Validar campos obrigatórios
     if (!senha || senha.trim() === '') {
@@ -997,14 +1396,70 @@ app.post('/api/consultores', authenticateToken, requireAdmin, async (req, res) =
     const saltRounds = 10;
     const senhaHash = await bcrypt.hash(senha, saltRounds);
     
+    // Preparar dados do consultor
+    const consultorData = { 
+      nome, 
+      telefone, 
+      email: emailNormalizado, 
+      senha: senhaHash, 
+      pix,
+      cidade,
+      estado,
+      is_freelancer
+    };
+    
+    // Se for empresa criando, vincular o consultor à empresa
+    if (req.user.tipo === 'empresa') {
+      consultorData.empresa_id = req.user.id;
+      // Empresa pode escolher se é freelancer ou consultor fixo
+      // Ambos só indicam (não alteram status)
+      consultorData.podealterarstatus = false;
+      consultorData.pode_ver_todas_novas_clinicas = false;
+    }
+    
     const { data, error } = await supabaseAdmin
       .from('consultores')
-      .insert([{ nome, telefone, email: emailNormalizado, senha: senhaHash, pix }])
+      .insert([consultorData])
       .select();
 
     if (error) throw error;
+    
+    const consultorId = data[0].id;
+    
+    // Gerar código de referência automaticamente para:
+    // - Freelancers sem empresa (is_freelancer=true, empresa_id=NULL)
+    // - Consultores de empresa (freelancers E funcionários com empresa_id preenchido)
+    // NÃO gerar para: Consultores Internos Invest Money (is_freelancer=false, empresa_id=NULL)
+    const deveGerarCodigo = consultorData.is_freelancer === true || consultorData.empresa_id !== undefined;
+    
+    if (deveGerarCodigo) {
+      try {
+        console.log('🔄 Gerando código de referência para consultor ID:', consultorId);
+        
+        const nomeLimpo = nome
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+          .replace(/[^a-z0-9]/g, '') // Remove caracteres especiais
+          .substring(0, 10); // Limita a 10 caracteres
+        
+        const codigoReferencia = `${nomeLimpo}${consultorId}`;
+        
+        // Atualizar o consultor com o código de referência
+        await supabaseAdmin
+          .from('consultores')
+          .update({ codigo_referencia: codigoReferencia })
+          .eq('id', consultorId);
+        
+        console.log('✅ Código gerado:', codigoReferencia);
+      } catch (codeError) {
+        console.error('⚠️ Erro ao gerar código de referência:', codeError);
+        // Não falha o cadastro se houver erro no código
+      }
+    }
+    
     res.json({ 
-      id: data[0].id, 
+      id: consultorId, 
       message: 'Consultor cadastrado com sucesso!',
       email: emailNormalizado
     });
@@ -1019,7 +1474,7 @@ app.post('/api/consultores/cadastro', async (req, res) => {
     console.log('📝 === NOVO CADASTRO DE CONSULTOR ===');
     console.log('📋 Dados recebidos:', req.body);
     
-    const { nome, telefone, email, senha, cpf, pix } = req.body;
+    const { nome, telefone, email, senha, cpf, pix, cidade, estado } = req.body;
     
     // Validar campos obrigatórios
     if (!nome || !telefone || !email || !senha || !cpf || !pix) {
@@ -1075,6 +1530,8 @@ app.post('/api/consultores/cadastro', async (req, res) => {
         senha: senhaHash, 
         cpf, 
         pix,
+        cidade,
+        estado,
         tipo: 'consultor',
         ativo: true,
         is_freelancer: true // Por padrão, consultores do cadastro público são freelancers
@@ -1527,13 +1984,30 @@ app.post('/api/clinicas/cadastro-publico', async (req, res) => {
   }
 });
 
-app.put('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.put('/api/consultores/:id', authenticateToken, requireAdminOrEmpresa, async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, telefone, email, senha, pix } = req.body;
+    const { nome, telefone, email, senha, pix, cidade, estado, is_freelancer } = req.body;
+    
+    // Se for empresa, verificar se o consultor pertence a ela
+    if (req.user.tipo === 'empresa') {
+      const { data: consultor, error: checkError } = await supabaseAdmin
+        .from('consultores')
+        .select('empresa_id')
+        .eq('id', id)
+        .single();
+      
+      if (checkError || !consultor) {
+        return res.status(404).json({ error: 'Consultor não encontrado' });
+      }
+      
+      if (consultor.empresa_id !== req.user.id) {
+        return res.status(403).json({ error: 'Você não pode editar consultores de outra empresa' });
+      }
+    }
     
     // Preparar dados para atualização
-    const updateData = { nome, telefone, pix };
+    const updateData = { nome, telefone, pix, cidade, estado, is_freelancer };
     
     // Atualizar email se fornecido
     if (email && email.trim() !== '') {
@@ -1580,7 +2054,24 @@ app.put('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res
 });
 
 // DELETE - Excluir consultor (apenas admin)
-app.delete('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.delete('/api/consultores/:id', authenticateToken, requireAdminOrEmpresa, async (req, res) => {
+  // Se for empresa, verificar se o consultor pertence a ela
+  if (req.user.tipo === 'empresa') {
+    const { data: consultor, error: checkError } = await supabaseAdmin
+      .from('consultores')
+      .select('empresa_id')
+      .eq('id', req.params.id)
+      .single();
+    
+    if (checkError || !consultor) {
+      return res.status(404).json({ error: 'Consultor não encontrado' });
+    }
+    
+    if (consultor.empresa_id !== req.user.id) {
+      return res.status(403).json({ error: 'Você não pode excluir consultores de outra empresa' });
+    }
+  }
+  
   try {
     const { id } = req.params;
     const { transferir_para_consultor_id, apenas_desativar } = req.body;
@@ -1729,7 +2220,7 @@ app.post('/api/consultores/:id/gerar-codigo', authenticateToken, requireAdmin, a
     
     if (updateError) throw updateError;
     
-    const linkPersonalizado = `https://crm.investmoneysa.com.br/captura-lead?ref=${codigoReferencia}`;
+    const linkPersonalizado = `https://solumn.com.br/captura-lead?ref=${codigoReferencia}`;
     
     res.json({
       codigo_referencia: codigoReferencia,
@@ -1805,14 +2296,10 @@ app.get('/api/consultores/:id/link-personalizado', authenticateToken, async (req
   try {
     const { id } = req.params;
     
-    // Verificar se o usuário pode acessar este consultor
-    if (req.user.tipo !== 'admin' && req.user.id !== parseInt(id)) {
-      return res.status(403).json({ error: 'Acesso negado' });
-    }
-    
+    // Buscar dados do consultor primeiro para verificar empresa_id
     const { data: consultor, error: consultorError } = await supabaseAdmin
       .from('consultores')
-      .select('id, nome, codigo_referencia')
+      .select('id, nome, codigo_referencia, empresa_id')
       .eq('id', id)
       .single();
     
@@ -1821,15 +2308,28 @@ app.get('/api/consultores/:id/link-personalizado', authenticateToken, async (req
       return res.status(404).json({ error: 'Consultor não encontrado' });
     }
     
+    // Verificar se o usuário pode acessar este consultor
+    const podeAcessar = 
+      req.user.tipo === 'admin' || // Admin vê todos
+      req.user.id === parseInt(id) || // Próprio consultor
+      (req.user.tipo === 'empresa' && consultor.empresa_id === req.user.id); // Empresa vê seus consultores
+    
+    if (!podeAcessar) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+    
     if (consultor.codigo_referencia) {
-      const linkPersonalizado = `https://crm.investmoneysa.com.br/captura-lead?ref=${consultor.codigo_referencia}`;
+      const linkPersonalizado = `https://solumn.com.br/captura-lead?ref=${consultor.codigo_referencia}`;
+      const linkClinicas = `https://solumn.com.br/captura-clinica?ref=${consultor.codigo_referencia}`;
       res.json({
         link_personalizado: linkPersonalizado,
+        link_clinicas: linkClinicas,
         codigo_referencia: consultor.codigo_referencia
       });
     } else {
       res.json({
         link_personalizado: null,
+        link_clinicas: null,
         codigo_referencia: null
       });
     }
@@ -2052,9 +2552,9 @@ app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado } = req.body;
     
-    // Verificar se é consultor interno - consultores internos não podem editar pacientes
-    if (req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true) {
-      return res.status(403).json({ error: 'Consultores internos não podem editar pacientes.' });
+    // Verificar se é consultor freelancer - freelancers não podem editar pacientes completamente
+    if (req.user.tipo === 'consultor' && req.user.podealterarstatus !== true) {
+      return res.status(403).json({ error: 'Você não tem permissão para editar pacientes.' });
     }
     
     // Normalizar telefone e CPF (remover formatação)
@@ -2137,9 +2637,9 @@ app.put('/api/pacientes/:id/status', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     
-    // Verificar se é consultor interno - consultores internos não podem editar pacientes
-    if (req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true) {
-      return res.status(403).json({ error: 'Consultores internos não podem editar pacientes.' });
+    // Verificar se é consultor freelancer - freelancers não podem alterar status
+    if (req.user.tipo === 'consultor' && req.user.podealterarstatus !== true) {
+      return res.status(403).json({ error: 'Você não tem permissão para alterar o status dos pacientes.' });
     }
     
     // Buscar dados do paciente primeiro
@@ -2355,6 +2855,79 @@ app.delete('/api/novos-leads/:id', authenticateToken, requireAdmin, async (req, 
   }
 });
 
+// === ATUALIZAR STATUS DE NOVO LEAD ===
+app.put('/api/novos-leads/:id/status', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    console.log('🔧 PUT /api/novos-leads/:id/status recebido');
+    console.log('🔧 ID do lead:', id);
+    console.log('🔧 Novo status:', status);
+    console.log('🔧 Usuário autenticado:', req.user);
+    
+    // Verificar se o status é válido (usando os mesmos status da tela de pacientes)
+    const statusValidos = [
+      'lead', 'em_conversa', 'cpf_aprovado', 'cpf_reprovado', 'nao_passou_cpf',
+      'nao_tem_outro_cpf', 'nao_existe', 'nao_tem_interesse', 'nao_reconhece',
+      'nao_responde', 'sem_clinica', 'agendado', 'compareceu', 'fechado',
+      'nao_fechou', 'nao_compareceu', 'reagendado'
+    ];
+    if (!status || !statusValidos.includes(status)) {
+      return res.status(400).json({ error: 'Status inválido! Status válidos: ' + statusValidos.join(', ') });
+    }
+    
+    // Verificar permissões: admin ou consultor com permissão
+    const podeAlterarStatus = req.user.tipo === 'admin' || 
+      (req.user.tipo === 'consultor' && req.user.podealterarstatus === true);
+    
+    if (!podeAlterarStatus) {
+      return res.status(403).json({ error: 'Você não tem permissão para alterar o status de leads!' });
+    }
+    
+    // Verificar se o lead existe
+    const { data: leadAtual, error: checkError } = await supabaseAdmin
+      .from('pacientes')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (checkError) {
+      console.error('❌ Erro ao buscar lead:', checkError);
+      return res.status(404).json({ error: 'Lead não encontrado!' });
+    }
+    
+    if (!leadAtual) {
+      return res.status(404).json({ error: 'Lead não encontrado!' });
+    }
+    
+    console.log('✅ Lead encontrado:', leadAtual.nome);
+    
+    // Atualizar o status do lead
+    const { data: leadAtualizado, error: updateError } = await supabaseAdmin
+      .from('pacientes')
+      .update({ status: status })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('❌ Erro ao atualizar status:', updateError);
+      throw updateError;
+    }
+    
+    console.log('✅ Status atualizado com sucesso!');
+    
+    res.json({ 
+      message: 'Status atualizado com sucesso!',
+      lead: leadAtualizado
+    });
+  } catch (error) {
+    console.error('❌ Erro geral:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // === NOVAS CLÍNICAS === (Funcionalidade para pegar clínicas encontradas nas missões)
 app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
   try {
@@ -2368,21 +2941,32 @@ app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
       .from('novas_clinicas')
       .select(`
         *,
-        consultores!criado_por_consultor_id(nome)
+        consultores!criado_por_consultor_id(
+          nome, 
+          empresa_id,
+          empresas(nome)
+        )
       `)
       .order('created_at', { ascending: false });
 
-    // Se for consultor freelancer (não tem as duas permissões), mostrar apenas clínicas disponíveis (sem proprietário) ou suas próprias
+    // Se for consultor freelancer, mostrar apenas suas próprias clínicas
     // Consultores internos (com pode_ver_todas_novas_clinicas=true E podealterarstatus=true) veem todas as novas clínicas
-    const isFreelancer = req.user.tipo === 'consultor' && !(req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true);
+    // Funcionários de empresa veem clínicas da empresa (filtrado depois)
+    const isConsultorInterno = req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true;
+    const isFreelancer = req.user.tipo === 'consultor' && !isConsultorInterno && req.user.is_freelancer === true;
+    
+    console.log('🔍 É consultor interno?', isConsultorInterno);
     console.log('🔍 É freelancer?', isFreelancer);
+    console.log('🔍 Tem empresa_id?', req.user.empresa_id);
+    console.log('🔍 is_freelancer?', req.user.is_freelancer);
     
     if (isFreelancer) {
+      // Freelancer (com ou sem empresa): só vê suas próprias clínicas
       console.log('🔍 Aplicando filtro para freelancer - ID:', req.user.id);
-      query = query.or(`criado_por_consultor_id.is.null,criado_por_consultor_id.eq.${req.user.id}`);
+      query = query.eq('criado_por_consultor_id', req.user.id);
       console.log('🔍 Query filtrada aplicada');
     } else {
-      console.log('🔍 Usuário tem acesso a todas as novas clínicas');
+      console.log('🔍 Usuário tem acesso a todas as novas clínicas (ou será filtrado por empresa)');
     }
     // Admin e consultores internos veem todas as novas clínicas (com ou sem consultor_id)
 
@@ -2398,13 +2982,38 @@ app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
 
     if (error) throw error;
     
-    // Reformatar dados para incluir nome do consultor
+    // Reformatar dados para incluir nome do consultor, empresa_id e nome da empresa
     const formattedData = data.map(clinica => ({
       ...clinica,
-      consultor_nome: clinica.consultores?.nome
+      consultor_nome: clinica.consultores?.nome,
+      // empresa_id: pode vir diretamente da clínica (se empresa cadastrou) ou do consultor
+      empresa_id: clinica.empresa_id || clinica.consultores?.empresa_id || null,
+      empresa_nome: clinica.consultores?.empresas?.nome || null // Nome da empresa (do consultor)
     }));
     
-    res.json(formattedData);
+    // Filtrar por empresa se necessário
+    let finalData = formattedData;
+    
+    // Se for empresa, filtrar apenas clínicas de consultores vinculados a ela OU cadastradas diretamente pela empresa
+    if (req.user.tipo === 'empresa') {
+      console.log('🔍 Filtrando clínicas para empresa ID:', req.user.id);
+      finalData = formattedData.filter(clinica => 
+        clinica.empresa_id === req.user.id
+      );
+      console.log('🔍 Clínicas filtradas para empresa:', finalData.length);
+    }
+    // Se for FUNCIONÁRIO de empresa (não freelancer), filtrar clínicas de toda a empresa
+    else if (req.user.tipo === 'consultor' && req.user.empresa_id && req.user.is_freelancer === false) {
+      console.log('🔍 Filtrando clínicas para FUNCIONÁRIO de empresa. Empresa ID:', req.user.empresa_id);
+      finalData = formattedData.filter(clinica => 
+        clinica.empresa_id === req.user.empresa_id && // Da mesma empresa
+        clinica.criado_por_consultor_id !== null // E que tenha um consultor (não disponíveis)
+      );
+      console.log('🔍 Clínicas filtradas para funcionário de empresa:', finalData.length);
+    }
+    // Freelancer de empresa já foi filtrado acima (query.eq) - vê apenas suas
+    
+    res.json(finalData);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -2414,8 +3023,9 @@ app.post('/api/novas-clinicas', authenticateToken, async (req, res) => {
   try {
     const { nome, cnpj, responsavel, endereco, bairro, cidade, estado, nicho, telefone, email, status, observacoes } = req.body;
     
-    // Normalizar telefone (remover formatação)
+    // Normalizar telefone e CNPJ (remover formatação)
     const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
+    const cnpjNumeros = cnpj ? cnpj.replace(/\D/g, '') : '';
     
     // Verificar se telefone já existe
     if (telefoneNumeros) {
@@ -2460,20 +3070,21 @@ app.post('/api/novas-clinicas', authenticateToken, async (req, res) => {
     // Preparar dados para inserção
     const clinicaData = {
       nome,
-      cnpj,
+      cnpj: cnpjNumeros, // Salvar apenas números
       responsavel,
       endereco,
       bairro,
       cidade,
       estado,
       nicho,
-      telefone: telefoneNumeros,
+      telefone: telefoneNumeros, // Salvar apenas números
       email,
       status: status || 'tem_interesse',
       observacoes,
       latitude,
       longitude,
       criado_por_consultor_id: req.user.tipo === 'consultor' ? req.user.id : null,
+      empresa_id: req.user.tipo === 'empresa' ? req.user.id : null, // Setar empresa_id quando empresa cadastra diretamente
       tipo_origem: 'aprovada' // Todas as novas clínicas serão aprovadas
     };
     
@@ -2553,6 +3164,7 @@ app.put('/api/novas-clinicas/:id/pegar', authenticateToken, async (req, res) => 
       email: clinicaAtual.email,
       status: 'ativo',
       consultor_id: clinicaAtual.criado_por_consultor_id, // Definir consultor_id baseado em quem criou
+      empresa_id: clinicaAtual.empresa_id, // Transferir empresa_id se foi empresa que cadastrou
       tipo_origem: 'aprovada' // Clínicas aprovadas da aba "Novas Clínicas"
     };
 
@@ -3001,6 +3613,21 @@ app.get('/api/dashboard/gerais/fechamentos', authenticateToken, async (req, res)
     }));
 
     res.json(formattedData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Endpoint para buscar TODAS as clínicas (para gráfico de cidades no dashboard)
+app.get('/api/dashboard/gerais/clinicas', authenticateToken, async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('clinicas')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -4321,26 +4948,9 @@ app.post('/api/reset-password', async (req, res) => {
 
 // ==================== ROTAS PARA MATERIAIS ====================
 
-// Middleware para servir arquivos de materiais
-app.use('/uploads/materiais', express.static(path.join(__dirname, 'uploads', 'materiais')));
-
-// Configuração do multer para upload de arquivos de materiais
-const materiaisStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, 'uploads', 'materiais');
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
+// Configuração do multer para upload de arquivos de materiais (em memória para Supabase)
 const materiaisUpload = multer({ 
-  storage: materiaisStorage,
+  storage: multer.memoryStorage(), // Usar memória ao invés de disco local
   limits: {
     fileSize: 200 * 1024 * 1024 // 200MB
   },
@@ -4374,6 +4984,9 @@ const materiaisUpload = multer({
     }
   }
 });
+
+// Nome do bucket do Supabase Storage para materiais
+const MATERIAIS_STORAGE_BUCKET = 'materiais-apoio';
 
 // GET /api/materiais - Listar todos os materiais
 app.get('/api/materiais', authenticateToken, async (req, res) => {
@@ -4413,10 +5026,8 @@ app.post('/api/materiais', authenticateToken, requireAdmin, (req, res, next) => 
 }, async (req, res) => {
   try {
     console.log('🔧 POST /api/materiais recebido');
-    console.log('🔧 Headers:', req.headers);
     console.log('🔧 Body:', req.body);
-    console.log('🔧 File:', req.file);
-    console.log('🔧 Usuário autenticado:', req.user);
+    console.log('🔧 File:', req.file ? req.file.originalname : 'nenhum');
 
     const { titulo, descricao, tipo } = req.body;
 
@@ -4428,13 +5039,62 @@ app.post('/api/materiais', authenticateToken, requireAdmin, (req, res, next) => 
       return res.status(400).json({ error: 'Arquivo é obrigatório' });
     }
 
+    // Gerar nome único para o arquivo no Supabase Storage
+    const timestamp = Date.now();
+    const randomId = Math.round(Math.random() * 1E9);
+    const fileExt = path.extname(req.file.originalname);
+    const fileName = `${tipo}_${timestamp}_${randomId}${fileExt}`;
+
+    const fileSizeMB = (req.file.size / (1024 * 1024)).toFixed(2);
+    console.log('📤 Fazendo upload para Supabase Storage:', fileName);
+    console.log('📦 Tamanho do arquivo:', fileSizeMB, 'MB');
+    console.log('🎬 Tipo:', req.file.mimetype);
+
+    // Fazer upload para Supabase Storage com timeout de 4 minutos
+    const uploadPromise = supabaseAdmin.storage
+      .from(MATERIAIS_STORAGE_BUCKET)
+      .upload(fileName, req.file.buffer, {
+        contentType: req.file.mimetype,
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    // Timeout de 4 minutos para uploads grandes (vídeos)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Upload timeout - arquivo muito grande ou conexão lenta')), 240000);
+    });
+
+    let uploadData, uploadError;
+    try {
+      const result = await Promise.race([uploadPromise, timeoutPromise]);
+      uploadData = result.data;
+      uploadError = result.error;
+    } catch (error) {
+      console.error('Erro ou timeout no upload:', error.message);
+      return res.status(500).json({ 
+        error: 'Tempo de upload excedido. Tente com um arquivo menor ou verifique sua conexão.' 
+      });
+    }
+
+    if (uploadError) {
+      console.error('Erro ao fazer upload no Supabase Storage:', uploadError);
+      return res.status(500).json({ error: 'Erro ao fazer upload do arquivo: ' + uploadError.message });
+    }
+
+    console.log('✅ Upload realizado com sucesso:', uploadData.path);
+
+    // Obter URL pública do arquivo
+    const { data: publicUrlData } = supabaseAdmin.storage
+      .from(MATERIAIS_STORAGE_BUCKET)
+      .getPublicUrl(fileName);
+
     const materialData = {
       titulo,
       descricao: descricao || '',
       tipo,
       url: null,
       arquivo_nome: req.file.originalname,
-      arquivo_url: `/uploads/materiais/${req.file.filename}`,
+      arquivo_url: fileName, // Salvar apenas o nome do arquivo no Storage
       created_by: req.user.id
     };
 
@@ -4446,6 +5106,8 @@ app.post('/api/materiais', authenticateToken, requireAdmin, (req, res, next) => 
 
     if (error) {
       console.error('Erro ao criar material:', error);
+      // Tentar remover arquivo do storage se falhou salvar no banco
+      await supabaseAdmin.storage.from(MATERIAIS_STORAGE_BUCKET).remove([fileName]);
       return res.status(500).json({ error: 'Erro ao criar material' });
     }
 
@@ -4464,28 +5126,58 @@ app.get('/api/materiais/:id/download', authenticateToken, async (req, res) => {
     console.log('🔧 GET /api/materiais/:id/download recebido');
     console.log('🔧 ID do material:', id);
 
-    const { data, error } = await supabaseAdmin
+    const { data: material, error } = await supabaseAdmin
       .from('materiais')
       .select('arquivo_url, arquivo_nome, titulo')
       .eq('id', id)
       .single();
 
-    if (error || !data) {
+    if (error || !material) {
       return res.status(404).json({ error: 'Material não encontrado' });
     }
 
-    if (!data.arquivo_url) {
+    if (!material.arquivo_url) {
       return res.status(400).json({ error: 'Este material não possui arquivo para download' });
     }
 
-    const filePath = path.join(__dirname, data.arquivo_url);
-    
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'Arquivo não encontrado no servidor' });
+    console.log('📥 Baixando arquivo do Supabase Storage:', material.arquivo_url);
+
+    // Baixar arquivo do Supabase Storage
+    const { data: fileData, error: downloadError } = await supabaseAdmin.storage
+      .from(MATERIAIS_STORAGE_BUCKET)
+      .download(material.arquivo_url);
+
+    if (downloadError) {
+      console.error('Erro ao baixar arquivo do Supabase Storage:', downloadError);
+      return res.status(500).json({ error: 'Erro ao baixar arquivo' });
     }
 
-    const fileName = data.arquivo_nome || data.titulo;
-    res.download(filePath, fileName);
+    // Detectar tipo de conteúdo baseado na extensão
+    const ext = path.extname(material.arquivo_nome || material.arquivo_url).toLowerCase();
+    const contentTypes = {
+      '.pdf': 'application/pdf',
+      '.doc': 'application/msword',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.ppt': 'application/vnd.ms-powerpoint',
+      '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      '.xls': 'application/vnd.ms-excel',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.txt': 'text/plain',
+      '.mp4': 'video/mp4',
+      '.mov': 'video/quicktime'
+    };
+
+    const contentType = contentTypes[ext] || 'application/octet-stream';
+    const fileName = material.arquivo_nome || material.titulo;
+
+    // Configurar headers para download
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    
+    // Converter blob para buffer e enviar
+    const arrayBuffer = await fileData.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    res.send(buffer);
   } catch (error) {
     console.error('Erro ao fazer download do material:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
@@ -4498,7 +5190,6 @@ app.delete('/api/materiais/:id', authenticateToken, requireAdmin, async (req, re
     const { id } = req.params;
     console.log('🔧 DELETE /api/materiais/:id recebido');
     console.log('🔧 ID do material:', id);
-    console.log('🔧 Usuário autenticado:', req.user);
 
     // Buscar o material para obter informações do arquivo
     const { data: material, error: fetchError } = await supabaseAdmin
@@ -4509,6 +5200,21 @@ app.delete('/api/materiais/:id', authenticateToken, requireAdmin, async (req, re
 
     if (fetchError || !material) {
       return res.status(404).json({ error: 'Material não encontrado' });
+    }
+
+    // Excluir arquivo do Supabase Storage se existir
+    if (material.arquivo_url) {
+      console.log('🗑️ Deletando arquivo do Supabase Storage:', material.arquivo_url);
+      const { error: storageError } = await supabaseAdmin.storage
+        .from(MATERIAIS_STORAGE_BUCKET)
+        .remove([material.arquivo_url]);
+      
+      if (storageError) {
+        console.error('Erro ao deletar arquivo do storage:', storageError);
+        // Continuar mesmo se falhar a exclusão do arquivo
+      } else {
+        console.log('✅ Arquivo deletado do Supabase Storage com sucesso');
+      }
     }
 
     // Excluir o material do banco
@@ -4546,12 +5252,18 @@ app.delete('/api/materiais/:id', authenticateToken, requireAdmin, async (req, re
 // ==================== FIM DAS ROTAS PARA MATERIAIS ====================
 
 // Inicializar servidor
+// Configurar timeouts para uploads grandes
+server.timeout = 300000; // 5 minutos
+server.keepAliveTimeout = 310000; // 5min + 10s
+server.headersTimeout = 320000; // 5min + 20s
+
 server.listen(PORT, async () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
   console.log(`🌐 Acesse: http://localhost:${PORT}`);
   console.log(`📱 WhatsApp API: http://localhost:${PORT}/api/whatsapp`);
   console.log(`🔗 Webhook WhatsApp: http://localhost:${PORT}/api/whatsapp/webhook`);
   console.log(`🗄️ Usando Supabase como banco de dados`);
+  console.log(`⏱️ Timeout configurado: ${server.timeout}ms (${server.timeout/1000}s)`);
   
   // Verificar conexão com Supabase
   try {

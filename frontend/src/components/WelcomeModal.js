@@ -30,8 +30,8 @@ const WelcomeModal = ({ isOpen, onClose, onStartTutorial }) => {
         if (!isConsultorInterno) {
           // Freelancer: buscar link personalizado baseado no código de referência
           if (consultorData.codigo_referencia) {
-            setLinkPersonalizado(`https://crm.investmoneysa.com.br/captura-lead?ref=${consultorData.codigo_referencia}`);
-            setLinkClinicas(`https://crm.investmoneysa.com.br/captura-clinica?ref=${consultorData.codigo_referencia}`);
+            setLinkPersonalizado(`https://solumn.com.br/captura-lead?ref=${consultorData.codigo_referencia}`);
+            setLinkClinicas(`https://solumn.com.br/captura-clinica?ref=${consultorData.codigo_referencia}`);
           } else {
             // Se não tem código de referência, mostrar mensagem
             setLinkPersonalizado(null);
@@ -39,8 +39,8 @@ const WelcomeModal = ({ isOpen, onClose, onStartTutorial }) => {
           }
         } else {
           // Interno: usar link geral
-          setLinkPersonalizado('https://crm.investmoneysa.com.br/captura-lead');
-          setLinkClinicas('https://crm.investmoneysa.com.br/captura-clinica');
+          setLinkPersonalizado('https://solumn.com.br/captura-lead');
+          setLinkClinicas('https://solumn.com.br/captura-clinica');
         }
       } else {
         console.error('Erro ao buscar dados do consultor:', responseData);
@@ -74,7 +74,7 @@ const WelcomeModal = ({ isOpen, onClose, onStartTutorial }) => {
 
   const pages = [
     {
-      title: 'Boas-vindas ao CRM Investmoney!',
+      title: 'Boas-vindas ao Solumn!',
       content: (
         <div>
           <div style={{ 

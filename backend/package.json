@@ -7,7 +7,9 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "cleanup-whatsapp": "node scripts/cleanup_whatsapp_sessions.js",
-    "cleanup-conversas": "node scripts/cleanup_whatsapp_conversas.js"
+    "cleanup-conversas": "node scripts/cleanup_whatsapp_conversas.js",
+    "migration:018": "node scripts/run_migration_018.js",
+    "check-emails": "node scripts/check_email_duplicates.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.3",

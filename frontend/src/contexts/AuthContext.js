@@ -30,8 +30,22 @@ export const AuthProvider = ({ children }) => {
   const clearAllData = () => {
     setUser(null);
     setToken(null);
+    
+    // Limpar apenas dados sensíveis do usuário, mantendo preferências de UI (tutoriais)
+    // Dados de autenticação
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    
+    // Caches que podem conter dados de outros usuários
+    localStorage.removeItem('metaAds_campaigns');
+    localStorage.removeItem('metaAds_adSets');
+    localStorage.removeItem('metaAds_selectedCampaign');
+    localStorage.removeItem('metaAds_timestamp');
+    localStorage.removeItem('geocodeCache');
+    localStorage.removeItem('data_sync_trigger');
+    
+    // Manter: tutorial-*-completed, tutorial-*-dismissed, welcome-completed, whatsapp-group-modal-shown
+    // Essas são preferências de UI por navegador/máquina, não por usuário
   };
 
   const makeRequest = async (url, options = {}) => {
@@ -66,6 +80,15 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, senha) => {
     try {
+      // CRÍTICO: Limpar TODOS os dados antes de fazer login para evitar cache/sessões cruzadas
+      console.log('🧹 Limpando dados antigos antes do login...');
+      localStorage.clear(); // Limpa TUDO
+      sessionStorage.clear(); // Limpa session storage também
+      setUser(null);
+      setToken(null);
+      
+      console.log('🔐 Iniciando login para:', email);
+      
       const response = await fetch(`${API_BASE_URL}/login`, {
         method: 'POST',
         headers: {
@@ -82,15 +105,26 @@ export const AuthProvider = ({ children }) => {
 
       const { token: newToken, usuario } = data;
       
+      console.log('✅ Login bem-sucedido!');
+      console.log('📋 Dados do usuário recebidos:', {
+        id: usuario.id,
+        nome: usuario.nome,
+        email: usuario.email,
+        tipo: usuario.tipo,
+        empresa_id: usuario.empresa_id
+      });
+      
       // Salvar token no localStorage e no state
       localStorage.setItem('token', newToken);
       localStorage.setItem('user', JSON.stringify(usuario));
+      localStorage.setItem('login_timestamp', new Date().toISOString()); // Timestamp do login
+      localStorage.setItem('login_email', email); // Email usado no login (para debug)
       setToken(newToken);
       setUser(usuario);
 
       return { success: true, user: usuario };
     } catch (error) {
-      console.error('Erro no login:', error);
+      console.error('❌ Erro no login:', error);
       return { success: false, error: error.message };
     }
   };
@@ -101,6 +135,8 @@ export const AuthProvider = ({ children }) => {
 
   const verifyToken = async () => {
     const currentToken = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+    const loginEmail = localStorage.getItem('login_email');
     
     if (!currentToken || currentToken === 'null' || currentToken.trim() === '') {
       clearAllData();
@@ -109,18 +145,57 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
+      console.log('🔍 Verificando token no backend...');
       const response = await makeRequest('/verify-token');
       
       if (response.ok) {
         const data = await response.json();
-        setUser(data.usuario);
+        const usuarioBackend = data.usuario;
+        
+        console.log('✅ Token válido | Usuário do backend:', {
+          id: usuarioBackend.id,
+          nome: usuarioBackend.nome,
+          email: usuarioBackend.email,
+          tipo: usuarioBackend.tipo
+        });
+        
+        // VALIDAÇÃO: Verificar se os dados do backend batem com o localStorage
+        if (savedUser) {
+          try {
+            const parsedUser = JSON.parse(savedUser);
+            
+            // Verificar se o ID bate (apenas warning - backend é fonte da verdade)
+            if (parsedUser.id !== usuarioBackend.id) {
+              console.warn('⚠️ AVISO: ID do usuário mudou');
+              console.warn('💾 ID no localStorage:', parsedUser.id);
+              console.warn('🔐 ID do token:', usuarioBackend.id);
+              console.warn('✅ Usando dados do backend (fonte da verdade)');
+            }
+            
+            // Verificar se o email bate (apenas warning - backend é fonte da verdade)
+            if (parsedUser.email && usuarioBackend.email && 
+                parsedUser.email.toLowerCase() !== usuarioBackend.email.toLowerCase()) {
+              console.warn('⚠️ AVISO: Email do usuário mudou');
+              console.warn('💾 Email no localStorage:', parsedUser.email);
+              console.warn('🔐 Email do token:', usuarioBackend.email);
+              console.warn('✅ Usando dados do backend (fonte da verdade)');
+            }
+          } catch (parseError) {
+            console.warn('⚠️ Erro ao parsear usuário salvo (será sobrescrito):', parseError);
+          }
+        }
+        
+        // Atualizar com dados do backend (fonte da verdade)
+        setUser(usuarioBackend);
         setToken(currentToken);
-        localStorage.setItem('user', JSON.stringify(data.usuario));
+        localStorage.setItem('user', JSON.stringify(usuarioBackend));
+        console.log('✅ Sessão verificada e atualizada com sucesso');
       } else {
+        console.error('❌ Token inválido no backend');
         clearAllData();
       }
     } catch (error) {
-      console.error('Erro ao verificar token:', error);
+      console.error('❌ Erro ao verificar token:', error);
       clearAllData();
     } finally {
       setLoading(false);
@@ -128,15 +203,19 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    // CRÍTICO: Validação de integridade dos dados ao carregar
+    console.log('🔐 Verificando integridade da sessão...');
     
     // Verificar se há dados corrompidos e limpar se necessário
     try {
       const savedUser = localStorage.getItem('user');
       const savedToken = localStorage.getItem('token');
+      const loginEmail = localStorage.getItem('login_email');
       
 
       // Se há dados inconsistentes, limpar tudo
       if ((savedUser && !savedToken) || (!savedUser && savedToken)) {
+        console.error('⚠️ DADOS INCONSISTENTES: user/token não batem');
         clearAllData();
         setLoading(false);
         return;
@@ -144,6 +223,7 @@ export const AuthProvider = ({ children }) => {
       
       // Se há usuário salvo mas token é inválido
       if (savedUser && savedToken && (!token || token.trim() === '' || token === 'null')) {
+        console.error('⚠️ TOKEN INVÁLIDO detectado');
         clearAllData();
         setLoading(false);
         return;
@@ -151,10 +231,27 @@ export const AuthProvider = ({ children }) => {
       
       // Tentar fazer parse do usuário se existir
       if (savedUser) {
-        JSON.parse(savedUser);
+        const parsedUser = JSON.parse(savedUser);
+        
+        // VALIDAÇÃO CRÍTICA: Verificar se o email do usuário salvo bate com o email de login
+        // (apenas se login_email existir - para compatibilidade com sessões antigas)
+        if (loginEmail && parsedUser.email) {
+          if (parsedUser.email.toLowerCase() !== loginEmail.toLowerCase()) {
+            console.error('🚨 ALERTA DE SEGURANÇA: Email do usuário não bate com email de login!');
+            console.error('📧 Email salvo no user:', parsedUser.email);
+            console.error('📧 Email usado no login:', loginEmail);
+            console.error('🧹 Limpando dados por segurança...');
+            clearAllData();
+            setLoading(false);
+            return;
+          }
+        }
+        
+        console.log('✅ Sessão inicial validada:', parsedUser.email, '| Tipo:', parsedUser.tipo);
       }
       
     } catch (error) {
+      console.error('❌ Erro ao validar sessão:', error);
       clearAllData();
       setLoading(false);
       return;
@@ -174,6 +271,7 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated: !!user && !!token,
     isAdmin: user?.tipo === 'admin',
     isConsultor: user?.tipo === 'consultor',
+    isEmpresa: user?.tipo === 'empresa',
     isFreelancer: user?.is_freelancer === true,
     // Consultor interno: tem pode_ver_todas_novas_clinicas=true E podealterarstatus=true
     isConsultorInterno: user?.tipo === 'consultor' && user?.pode_ver_todas_novas_clinicas === true && user?.podealterarstatus === true,

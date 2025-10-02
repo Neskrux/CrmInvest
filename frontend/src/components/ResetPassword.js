@@ -27,7 +27,7 @@ const ResetPassword = () => {
 
   const validateToken = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/validate-reset-token`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/validate-reset-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -74,7 +74,7 @@ const ResetPassword = () => {
     setLoading(true);
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/reset-password`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/reset-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -124,7 +124,7 @@ const ResetPassword = () => {
           <div style={{ marginBottom: '2rem' }}>
             <img 
               src={logoBrasaoPreto} 
-              alt="CRM System" 
+              alt="Solumn" 
               style={{ 
                 width: '80px', 
                 height: '80px', 
@@ -160,7 +160,7 @@ const ResetPassword = () => {
           <div style={{ marginBottom: '2rem' }}>
             <img 
               src={logoBrasaoPreto} 
-              alt="CRM System" 
+              alt="Solumn" 
               style={{ 
                 width: '80px', 
                 height: '80px', 
@@ -202,7 +202,7 @@ const ResetPassword = () => {
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <img 
             src={logoBrasaoPreto} 
-            alt="CRM System" 
+            alt="Solumn" 
             style={{ 
               width: '80px', 
               height: '80px', 

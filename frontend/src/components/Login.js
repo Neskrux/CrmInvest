@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import logoBrasaoPreto from '../images/logobrasaopreto.png';
+import logoBrasaoPreto from '../images/logohorizontalpreto.png';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -37,7 +37,7 @@ const Login = () => {
     setForgotPasswordLoading(true);
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/forgot-password`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/forgot-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -48,12 +48,8 @@ const Login = () => {
       const data = await response.json();
 
       if (response.ok) {
-        setForgotPasswordMessage('Instruções para redefinir sua senha foram enviadas para seu email. Caso não veja o e-mail, verifique sua caixa de spam.');
+        setForgotPasswordMessage('Instruções para redefinir sua senha foram enviadas para seu email. Caso não veja o e-mail, **verifique sua caixa de spam**.');
         setForgotPasswordEmail('');
-        setTimeout(() => {
-          setShowForgotPassword(false);
-          setForgotPasswordMessage('');
-        }, 3000);
       } else {
         setForgotPasswordMessage(data.error || 'Erro ao enviar email. Tente novamente.');
       }
@@ -84,11 +80,9 @@ const Login = () => {
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <img 
             src={logoBrasaoPreto} 
-            alt="CRM System" 
+            alt="Solumn" 
             style={{ 
-              width: '80px', 
-              height: '80px', 
-              marginBottom: '2rem',
+              height: '180px', 
               objectFit: 'contain'
             }} 
           />
@@ -272,10 +266,41 @@ const Login = () => {
                     border: `1px solid ${forgotPasswordMessage.includes('enviadas') ? '#a7f3d0' : '#fecaca'}`,
                     padding: '0.75rem',
                     borderRadius: '6px',
-                    fontSize: '0.875rem'
+                    fontSize: '0.875rem',
+                    position: 'relative'
                   }}
                 >
-                  {forgotPasswordMessage}
+                  <div style={{ paddingRight: '1.5rem' }}>
+                    {forgotPasswordMessage.split('**').map((part, index) => 
+                      index % 2 === 1 ? <strong key={index}>{part}</strong> : part
+                    )}
+                  </div>
+                  {forgotPasswordMessage.includes('enviadas') && (
+                    <button
+                      onClick={() => setForgotPasswordMessage('')}
+                      style={{
+                        position: 'absolute',
+                        top: '0.5rem',
+                        right: '0.5rem',
+                        background: 'none',
+                        border: 'none',
+                        color: '#065f46',
+                        cursor: 'pointer',
+                        fontSize: '1.25rem',
+                        fontWeight: 'bold',
+                        padding: '0',
+                        width: '1.5rem',
+                        height: '1.5rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '3px'
+                      }}
+                      title="Fechar"
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
               )}
 

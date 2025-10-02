@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import logoBrasaoPreto from '../images/logobrasaopreto.png';
+import logoBrasaoPreto from '../images/logohorizontalpreto.png';
 
 const CadastroConsultor = () => {
   const navigate = useNavigate();
@@ -12,8 +12,11 @@ const CadastroConsultor = () => {
     confirmarSenha: '',
     cpf: '',
     pix: '',
+    cidade: '',
+    estado: '',
     aceitaTermos: false
   });
+  const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -68,6 +71,122 @@ const CadastroConsultor = () => {
     return value;
   };
 
+  // Estados brasileiros
+  const estadosBrasileiros = [
+    { sigla: 'AC', nome: 'Acre' },
+    { sigla: 'AL', nome: 'Alagoas' },
+    { sigla: 'AP', nome: 'Amapá' },
+    { sigla: 'AM', nome: 'Amazonas' },
+    { sigla: 'BA', nome: 'Bahia' },
+    { sigla: 'CE', nome: 'Ceará' },
+    { sigla: 'DF', nome: 'Distrito Federal' },
+    { sigla: 'ES', nome: 'Espírito Santo' },
+    { sigla: 'GO', nome: 'Goiás' },
+    { sigla: 'MA', nome: 'Maranhão' },
+    { sigla: 'MT', nome: 'Mato Grosso' },
+    { sigla: 'MS', nome: 'Mato Grosso do Sul' },
+    { sigla: 'MG', nome: 'Minas Gerais' },
+    { sigla: 'PA', nome: 'Pará' },
+    { sigla: 'PB', nome: 'Paraíba' },
+    { sigla: 'PR', nome: 'Paraná' },
+    { sigla: 'PE', nome: 'Pernambuco' },
+    { sigla: 'PI', nome: 'Piauí' },
+    { sigla: 'RJ', nome: 'Rio de Janeiro' },
+    { sigla: 'RN', nome: 'Rio Grande do Norte' },
+    { sigla: 'RS', nome: 'Rio Grande do Sul' },
+    { sigla: 'RO', nome: 'Rondônia' },
+    { sigla: 'RR', nome: 'Roraima' },
+    { sigla: 'SC', nome: 'Santa Catarina' },
+    { sigla: 'SP', nome: 'São Paulo' },
+    { sigla: 'SE', nome: 'Sergipe' },
+    { sigla: 'TO', nome: 'Tocantins' }
+  ];
+
+  // Principais cidades por estado
+  const cidadesPorEstado = {
+    'SP': ['São Paulo', 'Campinas', 'Santos', 'São Bernardo do Campo', 'Santo André', 'Osasco', 'Ribeirão Preto', 'Sorocaba'],
+    'RJ': ['Rio de Janeiro', 'Niterói', 'Nova Iguaçu', 'Duque de Caxias', 'Campos dos Goytacazes', 'Petrópolis', 'Volta Redonda'],
+    'MG': ['Belo Horizonte', 'Uberlândia', 'Contagem', 'Juiz de Fora', 'Betim', 'Montes Claros', 'Ribeirão das Neves'],
+    'ES': ['Vitória', 'Serra', 'Vila Velha', 'Cariacica', 'Linhares', 'Cachoeiro de Itapemirim', 'Colatina'],
+    'PR': ['Curitiba', 'Londrina', 'Maringá', 'Ponta Grossa', 'Cascavel', 'São José dos Pinhais', 'Foz do Iguaçu'],
+    'RS': ['Porto Alegre', 'Caxias do Sul', 'Pelotas', 'Canoas', 'Santa Maria', 'Gravataí', 'Viamão'],
+    'SC': ['Florianópolis', 'Joinville', 'Blumenau', 'São José', 'Criciúma', 'Chapecó', 'Itajaí'],
+    'BA': ['Salvador', 'Feira de Santana', 'Vitória da Conquista', 'Camaçari', 'Juazeiro', 'Ilhéus', 'Itabuna'],
+    'GO': ['Goiânia', 'Aparecida de Goiânia', 'Anápolis', 'Rio Verde', 'Luziânia', 'Águas Lindas de Goiás'],
+    'PE': ['Recife', 'Jaboatão dos Guararapes', 'Olinda', 'Caruaru', 'Petrolina', 'Paulista', 'Cabo de Santo Agostinho'],
+    'CE': ['Fortaleza', 'Caucaia', 'Juazeiro do Norte', 'Maracanaú', 'Sobral', 'Crato', 'Itapipoca'],
+    'DF': ['Brasília', 'Taguatinga', 'Ceilândia', 'Samambaia', 'Planaltina', 'Águas Claras', 'Guará'],
+    'MT': ['Cuiabá', 'Várzea Grande', 'Rondonópolis', 'Sinop', 'Tangará da Serra', 'Cáceres', 'Barra do Garças'],
+    'MS': ['Campo Grande', 'Dourados', 'Três Lagoas', 'Corumbá', 'Ponta Porã', 'Aquidauana', 'Naviraí'],
+    'AL': ['Maceió', 'Arapiraca', 'Rio Largo', 'Palmeira dos Índios', 'União dos Palmares', 'Penedo'],
+    'SE': ['Aracaju', 'Nossa Senhora do Socorro', 'Lagarto', 'Itabaiana', 'Estância', 'Tobias Barreto'],
+    'PB': ['João Pessoa', 'Campina Grande', 'Santa Rita', 'Patos', 'Bayeux', 'Sousa', 'Cajazeiras'],
+    'RN': ['Natal', 'Mossoró', 'Parnamirim', 'São Gonçalo do Amarante', 'Macaíba', 'Ceará-Mirim'],
+    'PI': ['Teresina', 'Parnaíba', 'Picos', 'Piripiri', 'Floriano', 'Campo Maior', 'Barras'],
+    'MA': ['São Luís', 'Imperatriz', 'São José de Ribamar', 'Timon', 'Caxias', 'Codó', 'Paço do Lumiar'],
+    'TO': ['Palmas', 'Araguaína', 'Gurupi', 'Porto Nacional', 'Paraíso do Tocantins', 'Colinas do Tocantins'],
+    'AC': ['Rio Branco', 'Cruzeiro do Sul', 'Sena Madureira', 'Tarauacá', 'Feijó', 'Brasileia'],
+    'RO': ['Porto Velho', 'Ji-Paraná', 'Ariquemes', 'Vilhena', 'Cacoal', 'Rolim de Moura'],
+    'RR': ['Boa Vista', 'Rorainópolis', 'Caracaraí', 'Alto Alegre', 'Mucajaí', 'Cantá'],
+    'AP': ['Macapá', 'Santana', 'Laranjal do Jari', 'Oiapoque', 'Mazagão', 'Porto Grande'],
+    'AM': ['Manaus', 'Parintins', 'Itacoatiara', 'Manacapuru', 'Coari', 'Tefé', 'Tabatinga'],
+    'PA': ['Belém', 'Ananindeua', 'Santarém', 'Marabá', 'Parauapebas', 'Castanhal', 'Abaetetuba']
+  };
+
+  const formatarCidade = (value) => {
+    if (!value) return '';
+    
+    // Remove apenas números e caracteres especiais perigosos, mantém letras, espaços, acentos e hífen
+    let cleanValue = value.replace(/[0-9!@#$%^&*()_+=\[\]{}|\\:";'<>?,./~`]/g, '');
+
+    // Não aplicar formatação completa se o usuário ainda está digitando (termina com espaço)
+    const isTyping = value.endsWith(' ') && value.length > 0;
+    
+    if (isTyping) {
+      // Durante a digitação, apenas remove caracteres inválidos
+      return cleanValue;
+    }
+    
+    // Remove espaços extras apenas quando não está digitando
+    cleanValue = cleanValue.replace(/\s+/g, ' ').trim();
+    
+    // Não permite string vazia
+    if (!cleanValue) return '';
+    
+    // Se tem menos de 2 caracteres, não formatar ainda
+    if (cleanValue.length < 2) return cleanValue;
+    
+    // Verifica se está todo em maiúscula (mais de 3 caracteres) e converte para title case
+    const isAllUpperCase = cleanValue.length > 3 && cleanValue === cleanValue.toUpperCase();
+    
+    if (isAllUpperCase) {
+      // Converte para title case
+      return cleanValue.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+    }
+    
+    // Para entradas normais, aplica title case
+    return cleanValue
+      .toLowerCase()
+      .split(' ')
+      .map((palavra, index) => {
+        // Palavras que devem ficar em minúscula (exceto se for a primeira)
+        const preposicoes = ['de', 'da', 'do', 'das', 'dos', 'e', 'em', 'na', 'no', 'nas', 'nos'];
+        
+        // Primeira palavra sempre maiúscula
+        if (index === 0) {
+          return palavra.charAt(0).toUpperCase() + palavra.slice(1);
+        }
+        
+        if (preposicoes.includes(palavra)) {
+          return palavra;
+        }
+        
+        // Primeira letra maiúscula
+        return palavra.charAt(0).toUpperCase() + palavra.slice(1);
+      })
+      .join(' ');
+  };
+
   // Função para formatar nome (primeira letra maiúscula de cada palavra)
   const formatarNome = (value) => {
     if (!value) return '';
@@ -107,6 +226,20 @@ const CadastroConsultor = () => {
       formattedValue = formatCPF(value);
     } else if (name === 'nome') {
       formattedValue = formatarNome(value);
+    } else if (name === 'cidade') {
+      formattedValue = formatarCidade(value);
+    } else if (name === 'estado') {
+      // Resetar cidade e cidadeCustomizada quando estado muda
+      setFormData(prev => ({ ...prev, [name]: value, cidade: '' }));
+      setCidadeCustomizada(false);
+      // Limpar erro quando o usuário começa a digitar
+      if (errors[name]) {
+        setErrors(prev => ({
+          ...prev,
+          [name]: ''
+        }));
+      }
+      return; // Retorna aqui para não executar o setFormData novamente
     }
     
     setFormData(prev => ({
@@ -203,6 +336,8 @@ const CadastroConsultor = () => {
           senha: formData.senha,
           cpf: formData.cpf.replace(/\D/g, ''),
           pix: formData.pix.replace(/\D/g, ''),
+          cidade: formData.cidade,
+          estado: formData.estado,
           tipo: 'consultor'
         })
       });
@@ -248,11 +383,9 @@ const CadastroConsultor = () => {
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <img 
             src={logoBrasaoPreto} 
-            alt="CRM System" 
+            alt="Solumn" 
             style={{ 
-              width: '70px', 
-              height: '70px', 
-              marginBottom: '1rem',
+              height: '180px', 
               objectFit: 'contain'
             }} 
           />
@@ -379,6 +512,110 @@ const CadastroConsultor = () => {
                   </span>
                 )}
               </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Estado</label>
+              <select
+                name="estado"
+                className="form-input"
+                value={formData.estado}
+                onChange={handleChange}
+                style={{
+                  borderColor: errors.estado ? '#ef4444' : '#d1d5db'
+                }}
+              >
+                <option value="">Selecione seu estado</option>
+                {estadosBrasileiros.map(estado => (
+                  <option key={estado.sigla} value={estado.sigla}>
+                    {estado.sigla} - {estado.nome}
+                  </option>
+                ))}
+              </select>
+              {errors.estado && (
+                <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>
+                  {errors.estado}
+                </span>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Cidade</label>
+              {formData.estado && cidadesPorEstado[formData.estado] && !cidadeCustomizada ? (
+                <select
+                  name="cidade"
+                  className="form-input"
+                  value={formData.cidade}
+                  onChange={(e) => {
+                    if (e.target.value === 'OUTRA') {
+                      setCidadeCustomizada(true);
+                      setFormData(prev => ({ ...prev, cidade: '' }));
+                    } else {
+                      handleChange(e);
+                    }
+                  }}
+                  style={{
+                    borderColor: errors.cidade ? '#ef4444' : '#d1d5db'
+                  }}
+                >
+                  <option value="">Selecione a cidade</option>
+                  {cidadesPorEstado[formData.estado].map(cidade => (
+                    <option key={cidade} value={cidade}>{cidade}</option>
+                  ))}
+                  <option value="OUTRA">Outra cidade</option>
+                </select>
+              ) : (
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    name="cidade"
+                    className="form-input"
+                    value={formData.cidade}
+                    onChange={handleChange}
+                    placeholder="Digite o nome da cidade"
+                    disabled={!formData.estado}
+                    style={{
+                      borderColor: errors.cidade ? '#ef4444' : '#d1d5db',
+                      flex: 1
+                    }}
+                  />
+                  {formData.estado && cidadesPorEstado[formData.estado] && cidadeCustomizada && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCidadeCustomizada(false);
+                        setFormData(prev => ({ ...prev, cidade: '' }));
+                      }}
+                      style={{
+                        whiteSpace: 'nowrap',
+                        fontSize: '0.875rem',
+                        padding: '0.75rem 1rem',
+                        background: 'white',
+                        color: '#1a1d23',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.target.style.background = '#f9fafb';
+                        e.target.style.borderColor = '#9ca3af';
+                      }}
+                      onMouseOut={(e) => {
+                        e.target.style.background = 'white';
+                        e.target.style.borderColor = '#d1d5db';
+                      }}
+                    >
+                      Voltar
+                    </button>
+                  )}
+                </div>
+              )}
+              {errors.cidade && (
+                <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>
+                  {errors.cidade}
+                </span>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>

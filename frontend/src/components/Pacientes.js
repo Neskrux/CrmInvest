@@ -156,13 +156,13 @@ const Pacientes = () => {
     { value: 'em_conversa', label: 'Em conversa', color: '#0ea5e9', description: 'Conversando com o cliente' },
     { value: 'cpf_aprovado', label: 'CPF Aprovado', color: '#10b981', description: 'CPF foi aprovado' },
     { value: 'cpf_reprovado', label: 'CPF Reprovado', color: '#ef4444', description: 'CPF foi reprovado' },
-    { value: 'nao_passou_cpf', label: 'Não passou CPF', color: '#6366f1', description: 'Cliente não forneceu CPF' },
+    { value: 'nao_passou_cpf', label: 'Não forneceu CPF', color: '#6366f1', description: 'Cliente não forneceu CPF' },
     { value: 'nao_tem_outro_cpf', label: 'Não tem outro CPF', color: '#a3a3a3', description: 'Cliente não tem CPF alternativo' },
     { value: 'nao_existe', label: 'Paciente não existe', color: '#9ca3af', description: 'Cliente não existe' },
     { value: 'nao_tem_interesse', label: 'Paciente não tem interesse', color: '#9ca3af', description: 'Cliente não tem interesse' },
     { value: 'nao_reconhece', label: 'Paciente não reconhece', color: '#9ca3af', description: 'Cliente não reconhece' },
-    { value: 'sem_cedente', label: 'Sem clínica (CPF Aprovado)', color: '#fbbf24', description: 'CPF aprovado mas sem clínica' },
-    { value: 'sem_clinica', label: 'Sem clínica (CPF Reprovado)', color: '#fbbf24', description: 'CPF reprovado e sem clínica' },
+    { value: 'nao_responde', label: 'Paciente não responde', color: '#9ca3af', description: 'Cliente não responde' },
+    { value: 'sem_clinica', label: 'Sem clínica', color: '#fbbf24', description: 'Sem clínica' },
     // Demais status no final
     { value: 'agendado', label: 'Agendado', color: '#3b82f6', description: 'Abre modal para criar agendamento' },
     { value: 'compareceu', label: 'Compareceu', color: '#10b981', description: 'Cliente compareceu ao agendamento' },
@@ -211,15 +211,18 @@ const Pacientes = () => {
     const dashboardTutorialCompleted = localStorage.getItem('tutorial-completed');
     
     // Só mostrar tutorial se:
-    // 1. É consultor
+    // 1. É consultor OU admin
     // 2. Tutorial não foi completado
     // 3. Tutorial não foi dispensado
     // 4. Tutorial não está já aberto
-    // 5. Usuário já passou pelo fluxo inicial (welcome + dashboard tutorial)
-    if (isConsultor && !completed && !tutorialDismissed && !showTutorial && welcomeCompleted && dashboardTutorialCompleted) {
+    // 5. Usuário já passou pelo fluxo inicial OU é admin (admins podem ver direto)
+    const deveExibirTutorial = (isConsultor || isAdmin) && !completed && !tutorialDismissed && !showTutorial;
+    const fluxoInicialCompleto = welcomeCompleted && dashboardTutorialCompleted;
+    
+    if (deveExibirTutorial && (fluxoInicialCompleto || isAdmin)) {
       setShowTutorial(true);
     }
-  }, [user, isConsultor]);
+  }, [user, isConsultor, isAdmin]);
 
   // Garantir que freelancers fiquem na aba "Pacientes"
   useEffect(() => {
@@ -265,11 +268,10 @@ const Pacientes = () => {
     };
   }, [showModal, showViewModal, showObservacoesModal, showAgendamentoModal, showFechamentoModal, showPermissaoModal, showAtribuirConsultorModal]);
   
-  //Sempre que filtros ou a lista mudarem, voltar para a primeira página
+  //Sempre que FILTROS mudarem, voltar para a primeira página
   useEffect(() => {
     setCurrentPage(1);
   }, [
-    pacientes,
     filtroNome,
     filtroTelefone,
     filtroCPF,
@@ -344,8 +346,8 @@ const Pacientes = () => {
         if (!isConsultorInterno) {
           // Freelancer: buscar link personalizado baseado no código de referência
           if (consultorData.codigo_referencia) {
-            setLinkPersonalizado(`https://crm.investmoneysa.com.br/captura-lead?ref=${consultorData.codigo_referencia}`);
-            setLinkClinicas(`https://crm.investmoneysa.com.br/captura-clinica?ref=${consultorData.codigo_referencia}`);
+            setLinkPersonalizado(`https://solumn.com.br/captura-lead?ref=${consultorData.codigo_referencia}`);
+            setLinkClinicas(`https://solumn.com.br/captura-clinica?ref=${consultorData.codigo_referencia}`);
           } else {
             // Se não tem código de referência, mostrar mensagem
             setLinkPersonalizado(null);
@@ -353,8 +355,8 @@ const Pacientes = () => {
           }
         } else {
           // Interno: usar link geral
-          setLinkPersonalizado('https://crm.investmoneysa.com.br/captura-lead');
-          setLinkClinicas('https://crm.investmoneysa.com.br/captura-clinica');
+          setLinkPersonalizado('https://solumn.com.br/captura-lead');
+          setLinkClinicas('https://solumn.com.br/captura-clinica');
         }
       } else {
         console.error('Erro ao buscar dados do consultor:', responseData);
@@ -412,11 +414,11 @@ const Pacientes = () => {
         fetchNovosLeads();
         fetchPacientes();
       } else {
-        showErrorToast('Erro ao pegar lead: ' + data.error);
+        showErrorToast('Erro ao atribuir lead: ' + data.error);
       }
     } catch (error) {
-      console.error('Erro ao pegar lead:', error);
-      showErrorToast('Erro ao pegar lead');
+      console.error('Erro ao atribuir lead:', error);
+      showErrorToast('Erro ao atribuir lead');
     }
   };
 
@@ -442,6 +444,27 @@ const Pacientes = () => {
     } catch (error) {
       console.error('Erro ao excluir lead:', error);
       showErrorToast('Erro ao conectar com o servidor');
+    }
+  };
+
+  const alterarStatusNovoLead = async (leadId, novoStatus) => {
+    try {
+      const response = await makeRequest(`/novos-leads/${leadId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: novoStatus })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        showSuccessToast('Status atualizado com sucesso!');
+        fetchNovosLeads();
+      } else {
+        showErrorToast('Erro ao alterar status: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao alterar status:', error);
+      showErrorToast('Erro ao alterar status do lead');
     }
   };
 
@@ -1138,8 +1161,14 @@ const Pacientes = () => {
   };
 
   const pacientesFiltrados = pacientes.filter(p => {
-    // Consultores internos veem todos os pacientes, freelancers veem apenas os atribuídos
-    if (!isConsultorInterno && (!p.consultor_id || p.consultor_id === '' || p.consultor_id === null || p.consultor_id === undefined || Number(p.consultor_id) === 0)) return false;
+    // Admins e consultores internos veem todos os pacientes
+    // Freelancers veem apenas os atribuídos a eles
+    // Leads não atribuídos (sem consultor_id) NÃO devem aparecer aqui para ninguém
+    if (!isAdmin && !isConsultorInterno && (!p.consultor_id || p.consultor_id === '' || p.consultor_id === null || p.consultor_id === undefined || Number(p.consultor_id) === 0)) return false;
+    
+    // Para consultores internos e admins, também remover leads não atribuídos da aba "Geral"
+    // (eles devem aparecer apenas em "Novos Leads")
+    if ((isAdmin || isConsultorInterno) && (!p.consultor_id || p.consultor_id === '' || p.consultor_id === null || p.consultor_id === undefined || Number(p.consultor_id) === 0)) return false;
     
     const matchNome = !filtroNome || p.nome.toLowerCase().includes(filtroNome.toLowerCase());
     const matchTelefone = !filtroTelefone || (p.telefone || '').includes(filtroTelefone);
@@ -1882,9 +1911,32 @@ const Pacientes = () => {
                             )}
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                            <span className="badge badge-warning">
-                              {statusInfo.label}
-                            </span>
+                            {(isAdmin || podeAlterarStatus) ? (
+                              <select
+                                value={lead.status}
+                                onChange={(e) => alterarStatusNovoLead(lead.id, e.target.value)}
+                                className="form-select"
+                                style={{
+                                  fontSize: '0.75rem',
+                                  padding: '0.25rem 0.5rem',
+                                  border: 'none',
+                                  backgroundColor: statusInfo.color + '20',
+                                  color: statusInfo.color,
+                                  fontWeight: '600',
+                                  borderRadius: '0.375rem'
+                                }}
+                              >
+                                {statusOptions.map(option => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="badge badge-warning">
+                                {statusInfo.label}
+                              </span>
+                            )}
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarData(lead.created_at)}</td>
                           <td style={{ padding: '0.5rem', minWidth: '200px' }}>
@@ -1921,7 +1973,7 @@ const Pacientes = () => {
                                   whiteSpace: 'nowrap'
                                 }}
                               >
-                                {window.innerWidth <= 768 ? 'Pegar' : 'Pegar Lead'}
+                                {window.innerWidth <= 768 ? 'Atribuir' : 'Atribuir Lead'}
                               </button>
                               {/* Botão de excluir - apenas para admin */}
                               {isAdmin && (
