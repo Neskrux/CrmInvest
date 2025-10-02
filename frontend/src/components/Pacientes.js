@@ -1246,7 +1246,7 @@ const Pacientes = () => {
   const pacientesPaginados = pacientesFiltrados.slice(startIndex, endIndex);
 
   return (
-    <div>
+    <div style={{ padding: '1.5rem' }}>
       <div className="page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -1284,8 +1284,6 @@ const Pacientes = () => {
         </div>
         
         <div style={{
-          backgroundColor: '#f0f9ff',
-          border: '1px solid #bae6fd',
           borderRadius: '8px',
           padding: '1rem',
           marginTop: '1rem',
@@ -1297,7 +1295,6 @@ const Pacientes = () => {
             <div style={{ 
               marginTop: '1rem', 
               padding: '0.75rem', 
-              backgroundColor: '#f0fdf4', 
               borderRadius: '6px' 
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
@@ -1396,20 +1393,15 @@ const Pacientes = () => {
         </div>
       </div>
 
-      {/* Navegação por abas */}
-      <div className="tabs">
-        <button
-          className={`tab ${activeTab === 'pacientes' ? 'active' : ''}`}
-          onClick={() => setActiveTab('pacientes')}
-        >
-          Pacientes
-        </button>
-        {/* Mostrar aba "Novos Leads" apenas para admins e consultores internos */}
-        {(() => {
-          // Mostrar aba para admins ou consultores internos (não freelancers)
-          const shouldShow = isAdmin || isConsultorInterno;
-          return shouldShow;
-        })() && (
+      {/* Navegação por abas - Ocultar para freelancers */}
+      {(isAdmin || isConsultorInterno) && (
+        <div className="tabs">
+          <button
+            className={`tab ${activeTab === 'pacientes' ? 'active' : ''}`}
+            onClick={() => setActiveTab('pacientes')}
+          >
+            Pacientes
+          </button>
           <button
             className={`tab ${activeTab === 'novos-leads' ? 'active' : ''}`}
             onClick={() => setActiveTab('novos-leads')}
@@ -1420,8 +1412,8 @@ const Pacientes = () => {
               <span className="tab-badge">{novosLeads.length}</span>
             )}
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Conteúdo da aba Pacientes */}
       {activeTab === 'pacientes' && (

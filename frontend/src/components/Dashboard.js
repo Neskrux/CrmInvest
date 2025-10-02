@@ -2074,9 +2074,8 @@ const Dashboard = () => {
                   return { ...consultor, posicao: null, temAtividade };
                 });
 
-                // Separar ativos e inativos
-                const consultoresAtivos = consultoresComPosicao.filter(c => c.temAtividade);
-                const consultoresInativos = consultoresComPosicao.filter(c => !c.temAtividade);
+                // Separar ativos e limitar ao top 10
+                const consultoresAtivos = consultoresComPosicao.filter(c => c.temAtividade).slice(0, 10);
 
                 return (
                   <>
@@ -2302,7 +2301,7 @@ const Dashboard = () => {
                       )}
                     </div>
 
-                    {/* Restante dos consultores */}
+                    {/* Restante dos consultores - do 4º ao 10º */}
                     {consultoresAtivos.length > 3 && (
                       <div style={{ marginBottom: '2rem' }}>
                         <h4 style={{ 
@@ -2311,7 +2310,7 @@ const Dashboard = () => {
                           color: '#1e293b',
                           marginBottom: '1rem'
                         }}>
-                          Demais Posições
+                          Demais Posições (Top 10)
                         </h4>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                           {consultoresAtivos.slice(3).map((consultor, idx) => (
@@ -2387,58 +2386,6 @@ const Dashboard = () => {
                                   <circle cx="5" cy="12" r="1"></circle>
                                 </svg>
                               </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Consultores inativos */}
-                    {consultoresInativos.length > 0 && (
-                      <div>
-                        <h4 style={{ 
-                          fontSize: '1rem', 
-                          fontWeight: '600', 
-                          color: '#6b7280',
-                          marginBottom: '1rem'
-                        }}>
-                          Consultores Sem Vendas
-                        </h4>
-                        <div style={{ 
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                          gap: '0.75rem'
-                        }}>
-                          {consultoresInativos.map((consultor, idx) => (
-                            <div 
-                              key={idx}
-                              style={{
-                                padding: '1rem',
-                                background: '#f8fafc',
-                                borderRadius: '8px',
-                                border: '1px solid #e2e8f0',
-                                textAlign: 'center',
-                                opacity: 0.7
-                              }}
-                            >
-                              <div style={{ 
-                                fontSize: '0.875rem', 
-                                marginBottom: '0.5rem',
-                                color: '#9ca3af',
-                                fontWeight: '600' 
-                              }}>
-                                —
-                              </div>
-                              <div style={{ fontWeight: '600', color: '#64748b' }}>
-                                {consultor.nome}
-                              </div>
-                              <div style={{ 
-                                fontSize: '0.75rem', 
-                                color: '#94a3b8',
-                                marginTop: '0.25rem'
-                              }}>
-                                Sem vendas
-                              </div>
                             </div>
                           ))}
                         </div>

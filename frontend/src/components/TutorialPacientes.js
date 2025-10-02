@@ -30,7 +30,7 @@ const TutorialPacientes = ({ isOpen, onClose, onComplete }) => {
     },
     {
       id: 'lista-pacientes',
-      title: 'Lista de Pacientes',
+      title: 'Lista de Pacientes Indicados',
       content: 'Aqui estão todos os seus pacientes onde você pode visualizar detalhes completos.',
       selector: '.table-container',
       position: 'top'
@@ -38,7 +38,7 @@ const TutorialPacientes = ({ isOpen, onClose, onComplete }) => {
     {
       id: 'final-pacientes',
       title: 'Pronto!',
-      content: 'Agora você sabe como gerenciar seus pacientes e leads. Use os filtros para organizar, acompanhe o pipeline através dos status e não esqueça de verificar seus novos leads regularmente!',
+      content: 'Agora você sabe como gerenciar seus pacientes indicados. Use os filtros para organizar, acompanhe o pipeline através dos status e não esqueça de verificar seus status regularmente!',
       selector: '.page-header',
       position: 'center'
     }
@@ -186,6 +186,7 @@ const TutorialPacientes = ({ isOpen, onClose, onComplete }) => {
       {/* Tutorial Card */}
       <div
         style={{
+          zoom: '80%',
           position: 'absolute',
           ...tooltipStyle,
           backgroundColor: 'white',

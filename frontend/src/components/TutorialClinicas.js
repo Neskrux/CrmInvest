@@ -15,13 +15,6 @@ const TutorialClinicas = ({ isOpen, onClose, onComplete }) => {
       videoSrc: '/IMG_6824.MOV'
     },
     {
-      id: 'tabs-clinicas',
-      title: 'Abas de Navegação',
-      content: 'Use as abas para alternar entre "Clínicas" (parceiras e exclusivas ativas), "Novas Clínicas" (prospects) e "Mapa" (visualização geográfica).',
-      selector: '.tabs',
-      position: 'left'
-    },
-    {
       id: 'filtros-clinicas',
       title: 'Filtros de Localização',
       content: 'Filtre clínicas por estado, cidade ou status (desbloqueadas/bloqueadas) para encontrar rapidamente o que precisa.',
@@ -30,29 +23,15 @@ const TutorialClinicas = ({ isOpen, onClose, onComplete }) => {
     },
     {
       id: 'lista-clinicas',
-      title: 'Lista de Clínicas Parceiras',
-      content: 'Visualize todas as clínicas disponíveis com informações completas: localização, nicho, contatos e status de propriedade.',
+      title: 'Lista de Clínicas Indicadas',
+      content: 'Visualize todas as clínicas que você indicou com informações completas: localização, nicho, contatos e status do fechamento.',
       selector: '.table-container',
       position: 'bottom'
     },
     {
-      id: 'novas-clinicas',
-      title: 'Cadastrar Novas Clínicas',
-      content: 'Na aba "Novas Clínicas", cadastre prospects que você encontrou. Se aprovadas, elas não serão mais visíveis para outros consultores freelancers!',
-      selector: '.tabs',
-      position: 'right'
-    },
-    {
-      id: 'mapa-clinicas',
-      title: 'Visualização no Mapa',
-      content: 'A aba "Mapa" mostra todas as clínicas geograficamente. Pontos verdes são parceiras ativas, pontos laranja são novas clínicas (prospects).',
-      selector: '.tabs',
-      position: 'right'
-    },
-    {
       id: 'final-clinicas',
       title: 'Fantástico!',
-      content: 'Agora você domina o gerenciamento de clínicas. Use os filtros, cadastre novas clínicas e acompanhe no mapa para maximizar suas oportunidades!',
+      content: 'Agora você domina o gerenciamento de clínicas. Use os filtros para encontrar as melhores oportunidades!',
       selector: '.page-header',
       position: 'center'
     }
@@ -139,12 +118,12 @@ const TutorialClinicas = ({ isOpen, onClose, onComplete }) => {
 
     let top, left;
 
-    if (isMobile && (currentStep === 3 || currentStep === 4 || currentStep === 5)) {
+    if (isMobile && currentStep === 2) {
       return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
     }
 
-    // Posicionamento especial para desktop nos steps 4 e 5
-    if (!isMobile && currentStep === 3) {
+    // Posicionamento especial para desktop no step 2
+    if (!isMobile && currentStep === 2) {
        top = Math.max(rect.top - tooltipHeight - 200, 200);
        left = Math.max(rect.left + (rect.width / 2) - (tooltipWidth / 2), 20);
        if (left + tooltipWidth > window.innerWidth - 20) {
@@ -156,18 +135,6 @@ const TutorialClinicas = ({ isOpen, onClose, onComplete }) => {
          transform: 'none'
        };
      }
-     if (!isMobile && currentStep === 4) {
-         top = Math.max(rect.top - tooltipHeight - 200, 200);
-         left = Math.max(rect.left + (rect.width / 2) - (tooltipWidth / 2), 20);
-         if (left + tooltipWidth > window.innerWidth - 20) {
-           left = window.innerWidth - tooltipWidth - 20;
-         }
-         return {
-           top: `${top}px`,
-           left: `${left}px`,
-           transform: 'none'
-         };
-       }
 
     switch (position) {
       case 'top':
@@ -230,6 +197,7 @@ const TutorialClinicas = ({ isOpen, onClose, onComplete }) => {
       {/* Tutorial Card */}
       <div
         style={{
+          zoom: '80%',
           position: 'absolute',
           ...tooltipStyle,
           backgroundColor: 'white',
@@ -243,7 +211,7 @@ const TutorialClinicas = ({ isOpen, onClose, onComplete }) => {
         }}
       >
         {/* Arrow */}
-        {!(window.innerWidth <= 768 && (currentStep === 3 || currentStep === 4)) && (
+        {!(window.innerWidth <= 768 && currentStep === 2) && (
           <div
             style={{
               position: 'absolute',
