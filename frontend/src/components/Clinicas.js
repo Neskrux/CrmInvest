@@ -1073,7 +1073,7 @@ const Clinicas = () => {
   };
 
   return (
-    <div>
+    <div style={{ padding: '1.5rem' }}>
       <div className="page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -1111,8 +1111,6 @@ const Clinicas = () => {
         </div>
 
         <div style={{
-          backgroundColor: '#f0f9ff',
-          border: '1px solid #bae6fd',
           borderRadius: '8px',
           padding: '1rem',
           marginTop: '1rem',
@@ -1222,37 +1220,34 @@ const Clinicas = () => {
         </div>
       </div>
 
-      {/* Navegação por abas */}
-      <div className="tabs">
-        <button
-          className={`tab ${activeTab === 'clinicas' ? 'active' : ''}`}
-          onClick={() => setActiveTab('clinicas')}
-        >
-          Clínicas
-        </button>
-        
-        {/* Esconder "Novas Clínicas" e "Mapa" para freelancers */}
-        {!isFreelancer && (
-          <>
-            <button
-              className={`tab ${activeTab === 'novas-clinicas' ? 'active' : ''}`}
-              onClick={() => setActiveTab('novas-clinicas')}
-              style={{ position: 'relative' }}
-            >
-              {isAdmin ? 'Novas Clínicas' : 'Indicar Clínicas'}
-              {novasClinicas.length > 0 && (
-                <span className="tab-badge">{novasClinicas.length}</span>
-              )}
-            </button>
-            <button
-              className={`tab ${activeTab === 'mapa' ? 'active' : ''}`}
-              onClick={() => setActiveTab('mapa')}
-            >
-              Mapa
-            </button>
-          </>
-        )}
-      </div>
+      {/* Navegação por abas - Ocultar para freelancers */}
+      {!isFreelancer && (
+        <div className="tabs">
+          <button
+            className={`tab ${activeTab === 'clinicas' ? 'active' : ''}`}
+            onClick={() => setActiveTab('clinicas')}
+          >
+            Clínicas
+          </button>
+          
+          <button
+            className={`tab ${activeTab === 'novas-clinicas' ? 'active' : ''}`}
+            onClick={() => setActiveTab('novas-clinicas')}
+            style={{ position: 'relative' }}
+          >
+            {isAdmin ? 'Novas Clínicas' : 'Indicar Clínicas'}
+            {novasClinicas.length > 0 && (
+              <span className="tab-badge">{novasClinicas.length}</span>
+            )}
+          </button>
+          <button
+            className={`tab ${activeTab === 'mapa' ? 'active' : ''}`}
+            onClick={() => setActiveTab('mapa')}
+          >
+            Mapa
+          </button>
+        </div>
+      )}
 
       {/* Conteúdo da aba Mapa */}
       {activeTab === 'mapa' && (
@@ -1859,7 +1854,7 @@ const Clinicas = () => {
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Nicho</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Contato</th>
                   <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Proprietário</th>
-                  <th style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                  <th>
                     Status
                     {!podeAlterarStatus && (
                       <button
@@ -1903,75 +1898,56 @@ const Clinicas = () => {
                 {clinicasFiltradas.map(clinica => (
                   <tr key={clinica.id} className={clinica.status === 'inativa' ? 'clinica-bloqueada' : ''}>
                     <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                          {/* Indicador de origem da clínica - apenas para admin e consultor interno */}
-                          {(isAdmin || isConsultorInterno) && (
-                            <>
-                              {clinica.tipo_origem === 'aprovada' && (
-                                <span 
-                                  className="badge" 
-                                  style={{ 
-                                    backgroundColor: '#3b82f6', 
-                                    color: 'white',
-                                    fontSize: '0.7rem',
-                                    padding: '2px 6px',
-                                    borderRadius: '4px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                  }}
-                                  title="Clínica aprovada da aba 'Novas Clínicas'"
-                                >
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M9 12l2 2 4-4"/>
-                                    <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"/>
-                                  </svg>
-                                  Aprovada
-                                </span>
-                              )}
-                              {clinica.tipo_origem === 'direta' && (
-                                <span 
-                                  className="badge" 
-                                  style={{ 
-                                    backgroundColor: '#10b981', 
-                                    color: 'white',
-                                    fontSize: '0.7rem',
-                                    padding: '2px 6px',
-                                    borderRadius: '4px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                  }}
-                                  title="Clínica criada diretamente por administrador"
-                                >
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                  </svg>
-                                  Direta
-                                </span>
-                              )}
-                            </>
-                          )}
-                          <strong>{clinica.nome}</strong>
-                        </div>
-                        {/* Mostrar status no mobile */}
-                        {isMobile && (
-                          <span 
-                            className="badge"
-                            style={{
-                              backgroundColor: getStatusClinicaInfo(clinica.status).color + '20',
-                              color: getStatusClinicaInfo(clinica.status).color,
-                              fontWeight: '600',
-                              borderRadius: '0.375rem',
-                              fontSize: '0.75rem',
-                              padding: '0.25rem 0.5rem',
-                              width: 'fit-content'
-                            }}
-                          >
-                            {getStatusClinicaInfo(clinica.status).label}
-                          </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        {/* Indicador de origem da clínica - apenas para admin e consultor interno */}
+                        {(isAdmin || isConsultorInterno) && (
+                          <>
+                            {clinica.tipo_origem === 'aprovada' && (
+                              <span 
+                                className="badge" 
+                                style={{ 
+                                  backgroundColor: '#3b82f6', 
+                                  color: 'white',
+                                  fontSize: '0.7rem',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                title="Clínica aprovada da aba 'Novas Clínicas'"
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M9 12l2 2 4-4"/>
+                                  <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"/>
+                                </svg>
+                                Aprovada
+                              </span>
+                            )}
+                            {clinica.tipo_origem === 'direta' && (
+                              <span 
+                                className="badge" 
+                                style={{ 
+                                  backgroundColor: '#10b981', 
+                                  color: 'white',
+                                  fontSize: '0.7rem',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                title="Clínica criada diretamente por administrador"
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                </svg>
+                                Direta
+                              </span>
+                            )}
+                          </>
                         )}
+                        <strong>{clinica.nome}</strong>
                       </div>
                     </td>
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
@@ -2007,7 +1983,7 @@ const Clinicas = () => {
                         </span>
                       )}
                     </td>
-                    <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                    <td>
                       {(isAdmin || podeAlterarStatus) ? (
                         <select
                           value={clinica.status}
@@ -3241,93 +3217,104 @@ const Clinicas = () => {
              {/* Abas de Navegação */}
              <div style={{ 
                borderBottom: '1px solid #e5e7eb',
-               padding: '0 1.5rem'
+               padding: '0 0.75rem',
+               overflowX: 'auto',
+               WebkitOverflowScrolling: 'touch'
              }}>
-               <div style={{ display: 'flex', gap: '2rem' }}>
+               <div style={{ 
+                 display: 'flex', 
+                 gap: window.innerWidth <= 768 ? '0' : '2rem',
+                 minWidth: 'max-content'
+               }}>
                  <button
                    onClick={() => handleTabChange('informacoes')}
                    style={{
-                     padding: '1rem 0',
+                     padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
                      border: 'none',
                      background: 'none',
-                     fontSize: '0.875rem',
+                     fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
                      fontWeight: '500',
                      color: activeViewTab === 'informacoes' ? '#3b82f6' : '#6b7280',
                      borderBottom: activeViewTab === 'informacoes' ? '2px solid #3b82f6' : '2px solid transparent',
                      cursor: 'pointer',
-                     transition: 'all 0.2s'
+                     transition: 'all 0.2s',
+                     whiteSpace: 'nowrap'
                    }}
                  >
-                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
-                     <circle cx="12" cy="12" r="3"></circle>
-                     <path d="M12 1v6m0 6v6"></path>
-                     <path d="m21 12-6-6-6 6-6-6"></path>
-                   </svg>
-                   Informações Gerais
+                   {window.innerWidth <= 768 ? 'Informações' : 'Informações Gerais'}
                  </button>
                  
                  <button
                    onClick={() => handleTabChange('documentos')}
                    style={{
-                     padding: '1rem 0',
+                     padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
                      border: 'none',
                      background: 'none',
-                     fontSize: '0.875rem',
+                     fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
                      fontWeight: '500',
                      color: activeViewTab === 'documentos' ? '#3b82f6' : '#6b7280',
                      borderBottom: activeViewTab === 'documentos' ? '2px solid #3b82f6' : '2px solid transparent',
                      cursor: 'pointer',
-                     transition: 'all 0.2s'
+                     transition: 'all 0.2s',
+                     whiteSpace: 'nowrap'
                    }}
                  >
-                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
-                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                     <polyline points="14 2 14 8 20 8"></polyline>
-                     <line x1="16" y1="13" x2="8" y2="13"></line>
-                     <line x1="16" y1="17" x2="8" y2="17"></line>
-                   </svg>
+                   {window.innerWidth > 768 && (
+                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
+                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                       <polyline points="14 2 14 8 20 8"></polyline>
+                       <line x1="16" y1="13" x2="8" y2="13"></line>
+                       <line x1="16" y1="17" x2="8" y2="17"></line>
+                     </svg>
+                   )}
                    Documentos
                  </button>
                  
                  <button
                    onClick={() => handleTabChange('pacientes')}
                    style={{
-                     padding: '1rem 0',
+                     padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
                      border: 'none',
                      background: 'none',
-                     fontSize: '0.875rem',
+                     fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
                      fontWeight: '500',
                      color: activeViewTab === 'pacientes' ? '#3b82f6' : '#6b7280',
                      borderBottom: activeViewTab === 'pacientes' ? '2px solid #3b82f6' : '2px solid transparent',
                      cursor: 'pointer',
-                     transition: 'all 0.2s'
+                     transition: 'all 0.2s',
+                     whiteSpace: 'nowrap'
                    }}
                  >
-                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
-                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                     <circle cx="12" cy="7" r="4"></circle>
-                   </svg>
+                   {window.innerWidth > 768 && (
+                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
+                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                       <circle cx="12" cy="7" r="4"></circle>
+                     </svg>
+                   )}
                    Pacientes
                  </button>
                  
                  <button
                    onClick={() => handleTabChange('historico')}
                    style={{
-                     padding: '1rem 0',
+                     padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
                      border: 'none',
                      background: 'none',
-                     fontSize: '0.875rem',
+                     fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
                      fontWeight: '500',
                      color: activeViewTab === 'historico' ? '#3b82f6' : '#6b7280',
                      borderBottom: activeViewTab === 'historico' ? '2px solid #3b82f6' : '2px solid transparent',
                      cursor: 'pointer',
-                     transition: 'all 0.2s'
+                     transition: 'all 0.2s',
+                     whiteSpace: 'nowrap'
                    }}
                  >
-                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
-                     <circle cx="12" cy="12" r="10"></circle>
-                     <polyline points="12 6 12 12 16 14"></polyline>
-                   </svg>
+                   {window.innerWidth > 768 && (
+                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
+                       <circle cx="12" cy="12" r="10"></circle>
+                       <polyline points="12 6 12 12 16 14"></polyline>
+                     </svg>
+                   )}
                    Histórico
                  </button>
                </div>
@@ -3342,7 +3329,7 @@ const Clinicas = () => {
                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.nome}</p>
                  </div>
                  
-                 {viewingClinica.cnpj && (
+                 {viewingClinica.cnpj && !isFreelancer && (
                    <div>
                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>CNPJ</label>
                      <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937', fontFamily: 'monospace' }}>
@@ -3992,7 +3979,7 @@ const Clinicas = () => {
                   <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingNovaClinica.nome}</p>
                 </div>
                 
-                 {viewingNovaClinica.cnpj && (
+                 {viewingNovaClinica.cnpj && !isFreelancer && (
                    <div>
                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>CNPJ</label>
                      <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937', fontFamily: 'monospace' }}>

@@ -266,7 +266,7 @@ const Materiais = () => {
   }
 
   return (
-    <div className="container-fluid">
+    <div className="container-fluid" style={{ padding: '1.5rem' }}>
       <style>
         {`
           @keyframes spin {
@@ -360,7 +360,8 @@ const Materiais = () => {
                 <div 
                   className="card border-0 shadow-sm" 
                   style={{ 
-                    height: '280px',
+                    minHeight: '280px',
+                    height: '100%',
                     display: 'flex',
                     flexDirection: 'column'
                   }}
@@ -402,12 +403,8 @@ const Materiais = () => {
                           className="card-text text-muted mb-3" 
                           style={{ 
                             fontSize: '0.9rem', 
-                            lineHeight: '1.4', 
+                            lineHeight: '1.5', 
                             marginBottom: '1rem',
-                            overflow: 'hidden',
-                            display: '-webkit-box',
-                            WebkitLineClamp: 3,
-                            WebkitBoxOrient: 'vertical',
                             flex: 1
                           }}
                         >

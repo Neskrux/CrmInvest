@@ -3829,7 +3829,7 @@ select::placeholder {
 }
 
 .freelancer-logo img {
-  height: 90px;
+  height: 65px;
   object-fit: contain;
 }
 
@@ -3839,7 +3839,8 @@ select::placeholder {
   display: flex;
   align-items: center;
   flex: 1;
-  max-width: calc(100% - 200px);
+  max-width: 100%;
+  justify-content: flex-end;
 }
 
 /* Setas de Navegação */
@@ -3879,9 +3880,9 @@ select::placeholder {
 /* Navegação Principal - Otimizada para Mobile */
 .freelancer-nav {
   display: flex;
-  gap: 0.25rem;
-  flex: 1;
-  justify-content: flex-start;
+  gap: 0.5rem;
+  flex: 0 1 auto;
+  justify-content: flex-end;
   padding: 0 1rem;
   overflow-x: auto;
   scrollbar-width: none;
@@ -3964,26 +3965,6 @@ select::placeholder {
   flex-shrink: 0;
 }
 
-/* Separador visual na navegação */
-.nav-separator {
-  width: 1px;
-  height: 22px;
-  background: #e2e8f0;
-  margin: 0 0.375rem;
-}
-
-/* Links externos com estilo diferenciado */
-.freelancer-nav-item.external {
-  opacity: 0.8;
-  border-left: 2px solid #e2e8f0;
-  padding-left: 1.5rem !important;
-}
-
-.freelancer-nav-item.external:hover {
-  opacity: 1;
-  background: rgba(59, 130, 246, 0.1);
-  border-left-color: #3b82f6;
-}
 
 /* Menu do Usuário - NÃO USADO MAIS (substituído por itens na navegação) */
 /* .freelancer-user-menu {
@@ -4088,7 +4069,6 @@ select::placeholder {
 /* Main Content para Freelancer */
 .freelancer-main {
   flex: 1;
-  max-width: 1400px;
   margin: 0 auto;
   width: 100%;
 }
@@ -4128,6 +4108,12 @@ select::placeholder {
 
   .nav-scroll-container {
     max-width: 100%;
+    width: 100%;
+  }
+
+  .freelancer-nav {
+    justify-content: flex-start;
+    flex: 1;
   }
 
   .nav-arrow {
@@ -4177,14 +4163,6 @@ select::placeholder {
     hyphens: auto;
   }
 
-  .nav-separator {
-    display: none;
-  }
-
-  .freelancer-nav-item.external {
-    border-left: none;
-    padding-left: 0.5rem !important;
-  }
 
   /* .freelancer-user-menu {
     width: 100%;

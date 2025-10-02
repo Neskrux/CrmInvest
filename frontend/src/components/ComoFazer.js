@@ -597,10 +597,29 @@ const ComoFazer = () => {
                               <p>{selectedTemplate.descricao}</p>
                             </div>
                           </div>
-                          <div className="image-warning">
+                          <div className="image-warning" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                             <div className="warning-text">
                               <strong>Importante:</strong> Lembre-se de baixar a imagem selecionada e enviá-la junto com a mensagem para garantir que tudo fique perfeito!
                             </div>
+                            <button
+                              className="action-button download"
+                              onClick={downloadSelectedImage}
+                              style={{
+                                marginTop: '1rem',
+                                padding: '0.5rem 1rem',
+                                fontSize: '0.8rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
+                              }}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                              </svg>
+                              Baixar Imagem
+                            </button>
                           </div>
                         </div>
                       )}
