@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Sparkles, Trophy, Gem, Lock, Check, Star } from 'lucide-react';
-import logoBrasao from '../images/logobrasao.png';
+import logoBrasao from '../images/logobrasao-selo.png';
 import config from '../config';
 
 const CapturaLead = () => {
@@ -847,10 +847,13 @@ const CapturaLead = () => {
         }
 
         .captura-logo {
-          width: 80px;
-          height: 80px;
+          height: 170px;
           margin-bottom: 20px;
           filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+
+          @media (max-width: 768px) {
+            height: 100px;
+          }
         }
 
         .captura-title {

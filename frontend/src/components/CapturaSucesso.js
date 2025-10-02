@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CheckCircle, ArrowRight, Clock, Gift, Star, MessageCircle, Users, DollarSign, Target } from 'lucide-react';
-import logoBrasao from '../images/logobrasao.png';
+import logoBrasao from '../images/logobrasao-selo.png';
 
 const CapturaSucesso = () => {
   const location = useLocation();
@@ -176,10 +176,13 @@ const CapturaSucesso = () => {
         }
 
         .sucesso-logo {
-          width: 60px;
-          height: 60px;
+          height: 170px;
           margin-bottom: 20px;
           filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+
+          @media (max-width: 768px) {
+            height: 100px;
+          }
         }
 
         .sucesso-title {
