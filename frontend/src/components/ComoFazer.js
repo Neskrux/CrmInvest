@@ -25,66 +25,78 @@ const ComoFazer = () => {
   const imagensClinicas = [
     {
       id: 1,
-      url: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800&q=80',
-      titulo: 'Clínica Moderna',
-      descricao: 'Ambiente profissional e acolhedor'
+      url: '/images/clinicas/cli1.png',
+      titulo: 'Clínica Parceira',
+      descricao: 'Receba à vista, paciente paga parcelado'
     },
     {
       id: 2,
-      url: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&q=80',
-      titulo: 'Consultório Premium',
-      descricao: 'Tecnologia de ponta para tratamentos'
+      url: '/images/clinicas/cli2.png',
+      titulo: 'Aumente seu Faturamento',
+      descricao: 'Mais pacientes, sem inadimplência'
     },
     {
       id: 3,
-      url: 'https://images.unsplash.com/photo-1581595220892-b0739db3ba8c?w=800&q=80',
-      titulo: 'Sala de Atendimento',
-      descricao: 'Conforto e privacidade garantidos'
+      url: '/images/clinicas/cli3.png',
+      titulo: 'Gestão Completa',
+      descricao: 'Nós cuidamos da cobrança'
     },
     {
       id: 4,
-      url: 'https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=800&q=80',
-      titulo: 'Recepção Elegante',
-      descricao: 'Primeira impressão que marca'
+      url: '/images/clinicas/cli4.png',
+      titulo: 'Fluxo de Caixa Garantido',
+      descricao: 'Pagamento em D+1 útil'
     },
     {
       id: 5,
-      url: 'https://images.unsplash.com/photo-1631217868264-e5b90bb7e133?w=800&q=80',
-      titulo: 'Equipamentos Modernos',
-      descricao: 'Tecnologia avançada em saúde'
+      url: '/images/clinicas/cli5.png',
+      titulo: 'Pacientes Pré-aprovados',
+      descricao: 'Sem perda de tempo com negociação'
+    },
+    {
+      id: 6,
+      url: '/images/clinicas/cli6.png',
+      titulo: 'Parceria de Sucesso',
+      descricao: 'Mais de 200 clínicas parceiras'
     }
   ];
 
   const imagensPacientes = [
     {
       id: 1,
-      url: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=800&q=80',
-      titulo: 'Sorriso Renovado',
-      descricao: 'Resultados que transformam vidas'
+      url: '/images/pacientes/pac1.png',
+      titulo: 'Tratamento Odontológico',
+      descricao: 'Comece hoje e pague no boleto em até 36x'
     },
     {
       id: 2,
-      url: 'https://images.unsplash.com/photo-1606811841689-23dfddce3e95?w=800&q=80',
-      titulo: 'Tratamento Personalizado',
-      descricao: 'Cuidado único para cada paciente'
+      url: '/images/pacientes/pac2.png',
+      titulo: 'Parcelamento Facilitado',
+      descricao: 'Só a InvestMoney parcela no boleto'
     },
     {
       id: 3,
-      url: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=800&q=80',
-      titulo: 'Bem-estar Completo',
-      descricao: 'Saúde e qualidade de vida'
+      url: '/images/pacientes/pac3.png',
+      titulo: 'Sorriso Novo',
+      descricao: 'Implantes parcelados em até 36x'
     },
     {
       id: 4,
-      url: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=800&q=80',
-      titulo: 'Consulta Especializada',
-      descricao: 'Profissionais qualificados'
+      url: '/images/pacientes/pac4.png',
+      titulo: 'Sorriso dos Sonhos',
+      descricao: 'Sem entrada, parcelas que cabem no bolso'
     },
     {
       id: 5,
-      url: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=800&q=80',
-      titulo: 'Resultado Garantido',
-      descricao: 'Satisfação e confiança'
+      url: '/images/pacientes/pac5.png',
+      titulo: 'Procedimento Estético',
+      descricao: 'Harmonização facial parcelada'
+    },
+    {
+      id: 6,
+      url: '/images/pacientes/pac6.png',
+      titulo: 'Tratamento Completo',
+      descricao: 'Aprovação rápida, sem burocracia'
     }
   ];
 
@@ -95,36 +107,36 @@ const ComoFazer = () => {
   const mensagensPacientes = [
     {
       id: 1,
-      titulo: 'Consulta Inicial Gratuita',
-      texto: `Prezado(a),\n\nTemos uma oportunidade exclusiva para você conhecer nossos serviços.\n\n• Consulta inicial sem custo\n• Avaliação profissional completa\n• Plano de tratamento personalizado\n• Condições especiais de pagamento\n• Profissionais altamente qualificados\n\nAproveite esta oportunidade:`
+      titulo: 'Tratamento Aprovado - Sem Cartão',
+      texto: `Olá!\n\nTemos uma boa notícia: conseguimos aprovar seu tratamento mesmo sem cartão de crédito.\n\nComo funciona:\n• Pagamento 100% no boleto mensal\n• Sem entrada obrigatória\n• Primeira consulta gratuita\n• Início do tratamento após aprovação\n\nVantagens:\n• Sem consulta ao SPC/Serasa\n• Parcelas que cabem no seu orçamento\n• Clínicas parceiras qualificadas\n• Profissionais especializados\n\nEsta é uma oportunidade real para você realizar seu tratamento. Entre em contato para mais informações:`
     },
     {
       id: 2,
-      titulo: 'Tratamento Especializado',
-      texto: `Excelente oportunidade para investir na sua saúde e bem-estar.\n\n• Clínicas com tecnologia de ponta\n• Equipe multidisciplinar qualificada\n• Condições de parcelamento facilitadas\n• Tratamento 100% personalizado\n• Resultados comprovados e duradouros\n\nConheça nossa proposta:`
+      titulo: 'Tratamento Odontológico Facilitado',
+      texto: `Prezado(a),\n\nOferecemos uma solução para quem precisa de tratamento odontológico mas não possui cartão de crédito ou dinheiro à vista.\n\nNossa proposta:\n• Parcelamento no boleto bancário\n• Avaliação inicial gratuita\n• Aprovação rápida e simples\n• Clínicas parceiras certificadas\n\nTratamentos disponíveis:\n• Ortodontia\n• Implantes\n• Próteses\n• Estética dental\n\nMais de 3.000 pacientes já foram atendidos através do nosso sistema. Queremos ajudar você também.\n\nEntre em contato para agendar sua avaliação:`
     },
     {
       id: 3,
-      titulo: 'Transformação Completa',
-      texto: `Invista no seu bem-estar com nossos serviços exclusivos.\n\n• Tratamentos com resultados excepcionais\n• Abordagem personalizada para cada paciente\n• Condições comerciais diferenciadas\n• Acompanhamento especializado completo\n• Satisfação garantida com nossos protocolos\n\nDescubra o que preparamos para você:`
+      titulo: 'Procedimentos Estéticos - Pagamento Facilitado',
+      texto: `Olá!\n\nSe você deseja realizar procedimentos estéticos mas não tem cartão de crédito, temos uma solução para você.\n\nNossa proposta:\n• Parcelamento no boleto\n• Sem entrada obrigatória\n• Aprovação em até 24h\n• Clínicas parceiras qualificadas\n\nProcedimentos disponíveis:\n• Harmonização facial\n• Preenchimentos\n• Limpeza de pele\n• Tratamentos corporais\n\nTrabalhamos com clínicas que utilizam produtos originais e contam com profissionais especializados.\n\nAgende sua consulta gratuita:`
     }
   ];
 
   const mensagensClinicas = [
     {
       id: 1,
-      titulo: 'Parceria Estratégica',
-      texto: `Prezada clínica,\n\nApresentamos uma proposta comercial diferenciada para expansão da sua carteira de pacientes.\n\n• Sistema exclusivo de captação de pacientes\n• Pacientes pré-qualificados com alto potencial\n• Modelo sem mensalidade - pague por resultados\n• Relatórios detalhados e transparência total\n• Suporte técnico especializado incluso\n\nAgende uma reunião para conhecer nossa proposta:`
+      titulo: 'Receba à Vista - Paciente Paga Parcelado',
+      texto: `Prezado(a) proprietário(a) de clínica,\n\nApresentamos uma proposta comercial que pode aumentar significativamente seu faturamento.\n\nComo funciona:\n• Paciente faz tratamento de R$ 5.000\n• Ele parcela em 10x no boleto\n• Você recebe os R$ 5.000 à vista\n• Nós cuidamos da cobrança\n\nVantagens para sua clínica:\n• Eliminação do risco de inadimplência\n• Fluxo de caixa garantido\n• Aumento no número de pacientes\n• Pacientes pré-aprovados para tratamento\n• Sem taxas de cartão de crédito\n\nNossos números:\n• 85% de aprovação dos pacientes\n• Ticket médio: R$ 3.500\n• 15-20 novos pacientes por mês\n• Pagamento em D+1 útil\n\nTrabalhamos com mais de 200 clínicas parceiras em todo o Brasil.\n\nEntre em contato para conhecer nossa proposta:`
     },
     {
       id: 2,
-      titulo: 'Programa de Indicação',
-      texto: `Clínica especializada,\n\nOferecemos um programa de captação de pacientes com resultados comprovados.\n\n• Sistema testado por clínicas parceiras\n• Pacientes qualificados com interesse real\n• Comissão atrativa e competitiva\n• Suporte técnico durante toda parceria\n• Implementação rápida e simples\n\nEntre em contato para conhecer os detalhes:`
+      titulo: 'Solução para Agenda e Inadimplência',
+      texto: `Prezada clínica,\n\nIdentificamos que muitas clínicas enfrentam os seguintes desafios:\n• Agenda com baixa ocupação\n• Alto índice de inadimplência\n• Pacientes que desistem por falta de crédito\n• Fluxo de caixa irregular\n\nNossa solução:\n\n1. Enviamos pacientes pré-aprovados\n2. Você atende e fecha o tratamento\n3. Recebe o valor à vista em 24h\n4. Nós gerenciamos a cobrança\n\nBenefícios comprovados:\n• Aumento médio de 35% no faturamento\n• Zero inadimplência para a clínica\n• Pacientes que realmente realizam o tratamento\n• Gestão completa da cobrança\n• Sistema legal e transparente\n\nExemplo de resultado:\nClínica parceira - Odontologia\nAntes: 40 pacientes/mês\nDepois: 95 pacientes/mês\nAumento no faturamento: R$ 65.000/mês\n\nVagas limitadas por região. Entre em contato:`
     },
     {
       id: 3,
-      titulo: 'Expansão Comercial',
-      texto: `Estimada clínica,\n\nApresentamos uma oportunidade de parceria comercial para crescimento sustentável.\n\n• Aumento médio de 40% em novos pacientes\n• Sistema automatizado de captação\n• Gestão profissional com relatórios\n• Marketing especializado incluso\n• Treinamento da equipe para conversões\n\nVamos conversar sobre esta parceria:`
+      titulo: 'Antecipação de Boletos - Aumento de Faturamento',
+      texto: `Prezado(a) proprietário(a),\n\nPara clínicas que desejam:\n• Aumentar o número de pacientes\n• Receber sempre à vista\n• Eliminar inadimplência\n• Melhorar a ocupação da agenda\n\nO problema: 60% dos pacientes não possuem cartão com limite suficiente.\nNossa solução: Antecipamos o pagamento via boleto.\n\nComo funciona:\n• Paciente sem cartão/dinheiro\n• Quer fazer tratamento de R$ 8.000\n• Parcela em 12x no boleto\n• Você recebe R$ 8.000 à vista\n• Nós gerenciamos a cobrança\n\nDiferenciais:\n• Aprovação em até 24h\n• Pagamento em D+1\n• Taxa menor que cartão de crédito\n• Atendimento a todas as classes sociais\n• Suporte completo\n\nMédia das nossas clínicas parceiras:\n• 20 novos pacientes por mês\n• Ticket médio: R$ 3.800\n• Taxa de conversão: 88%\n\nEntre em contato para mais informações:`
     }
   ];
 
