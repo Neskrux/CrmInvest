@@ -1,108 +1,91 @@
 {
-  "builds": [
+  "buildCommand": "cd landing-page && npm install && npm run build && cd ../frontend && npm install && npm run build",
+  "outputDirectory": "landing-page/dist",
+  "framework": null,
+  "rewrites": [
     {
-      "src": "landing-page/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
+      "source": "/static/(.*)",
+      "destination": "/../frontend/build/static/$1"
     },
     {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "build"
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/static/(.*)",
-      "dest": "/frontend/build/static/$1"
+      "source": "/captura-lead",
+      "destination": "/../frontend/build/index.html"
     },
     {
-      "src": "/captura-lead",
-      "dest": "/frontend/build/index.html"
+      "source": "/captura-sucesso", 
+      "destination": "/../frontend/build/index.html"
     },
     {
-      "src": "/captura-sucesso",
-      "dest": "/frontend/build/index.html"
+      "source": "/captura-clinica",
+      "destination": "/../frontend/build/index.html"
     },
     {
-      "src": "/captura-clinica",
-      "dest": "/frontend/build/index.html"
+      "source": "/captura-clinica-sucesso",
+      "destination": "/../frontend/build/index.html"
     },
     {
-      "src": "/captura-clinica-sucesso",
-      "dest": "/frontend/build/index.html"
+      "source": "/cadastro",
+      "destination": "/../frontend/build/index.html"
     },
     {
-      "src": "/cadastro",
-      "dest": "/frontend/build/index.html"
+      "source": "/cadastro-sucesso",
+      "destination": "/../frontend/build/index.html"
     },
     {
-      "src": "/cadastro-sucesso",
-      "dest": "/frontend/build/index.html"
+      "source": "/login",
+      "destination": "/../frontend/build/index.html"
     },
     {
-      "src": "/login",
-      "dest": "/frontend/build/index.html"
+      "source": "/reset-password",
+      "destination": "/../frontend/build/index.html"
     },
     {
-      "src": "/reset-password",
-      "dest": "/frontend/build/index.html"
+      "source": "/dashboard",
+      "destination": "/../frontend/build/index.html"
     },
     {
-      "src": "/dashboard",
-      "dest": "/frontend/build/index.html"
+      "source": "/pacientes",
+      "destination": "/../frontend/build/index.html"
     },
     {
-      "src": "/pacientes",
-      "dest": "/frontend/build/index.html"
+      "source": "/consultores",
+      "destination": "/../frontend/build/index.html"
     },
     {
-      "src": "/consultores",
-      "dest": "/frontend/build/index.html"
+      "source": "/clinicas",
+      "destination": "/../frontend/build/index.html"
     },
     {
-      "src": "/clinicas",
-      "dest": "/frontend/build/index.html"
+      "source": "/agendamentos",
+      "destination": "/../frontend/build/index.html"
     },
     {
-      "src": "/agendamentos",
-      "dest": "/frontend/build/index.html"
+      "source": "/fechamentos",
+      "destination": "/../frontend/build/index.html"
     },
     {
-      "src": "/fechamentos",
-      "dest": "/frontend/build/index.html"
+      "source": "/meta-ads",
+      "destination": "/../frontend/build/index.html"
     },
     {
-      "src": "/meta-ads",
-      "dest": "/frontend/build/index.html"
+      "source": "/materiais",
+      "destination": "/../frontend/build/index.html"
     },
     {
-      "src": "/materiais",
-      "dest": "/frontend/build/index.html"
+      "source": "/idsf",
+      "destination": "/../frontend/build/index.html"
     },
     {
-      "src": "/idsf",
-      "dest": "/frontend/build/index.html"
+      "source": "/perfil",
+      "destination": "/../frontend/build/index.html"
     },
     {
-      "src": "/perfil",
-      "dest": "/frontend/build/index.html"
+      "source": "/como-fazer",
+      "destination": "/../frontend/build/index.html"
     },
     {
-      "src": "/como-fazer",
-      "dest": "/frontend/build/index.html"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/landing-page/dist/$1"
-    },
-    {
-      "src": "/",
-      "dest": "/landing-page/dist/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ],
   "env": {
