@@ -357,150 +357,12 @@ const ComoFazer = () => {
 
       {/* Processo executivo */}
       <div className="process-container">
-        {/* Passo 1: Templates Premium */}
+        {/* Passo 1: Links Executivos */}
         <div className="process-step">
           <div className="step-header">
             <div className="step-number">1</div>
             <div className="step-content">
-                   <h2>Escolha uma Imagem (Opcional)</h2>
-                   <p>Selecione o template que mais combina com seu público</p>
-            </div>
-          </div>
-          <div className="carousel-container">
-            <button className="carousel-arrow carousel-arrow-left" onClick={handlePrevImage}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="15 18 9 12 15 6"/>
-              </svg>
-            </button>
-            
-            <div className="carousel-content">
-              <div className="carousel-main-image">
-                <img 
-                  src={templatesDisponiveis[selectedImageIndex].url} 
-                  alt={templatesDisponiveis[selectedImageIndex].titulo}
-                  onClick={() => openImageModal(templatesDisponiveis[selectedImageIndex])}
-                />
-                <div className="carousel-image-info">
-                  <h3>{templatesDisponiveis[selectedImageIndex].titulo}</h3>
-                  <p>{templatesDisponiveis[selectedImageIndex].descricao}</p>
-                </div>
-                {selectedTemplate?.id === templatesDisponiveis[selectedImageIndex].id && (
-                  <div className="selected-badge-carousel">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                    <span>Selecionada</span>
-                  </div>
-                )}
-                <button 
-                  className="select-image-button"
-                  onClick={() => handleTemplateSelect(templatesDisponiveis[selectedImageIndex])}
-                >
-                  {selectedTemplate?.id === templatesDisponiveis[selectedImageIndex].id ? 'Selecionada' : 'Selecionar'}
-                </button>
-              </div>
-              
-              <div className="carousel-thumbnails">
-                {templatesDisponiveis.map((image, index) => (
-                  <div
-                    key={image.id}
-                    className={`thumbnail ${index === selectedImageIndex ? 'active' : ''} ${selectedTemplate?.id === image.id ? 'selected' : ''}`}
-                    onClick={() => setSelectedImageIndex(index)}
-                  >
-                    <img src={image.url} alt={image.titulo} />
-                    {selectedTemplate?.id === image.id && (
-                      <div className="thumbnail-selected">
-                        <CheckCircle size={20} color="white" />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-            
-            <button className="carousel-arrow carousel-arrow-right" onClick={handleNextImage}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="9 18 15 12 9 6"/>
-              </svg>
-            </button>
-          </div>
-          
-          {/* Botão de baixar imagem */}
-          {selectedTemplate && (
-            <div className="download-image-section">
-              <button
-                className="action-button download"
-                onClick={downloadSelectedImage}
-                disabled={!selectedTemplate}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-                Baixar Imagem Selecionada
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Passo 2: Mensagens Corporativas */}
-        <div className="process-step">
-          <div className="step-header">
-            <div className="step-number">2</div>
-            <div className="step-content">
-                   <h2>Escolha uma Mensagem</h2>
-                   <p>Use um dos modelos prontos ou personalize do seu jeito</p>
-            </div>
-          </div>
-          <div className="messages-grid">
-            {(activeTab === 'clinicas' ? mensagensClinicas : mensagensPacientes).map(message => (
-              <div
-                key={message.id}
-                className={`message-card ${selectedMessage?.id === message.id ? 'selected' : ''}`}
-                onClick={() => handleMessageSelect(message)}
-              >
-                <div className="message-header">
-                  <h3>{message.titulo}</h3>
-                </div>
-                <div className="message-content">
-                  <div className="message-preview">
-                    <p>{message.texto.substring(0, 150)}...</p>
-                  </div>
-                  <div className="message-actions">
-                    <button 
-                      className="view-full-button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openMessageModal(message);
-                      }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                        <circle cx="12" cy="12" r="3"/>
-                      </svg>
-                      Ver completo
-                    </button>
-                    {selectedMessage?.id === message.id && (
-                      <div className="selected-indicator">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Passo 3: Links Executivos */}
-        <div className="process-step">
-          <div className="step-header">
-            <div className="step-number">3</div>
-            <div className="step-content">
-                   <h2>Copie seu Link</h2>
+                   <h2>Esse é <strong>SEU</strong> link personalizado</h2>
                    <p>Seu link personalizado para acompanhar as indicações</p>
             </div>
           </div>
@@ -659,11 +521,149 @@ const ComoFazer = () => {
           )}
         </div>
 
+        {/* Passo 2: Mensagens Corporativas */}
+        <div className="process-step">
+          <div className="step-header">
+            <div className="step-number">2</div>
+            <div className="step-content">
+                   <h2>Escolha uma Mensagem (Opcional)</h2>
+                   <p>Use um dos modelos prontos ou personalize do seu jeito</p>
+            </div>
+          </div>
+          <div className="messages-grid">
+            {(activeTab === 'clinicas' ? mensagensClinicas : mensagensPacientes).map(message => (
+              <div
+                key={message.id}
+                className={`message-card ${selectedMessage?.id === message.id ? 'selected' : ''}`}
+                onClick={() => handleMessageSelect(message)}
+              >
+                <div className="message-header">
+                  <h3>{message.titulo}</h3>
+                </div>
+                <div className="message-content">
+                  <div className="message-preview">
+                    <p>{message.texto.substring(0, 150)}...</p>
+                  </div>
+                  <div className="message-actions">
+                    <button 
+                      className="view-full-button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openMessageModal(message);
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
+                      Ver completo
+                    </button>
+                    {selectedMessage?.id === message.id && (
+                      <div className="selected-indicator">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Passo 3: Templates Premium */}
+        <div className="process-step">
+          <div className="step-header">
+            <div className="step-number">3</div>
+            <div className="step-content">
+                   <h2>Escolha uma Imagem (Opcional)</h2>
+                   <p>Selecione o template que mais combina com seu público</p>
+            </div>
+          </div>
+          <div className="carousel-container">
+            <button className="carousel-arrow carousel-arrow-left" onClick={handlePrevImage}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+            </button>
+            
+            <div className="carousel-content">
+              <div className="carousel-main-image">
+                <img 
+                  src={templatesDisponiveis[selectedImageIndex].url} 
+                  alt={templatesDisponiveis[selectedImageIndex].titulo}
+                  onClick={() => openImageModal(templatesDisponiveis[selectedImageIndex])}
+                />
+                <div className="carousel-image-info">
+                  <h3>{templatesDisponiveis[selectedImageIndex].titulo}</h3>
+                  <p>{templatesDisponiveis[selectedImageIndex].descricao}</p>
+                </div>
+                {selectedTemplate?.id === templatesDisponiveis[selectedImageIndex].id && (
+                  <div className="selected-badge-carousel">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    <span>Selecionada</span>
+                  </div>
+                )}
+                <button 
+                  className="select-image-button"
+                  onClick={() => handleTemplateSelect(templatesDisponiveis[selectedImageIndex])}
+                >
+                  {selectedTemplate?.id === templatesDisponiveis[selectedImageIndex].id ? 'Selecionada' : 'Selecionar'}
+                </button>
+              </div>
+              
+              <div className="carousel-thumbnails">
+                {templatesDisponiveis.map((image, index) => (
+                  <div
+                    key={image.id}
+                    className={`thumbnail ${index === selectedImageIndex ? 'active' : ''} ${selectedTemplate?.id === image.id ? 'selected' : ''}`}
+                    onClick={() => setSelectedImageIndex(index)}
+                  >
+                    <img src={image.url} alt={image.titulo} />
+                    {selectedTemplate?.id === image.id && (
+                      <div className="thumbnail-selected">
+                        <CheckCircle size={20} color="white" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <button className="carousel-arrow carousel-arrow-right" onClick={handleNextImage}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </button>
+          </div>
+          
+          {/* Botão de baixar imagem */}
+          {selectedTemplate && (
+            <div className="download-image-section">
+              <button
+                className="action-button download"
+                onClick={downloadSelectedImage}
+                disabled={!selectedTemplate}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Baixar Imagem Selecionada
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Ações Finais */}
         <div className="final-actions">
           <h3>Tudo pronto!</h3>
-          <p>Agora é só compartilhar e acompanhar o status das suas indicações</p>
+          <p>Agora é só compartilhar e acompanhar o status das suas indicações <br /> <strong>Todos que se cadastrarem pelo seu link serão atribuídos a você no sistema
+          </strong></p>
           <div className="action-buttons">
             <button className="action-button primary" onClick={() => window.location.href = '/dashboard'}>
               Ver Dashboard

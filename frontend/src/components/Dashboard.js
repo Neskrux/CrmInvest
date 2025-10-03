@@ -101,13 +101,10 @@ const Dashboard = () => {
       if (mes) params.append('mes', mes);
       if (ano) params.append('ano', ano);
       
-      console.log('🔍 Buscando metas com params:', params.toString());
       const response = await makeRequest(`/metas/progresso${params.toString() ? `?${params.toString()}` : ''}`);
-      console.log('📡 Response status:', response.status);
       
       if (response.ok) {
         const data = await response.json();
-        console.log('📊 Dados recebidos:', data);
         setMetasData(data);
         setMetasEditadas({
           clinicas: data.metas?.clinicas_aprovadas || 30,
@@ -115,10 +112,8 @@ const Dashboard = () => {
         });
       } else {
         const error = await response.text();
-        console.error('❌ Erro na resposta:', error);
       }
     } catch (error) {
-      console.error('❌ Erro ao buscar metas:', error);
     } finally {
       setLoadingMetas(false);
     }
@@ -144,7 +139,6 @@ const Dashboard = () => {
         }
       }
     } catch (error) {
-      console.error('Erro ao atualizar meta:', error);
     }
   };
   
@@ -161,8 +155,6 @@ const Dashboard = () => {
       
       // Se for julho/2025, usar dados históricos
       if (mes === 7 && ano === 2025) {
-        console.log('🎯 Carregando dados históricos de julho/2025');
-        
         // Ramp-up progressivo: Semana 1: 20%, Semana 2: 40%, Semana 3: 70%, Semana 4: 100%
         const metaMensalPacientes = 120;
         const metaMensalClinicas = 30;
@@ -242,7 +234,6 @@ const Dashboard = () => {
         });
       } else if (mes === 9 && ano === 2025) {
         // Dados de setembro/2025
-        console.log('🎯 Carregando dados reais de setembro/2025');
         setMetasData({
           metas: {
             pacientes_fechados: 120,
@@ -326,8 +317,6 @@ const Dashboard = () => {
         });
       } else if (mes === 10 && ano === 2024) {
         // OUTUBRO/2024 - MÊS ATUAL 
-        console.log('📅 Outubro/2024 - Semanas 40-44 do ano');
-        
         // Outubro 2024 abrange as semanas 40, 41, 42, 43 e parte da 44
         const metaMensalPacientes = 120;
         const metaMensalClinicas = 30;
@@ -449,8 +438,6 @@ const Dashboard = () => {
         });
       } else {
         // Para outros meses, gerar estrutura com semanas corretas do ano
-        console.log(`📅 ${mes}/${ano} - Gerando estrutura com semanas do ano...`);
-        
         // Função para calcular semana do ano
         const getWeekOfYear = (date) => {
           const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
@@ -766,7 +753,6 @@ const Dashboard = () => {
           }
         }
       } catch (error) {
-        console.error('Erro ao carregar cidades:', error);
       }
     };
 
@@ -1000,7 +986,6 @@ const Dashboard = () => {
             todasClinicas = await todasClinicasRes.json();
           }
         } catch (error) {
-          console.error('Erro ao buscar todas as clínicas:', error);
         // Fallback para clínicas filtradas se houver erro
         todasClinicas = clinicasFiltradas;
       }
@@ -1210,7 +1195,6 @@ const Dashboard = () => {
       });
       setLoading(false);
     } catch (error) {
-      console.error('Erro ao carregar estatísticas:', error);
       setLoading(false);
     }
   };
@@ -1223,7 +1207,6 @@ const Dashboard = () => {
         setEstadosDisponiveis(estados);
       }
     } catch (error) {
-      console.error('Erro ao carregar estados:', error);
     }
   };
 
