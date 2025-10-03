@@ -1,108 +1,11 @@
 {
-  "builds": [
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/build",
+  "framework": null,
+  "rewrites": [
     {
-      "src": "landing-page/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist",
-        "installCommand": "npm install",
-        "buildCommand": "npm run build"
-      }
-    },
-    {
-      "src": "frontend/package.json", 
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "build",
-        "installCommand": "npm install",
-        "buildCommand": "npm run build"
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/static/(.*)",
-      "dest": "/../frontend/build/static/$1"
-    },
-    {
-      "src": "/captura-lead",
-      "dest": "/../frontend/build/index.html"
-    },
-    {
-      "src": "/captura-sucesso", 
-      "dest": "/../frontend/build/index.html"
-    },
-    {
-      "src": "/captura-clinica",
-      "dest": "/../frontend/build/index.html"
-    },
-    {
-      "src": "/captura-clinica-sucesso",
-      "dest": "/../frontend/build/index.html"
-    },
-    {
-      "src": "/cadastro",
-      "dest": "/../frontend/build/index.html"
-    },
-    {
-      "src": "/cadastro-sucesso",
-      "dest": "/../frontend/build/index.html"
-    },
-    {
-      "src": "/login",
-      "dest": "/../frontend/build/index.html"
-    },
-    {
-      "src": "/reset-password",
-      "dest": "/../frontend/build/index.html"
-    },
-    {
-      "src": "/dashboard",
-      "dest": "/../frontend/build/index.html"
-    },
-    {
-      "src": "/pacientes",
-      "dest": "/../frontend/build/index.html"
-    },
-    {
-      "src": "/consultores",
-      "dest": "/../frontend/build/index.html"
-    },
-    {
-      "src": "/clinicas",
-      "dest": "/../frontend/build/index.html"
-    },
-    {
-      "src": "/agendamentos",
-      "dest": "/../frontend/build/index.html"
-    },
-    {
-      "src": "/fechamentos",
-      "dest": "/../frontend/build/index.html"
-    },
-    {
-      "src": "/meta-ads",
-      "dest": "/../frontend/build/index.html"
-    },
-    {
-      "src": "/materiais",
-      "dest": "/../frontend/build/index.html"
-    },
-    {
-      "src": "/idsf",
-      "dest": "/../frontend/build/index.html"
-    },
-    {
-      "src": "/perfil",
-      "dest": "/../frontend/build/index.html"
-    },
-    {
-      "src": "/como-fazer",
-      "dest": "/../frontend/build/index.html"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/landing-page/dist/$1"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ],
   "env": {
@@ -111,5 +14,5 @@
     "CI": "false",
     "REACT_APP_API_URL": "https://crminvest-backend.fly.dev/api"
   },
-  "regions": ["gru1"]
+  "regions":["gru1"]
 }

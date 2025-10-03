@@ -38,21 +38,6 @@ function App() {
   const [swiper, setSwiper] = useState<any>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Função para navegar para o CRM (funciona local e produção)
-  const navigateToCRM = (path: string = '') => {
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const basePath = isLocal ? 'http://localhost:3000' : '';
-    const fullPath = basePath + (path ? `/${path}` : '');
-    
-    if (isLocal) {
-      // Em desenvolvimento local, abrir em nova aba
-      window.open(fullPath, '_blank');
-    } else {
-      // Em produção, navegar na mesma aba
-      window.location.href = fullPath;
-    }
-  };
-
   const goToPrevSlide = () => {
     if (swiper) {
       swiper.slidePrev();
@@ -83,18 +68,12 @@ function App() {
   return (
     <div className="w-full min-h-screen">
       {/* Header */}
-      <header className="absolute top-0 left-0 right-0 z-50 p-4 lg:px-12 pt-4 flex justify-between items-center">
+      <header className="absolute top-0 left-0 z-50 p-4 lg:pl-12 pt-4">
         <img 
           src="/logo.png" 
           alt="IM Solumn Logo" 
           className="h-18 w-auto"
         />
-        <button
-          onClick={() => navigateToCRM('login')}
-          className="px-6 py-2 rounded-lg font-semibold text-sm transition-all duration-300 bg-white text-black hover:bg-gray-100 cursor-pointer"
-        >
-          Login
-        </button>
       </header>
 
       {/* Hero Section */}
@@ -111,7 +90,7 @@ function App() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 items-center justify-center animate-fade-in" style={{animationDelay: '2s', animationFillMode: 'both'}}>
             <button 
-              onClick={() => navigateToCRM('cadastro')}
+              onClick={() => window.open('https://solumn.com.br/cadastro', '_blank')}
               className="px-10 py-4 rounded-lg font-semibold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg bg-white text-black cursor-pointer"
             >
               Quero ser Freelancer Solumn
@@ -278,7 +257,7 @@ function App() {
                 </video>
                 <div className="text-center mt-4">
                   <button 
-                    onClick={() => navigateToCRM('cadastro')}
+                    onClick={() => window.open('https://solumn.com.br/cadastro', '_blank')}
                     className="w-full px-8 py-3 rounded-lg font-semibold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg bg-gray-900 hover:bg-gray-950 text-white cursor-pointer"
                   >
                     Começar Agora
@@ -526,7 +505,7 @@ function App() {
           {/* CTA Button */}
           <div className="text-center mt-12">
             <button 
-              onClick={() => navigateToCRM('cadastro')}
+              onClick={() => window.open('https://solumn.com.br/cadastro', '_blank')}
               className="px-10 py-4 rounded-lg font-semibold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg bg-gray-900 hover:bg-gray-950 text-white cursor-pointer"
             >
               Cadastre-se Agora e Comece a Ganhar
@@ -632,7 +611,7 @@ function App() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
               <button 
-                onClick={() => navigateToCRM('cadastro')}
+                onClick={() => window.open('https://solumn.com.br/cadastro', '_blank')}
                 className="px-10 py-4 rounded-lg font-semibold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg bg-white text-black cursor-pointer"
               >
                 Quero ser Freelancer Solumn
@@ -665,7 +644,7 @@ function App() {
               <h4 className="text-white font-semibold text-lg mb-4">Links Úteis</h4>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <a href="#" onClick={(e) => { e.preventDefault(); navigateToCRM('cadastro'); }} className="hover:text-white transition-colors">
+                  <a href="https://solumn.com.br/cadastro" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
                     Cadastrar-se
                   </a>
                 </li>

@@ -1,6 +1,0 @@
-# Redirects for CRM app - URLs limpas
-/cadastro /index.html 200
-/login /index.html 200
-/dashboard /index.html 200
-/pacientes /index.html 200
-/clinicas /index.html 200
