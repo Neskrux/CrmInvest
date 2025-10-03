@@ -426,108 +426,6 @@ const ComoFazer = () => {
                     </button>
                   </div>
                 </div>
-
-
-                {selectedMessage && (
-                  <div className="complete-message-card">
-                    <div className="message-header">
-                        <h4>Mensagem Completa</h4>
-                      <button className="copy-all-button" onClick={copyFullMessage}>
-                        <Copy size={16} />
-                        Copiar Mensagem
-                      </button>
-                    </div>
-                    <div className="message-full-content">
-                      {/* Preview da imagem selecionada */}
-                      {selectedTemplate && (
-                        <div className="selected-image-preview">
-                          <div className="preview-header">
-                            <h5>Imagem Selecionada</h5>
-                            <div className="preview-badge">
-                              <CheckCircle size={16} color="#10b981" />
-                              <span>Selecionada</span>
-                            </div>
-                          </div>
-                          <div className="preview-image-container">
-                            <img 
-                              src={selectedTemplate.url} 
-                              alt={selectedTemplate.titulo}
-                              className="preview-image"
-                            />
-                            <div className="preview-info">
-                              <h6>{selectedTemplate.titulo}</h6>
-                              <p>{selectedTemplate.descricao}</p>
-                            </div>
-                          </div>
-                          <div className="image-warning" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <div className="warning-text">
-                              <strong>Importante:</strong> Lembre-se de baixar a imagem selecionada e enviá-la junto com a mensagem para garantir que tudo fique perfeito!
-                            </div>
-                            <button
-                              className="action-button download"
-                              onClick={downloadSelectedImage}
-                              style={{
-                                marginTop: '1rem',
-                                padding: '0.5rem 1rem',
-                                fontSize: '0.8rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem'
-                              }}
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                <polyline points="7 10 12 15 17 10"/>
-                                <line x1="12" y1="15" x2="12" y2="3"/>
-                              </svg>
-                              Baixar Imagem
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div className="message-text">
-                        <p>{selectedMessage.texto}</p>
-                        <div className="link-attachment">
-                          <div className="link-box">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                            </svg>
-                            {activeTab === 'clinicas' ? linkClinicas : linkPacientes}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Botão de copiar no final */}
-                      <div style={{ 
-                        display: 'flex', 
-                        justifyContent: 'center', 
-                        marginTop: '1.5rem',
-                        paddingTop: '1rem',
-                        borderTop: '1px solid #e5e7eb'
-                      }}>
-                        <button 
-                          className="action-button primary" 
-                          onClick={copyFullMessage}
-                          style={{
-                            padding: '0.75rem 2rem',
-                            fontSize: '0.9rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem'
-                          }}
-                        >
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                          </svg>
-                          Copiar Mensagem Completa
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -667,6 +565,108 @@ const ComoFazer = () => {
                 </svg>
                 Baixar Imagem Selecionada
               </button>
+            </div>
+          )}
+
+          {/* Mensagem Completa - Preview Final */}
+          {selectedMessage && (
+            <div className="complete-message-card">
+              <div className="message-header">
+                  <h4>Mensagem Completa</h4>
+                <button className="copy-all-button" onClick={copyFullMessage}>
+                  <Copy size={16} />
+                  Copiar Mensagem
+                </button>
+              </div>
+              <div className="message-full-content">
+                {/* Preview da imagem selecionada */}
+                {selectedTemplate && (
+                  <div className="selected-image-preview">
+                    <div className="preview-header">
+                      <h5>Imagem Selecionada</h5>
+                      <div className="preview-badge">
+                        <CheckCircle size={16} color="#10b981" />
+                        <span>Selecionada</span>
+                      </div>
+                    </div>
+                    <div className="preview-image-container">
+                      <img 
+                        src={selectedTemplate.url} 
+                        alt={selectedTemplate.titulo}
+                        className="preview-image"
+                      />
+                      <div className="preview-info">
+                        <h6>{selectedTemplate.titulo}</h6>
+                        <p>{selectedTemplate.descricao}</p>
+                      </div>
+                    </div>
+                    <div className="image-warning" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <div className="warning-text">
+                        <strong>Importante:</strong> Lembre-se de baixar a imagem selecionada e enviá-la junto com a mensagem para garantir que tudo fique perfeito!
+                      </div>
+                      <button
+                        className="action-button download"
+                        onClick={downloadSelectedImage}
+                        style={{
+                          marginTop: '1rem',
+                          padding: '0.5rem 1rem',
+                          fontSize: '0.8rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                          <polyline points="7 10 12 15 17 10"/>
+                          <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        Baixar Imagem
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="message-text">
+                  <p>{selectedMessage.texto}</p>
+                  <div className="link-attachment">
+                    <div className="link-box">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                      </svg>
+                      {activeTab === 'clinicas' ? linkClinicas : linkPacientes}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Botão de copiar no final */}
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  marginTop: '1.5rem',
+                  paddingTop: '1rem',
+                  borderTop: '1px solid #e5e7eb'
+                }}>
+                  <button 
+                    className="action-button primary" 
+                    onClick={copyFullMessage}
+                    style={{
+                      padding: '0.75rem 2rem',
+                      fontSize: '0.9rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                    Copiar Mensagem Completa
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
