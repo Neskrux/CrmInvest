@@ -721,10 +721,18 @@ const CapturaClinica = () => {
           color: white;
           font-weight: 600;
           font-size: 0.78rem;
+
+          span {
+            color: white !important;
+          }
         }
 
         .benefit-icon {
           font-size: 1.2rem;
+          
+          svg {
+            color: #ffde34 !important;
+          }
         }
 
         .captura-form-container {

@@ -301,6 +301,14 @@ const CadastroConsultor = () => {
       newErrors.pix = 'PIX deve ser igual ao CPF informado';
     }
     
+    if (!formData.estado.trim()) {
+      newErrors.estado = 'Estado é obrigatório';
+    }
+    
+    if (!formData.cidade.trim()) {
+      newErrors.cidade = 'Cidade é obrigatória';
+    }
+    
     if (!formData.aceitaTermos) {
       newErrors.aceitaTermos = 'Você deve aceitar os termos de uso';
     }
@@ -354,7 +362,6 @@ const CadastroConsultor = () => {
         setErrors({ general: errorMsg });
       }
     } catch (error) {
-      console.error('Erro no cadastro:', error);
       setErrors({ general: 'Erro de conexão. Tente novamente.' });
     } finally {
       setLoading(false);
@@ -516,12 +523,13 @@ const CadastroConsultor = () => {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Estado</label>
+              <label className="form-label">Estado *</label>
               <select
                 name="estado"
                 className="form-input"
                 value={formData.estado}
                 onChange={handleChange}
+                required
                 style={{
                   borderColor: errors.estado ? '#ef4444' : '#d1d5db'
                 }}
@@ -541,7 +549,7 @@ const CadastroConsultor = () => {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Cidade</label>
+              <label className="form-label">Cidade *</label>
               {formData.estado && cidadesPorEstado[formData.estado] && !cidadeCustomizada ? (
                 <select
                   name="cidade"
@@ -555,6 +563,7 @@ const CadastroConsultor = () => {
                       handleChange(e);
                     }
                   }}
+                  required
                   style={{
                     borderColor: errors.cidade ? '#ef4444' : '#d1d5db'
                   }}
@@ -575,6 +584,7 @@ const CadastroConsultor = () => {
                     onChange={handleChange}
                     placeholder="Digite o nome da cidade"
                     disabled={!formData.estado}
+                    required
                     style={{
                       borderColor: errors.cidade ? '#ef4444' : '#d1d5db',
                       flex: 1
