@@ -909,7 +909,6 @@ function App() {
         <AudioProvider>
           <LeadNotificationProvider>
             <Router>
-              
               <Routes>
                 {/* Rotas públicas - Captura de leads */}
                 <Route path="/captura-lead" element={<CapturaLead />} />
