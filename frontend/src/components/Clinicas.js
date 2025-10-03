@@ -1220,33 +1220,33 @@ const Clinicas = () => {
         </div>
       </div>
 
-      {/* Navegação por abas - Ocultar para freelancers */}
-      {!isFreelancer && (
-        <div className="tabs">
-          <button
-            className={`tab ${activeTab === 'clinicas' ? 'active' : ''}`}
-            onClick={() => setActiveTab('clinicas')}
-          >
-            Clínicas
-          </button>
-          
-          <button
-            className={`tab ${activeTab === 'novas-clinicas' ? 'active' : ''}`}
-            onClick={() => setActiveTab('novas-clinicas')}
-            style={{ position: 'relative' }}
-          >
-            {isAdmin ? 'Novas Clínicas' : 'Indicar Clínicas'}
-            {novasClinicas.length > 0 && (
-              <span className="tab-badge">{novasClinicas.length}</span>
-            )}
-          </button>
-          <button
-            className={`tab ${activeTab === 'mapa' ? 'active' : ''}`}
-            onClick={() => setActiveTab('mapa')}
-          >
-            Mapa
-          </button>
-        </div>
+      {/* Navegação por abas - Mostrar para Admin e Consultor Interno */}
+      {(isAdmin || isConsultorInterno) && (
+      <div className="tabs">
+        <button
+          className={`tab ${activeTab === 'clinicas' ? 'active' : ''}`}
+          onClick={() => setActiveTab('clinicas')}
+        >
+          Clínicas
+        </button>
+        
+            <button
+              className={`tab ${activeTab === 'novas-clinicas' ? 'active' : ''}`}
+              onClick={() => setActiveTab('novas-clinicas')}
+              style={{ position: 'relative' }}
+            >
+              {isAdmin ? 'Novas Clínicas' : 'Indicar Clínicas'}
+              {novasClinicas.length > 0 && (
+                <span className="tab-badge">{novasClinicas.length}</span>
+              )}
+            </button>
+            <button
+              className={`tab ${activeTab === 'mapa' ? 'active' : ''}`}
+              onClick={() => setActiveTab('mapa')}
+            >
+              Mapa
+            </button>
+      </div>
       )}
 
       {/* Conteúdo da aba Mapa */}
@@ -1898,56 +1898,56 @@ const Clinicas = () => {
                 {clinicasFiltradas.map(clinica => (
                   <tr key={clinica.id} className={clinica.status === 'inativa' ? 'clinica-bloqueada' : ''}>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        {/* Indicador de origem da clínica - apenas para admin e consultor interno */}
-                        {(isAdmin || isConsultorInterno) && (
-                          <>
-                            {clinica.tipo_origem === 'aprovada' && (
-                              <span 
-                                className="badge" 
-                                style={{ 
-                                  backgroundColor: '#3b82f6', 
-                                  color: 'white',
-                                  fontSize: '0.7rem',
-                                  padding: '2px 6px',
-                                  borderRadius: '4px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}
-                                title="Clínica aprovada da aba 'Novas Clínicas'"
-                              >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M9 12l2 2 4-4"/>
-                                  <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"/>
-                                </svg>
-                                Aprovada
-                              </span>
-                            )}
-                            {clinica.tipo_origem === 'direta' && (
-                              <span 
-                                className="badge" 
-                                style={{ 
-                                  backgroundColor: '#10b981', 
-                                  color: 'white',
-                                  fontSize: '0.7rem',
-                                  padding: '2px 6px',
-                                  borderRadius: '4px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}
-                                title="Clínica criada diretamente por administrador"
-                              >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                </svg>
-                                Direta
-                              </span>
-                            )}
-                          </>
-                        )}
-                        <strong>{clinica.nome}</strong>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          {/* Indicador de origem da clínica - apenas para admin e consultor interno */}
+                          {(isAdmin || isConsultorInterno) && (
+                            <>
+                              {clinica.tipo_origem === 'aprovada' && (
+                                <span 
+                                  className="badge" 
+                                  style={{ 
+                                    backgroundColor: '#3b82f6', 
+                                    color: 'white',
+                                    fontSize: '0.7rem',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                  title="Clínica aprovada da aba 'Novas Clínicas'"
+                                >
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M9 12l2 2 4-4"/>
+                                    <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"/>
+                                  </svg>
+                                  Aprovada
+                                </span>
+                              )}
+                              {clinica.tipo_origem === 'direta' && (
+                                <span 
+                                  className="badge" 
+                                  style={{ 
+                                    backgroundColor: '#10b981', 
+                                    color: 'white',
+                                    fontSize: '0.7rem',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                  title="Clínica criada diretamente por administrador"
+                                >
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                  </svg>
+                                  Direta
+                                </span>
+                              )}
+                            </>
+                          )}
+                          <strong>{clinica.nome}</strong>
                       </div>
                     </td>
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
@@ -3260,12 +3260,12 @@ const Clinicas = () => {
                    }}
                  >
                    {window.innerWidth > 768 && (
-                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
-                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                       <polyline points="14 2 14 8 20 8"></polyline>
-                       <line x1="16" y1="13" x2="8" y2="13"></line>
-                       <line x1="16" y1="17" x2="8" y2="17"></line>
-                     </svg>
+                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
+                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                     <polyline points="14 2 14 8 20 8"></polyline>
+                     <line x1="16" y1="13" x2="8" y2="13"></line>
+                     <line x1="16" y1="17" x2="8" y2="17"></line>
+                   </svg>
                    )}
                    Documentos
                  </button>
@@ -3286,10 +3286,10 @@ const Clinicas = () => {
                    }}
                  >
                    {window.innerWidth > 768 && (
-                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
-                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                       <circle cx="12" cy="7" r="4"></circle>
-                     </svg>
+                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
+                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                     <circle cx="12" cy="7" r="4"></circle>
+                   </svg>
                    )}
                    Pacientes
                  </button>
@@ -3310,10 +3310,10 @@ const Clinicas = () => {
                    }}
                  >
                    {window.innerWidth > 768 && (
-                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
-                       <circle cx="12" cy="12" r="10"></circle>
-                       <polyline points="12 6 12 12 16 14"></polyline>
-                     </svg>
+                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
+                     <circle cx="12" cy="12" r="10"></circle>
+                     <polyline points="12 6 12 12 16 14"></polyline>
+                   </svg>
                    )}
                    Histórico
                  </button>
