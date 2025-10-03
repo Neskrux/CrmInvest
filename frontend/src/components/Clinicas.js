@@ -1220,8 +1220,8 @@ const Clinicas = () => {
         </div>
       </div>
 
-      {/* Navegação por abas - Ocultar para freelancers */}
-      {!isFreelancer && (
+      {/* Navegação por abas - Mostrar apenas para admin e consultor interno */}
+      {(isAdmin || isConsultorInterno) && (
         <div className="tabs">
           <button
             className={`tab ${activeTab === 'clinicas' ? 'active' : ''}`}
