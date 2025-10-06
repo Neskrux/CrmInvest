@@ -22,7 +22,7 @@ const ComoFazer = () => {
     },
     {
       pergunta: "E quanto ganho por indicar um paciente?",
-      resposta: "Cada paciente que faz um tratamento pela IM gera 1% do valor do procedimento pra você. Se ele fizer um tratamento de R$ 4.000, por exemplo, você ganha R$ 40."
+      resposta: "Cada paciente que faz um tratamento pela IM gera 1% do valor do procedimento pra você. Se ele fizer um tratamento de R$ 5.000, por exemplo, você ganha R$ 50."
     },
     {
       pergunta: "Tem limite de indicações ou ganhos?",
@@ -30,7 +30,7 @@ const ComoFazer = () => {
     },
     {
       pergunta: "Como faço para indicar?",
-      resposta: "É muito fácil! Na página 'Indicações' você encontra seus links personalizados e materiais prontos. Você pode compartilhar esses links nas suas redes sociais ou cadastrar clínicas e pacientes diretamente na plataforma. Todos que se cadastrarem pelo seu link serão automaticamente atribuídos a você."
+      resposta: "É muito fácil! Na página 'Indicações' você encontra seus links personalizados e materiais prontos. Você pode compartilhar esses links nas suas redes sociais, todos que se cadastrarem pelo seu link serão automaticamente atribuídos a você."
     },
     {
       pergunta: "Como acompanho meus ganhos e status?",
@@ -42,15 +42,15 @@ const ComoFazer = () => {
     },
     {
       pergunta: "Com quem falo se tiver dúvidas?",
-      resposta: "Entre em contato direto pelo número da Gimtech ou click em suporte no Solumn."
+      resposta: "Clique no botão no canto inferior direito para entrar em contato com a nossa equipe, ou na aba 'Suporte'."
     },
     {
       pergunta: "Existe algum grupo ou canal oficial de freelancers?",
-      resposta: "Sim! Participe do grupo dos frella para receber novidades, campanhas e tirar dúvidas com outros freelancers."
+      resposta: "Sim! Participe da comunidade dos consultores para receber novidades, campanhas e tirar dúvidas com outros freelancers."
     },
     {
       pergunta: "Posso atualizar meus dados depois do cadastro?",
-      resposta: "Sim. Dentro da plataforma Solumn, vá em 'Meu Perfil' e atualize suas informações sempre que precisar — como telefone, e-mail ou dados bancários."
+      resposta: "Sim. Dentro da plataforma Solumn, vá em 'Meu Perfil' e atualize suas informações sempre que precisar — como telefone, e-mail ou chave PIX."
     },
     {
       pergunta: "O que é a Investmoney e o que ela faz?",

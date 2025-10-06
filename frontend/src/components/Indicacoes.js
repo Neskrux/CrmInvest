@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from './Toast';
-import { Copy, Check, CheckCircle } from 'lucide-react';
+import { Copy, Check, CheckCircle, Lightbulb, HelpCircle } from 'lucide-react';
 import './Indicacoes.css';
+import TutorialIndicacoes from './TutorialIndicacoes';
 
 const Indicacoes = () => {
   const { user, makeRequest } = useAuth();
@@ -20,6 +21,10 @@ const Indicacoes = () => {
   const [modalImage, setModalImage] = useState(null);
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [modalMessage, setModalMessage] = useState(null);
+  
+  // Estados para controlar o tutorial
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialCompleted, setTutorialCompleted] = useState(false);
 
   // Imagens para o carrossel
   const imagensClinicas = [
@@ -149,6 +154,32 @@ const Indicacoes = () => {
     // Só executa fetchLinks se o usuário tiver permissão
     fetchLinks();
   }, [user]);
+
+  // Verificar se deve mostrar tutorial
+  useEffect(() => {
+    if (!user) return;
+    
+    const hasSeenTutorialIndicacoes = localStorage.getItem('tutorial-indicacoes-completed');
+    
+    // Não mostrar tutorial automaticamente, apenas se o usuário clicar
+    // if (!hasSeenTutorialIndicacoes) {
+    //   setShowTutorial(true);
+    // }
+  }, [user]);
+
+  const handleTutorialComplete = () => {
+    setShowTutorial(false);
+    setTutorialCompleted(true);
+    localStorage.setItem('tutorial-indicacoes-completed', 'true');
+  };
+
+  const handleTutorialClose = () => {
+    setShowTutorial(false);
+  };
+
+  const startTutorial = () => {
+    setShowTutorial(true);
+  };
 
   // Cleanup: restaurar scroll quando componente for desmontado
   useEffect(() => {
@@ -366,7 +397,7 @@ const Indicacoes = () => {
   return (
     <div className="indicacoes-container">
       {/* Header executivo */}
-      <div className="indicacoes-header">
+      <div className="indicacoes-header" style={{ position: 'relative' }}>
         <div className="header-content">
           <h1 className="header-title">
             Comece a Indicar
@@ -374,17 +405,157 @@ const Indicacoes = () => {
           <p className="header-subtitle">
             Siga os passos abaixo para começar a indicar e ganhar dinheiro
           </p>
+          
+          {/* Botão Ver Tutorial - Mobile: abaixo do texto */}
+          <button
+            onClick={startTutorial}
+            style={{
+              display: window.innerWidth <= 768 ? 'flex' : 'none',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '10px 20px',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(255, 255, 255, 0.15)',
+              color: 'white',
+              fontSize: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+              backdropFilter: 'blur(10px)',
+              marginTop: '1rem',
+              width: 'fit-content',
+              margin: '1rem auto 0'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
+              e.target.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+              e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+            }}
+            title="Ver tutorial da página"
+          >
+            Ver Tutorial
+          </button>
+        </div>
+        
+        {/* Botão Ver Tutorial - Desktop: posição absoluta no canto superior direito */}
+        <button
+          onClick={startTutorial}
+          style={{
+            position: 'absolute',
+            top: '1.5rem',
+            right: '1.5rem',
+            display: window.innerWidth <= 768 ? 'none' : 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 16px',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            borderRadius: '8px',
+            backgroundColor: 'rgba(255, 255, 255, 0.15)',
+            color: 'white',
+            fontSize: '14px',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+            backdropFilter: 'blur(10px)',
+            zIndex: 10
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
+            e.target.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+            e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+          }}
+          title="Ver tutorial da página"
+        >
+          Ver Tutorial
+        </button>
+      </div>
+
+
+      {/* Seção Explicativa do Produto */}
+      <div style={{
+        maxWidth: '1200px',
+        margin: '2rem auto',
+        padding: '0 1rem'
+      }}>
+        <div 
+          data-tutorial="produto-explicacao"
+          style={{
+            background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+            borderRadius: '12px',
+            padding: '2rem',
+            border: '2px solid #93c5fd',
+            boxShadow: '0 4px 20px rgba(59, 130, 246, 0.15)'
+          }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '1.5rem',
+            marginBottom: '1rem'
+          }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <Lightbulb size={28} color="white" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <h3 style={{
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                color: '#1e40af',
+                marginBottom: '1rem'
+              }}>
+                O que o Solumn faz e como você faz parte disso?
+              </h3>
+              <p style={{
+                fontSize: '1.05rem',
+                color: '#1e3a8a',
+                lineHeight: '1.7',
+                marginBottom: '0'
+              }}>
+                A clínica faz um tratamento e o paciente paga em várias parcelas.
+                A Investmoney, empresa desenvolvedora da Solumn, adianta esse dinheiro pra clínica — e depois recebe os boletos aos poucos.
+                Isso ajuda clínicas a terem dinheiro agora e pacientes a fazerem o tratamento sem precisar de cartão de crédito e sem taxas abusivas.
+              </p>
+              <p style={{
+                fontSize: '1.05rem',
+                color: '#1e3a8a',
+                lineHeight: '1.7',
+                marginTop: '1rem',
+                marginBottom: '0',
+                fontWeight: '500'
+              }}>
+                <strong>Você </strong>faz parte indicando clínicas que querem receber à vista e pacientes que precisam parcelar com facilidade.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Seção de Comissões em Destaque */}
-      <div style={{
-        padding: '2rem',
-        borderRadius: '16px',
-        margin: '2rem auto',
-        maxWidth: '1200px',
-        boxShadow: '0 20px 60px rgba(102, 126, 234, 0.3)'
-      }}>
+      <div 
+        data-tutorial="comissoes"
+        style={{
+          padding: '2rem',
+          borderRadius: '16px',
+          margin: '2rem auto',
+          maxWidth: '1200px',
+          boxShadow: '0 20px 60px rgba(102, 126, 234, 0.3)'
+        }}>
         <div style={{
           textAlign: 'center',
           color: 'black',
@@ -607,7 +778,7 @@ const Indicacoes = () => {
         textAlign: 'center',
         marginTop: '2rem'
       }}>Escolha o que você quer indicar</h2>
-      <div className="tabs-container">
+      <div className="tabs-container" data-tutorial="escolha-tipo">
         <div className="tabs-wrapper">
           <button
             className={`tab-button ${activeTab === 'clinicas' ? 'active' : ''}`}
@@ -676,7 +847,7 @@ const Indicacoes = () => {
       <div className="process-container">
 
         {/* Passo 2: Mensagens Corporativas */}
-        <div className="process-step">
+        <div className="process-step" data-tutorial="mensagens">
           <div className="step-header">
             <div className="step-number">1</div>
             <div className="step-content">
@@ -727,7 +898,7 @@ const Indicacoes = () => {
         </div>
 
         {/* Passo 3: Templates Premium */}
-        <div className="process-step">
+        <div className="process-step" data-tutorial="imagens">
           <div className="step-header">
             <div className="step-number">2</div>
             <div className="step-content">
@@ -915,7 +1086,7 @@ const Indicacoes = () => {
           )}
 
           {/* Passo 1: Links Executivos */}
-        <div className="process-step">
+        <div className="process-step" data-tutorial="link-personalizado">
           <div className="step-header">
             <div className="step-content">
                    <h2>Esse é <strong>SEU</strong> link personalizado</h2>
@@ -1056,6 +1227,13 @@ const Indicacoes = () => {
           </div>
         </div>
       )}
+
+      {/* Tutorial Overlay */}
+      <TutorialIndicacoes
+        isOpen={showTutorial}
+        onClose={handleTutorialClose}
+        onComplete={handleTutorialComplete}
+      />
     </div>
   );
 };
