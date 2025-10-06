@@ -760,7 +760,7 @@ const Dashboard = () => {
   }, [filtroRegiao.estado]);
 
   const calcularComissao = (valorFechado) => {
-    return (valorFechado / 1000) * 5;
+    return valorFechado * 0.01; // 1% do valor total
   };
 
   const fetchStats = async () => {

@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './components/Toast';
 import { LeadNotificationProvider, useLeadNotification } from './components/LeadNotificationProvider';
 import { AudioProvider } from './contexts/AudioContext';
+import { HelpCircle } from 'lucide-react';
 import LandingPage from './components/LandingPage';
 import CadastroConsultor from './components/CadastroConsultor';
 import CadastroSucesso from './components/CadastroSucesso';
@@ -25,6 +26,7 @@ import MetaAds from './components/MetaAds';
 import Perfil from './components/Perfil';
 import Materiais from './components/Materiais';
 import IDSFIntegration from './components/IDSFIntegration';
+import Indicacoes from './components/Indicacoes';
 import ComoFazer from './components/ComoFazer';
 import logoBrasao from './images/logobrasao.png';
 import logoHorizontal from './images/logohorizontal.png';
@@ -85,6 +87,7 @@ const AppContentWithNotifications = () => {
   // Determinar aba ativa baseada na rota atual
   const getActiveTab = () => {
     const path = location.pathname;
+    if (path.includes('/indicacoes')) return 'indicacoes';
     if (path.includes('/como-fazer')) return 'como-fazer';
     if (path.includes('/pacientes')) return 'pacientes';
     if (path.includes('/consultores')) return 'consultores';
@@ -171,25 +174,24 @@ const AppContentWithNotifications = () => {
     if (isFreelancer && user?.tipo === 'consultor') {
       return (
         <Routes>
+          <Route path="/indicacoes" element={<Indicacoes />} />
           <Route path="/como-fazer" element={<ComoFazer />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/pacientes" element={<Pacientes />} />
           <Route path="/clinicas" element={<Clinicas />} />
           <Route path="/materiais" element={<Materiais />} />
           <Route path="/perfil" element={<Perfil />} />
-          {/* Redirecionar para Como Fazer como página inicial */}
-          <Route path="/" element={<Navigate to="/como-fazer" replace />} />
-          <Route path="*" element={<Navigate to="/como-fazer" replace />} />
+          <Route path="/" element={<Navigate to="/indicacoes" replace />} />
+          <Route path="*" element={<Navigate to="/indicacoes" replace />} />
         </Routes>
       );
     }
 
-    // Rota específica para Como Fazer - APENAS freelancers consultores
     if (isFreelancer && user?.tipo === 'consultor') {
       return (
         <Routes>
-          <Route path="/como-fazer" element={<ComoFazer />} />
-          <Route path="*" element={<Navigate to="/como-fazer" replace />} />
+          <Route path="/indicacoes" element={<Indicacoes />} />
+          <Route path="*" element={<Navigate to="/indicacoes" replace />} />
         </Routes>
       );
     }
@@ -236,6 +238,7 @@ const AppContentWithNotifications = () => {
         {/* Rota WhatsApp temporariamente removida */}
         {/* <Route path="/whatsapp" element={<WhatsApp />} /> */}
         <Route path="/materiais" element={<Materiais />} />
+        <Route path="/como-fazer" element={<ComoFazer />} />
         <Route path="/idsf" element={<IDSFIntegration />} />
         <Route path="/perfil" element={<Perfil />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -277,13 +280,21 @@ const AppContentWithNotifications = () => {
               
               <nav className="freelancer-nav" ref={navRef} onScroll={checkScrollArrows}>
               <Link
-                to="/como-fazer"
-                className={`freelancer-nav-item ${activeTab === 'como-fazer' ? 'active' : ''}`}
+                to="/indicacoes"
+                className={`freelancer-nav-item ${activeTab === 'indicacoes' ? 'active' : ''}`}
               >
                 <svg className="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
                 </svg>
                 <span>Indicações</span>
+              </Link>
+
+              <Link
+                to="/como-fazer"
+                className={`freelancer-nav-item ${activeTab === 'como-fazer' ? 'active' : ''}`}
+              >
+                <HelpCircle className="nav-icon" size={20} />
+                <span>Como Fazer?</span>
               </Link>
 
               <Link
@@ -398,6 +409,71 @@ const AppContentWithNotifications = () => {
         <main className="freelancer-main">
           {RenderContent()}
         </main>
+
+        {/* Botão Flutuante WhatsApp - Para Freelancers */}
+        <a
+          href="https://wa.me/554199647120?text=Olá! Sou freelancer do Solumn e preciso de ajuda."
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            position: 'fixed',
+            bottom: '1.5rem',
+            right: '1.5rem',
+            backgroundColor: '#25D366',
+            color: 'white',
+            borderRadius: '50%',
+            padding: '1rem',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
+            transition: 'all 0.3s ease',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            textDecoration: 'none'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.1)';
+            e.currentTarget.style.backgroundColor = '#128C7E';
+            const tooltip = e.currentTarget.querySelector('.whatsapp-tooltip');
+            if (tooltip) tooltip.style.opacity = '1';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.backgroundColor = '#25D366';
+            const tooltip = e.currentTarget.querySelector('.whatsapp-tooltip');
+            if (tooltip) tooltip.style.opacity = '0';
+          }}
+          aria-label="Fale conosco no WhatsApp"
+        >
+          <svg 
+            width="32" 
+            height="32" 
+            fill="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/>
+          </svg>
+          <span 
+            className="whatsapp-tooltip"
+            style={{
+              position: 'absolute',
+              right: '100%',
+              marginRight: '0.75rem',
+              backgroundColor: '#1f2937',
+              color: 'white',
+              padding: '0.5rem 0.75rem',
+              borderRadius: '0.5rem',
+              fontSize: '0.875rem',
+              whiteSpace: 'nowrap',
+              opacity: 0,
+              transition: 'opacity 0.3s ease',
+              pointerEvents: 'none'
+            }}
+          >
+            Fale conosco!
+          </span>
+        </a>
       </div>
     );
     }
@@ -898,6 +974,73 @@ const AppContentWithNotifications = () => {
           {RenderContent()}
         </div>
       </main>
+
+      {/* Botão Flutuante WhatsApp - Apenas para consultores */}
+      {user?.tipo === 'consultor' && (
+        <a
+          href="https://wa.me/5541999647120?text=Olá! Sou freelancer do Solumn e preciso de ajuda."
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            position: 'fixed',
+            bottom: '1.5rem',
+            right: '1.5rem',
+            backgroundColor: '#25D366',
+            color: 'white',
+            borderRadius: '50%',
+            padding: '1rem',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
+            transition: 'all 0.3s ease',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            textDecoration: 'none'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.1)';
+            e.currentTarget.style.backgroundColor = '#128C7E';
+            const tooltip = e.currentTarget.querySelector('.whatsapp-tooltip');
+            if (tooltip) tooltip.style.opacity = '1';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.backgroundColor = '#25D366';
+            const tooltip = e.currentTarget.querySelector('.whatsapp-tooltip');
+            if (tooltip) tooltip.style.opacity = '0';
+          }}
+          aria-label="Fale conosco no WhatsApp"
+        >
+          <svg 
+            width="32" 
+            height="32" 
+            fill="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/>
+          </svg>
+          <span 
+            className="whatsapp-tooltip"
+            style={{
+              position: 'absolute',
+              right: '100%',
+              marginRight: '0.75rem',
+              backgroundColor: '#1f2937',
+              color: 'white',
+              padding: '0.5rem 0.75rem',
+              borderRadius: '0.5rem',
+              fontSize: '0.875rem',
+              whiteSpace: 'nowrap',
+              opacity: 0,
+              transition: 'opacity 0.3s ease',
+              pointerEvents: 'none'
+            }}
+          >
+            Fale conosco!
+          </span>
+        </a>
+      )}
     </div>
   );
 }
