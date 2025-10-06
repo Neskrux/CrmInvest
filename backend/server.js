@@ -1974,7 +1974,10 @@ app.post('/api/clinicas/cadastro-publico', async (req, res) => {
     
     // Decidir em qual tabela inserir baseado se é freelancer
     const tabelaDestino = isFreelancer ? 'clinicas' : 'novas_clinicas';
-    console.log(`💾 Inserindo clínica na tabela ${tabelaDestino} com consultor_id:`, consultorId);
+    console.log(`💾 Inserindo clínica na tabela ${tabelaDestino}`);
+    console.log(`   - Consultor ID: ${consultorId}`);
+    console.log(`   - Consultor Nome: ${consultorNome}`);
+    console.log(`   - É Freelancer: ${isFreelancer}`);
     
     // Preparar dados base
     const dadosBase = {
@@ -2001,7 +2004,8 @@ app.post('/api/clinicas/cadastro-publico', async (req, res) => {
           ...dadosBase,
           responsavel: responsavel.trim(),
           status: 'em_contato', // Clínicas de freelancers entram com status "Em contato"
-          tipo_origem: 'freelancer' // Identificar origem
+          tipo_origem: 'freelancer', // Identificar origem
+          consultor_id: consultorId // Vincular clínica ao freelancer
         }])
         .select();
       data = result.data;

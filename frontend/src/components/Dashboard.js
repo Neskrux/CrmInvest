@@ -2449,30 +2449,6 @@ const Dashboard = () => {
               <div style={{ 
                 fontSize: window.innerWidth <= 768 ? '1.5rem' : '2.5rem', 
                 fontWeight: '800', 
-                color: '#1a1d23',
-                marginBottom: '0.5rem'
-              }}>
-                {pipelineFiltrado.compareceu || 0}
-              </div>
-              <div style={{ 
-                fontSize: '0.75rem', 
-                color: '#64748b', 
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                fontWeight: '600'
-              }}>
-                Compareceram
-              </div>
-            </div>
-
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5">
-              <polyline points="9 18 15 12 9 6"></polyline>
-            </svg>
-
-            <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ 
-                fontSize: window.innerWidth <= 768 ? '1.5rem' : '2.5rem', 
-                fontWeight: '800', 
                 color: '#059669',
                 marginBottom: '0.5rem'
               }}>
