@@ -81,7 +81,13 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, senha) => {
     try {
       // CRÍTICO: Limpar TODOS os dados antes de fazer login para evitar cache/sessões cruzadas
-      localStorage.clear(); // Limpa TUDO
+      const keysToKeep = []; // Não manter nada do localStorage
+      const allKeys = Object.keys(localStorage);
+      allKeys.forEach(key => {
+        if (!keysToKeep.includes(key)) {
+          localStorage.removeItem(key);
+        }
+      });
       sessionStorage.clear(); // Limpa session storage também
       setUser(null);
       setToken(null);
@@ -101,6 +107,19 @@ export const AuthProvider = ({ children }) => {
       }
 
       const { token: newToken, usuario } = data;
+      
+      console.log('🔐 Usuario recebido do backend:', usuario);
+      console.log('🔑 clinica_id:', usuario?.clinica_id);
+      
+      // Limpar flags de tutoriais e modais (importante para evitar confusion entre tipos de usuário)
+      localStorage.removeItem('welcome-completed');
+      localStorage.removeItem('tutorial-completed');
+      localStorage.removeItem('whatsapp-group-modal-shown');
+      localStorage.removeItem('tutorial-pacientes-completed');
+      localStorage.removeItem('tutorial-agendamentos-completed');
+      localStorage.removeItem('tutorial-fechamentos-completed');
+      localStorage.removeItem('tutorial-clinicas-completed');
+      localStorage.removeItem('tutorial-whatsapp-completed');
       
       // Salvar token no localStorage e no state
       localStorage.setItem('token', newToken);
@@ -137,6 +156,23 @@ export const AuthProvider = ({ children }) => {
       if (response.ok) {
         const data = await response.json();
         const usuarioBackend = data.usuario;
+        
+        // Verificar se o tipo de usuário mudou (segurança adicional)
+        let savedUserParsed = null;
+        try {
+          savedUserParsed = JSON.parse(savedUser);
+        } catch (e) {
+          // Se não conseguir parsear, limpa tudo
+          clearAllData();
+          return;
+        }
+        
+        // Se o tipo de usuário mudou, forçar novo login
+        if (savedUserParsed && savedUserParsed.tipo !== usuarioBackend.tipo) {
+          console.log('⚠️ Tipo de usuário mudou, fazendo logout:', savedUserParsed.tipo, '->', usuarioBackend.tipo);
+          clearAllData();
+          return;
+        }
         
         // Atualizar com dados do backend (fonte da verdade)
         setUser(usuarioBackend);
@@ -211,6 +247,7 @@ export const AuthProvider = ({ children }) => {
     isAdmin: user?.tipo === 'admin',
     isConsultor: user?.tipo === 'consultor',
     isEmpresa: user?.tipo === 'empresa',
+    isClinica: user?.tipo === 'clinica',
     isFreelancer: user?.is_freelancer === true,
     // Consultor interno: tem pode_ver_todas_novas_clinicas=true E podealterarstatus=true
     isConsultorInterno: user?.tipo === 'consultor' && user?.pode_ver_todas_novas_clinicas === true && user?.podealterarstatus === true,
@@ -218,7 +255,9 @@ export const AuthProvider = ({ children }) => {
     // Pode ver todos os dados: admin OU consultor interno (com ambas as permissões)
     podeVerTodosDados: user?.tipo === 'admin' || (user?.tipo === 'consultor' && user?.pode_ver_todas_novas_clinicas === true && user?.podealterarstatus === true),
     // Deve filtrar por consultor: é consultor mas NÃO é interno (não tem as duas permissões)
-    deveFiltrarPorConsultor: user?.tipo === 'consultor' && !(user?.pode_ver_todas_novas_clinicas === true && user?.podealterarstatus === true)
+    deveFiltrarPorConsultor: user?.tipo === 'consultor' && !(user?.pode_ver_todas_novas_clinicas === true && user?.podealterarstatus === true),
+    // Deve filtrar por clínica: é clínica e deve ver apenas seus dados
+    deveFiltrarPorClinica: user?.tipo === 'clinica'
   };
 
   return (

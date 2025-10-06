@@ -368,9 +368,45 @@ app.post('/api/login', async (req, res) => {
       }
     }
 
-  // Se não encontrou admin, tentar login como empresa (antes de consultor, pois é mais específico)
+  // Se não encontrou admin, tentar login como clínica
   if (!usuario && typeof email === 'string' && email.includes('@')) {
-      console.log('🔍 [2/3] Buscando em EMPRESAS...');
+      console.log('🔍 [2/4] Buscando em CLÍNICAS...');
+      
+      const { data: clinicas, error } = await supabaseAdmin
+        .from('clinicas')
+        .select('*')
+        .eq('email_login', emailNormalizado)
+        .eq('ativo_no_sistema', true);
+
+      if (error) {
+        console.error('❌ Erro ao buscar em clínicas:', error);
+        throw error;
+      }
+
+      console.log('🔍 Resultados em CLÍNICAS:', clinicas ? clinicas.length : 0);
+
+      if (clinicas && clinicas.length > 0) {
+        if (clinicas.length > 1) {
+          console.error('⚠️ ALERTA: Múltiplas clínicas com o mesmo email!', clinicas.map(c => ({ id: c.id, email: c.email_login })));
+        }
+        usuario = clinicas[0];
+        tipoLogin = 'clinica';
+        console.log('✅ Usuário encontrado em: CLÍNICA');
+        console.log('📋 ID:', usuario.id, '| Nome:', usuario.nome);
+        
+        // Atualizar último acesso da clínica
+        await supabaseAdmin
+          .from('clinicas')
+          .update({ ultimo_acesso: new Date().toISOString() })
+          .eq('id', usuario.id);
+      } else {
+        console.log('❌ Não encontrado em clínicas');
+      }
+    }
+
+  // Se não encontrou admin nem clínica, tentar login como empresa
+  if (!usuario && typeof email === 'string' && email.includes('@')) {
+      console.log('🔍 [3/4] Buscando em EMPRESAS...');
       
       const { data: empresas, error } = await supabaseAdmin
         .from('empresas')
@@ -398,9 +434,9 @@ app.post('/api/login', async (req, res) => {
       }
     }
 
-  // Se não encontrou admin nem empresa, tentar login como consultor
+  // Se não encontrou admin, clínica nem empresa, tentar login como consultor
   if (!usuario && typeof email === 'string' && email.includes('@')) {
-      console.log('🔍 [3/3] Buscando em CONSULTORES...');
+      console.log('🔍 [4/4] Buscando em CONSULTORES...');
       
       const { data: consultores, error } = await supabaseAdmin
         .from('consultores')
@@ -435,9 +471,16 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
-    // Verificar senha
+    // Verificar senha (diferente para clínicas que usam senha_hash)
+    let senhaValida = false;
     
-    const senhaValida = await bcrypt.compare(senha, usuario.senha);
+    if (tipoLogin === 'clinica') {
+      // Clínicas usam o campo senha_hash
+      senhaValida = await bcrypt.compare(senha, usuario.senha_hash);
+    } else {
+      // Outros usuários usam o campo senha
+      senhaValida = await bcrypt.compare(senha, usuario.senha);
+    }
     
     // TEMPORÁRIO: Aceitar senha admin123 para admin
     const senhaTemporaria = senha === 'admin123' && usuario.email === 'admin@crm.com';
@@ -460,29 +503,39 @@ app.post('/api/login', async (req, res) => {
     const payload = {
       id: usuario.id,
       nome: usuario.nome,
-      email: usuario.email,
-      tipo: tipoLogin === 'empresa' ? 'empresa' : usuario.tipo,
+      email: tipoLogin === 'clinica' ? usuario.email_login : usuario.email,
+      tipo: tipoLogin === 'empresa' ? 'empresa' : (tipoLogin === 'clinica' ? 'clinica' : usuario.tipo),
+      clinica_id: tipoLogin === 'clinica' ? usuario.id : null, // ID da clínica quando for login de clínica
       consultor_id: usuario.consultor_id !== undefined ? usuario.consultor_id : (tipoLogin === 'consultor' ? usuario.id : null),
       empresa_id: usuario.empresa_id || null, // ID da empresa (para consultores vinculados ou login como empresa)
-      podealterarstatus: tipoLogin === 'empresa' ? false : (usuario.podealterarstatus || usuario.tipo === 'admin' || false),
-      pode_ver_todas_novas_clinicas: tipoLogin === 'empresa' ? false : (usuario.pode_ver_todas_novas_clinicas || false),
-      is_freelancer: tipoLogin === 'empresa' ? false : (usuario.is_freelancer !== false) // Empresas não são freelancers
+      podealterarstatus: (tipoLogin === 'empresa' || tipoLogin === 'clinica') ? false : (usuario.podealterarstatus || usuario.tipo === 'admin' || false),
+      pode_ver_todas_novas_clinicas: (tipoLogin === 'empresa' || tipoLogin === 'clinica') ? false : (usuario.pode_ver_todas_novas_clinicas || false),
+      is_freelancer: (tipoLogin === 'empresa' || tipoLogin === 'clinica') ? false : (usuario.is_freelancer !== false) // Empresas e clínicas não são freelancers
     };
 
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
 
     // Remover senha do objeto antes de enviar para o front
     delete usuario.senha;
+    delete usuario.senha_hash; // Remover senha_hash também (para clínicas)
 
-    // Garante que usuario.tipo, consultor_id, empresa_id, podealterarstatus, pode_ver_todas_novas_clinicas e is_freelancer também estejam presentes no objeto de resposta
+    // Garante que usuario.tipo, consultor_id, empresa_id, clinica_id, podealterarstatus, pode_ver_todas_novas_clinicas e is_freelancer também estejam presentes no objeto de resposta
     usuario.tipo = payload.tipo;
     usuario.consultor_id = payload.consultor_id;
     usuario.empresa_id = payload.empresa_id;
+    usuario.clinica_id = payload.clinica_id; // Adicionar clinica_id
     usuario.podealterarstatus = payload.podealterarstatus;
     usuario.pode_ver_todas_novas_clinicas = payload.pode_ver_todas_novas_clinicas;
     usuario.is_freelancer = payload.is_freelancer;
 
     console.log('✅ Login bem-sucedido! Tipo:', usuario.tipo);
+    console.log('📋 Usuario retornado para o frontend:', {
+      id: usuario.id,
+      nome: usuario.nome,
+      tipo: usuario.tipo,
+      clinica_id: usuario.clinica_id,
+      email: usuario.email || usuario.email_login
+    });
 
     res.json({ token, usuario });
 
@@ -883,7 +936,7 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
     console.log('✅ Token verificado com sucesso para:', usuario.email);
 
     // Remover senha do objeto antes de enviar para o front
-    const { senha: _, ...dadosUsuario } = usuario;
+    const { senha: _, senha_hash: __, ...dadosUsuario } = usuario;
 
     res.json({
       usuario: {
@@ -891,6 +944,7 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
         tipo,
         consultor_id,
         empresa_id: usuario.empresa_id || null, // Incluir empresa_id
+        clinica_id: tipo === 'clinica' ? usuario.id : null, // Incluir clinica_id
         podealterarstatus: usuario.podealterarstatus || tipo === 'admin' || false,
         pode_ver_todas_novas_clinicas: usuario.pode_ver_todas_novas_clinicas || false,
         is_freelancer: tipo === 'empresa' ? false : (usuario.is_freelancer !== false) // Empresas não são freelancers
@@ -1029,6 +1083,31 @@ app.put('/api/empresas/perfil', authenticateToken, async (req, res) => {
 });
 
 // === CLÍNICAS === (Admin vê todas, Consultores vêem apenas públicas ou suas próprias)
+
+// Buscar uma clínica específica por ID
+app.get('/api/clinicas/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const { data, error } = await supabaseAdmin
+      .from('clinicas')
+      .select('*')
+      .eq('id', id)
+      .single();
+      
+    if (error) throw error;
+    
+    // Clínicas só podem ver seus próprios dados
+    if (req.user.tipo === 'clinica' && req.user.clinica_id !== parseInt(id)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+    
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/clinicas', authenticateToken, async (req, res) => {
   try {
     const { cidade, estado } = req.query;
@@ -1188,7 +1267,12 @@ app.get('/api/clinicas/estados', authenticateToken, async (req, res) => {
 
 app.post('/api/clinicas', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { nome, endereco, bairro, cidade, estado, nicho, telefone, email, status } = req.body;
+    let { nome, endereco, bairro, cidade, estado, nicho, telefone, email, status } = req.body;
+    
+    // Normalizar email
+    if (email) {
+      email = email.toLowerCase().trim();
+    }
     
     // Geocodificar endereço se tiver cidade e estado
     let latitude = null;
@@ -1236,6 +1320,335 @@ app.post('/api/clinicas', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
+// Rota para criar acesso de clínica ao sistema
+app.post('/api/clinicas/:id/criar-acesso', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    let { email, senha } = req.body;
+    
+    console.log('🔑 Criando acesso para clínica:', id);
+    
+    // Validar entrada
+    if (!email || !senha) {
+      return res.status(400).json({ error: 'Email e senha são obrigatórios' });
+    }
+    
+    // Normalizar email para minúsculas
+    email = email.toLowerCase().trim();
+    
+    // Verificar se a clínica existe
+    const { data: clinica, error: clinicaError } = await supabaseAdmin
+      .from('clinicas')
+      .select('*')
+      .eq('id', id)
+      .single();
+      
+    if (clinicaError || !clinica) {
+      return res.status(404).json({ error: 'Clínica não encontrada' });
+    }
+    
+    // Verificar se o email já está em uso por outra clínica
+    const { data: emailExistente } = await supabaseAdmin
+      .from('clinicas')
+      .select('id')
+      .eq('email_login', email)
+      .neq('id', id)
+      .single();
+      
+    if (emailExistente) {
+      return res.status(400).json({ error: 'Este email já está em uso por outra clínica' });
+    }
+    
+    // Hash da senha
+    const saltRounds = 10;
+    const senhaHash = await bcrypt.hash(senha, saltRounds);
+    
+    // Atualizar clínica com dados de acesso
+    const { error: updateError } = await supabaseAdmin
+      .from('clinicas')
+      .update({
+        email_login: email,
+        senha_hash: senhaHash,
+        ativo_no_sistema: true,
+        criado_por_admin_id: req.user.id,
+        data_criacao_acesso: new Date().toISOString()
+      })
+      .eq('id', id);
+      
+    if (updateError) {
+      console.error('❌ Erro ao criar acesso:', updateError);
+      throw updateError;
+    }
+    
+    console.log('✅ Acesso criado com sucesso para clínica:', clinica.nome);
+    res.json({ 
+      success: true, 
+      message: 'Acesso criado com sucesso',
+      clinica: {
+        id: clinica.id,
+        nome: clinica.nome,
+        email_login: email
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Erro ao criar acesso de clínica:', error);
+    res.status(500).json({ error: 'Erro interno ao criar acesso' });
+  }
+});
+
+// Rota para remover acesso de clínica ao sistema
+// Rota para upload de documentos da clínica
+app.post('/api/clinicas/:id/documentos', authenticateToken, upload.single('documento'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tipo } = req.body;
+    const file = req.file;
+    
+    console.log('📄 Upload de documento para clínica:', id, 'tipo:', tipo);
+    
+    // Validar se é uma clínica acessando seus próprios dados
+    if (req.user.tipo === 'clinica' && req.user.clinica_id !== parseInt(id)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+    
+    if (!file) {
+      return res.status(400).json({ error: 'Nenhum arquivo foi enviado' });
+    }
+    
+    if (!tipo) {
+      return res.status(400).json({ error: 'Tipo de documento não informado' });
+    }
+    
+    // Validar tipo de arquivo
+    if (file.mimetype !== 'application/pdf') {
+      return res.status(400).json({ error: 'Apenas arquivos PDF são permitidos' });
+    }
+    
+    // Usar o buffer do arquivo diretamente (sem salvar temporariamente)
+    const fileName = `${tipo}_${Date.now()}.pdf`;
+    const filePath = `clinicas/${id}/${fileName}`;
+    
+    // Upload direto para o Supabase Storage usando o buffer
+    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+      .from('documentos')
+      .upload(filePath, file.buffer, {
+        contentType: 'application/pdf',
+        upsert: true
+      });
+    
+    if (uploadError) {
+      console.error('❌ Erro ao fazer upload:', uploadError);
+      throw uploadError;
+    }
+    
+    // Atualizar campo do documento na tabela clinicas
+    const updateData = {};
+    updateData[tipo] = true;
+    updateData[`${tipo}_aprovado`] = null; // Resetar aprovação ao reenviar
+    
+    const { error: updateError } = await supabaseAdmin
+      .from('clinicas')
+      .update(updateData)
+      .eq('id', id);
+    
+    if (updateError) {
+      console.error('❌ Erro ao atualizar status do documento:', updateError);
+      throw updateError;
+    }
+    
+    console.log('✅ Documento enviado com sucesso:', fileName);
+    res.json({ success: true, message: 'Documento enviado com sucesso', file: fileName });
+    
+  } catch (error) {
+    console.error('❌ Erro ao enviar documento:', error);
+    res.status(500).json({ error: 'Erro ao enviar documento' });
+  }
+});
+
+// Rota para download de documentos da clínica
+app.get('/api/clinicas/:id/documentos/:tipo', authenticateToken, async (req, res) => {
+  try {
+    const { id, tipo } = req.params;
+    
+    console.log('📥 Download de documento da clínica:', id, 'tipo:', tipo);
+    
+    // Validar se é uma clínica acessando seus próprios dados ou admin
+    if (req.user.tipo === 'clinica' && req.user.clinica_id !== parseInt(id)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+    
+    // Listar arquivos do tipo na pasta da clínica
+    const { data: files, error: listError } = await supabaseAdmin.storage
+      .from('documentos')
+      .list(`clinicas/${id}`, {
+        search: tipo
+      });
+    
+    if (listError) {
+      console.error('❌ Erro ao listar arquivos:', listError);
+      throw listError;
+    }
+    
+    if (!files || files.length === 0) {
+      return res.status(404).json({ error: 'Documento não encontrado' });
+    }
+    
+    // Pegar o arquivo mais recente
+    const latestFile = files.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+    const filePath = `clinicas/${id}/${latestFile.name}`;
+    
+    // Download do arquivo
+    const { data: fileData, error: downloadError } = await supabaseAdmin.storage
+      .from('documentos')
+      .download(filePath);
+    
+    if (downloadError) {
+      console.error('❌ Erro ao baixar arquivo:', downloadError);
+      throw downloadError;
+    }
+    
+    // Converter blob para buffer
+    const buffer = Buffer.from(await fileData.arrayBuffer());
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${latestFile.name}"`);
+    res.send(buffer);
+    
+  } catch (error) {
+    console.error('❌ Erro ao baixar documento:', error);
+    res.status(500).json({ error: 'Erro ao baixar documento' });
+  }
+});
+
+// Rota para aprovar documento da clínica
+app.put('/api/clinicas/:id/documentos/:tipo/aprovar', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id, tipo } = req.params;
+    
+    console.log(`✅ Aprovando documento ${tipo} da clínica ${id}`);
+    
+    // Validar tipo de documento
+    const tiposValidos = [
+      'doc_cartao_cnpj', 'doc_contrato_social', 'doc_alvara_sanitario', 
+      'doc_balanco', 'doc_comprovante_endereco', 'doc_dados_bancarios',
+      'doc_socios', 'doc_certidao_resp_tecnico', 'doc_resp_tecnico'
+    ];
+    
+    if (!tiposValidos.includes(tipo)) {
+      return res.status(400).json({ error: 'Tipo de documento inválido' });
+    }
+    
+    // Atualizar status de aprovação
+    const updateData = {};
+    updateData[`${tipo}_aprovado`] = true;
+    
+    const { error: updateError } = await supabaseAdmin
+      .from('clinicas')
+      .update(updateData)
+      .eq('id', id);
+    
+    if (updateError) {
+      console.error('❌ Erro ao aprovar documento:', updateError);
+      throw updateError;
+    }
+    
+    console.log(`✅ Documento ${tipo} aprovado com sucesso`);
+    res.json({ success: true, message: 'Documento aprovado com sucesso' });
+    
+  } catch (error) {
+    console.error('❌ Erro ao aprovar documento:', error);
+    res.status(500).json({ error: 'Erro ao aprovar documento' });
+  }
+});
+
+// Rota para reprovar documento da clínica
+app.put('/api/clinicas/:id/documentos/:tipo/reprovar', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id, tipo } = req.params;
+    const { motivo } = req.body; // Opcional: motivo da reprovação
+    
+    console.log(`❌ Reprovando documento ${tipo} da clínica ${id}`);
+    
+    // Validar tipo de documento
+    const tiposValidos = [
+      'doc_cartao_cnpj', 'doc_contrato_social', 'doc_alvara_sanitario', 
+      'doc_balanco', 'doc_comprovante_endereco', 'doc_dados_bancarios',
+      'doc_socios', 'doc_certidao_resp_tecnico', 'doc_resp_tecnico'
+    ];
+    
+    if (!tiposValidos.includes(tipo)) {
+      return res.status(400).json({ error: 'Tipo de documento inválido' });
+    }
+    
+    // Atualizar status de aprovação
+    const updateData = {};
+    updateData[`${tipo}_aprovado`] = false;
+    
+    const { error: updateError } = await supabaseAdmin
+      .from('clinicas')
+      .update(updateData)
+      .eq('id', id);
+    
+    if (updateError) {
+      console.error('❌ Erro ao reprovar documento:', updateError);
+      throw updateError;
+    }
+    
+    console.log(`❌ Documento ${tipo} reprovado com sucesso`);
+    res.json({ success: true, message: 'Documento reprovado com sucesso', motivo });
+    
+  } catch (error) {
+    console.error('❌ Erro ao reprovar documento:', error);
+    res.status(500).json({ error: 'Erro ao reprovar documento' });
+  }
+});
+
+app.delete('/api/clinicas/:id/remover-acesso', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    console.log('🔒 Removendo acesso da clínica:', id);
+    
+    // Verificar se a clínica existe
+    const { data: clinica, error: clinicaError } = await supabaseAdmin
+      .from('clinicas')
+      .select('*')
+      .eq('id', id)
+      .single();
+      
+    if (clinicaError || !clinica) {
+      return res.status(404).json({ error: 'Clínica não encontrada' });
+    }
+    
+    // Remover dados de acesso
+    const { error: updateError } = await supabaseAdmin
+      .from('clinicas')
+      .update({
+        email_login: null,
+        senha_hash: null,
+        ativo_no_sistema: false,
+        ultimo_acesso: null
+      })
+      .eq('id', id);
+      
+    if (updateError) {
+      console.error('❌ Erro ao remover acesso:', updateError);
+      throw updateError;
+    }
+    
+    console.log('✅ Acesso removido com sucesso da clínica:', clinica.nome);
+    res.json({ 
+      success: true, 
+      message: 'Acesso removido com sucesso'
+    });
+    
+  } catch (error) {
+    console.error('❌ Erro ao remover acesso de clínica:', error);
+    res.status(500).json({ error: 'Erro interno ao remover acesso' });
+  }
+});
+
 app.put('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -1249,7 +1662,12 @@ app.put('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) =
     const updateData = {};
     for (const campo of camposPermitidos) {
       if (req.body[campo] !== undefined) {
-        updateData[campo] = req.body[campo];
+        // Normalizar email se for o campo email
+        if (campo === 'email' && req.body[campo]) {
+          updateData[campo] = req.body[campo].toLowerCase().trim();
+        } else {
+          updateData[campo] = req.body[campo];
+        }
       }
     }
     if (Object.keys(updateData).length === 0) {
@@ -1831,7 +2249,7 @@ app.post('/api/leads/cadastro', async (req, res) => {
 app.post('/api/clinicas/cadastro-publico', async (req, res) => {
   try {
     console.log('📝 Cadastro de clínica recebido:', req.body);
-    const { 
+    let { 
       nome, 
       cnpj, 
       endereco, 
@@ -1845,6 +2263,11 @@ app.post('/api/clinicas/cadastro-publico', async (req, res) => {
       observacoes, 
       ref_consultor 
     } = req.body;
+    
+    // Normalizar email
+    if (email) {
+      email = email.toLowerCase().trim();
+    }
     
     // Validar campos obrigatórios
     if (!nome || !cnpj || !telefone || !email || !responsavel) {
@@ -2482,9 +2905,28 @@ app.get('/api/pacientes', authenticateToken, async (req, res) => {
       `)
       .order('created_at', { ascending: false });
 
+    // Se for clínica, filtrar apenas pacientes que têm agendamentos nesta clínica
+    if (req.user.tipo === 'clinica') {
+      // Buscar pacientes com agendamentos nesta clínica
+      const { data: agendamentos, error: agendError } = await supabaseAdmin
+        .from('agendamentos')
+        .select('paciente_id')
+        .eq('clinica_id', req.user.clinica_id);
+
+      if (agendError) throw agendError;
+
+      const pacienteIds = [...new Set(agendamentos.map(a => a.paciente_id))]; // Remove duplicatas
+      
+      if (pacienteIds.length > 0) {
+        query = query.in('id', pacienteIds);
+      } else {
+        // Se a clínica não tem agendamentos, retorna array vazio
+        return res.json([]);
+      }
+    }
     // Se for consultor freelancer (não tem as duas permissões), filtrar pacientes atribuídos a ele OU vinculados através de agendamentos
     // Consultores internos (com pode_ver_todas_novas_clinicas=true E podealterarstatus=true) veem todos os pacientes
-    if (req.user.tipo === 'consultor' && !(req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true)) {
+    else if (req.user.tipo === 'consultor' && !(req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true)) {
       // Buscar pacientes com agendamentos deste consultor
       const { data: agendamentos, error: agendError } = await supabaseAdmin
         .from('agendamentos')
@@ -3398,9 +3840,13 @@ app.get('/api/agendamentos', authenticateToken, async (req, res) => {
       .order('data_agendamento', { ascending: false })
       .order('horario');
 
+    // Se for clínica, filtrar apenas agendamentos desta clínica
+    if (req.user.tipo === 'clinica') {
+      query = query.eq('clinica_id', req.user.clinica_id);
+    }
     // Se for consultor freelancer (não tem as duas permissões), filtrar apenas seus agendamentos
     // Consultores internos (com pode_ver_todas_novas_clinicas=true E podealterarstatus=true) veem todos os agendamentos
-    if (req.user.tipo === 'consultor' && !(req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true)) {
+    else if (req.user.tipo === 'consultor' && !(req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true)) {
       query = query.eq('consultor_id', req.user.id);
     }
 
@@ -4478,7 +4924,9 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
 
     // Configurar filtros baseados no tipo de usuário
     const isConsultor = req.user.tipo === 'consultor';
+    const isClinica = req.user.tipo === 'clinica';
     const consultorId = req.user.id;
+    const clinicaId = req.user.clinica_id;
 
     // Buscar agendamentos de hoje
     let agendamentosQuery = supabase
@@ -4486,7 +4934,9 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
       .select('*')
       .eq('data_agendamento', hoje);
     
-    if (isConsultor) {
+    if (isClinica) {
+      agendamentosQuery = agendamentosQuery.eq('clinica_id', clinicaId);
+    } else if (isConsultor) {
       agendamentosQuery = agendamentosQuery.eq('consultor_id', consultorId);
     }
 
@@ -4500,7 +4950,9 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
       .eq('data_agendamento', hoje)
       .eq('lembrado', true);
     
-    if (isConsultor) {
+    if (isClinica) {
+      lembradosQuery = lembradosQuery.eq('clinica_id', clinicaId);
+    } else if (isConsultor) {
       lembradosQuery = lembradosQuery.eq('consultor_id', consultorId);
     }
 
@@ -4512,8 +4964,25 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
       .from('pacientes')
       .select('*', { count: 'exact', head: true });
 
+    // Para clínica, contar apenas pacientes com agendamentos nesta clínica
+    if (isClinica) {
+      const { data: agendamentos, error: agendError } = await supabaseAdmin
+        .from('agendamentos')
+        .select('paciente_id')
+        .eq('clinica_id', clinicaId);
+
+      if (agendError) throw agendError;
+
+      const pacienteIds = [...new Set(agendamentos.map(a => a.paciente_id))];
+      
+      if (pacienteIds.length > 0) {
+        pacientesQuery = pacientesQuery.in('id', pacienteIds);
+      } else {
+        pacientesQuery = pacientesQuery.eq('id', 0); // Força resultado vazio
+      }
+    }
     // Para consultor, contar apenas pacientes com agendamentos dele
-    if (isConsultor) {
+    else if (isConsultor) {
       const { data: agendamentos, error: agendError } = await supabaseAdmin
         .from('agendamentos')
         .select('paciente_id')
@@ -4538,7 +5007,23 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
       .from('fechamentos')
       .select('*');
     
-    if (isConsultor) {
+    if (isClinica) {
+      // Para clínica, buscar fechamentos dos pacientes com agendamentos nesta clínica
+      const { data: agendamentos, error: agendError } = await supabaseAdmin
+        .from('agendamentos')
+        .select('paciente_id')
+        .eq('clinica_id', clinicaId);
+
+      if (agendError) throw agendError;
+
+      const pacienteIds = [...new Set(agendamentos.map(a => a.paciente_id))];
+      
+      if (pacienteIds.length > 0) {
+        fechamentosQuery = fechamentosQuery.in('paciente_id', pacienteIds);
+      } else {
+        fechamentosQuery = fechamentosQuery.eq('id', 0); // Força resultado vazio
+      }
+    } else if (isConsultor) {
       fechamentosQuery = fechamentosQuery.eq('consultor_id', consultorId);
     }
 
@@ -4576,7 +5061,9 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
       .from('agendamentos')
       .select('id, consultor_id, lembrado, data_agendamento');
 
-    if (isConsultor) {
+    if (isClinica) {
+      agendamentosConsultorQuery = agendamentosConsultorQuery.eq('clinica_id', clinicaId);
+    } else if (isConsultor) {
       agendamentosConsultorQuery = agendamentosConsultorQuery.eq('consultor_id', consultorId);
     }
 
@@ -4586,9 +5073,25 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
     // Buscar todos os fechamentos
     let fechamentosConsultorQuery = supabaseAdmin
       .from('fechamentos')
-      .select('id, consultor_id, valor_fechado, data_fechamento');
+      .select('id, consultor_id, valor_fechado, data_fechamento, paciente_id');
 
-    if (isConsultor) {
+    if (isClinica) {
+      // Buscar pacientes com agendamentos nesta clínica para filtrar fechamentos
+      const { data: agendamentos, error: agendError } = await supabaseAdmin
+        .from('agendamentos')
+        .select('paciente_id')
+        .eq('clinica_id', clinicaId);
+
+      if (agendError) throw agendError;
+
+      const pacienteIds = [...new Set(agendamentos.map(a => a.paciente_id))];
+      
+      if (pacienteIds.length > 0) {
+        fechamentosConsultorQuery = fechamentosConsultorQuery.in('paciente_id', pacienteIds);
+      } else {
+        fechamentosConsultorQuery = fechamentosConsultorQuery.eq('id', 0); // Força resultado vazio
+      }
+    } else if (isConsultor) {
       fechamentosConsultorQuery = fechamentosConsultorQuery.eq('consultor_id', consultorId);
     }
 
@@ -4597,8 +5100,8 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
 
 
 
-    // Processar estatísticas dos consultores
-    const estatisticasConsultores = consultores.map(consultor => {
+    // Processar estatísticas dos consultores (não mostrar para clínicas)
+    const estatisticasConsultores = isClinica ? [] : consultores.map(consultor => {
       // Filtrar agendamentos do consultor
       const agendamentos = todosAgendamentos.filter(a => a.consultor_id === consultor.id);
       
