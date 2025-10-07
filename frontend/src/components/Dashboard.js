@@ -13,7 +13,7 @@ const Dashboard = () => {
     valorTotalFechamentos: 0,
     agendamentosHoje: 0
   });
-  const { makeRequest, user, isAdmin, isConsultorInterno, podeVerTodosDados } = useAuth();
+  const { makeRequest, user, isAdmin, isConsultorInterno, podeVerTodosDados, isClinica, deveFiltrarPorClinica } = useAuth();
   const [periodo, setPeriodo] = useState('total'); // total, semanal, mensal
   const [subPeriodo, setSubPeriodo] = useState(null); // para dias da semana
   const [semanaOpcao, setSemanaOpcao] = useState('atual'); // atual, proxima
@@ -534,16 +534,23 @@ const Dashboard = () => {
         if (filtroRegiao.estado) clinicasParams.append('estado', filtroRegiao.estado);
         if (filtroRegiao.cidade) clinicasParams.append('cidade', filtroRegiao.cidade);
         
-        const [pacientesRes, agendamentosRes, fechamentosRes, clinicasRes] = await Promise.all([
+        const requests = [
           makeRequest('/dashboard/pacientes'),
           makeRequest('/dashboard/agendamentos'),
-          makeRequest('/dashboard/fechamentos'),
-          makeRequest(`/clinicas?${clinicasParams.toString()}`)
-        ]);
-        let pacientes = await pacientesRes.json();
-        let agendamentos = await agendamentosRes.json();
-        let fechamentos = await fechamentosRes.json();
-        const clinicasFiltradas = await clinicasRes.json();
+          makeRequest('/dashboard/fechamentos')
+        ];
+        
+        // Clínicas não precisam buscar lista de clínicas
+        if (user?.tipo !== 'clinica') {
+          requests.push(makeRequest(`/clinicas?${clinicasParams.toString()}`));
+        }
+        
+        const responses = await Promise.all(requests);
+        
+        let pacientes = await responses[0].json();
+        let agendamentos = await responses[1].json();
+        let fechamentos = await responses[2].json();
+        const clinicasFiltradas = user?.tipo === 'clinica' ? [] : await responses[3].json();
         
         // Aplicar filtros por região se especificados
         if (filtroRegiao.cidade || filtroRegiao.estado) {
@@ -781,23 +788,33 @@ const Dashboard = () => {
         makeRequest(`/clinicas?${clinicasParams.toString()}`)
       ]);
 
-      // Para gráfico de cidades e ranking, buscar dados gerais (não filtrados por consultor)
-      const [pacientesGeraisRes, agendamentosGeraisRes, fechamentosGeraisRes] = await Promise.all([
-        makeRequest('/dashboard/gerais/pacientes'),
-        makeRequest('/dashboard/gerais/agendamentos'),
-        makeRequest('/dashboard/gerais/fechamentos')
-      ]);
-
       const pacientes = await pacientesRes.json();
       let agendamentos = await agendamentosRes.json();
       let fechamentos = await fechamentosRes.json();
       const consultores = await consultoresRes.json();
       const clinicasFiltradas = await clinicasRes.json();
 
-      // Dados gerais para gráfico de cidades e ranking
-      const pacientesGerais = await pacientesGeraisRes.json();
-      const agendamentosGerais = await agendamentosGeraisRes.json();
-      const fechamentosGerais = await fechamentosGeraisRes.json();
+      // Para gráfico de cidades e ranking, buscar dados gerais (não filtrados por consultor)
+      // Clínicas NÃO devem ver dados gerais, apenas os seus
+      let pacientesGerais, agendamentosGerais, fechamentosGerais;
+      
+      if (user?.tipo === 'clinica') {
+        // Clínicas usam os mesmos dados filtrados
+        pacientesGerais = pacientes;
+        agendamentosGerais = agendamentos;
+        fechamentosGerais = fechamentos;
+      } else {
+        // Admin e consultores veem dados gerais
+        const [pacientesGeraisRes, agendamentosGeraisRes, fechamentosGeraisRes] = await Promise.all([
+          makeRequest('/dashboard/gerais/pacientes'),
+          makeRequest('/dashboard/gerais/agendamentos'),
+          makeRequest('/dashboard/gerais/fechamentos')
+        ]);
+        
+        pacientesGerais = await pacientesGeraisRes.json();
+        agendamentosGerais = await agendamentosGeraisRes.json();
+        fechamentosGerais = await fechamentosGeraisRes.json();
+      }
 
 
       // Calcular períodos para comparação de crescimento
@@ -2035,6 +2052,15 @@ const Dashboard = () => {
           <div className="card-body">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {(() => {
+                // Clínicas não devem ver ranking de consultores
+                if (user?.tipo === 'clinica') {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                      <p>Esta seção não está disponível para clínicas</p>
+                    </div>
+                  );
+                }
+                
                 // Ordenar consultores e calcular posições
                 const consultoresOrdenados = [...stats.consultoresStats]
                   .sort((a, b) => {
