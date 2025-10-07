@@ -225,12 +225,17 @@ const Perfil = () => {
 
   // Função para obter iniciais do nome
   const getUserInitials = () => {
-    if (user.nome) {
-      const names = user.nome.split(' ');
+    if (user?.nome) {
+      const names = user.nome.trim().split(' ').filter(n => n.length > 0);
       if (names.length >= 2) {
-        return names[0][0] + names[names.length - 1][0];
+        return (names[0][0] + names[names.length - 1][0]).toUpperCase();
       }
-      return names[0][0] + names[0][1];
+      if (names.length === 1 && names[0].length >= 2) {
+        return (names[0][0] + names[0][1]).toUpperCase();
+      }
+      if (names.length === 1 && names[0].length === 1) {
+        return names[0][0].toUpperCase();
+      }
     }
     return 'U';
   };
@@ -612,6 +617,15 @@ const Perfil = () => {
                 type="text"
                 className="form-input"
                 value="Empresa"
+                disabled
+                readOnly
+                style={{ backgroundColor: '#f3f4f6', color: '#6b7280' }}
+              />
+            ) : user?.tipo === 'clinica' ? (
+              <input
+                type="text"
+                className="form-input"
+                value="Clínica"
                 disabled
                 readOnly
                 style={{ backgroundColor: '#f3f4f6', color: '#6b7280' }}

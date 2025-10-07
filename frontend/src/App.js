@@ -267,12 +267,17 @@ const AppContentWithNotifications = () => {
   };
 
   const getUserInitials = () => {
-    if (user.nome) {
-      const names = user.nome.split(' ');
+    if (user?.nome) {
+      const names = user.nome.trim().split(' ').filter(n => n.length > 0);
       if (names.length >= 2) {
-        return names[0][0] + names[names.length - 1][0];
+        return (names[0][0] + names[names.length - 1][0]).toUpperCase();
       }
-      return names[0][0] + names[0][1];
+      if (names.length === 1 && names[0].length >= 2) {
+        return (names[0][0] + names[0][1]).toUpperCase();
+      }
+      if (names.length === 1 && names[0].length === 1) {
+        return names[0][0].toUpperCase();
+      }
     }
     return 'U';
   };
@@ -670,22 +675,25 @@ const AppContentWithNotifications = () => {
             </div>
           )}
 
-          <div className="nav-item">
-            <Link
-              to="/materiais"
-              className={`nav-link ${activeTab === 'materiais' ? 'active' : ''}`}
-              onClick={handleMobileNavigation}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14,2 14,8 20,8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
-                <polyline points="10,9 9,9 8,9"/>
-              </svg>
-              Materiais de Apoio
-            </Link>
-          </div>
+          {/* Materiais de Apoio - Não mostrar para clínicas */}
+          {user.tipo !== 'clinica' && (
+            <div className="nav-item">
+              <Link
+                to="/materiais"
+                className={`nav-link ${activeTab === 'materiais' ? 'active' : ''}`}
+                onClick={handleMobileNavigation}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14,2 14,8 20,8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/>
+                  <line x1="16" y1="17" x2="8" y2="17"/>
+                  <polyline points="10,9 9,9 8,9"/>
+                </svg>
+                Materiais de Apoio
+              </Link>
+            </div>
+          )}
 
           {/* Integração IDSF - Não mostrar para clínicas */}
           {user.tipo !== 'clinica' && (
@@ -790,7 +798,7 @@ const AppContentWithNotifications = () => {
             </div>
             <div className="user-details">
               <h3>{user.nome}</h3>
-              <p>{user.tipo === 'admin' ? 'Administrador' : user.tipo === 'empresa' ? 'Empresa' : 'Consultor'}</p>
+              <p>{user.tipo === 'admin' ? 'Administrador' : user.tipo === 'empresa' ? 'Empresa' : user.tipo === 'clinica' ? 'Clínica' : 'Consultor'}</p>
             </div>
           </div>
           <Link
@@ -911,7 +919,7 @@ const AppContentWithNotifications = () => {
                   {user.nome}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                  {user.tipo === 'admin' ? 'Administrador' : user.tipo === 'empresa' ? 'Empresa' : 'Consultor'}
+                  {user.tipo === 'admin' ? 'Administrador' : user.tipo === 'empresa' ? 'Empresa' : user.tipo === 'clinica' ? 'Clínica' : 'Consultor'}
                 </div>
               </div>
               <svg 

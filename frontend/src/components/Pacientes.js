@@ -201,28 +201,8 @@ const Pacientes = () => {
   setTutorialCompleted(!!completed);
   }, [podeAlterarStatus, isConsultorInterno, deveFiltrarPorConsultor, user?.consultor_id]);
 
-  // Verificar se deve mostrar tutorial no primeiro acesso
-  useEffect(() => {
-    if (!user) return; // Aguardar usuário estar logado
-    
-    const completed = localStorage.getItem('tutorial-pacientes-completed');
-    const tutorialDismissed = localStorage.getItem('tutorial-pacientes-dismissed');
-    const welcomeCompleted = localStorage.getItem('welcome-completed');
-    const dashboardTutorialCompleted = localStorage.getItem('tutorial-completed');
-    
-    // Só mostrar tutorial se:
-    // 1. É consultor OU admin
-    // 2. Tutorial não foi completado
-    // 3. Tutorial não foi dispensado
-    // 4. Tutorial não está já aberto
-    // 5. Usuário já passou pelo fluxo inicial OU é admin (admins podem ver direto)
-    const deveExibirTutorial = (isConsultor || isAdmin) && !completed && !tutorialDismissed && !showTutorial;
-    const fluxoInicialCompleto = welcomeCompleted && dashboardTutorialCompleted;
-    
-    if (deveExibirTutorial && (fluxoInicialCompleto || isAdmin)) {
-      setShowTutorial(true);
-    }
-  }, [user, isConsultor, isAdmin]);
+  // Tutorial automático desabilitado
+  // Os usuários podem acessá-lo manualmente através do botão "Ver Tutorial"
 
   // Garantir que freelancers fiquem na aba "Pacientes"
   useEffect(() => {
@@ -1253,40 +1233,41 @@ const Pacientes = () => {
             <h1 className="page-title">Meus Pacientes</h1>
             <p className="page-subtitle">Acompanhe o status de seus pacientes indicados</p>
           </div>
-          <button
-            onClick={startTutorial}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 16px',
-              border: '1px solid #d1d5db',
-              borderRadius: '8px',
-              backgroundColor: 'white',
-              color: '#374151',
-              fontSize: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = '#f9fafb';
-              e.target.style.borderColor = '#9ca3af';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'white';
-              e.target.style.borderColor = '#d1d5db';
-            }}
-            title="Ver tutorial da tela de pacientes"
-          >
-            Ver Tutorial
-          </button>
+          {!isClinica && (
+            <button
+              onClick={startTutorial}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                backgroundColor: 'white',
+                color: '#374151',
+                fontSize: '14px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f9fafb';
+                e.target.style.borderColor = '#9ca3af';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'white';
+                e.target.style.borderColor = '#d1d5db';
+              }}
+              title="Ver tutorial da tela de pacientes"
+            >
+              Ver Tutorial
+            </button>
+          )}
         </div>
         
         <div style={{
           borderRadius: '8px',
           padding: '1rem',
-          marginTop: '1rem',
           fontSize: '0.875rem'
         }}>
           
@@ -1738,7 +1719,7 @@ const Pacientes = () => {
                                   <circle cx="12" cy="12" r="3" />
                                 </svg>
                               </button>
-                            {!isConsultor ? (
+                            {!isConsultor && !isClinica ? (
                               <button
                                 onClick={() => handleEdit(paciente)}
                                 className="btn-action"

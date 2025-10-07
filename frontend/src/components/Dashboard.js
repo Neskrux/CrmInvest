@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, Area, AreaChart, ReferenceLine, ComposedChart } from 'recharts';
+import { TrendingUp, Calendar, BarChart3, CheckCircle, XCircle, RotateCcw } from 'lucide-react';
 import TutorialOverlay from './TutorialOverlay';
 import WelcomeModal from './WelcomeModal';
 
@@ -552,8 +553,28 @@ const Dashboard = () => {
         let fechamentos = await responses[2].json();
         const clinicasFiltradas = user?.tipo === 'clinica' ? [] : await responses[3].json();
         
-        // Aplicar filtros por região se especificados
-        if (filtroRegiao.cidade || filtroRegiao.estado) {
+        // Se for clínica, filtrar apenas dados relacionados a ela
+        if (isClinica && user?.clinica_id) {
+          const clinicaId = user.clinica_id;
+          
+          // Filtrar agendamentos desta clínica
+          agendamentos = agendamentos.filter(agendamento => agendamento.clinica_id === clinicaId);
+          
+          // Filtrar fechamentos desta clínica
+          fechamentos = fechamentos.filter(fechamento => fechamento.clinica_id === clinicaId);
+          
+          // Filtrar pacientes que têm agendamentos ou fechamentos nesta clínica
+          const pacientesIdsClinica = new Set();
+          agendamentos.forEach(a => {
+            if (a.paciente_id) pacientesIdsClinica.add(a.paciente_id);
+          });
+          fechamentos.forEach(f => {
+            if (f.paciente_id) pacientesIdsClinica.add(f.paciente_id);
+          });
+          pacientes = pacientes.filter(p => pacientesIdsClinica.has(p.id));
+        }
+        // Aplicar filtros por região se especificados (apenas para não-clínicas)
+        else if (filtroRegiao.cidade || filtroRegiao.estado) {
           const clinicasIds = clinicasFiltradas.map(c => c.id);
           
           // Filtrar agendamentos por região (via clínicas)
@@ -678,32 +699,8 @@ const Dashboard = () => {
     fetchRegioesDisponiveis();
   }, [periodo, subPeriodo, mesAno, semanaOpcao, filtroRegiao]);
 
-  // Verificar se deve mostrar modal de boas-vindas e tutorial
-  useEffect(() => {
-    if (!user) return; // Aguardar usuário estar logado
-    
-    // Clínicas não veem modais de boas-vindas e tutoriais
-    if (user?.tipo === 'clinica') return;
-    
-    const hasSeenWelcome = localStorage.getItem('welcome-completed');
-    const hasSeenTutorial = localStorage.getItem('tutorial-completed');
-    
-    // Mostrar boas-vindas se não viu nem boas-vindas nem tutorial
-    // Isso inclui usuários que se cadastraram antes da implementação
-    if (!hasSeenWelcome && !hasSeenTutorial) {
-      setShowWelcome(true);
-    }
-    
-    // Mostrar modal do grupo do WhatsApp para consultores (não admins)
-    // Só após completar o tutorial de boas-vindas
-    if (user?.tipo === 'consultor' && !isAdmin) {
-      const whatsappModalShown = localStorage.getItem('whatsapp-group-modal-shown');
-      const welcomeCompleted = localStorage.getItem('welcome-completed');
-      if (!whatsappModalShown && welcomeCompleted) {
-        setShowWhatsAppGroupModal(true);
-      }
-    }
-  }, [user, isAdmin]);
+  // Tutoriais e modais de boas-vindas foram desabilitados
+  // Os usuários podem acessá-los manualmente através do botão "Ver Tutorial"
 
   // Desabilitar overflow quando modal de boas-vindas estiver ativo
   useEffect(() => {
@@ -838,8 +835,28 @@ const Dashboard = () => {
         return dataObj.getMonth() === mesAnterior && dataObj.getFullYear() === anoMesAnterior;
       };
 
-      // Aplicar filtros por região se especificados
-      if (filtroRegiao.cidade || filtroRegiao.estado) {
+      // Se for clínica, filtrar apenas dados relacionados a ela
+      if (isClinica && user?.clinica_id) {
+        const clinicaId = user.clinica_id;
+        
+        // Filtrar agendamentos desta clínica
+        agendamentos = agendamentos.filter(agendamento => agendamento.clinica_id === clinicaId);
+        
+        // Filtrar fechamentos desta clínica
+        fechamentos = fechamentos.filter(fechamento => fechamento.clinica_id === clinicaId);
+        
+        // Filtrar pacientes que têm agendamentos ou fechamentos nesta clínica
+        const pacientesIdsClinica = new Set();
+        agendamentos.forEach(a => {
+          if (a.paciente_id) pacientesIdsClinica.add(a.paciente_id);
+        });
+        fechamentos.forEach(f => {
+          if (f.paciente_id) pacientesIdsClinica.add(f.paciente_id);
+        });
+        pacientes = pacientes.filter(p => pacientesIdsClinica.has(p.id));
+      }
+      // Aplicar filtros por região se especificados (apenas para não-clínicas)
+      else if (filtroRegiao.cidade || filtroRegiao.estado) {
         const clinicasIds = clinicasFiltradas.map(c => c.id);
         
         // Filtrar agendamentos por região (via clínicas)
@@ -1191,6 +1208,83 @@ const Dashboard = () => {
 
       const consultoresStats = Object.values(consultoresMap);
       
+      // Dados específicos para clínicas
+      let evolucaoMensal = [];
+      let proximosAgendamentos = [];
+      let taxasComparecimento = {
+        compareceu: 0,
+        naoCompareceu: 0,
+        reagendado: 0,
+        totalAgendados: 0,
+        taxaComparecimento: 0,
+        taxaConversao: 0
+      };
+
+      if (isClinica) {
+        // 1. Evolução Mensal (últimos 6 meses)
+        const mesesArray = [];
+        for (let i = 5; i >= 0; i--) {
+          const data = new Date(hoje);
+          data.setMonth(hoje.getMonth() - i);
+          const mes = data.getMonth();
+          const ano = data.getFullYear();
+          
+          const agendamentosMes = agendamentos.filter(a => {
+            const dataAgendamento = new Date(a.data_agendamento);
+            return dataAgendamento.getMonth() === mes && dataAgendamento.getFullYear() === ano;
+          }).length;
+          
+          const fechamentosMes = fechamentos.filter(f => {
+            if (f.aprovado === 'reprovado') return false;
+            const dataFechamento = new Date(f.data_fechamento);
+            return dataFechamento.getMonth() === mes && dataFechamento.getFullYear() === ano;
+          }).length;
+          
+          const valorMes = fechamentos
+            .filter(f => {
+              if (f.aprovado === 'reprovado') return false;
+              const dataFechamento = new Date(f.data_fechamento);
+              return dataFechamento.getMonth() === mes && dataFechamento.getFullYear() === ano;
+            })
+            .reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0);
+          
+          mesesArray.push({
+            mes: data.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }),
+            agendamentos: agendamentosMes,
+            fechamentos: fechamentosMes,
+            valor: valorMes
+          });
+        }
+        evolucaoMensal = mesesArray;
+        
+        // 2. Próximos Agendamentos (próximos 7 dias)
+        const dataLimite = new Date(hoje);
+        dataLimite.setDate(hoje.getDate() + 7);
+        
+        proximosAgendamentos = agendamentos
+          .filter(a => {
+            const dataAgendamento = new Date(a.data_agendamento);
+            return dataAgendamento >= hoje && dataAgendamento <= dataLimite;
+          })
+          .sort((a, b) => new Date(a.data_agendamento) - new Date(b.data_agendamento))
+          .slice(0, 10); // Limitar a 10 agendamentos
+        
+        // 3. Taxas de Comparecimento
+        const agendadosPassados = agendamentos.filter(a => new Date(a.data_agendamento) < hoje);
+        
+        taxasComparecimento = {
+          compareceu: pacientes.filter(p => p.status === 'compareceu').length,
+          naoCompareceu: pacientes.filter(p => p.status === 'nao_compareceu').length,
+          reagendado: pacientes.filter(p => p.status === 'reagendado').length,
+          totalAgendados: agendadosPassados.length,
+          taxaComparecimento: agendadosPassados.length > 0 
+            ? ((pacientes.filter(p => p.status === 'compareceu').length / agendadosPassados.length) * 100).toFixed(1)
+            : 0,
+          taxaConversao: agendamentos.length > 0
+            ? ((fechamentos.filter(f => f.aprovado !== 'reprovado').length / agendamentos.length) * 100).toFixed(1)
+            : 0
+        };
+      }
 
       setStats({
         totalPacientes: pacientes.length,
@@ -1211,7 +1305,11 @@ const Dashboard = () => {
         // Crescimentos dinâmicos
         crescimentoPacientes,
         crescimentoFechamentos,
-        crescimentoValor
+        crescimentoValor,
+        // Dados específicos para clínicas
+        evolucaoMensal,
+        proximosAgendamentos,
+        taxasComparecimento
       });
       setLoading(false);
     } catch (error) {
@@ -1337,34 +1435,36 @@ const Dashboard = () => {
               )}
             </p>
           </div>
-          <button
-            onClick={startTutorial}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 16px',
-              border: '1px solid #d1d5db',
-              borderRadius: '8px',
-              backgroundColor: 'white',
-              color: '#374151',
-              fontSize: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = '#f9fafb';
-              e.target.style.borderColor = '#9ca3af';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'white';
-              e.target.style.borderColor = '#d1d5db';
-            }}
-            title="Ver tutorial do dashboard"
-          >
-            Ver Tutorial
-          </button>
+          {!isClinica && (
+            <button
+              onClick={startTutorial}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                backgroundColor: 'white',
+                color: '#374151',
+                fontSize: '14px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f9fafb';
+                e.target.style.borderColor = '#9ca3af';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'white';
+                e.target.style.borderColor = '#d1d5db';
+              }}
+              title="Ver tutorial do dashboard"
+            >
+              Ver Tutorial
+            </button>
+          )}
         </div>
       </div>
 
@@ -1511,7 +1611,8 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Filtros por Região */}
+        {/* Filtros por Região - Ocultar para clínicas */}
+        {!isClinica && (
         <div style={{ 
           marginTop: '1rem',
           paddingTop: '1rem',
@@ -1574,6 +1675,7 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* Estatísticas detalhadas por dia (apenas no modo semanal) */}
@@ -1740,7 +1842,237 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Cards de Comissão (dados filtrados) */}
+      {/* Seção Exclusiva para Clínicas */}
+      {isClinica && (
+        <>
+          {/* Gráfico de Evolução Mensal */}
+          <div className="card" style={{ marginTop: '2rem' }}>
+            <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
+              <h2 className="card-title" style={{ color: '#1a1d23', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <TrendingUp size={24} />
+                Evolução dos Últimos 6 Meses
+              </h2>
+              <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0, fontWeight: '500' }}>
+                Acompanhe o crescimento de agendamentos e fechamentos
+              </p>
+            </div>
+            <div className="card-body" style={{ padding: '2rem' }}>
+              <ResponsiveContainer width="100%" height={350}>
+                <ComposedChart
+                  data={stats.evolucaoMensal || []}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                >
+                  <defs>
+                    <linearGradient id="agendamentosGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                    </linearGradient>
+                    <linearGradient id="fechamentosGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis 
+                    dataKey="mes" 
+                    tick={{ fontSize: 12, fill: '#6b7280' }}
+                    axisLine={{ stroke: '#e5e7eb' }}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 12, fill: '#6b7280' }}
+                    axisLine={{ stroke: '#e5e7eb' }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'rgba(255, 255, 255, 0.98)', 
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                    }}
+                    formatter={(value, name) => {
+                      if (name === 'valor') return [formatCurrency(value), 'Valor'];
+                      return [value, name === 'agendamentos' ? 'Agendamentos' : 'Fechamentos'];
+                    }}
+                  />
+                  <Legend 
+                    wrapperStyle={{ paddingTop: '20px' }}
+                    formatter={(value) => {
+                      const labels = {
+                        agendamentos: 'Agendamentos',
+                        fechamentos: 'Fechamentos',
+                        valor: 'Valor Total'
+                      };
+                      return labels[value] || value;
+                    }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="agendamentos" 
+                    stroke="#3b82f6" 
+                    fill="url(#agendamentosGradient)" 
+                    strokeWidth={2}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="fechamentos" 
+                    stroke="#10b981" 
+                    fill="url(#fechamentosGradient)" 
+                    strokeWidth={2}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="valor" 
+                    stroke="#f59e0b" 
+                    strokeWidth={2}
+                    dot={{ r: 4, fill: '#f59e0b' }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Grid: Próximos Agendamentos + Taxas */}
+          <div className="grid grid-2" style={{ gap: '2rem', marginTop: '2rem' }}>
+            {/* Próximos Agendamentos */}
+            <div className="card">
+              <div className="card-header" style={{ background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)' }}>
+                <h3 className="card-title" style={{ color: '#1e40af', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Calendar size={20} />
+                  Próximos Agendamentos
+                </h3>
+                <p style={{ fontSize: '0.875rem', color: '#1e40af', margin: 0 }}>
+                  Próximos 7 dias
+                </p>
+              </div>
+              <div className="card-body" style={{ padding: '1.5rem' }}>
+                {stats.proximosAgendamentos && stats.proximosAgendamentos.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '400px', overflowY: 'auto' }}>
+                    {stats.proximosAgendamentos.map((agendamento, index) => (
+                      <div 
+                        key={index}
+                        style={{
+                          padding: '1rem',
+                          background: '#f8fafc',
+                          borderRadius: '8px',
+                          border: '1px solid #e5e7eb',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: '600', color: '#1a1d23', marginBottom: '0.25rem' }}>
+                            {agendamento.paciente_nome || 'Paciente'}
+                          </div>
+                          <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                            {new Date(agendamento.data_agendamento).toLocaleDateString('pt-BR', { 
+                              day: '2-digit', 
+                              month: 'short',
+                              weekday: 'short'
+                            })}
+                            {agendamento.hora_agendamento && ` às ${agendamento.hora_agendamento}`}
+                          </div>
+                          {agendamento.consultor_nome && (
+                            <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+                              Consultor: {agendamento.consultor_nome}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '12px',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          background: '#dbeafe',
+                          color: '#1e40af'
+                        }}>
+                          {agendamento.status || 'Agendado'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ margin: '0 auto 1rem' }}>
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                      <line x1="16" y1="2" x2="16" y2="6"></line>
+                      <line x1="8" y1="2" x2="8" y2="6"></line>
+                      <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    <p>Nenhum agendamento nos próximos 7 dias</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Taxas de Comparecimento e Conversão */}
+            <div className="card">
+              <div className="card-header" style={{ background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' }}>
+                <h3 className="card-title" style={{ color: '#059669', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <BarChart3 size={20} />
+                  Taxas de Performance
+                </h3>
+                <p style={{ fontSize: '0.875rem', color: '#059669', margin: 0 }}>
+                  Indicadores de conversão
+                </p>
+              </div>
+              <div className="card-body" style={{ padding: '1.5rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {/* Taxa de Comparecimento */}
+                  <div style={{
+                    padding: '1.5rem',
+                    background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                    borderRadius: '12px',
+                    border: '2px solid #3b82f6'
+                  }}>
+                    <div style={{ fontSize: '0.875rem', color: '#1e40af', marginBottom: '0.5rem', fontWeight: '600' }}>
+                      Taxa de Comparecimento
+                    </div>
+                    <div style={{ fontSize: '2.5rem', fontWeight: '800', color: '#1e40af', marginBottom: '0.5rem' }}>
+                      {stats.taxasComparecimento?.taxaComparecimento || 0}%
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem', fontSize: '0.75rem', color: '#6b7280', flexWrap: 'wrap' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <CheckCircle size={14} color="#10b981" />
+                        Compareceu: {stats.taxasComparecimento?.compareceu || 0}
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <XCircle size={14} color="#ef4444" />
+                        Não compareceu: {stats.taxasComparecimento?.naoCompareceu || 0}
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <RotateCcw size={14} color="#f59e0b" />
+                        Reagendado: {stats.taxasComparecimento?.reagendado || 0}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Taxa de Conversão */}
+                  <div style={{
+                    padding: '1.5rem',
+                    background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                    borderRadius: '12px',
+                    border: '2px solid #10b981'
+                  }}>
+                    <div style={{ fontSize: '0.875rem', color: '#059669', marginBottom: '0.5rem', fontWeight: '600' }}>
+                      Taxa de Conversão
+                    </div>
+                    <div style={{ fontSize: '2.5rem', fontWeight: '800', color: '#059669', marginBottom: '0.5rem' }}>
+                      {stats.taxasComparecimento?.taxaConversao || 0}%
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                      De agendamentos para fechamentos
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Cards de Comissão (dados filtrados) - Ocultar para clínicas */}
+      {!isClinica && (
       <div className="stats-grid" style={{ marginTop: '2rem', gridTemplateColumns: 'repeat(2, 1fr)', padding: '2rem' }}>
         <div className="stat-card" style={{ 
           background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
@@ -1780,9 +2112,10 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+      )}
 
-      {/* Gráfico de Pacientes, Agendamentos e Fechamentos por Cidade */}
-      {stats.agendamentosPorCidade.length > 0 && (
+      {/* Gráfico de Pacientes, Agendamentos e Fechamentos por Cidade - Ocultar para clínicas */}
+      {!isClinica && stats.agendamentosPorCidade.length > 0 && (
         <div className="card" style={{ marginTop: '2rem' }} data-tutorial="cities-chart">
           <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
             <h2 className="card-title" style={{ color: '#1a1d23', fontWeight: '700' }}>Análise Geográfica de Performance</h2>
@@ -1999,7 +2332,8 @@ const Dashboard = () => {
         </div>
       )}
 
-      <div className="grid grid-2" style={{ gap: '2rem' }}>
+      {/* Pipeline de Vendas - Largura inteira para clínicas, metade para outros */}
+      <div className={isClinica ? "" : "grid grid-2"} style={isClinica ? {} : { gap: '2rem' }}>
         {/* Pipeline de Vendas (dados filtrados) */}
         <div className="card" style={{ minWidth: 0 }} data-tutorial="sales-pipeline">
           <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
@@ -2041,7 +2375,8 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Ranking dos Consultores */}
+        {/* Ranking dos Consultores - Ocultar para clínicas */}
+        {!isClinica && (
         <div className="card" style={{ minWidth: 0 }} data-tutorial="ranking">
           <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
             <h2 className="card-title" style={{ color: '#1a1d23', fontWeight: '700' }}>Ranking de Performance</h2>
@@ -2409,6 +2744,7 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* Gráfico de Conversão (dados filtrados) */}
@@ -3215,133 +3551,6 @@ const Dashboard = () => {
         onComplete={handleTutorialComplete}
       />
 
-      {/* Modal do Grupo do WhatsApp */}
-      {showWhatsAppGroupModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            padding: '2rem',
-            maxWidth: '500px',
-            width: '90%',
-            textAlign: 'center',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-          }}>
-            <div style={{
-              width: '60px',
-              height: '60px',
-              background: '#25D366',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 1.5rem'
-            }}>
-              <svg width="30" height="30" viewBox="0 0 24 24" fill="white">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/>
-              </svg>
-            </div>
-
-            <h2 style={{
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              color: '#1a1d23',
-              marginBottom: '1rem'
-            }}>
-              Entre no Grupo dos Consultores!
-            </h2>
-
-            <p style={{
-              fontSize: '1rem',
-              color: '#4b5563',
-              marginBottom: '1.5rem',
-              lineHeight: '1.5'
-            }}>
-              Junte-se ao grupo do WhatsApp para trocar experiências, 
-              receber dicas e se conectar com outros consultores da plataforma.
-            </p>
-
-            <p style={{
-              fontSize: '0.875rem',
-              color: '#6b7280',
-              marginBottom: '1.5rem',
-              lineHeight: '1.4',
-              fontStyle: 'italic'
-            }}>
-              <strong>Dica:</strong> Este link também estará sempre disponível na sua tela de perfil, 
-              caso queira acessar depois!
-            </p>
-
-            <div style={{
-              display: 'flex',
-              gap: '1rem',
-              justifyContent: 'center'
-            }}>
-              <button
-                onClick={() => {
-                  localStorage.setItem('whatsapp-group-modal-shown', 'true');
-                  setShowWhatsAppGroupModal(false);
-                }}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  background: '#6b7280',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => e.target.style.background = '#4b5563'}
-                onMouseOut={(e) => e.target.style.background = '#6b7280'}
-              >
-                Talvez Depois
-              </button>
-
-              <button
-                onClick={() => {
-                  localStorage.setItem('whatsapp-group-modal-shown', 'true');
-                  setShowWhatsAppGroupModal(false);
-                  window.open('https://chat.whatsapp.com/H58PhHmVQpj1mRSj7wlZgs', '_blank');
-                }}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  background: '#25D366',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}
-                onMouseOver={(e) => e.target.style.background = '#128C7E'}
-                onMouseOut={(e) => e.target.style.background = '#25D366'}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/>
-                </svg>
-                Entrar no Grupo
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
