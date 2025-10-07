@@ -28,6 +28,7 @@ import Materiais from './components/Materiais';
 import IDSFIntegration from './components/IDSFIntegration';
 import Indicacoes from './components/Indicacoes';
 import ComoFazer from './components/ComoFazer';
+import MeusDocumentos from './components/MeusDocumentos';
 import logoBrasao from './images/logobrasao.png';
 import logoHorizontal from './images/logohorizontal.png';
 import logoHorizontalPreto from './images/logohorizontalpreto.png';
@@ -53,7 +54,7 @@ const ProtectedRoute = ({ children }) => {
 
 // Componente interno que usa o hook de notificação
 const AppContentWithNotifications = () => {
-  const { user, logout, loading } = useAuth();
+  const { user, logout, loading, isAdmin, isEmpresa } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -96,6 +97,7 @@ const AppContentWithNotifications = () => {
     if (path.includes('/fechamentos')) return 'fechamentos';
     if (path.includes('/meta-ads')) return 'meta-ads';
     if (path.includes('/whatsapp')) return 'whatsapp';
+    if (path.includes('/meus-documentos')) return 'meus-documentos';
     if (path.includes('/materiais')) return 'materiais';
     if (path.includes('/perfil')) return 'perfil';
     return 'dashboard';
@@ -196,6 +198,23 @@ const AppContentWithNotifications = () => {
       );
     }
     
+    // Clínicas têm acesso limitado: pacientes (seus), agendamentos (seus), documentação e dashboard
+    if (user?.tipo === 'clinica') {
+      return (
+        <Routes>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/pacientes" element={<Pacientes />} />
+          <Route path="/agendamentos" element={<Agendamentos />} />
+          <Route path="/meus-documentos" element={<MeusDocumentos />} />
+          <Route path="/materiais" element={<Materiais />} />
+          <Route path="/perfil" element={<Perfil />} />
+          {/* Redirecionar qualquer outra rota para dashboard */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      );
+    }
+
     // Empresas têm acesso limitado: consultores (da empresa), clínicas, materiais e perfil
     if (isEmpresa) {
       return (
@@ -540,8 +559,8 @@ const AppContentWithNotifications = () => {
         </div>
 
         <nav className="sidebar-nav">
-          {/* Dashboard - Apenas para Admin e Consultores Invest Money */}
-          {user.tipo !== 'empresa' && !user.empresa_id && (
+          {/* Dashboard - Para Admin, Consultores Invest Money e Clínicas */}
+          {(user.tipo !== 'empresa' && !user.empresa_id) || user.tipo === 'clinica' ? (
             <div className="nav-item">
               <Link
                 to="/dashboard"
@@ -557,10 +576,10 @@ const AppContentWithNotifications = () => {
                 Dashboard
               </Link>
             </div>
-          )}
+          ) : null}
 
-          {/* Pacientes - Apenas para Admin e Consultores Invest Money */}
-          {user.tipo !== 'empresa' && !user.empresa_id && (
+          {/* Pacientes - Para Admin, Consultores Invest Money e Clínicas (com label diferente para clínicas) */}
+          {(user.tipo !== 'empresa' && !user.empresa_id) || user.tipo === 'clinica' ? (
             <div className="nav-item">
               <Link
                 to="/pacientes"
@@ -573,13 +592,13 @@ const AppContentWithNotifications = () => {
                   <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                   <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
-                Pacientes
+                {user.tipo === 'clinica' ? 'Meus Pacientes' : 'Pacientes'}
               </Link>
             </div>
-          )}
+          ) : null}
 
-          {/* Agendamentos - Apenas para Admin e Consultores Invest Money */}
-          {user.tipo !== 'empresa' && !user.empresa_id && (
+          {/* Agendamentos - Para Admin, Consultores Invest Money e Clínicas */}
+          {(user.tipo !== 'empresa' && !user.empresa_id) || user.tipo === 'clinica' ? (
             <div className="nav-item">
               <Link
                 to="/agendamentos"
@@ -595,10 +614,10 @@ const AppContentWithNotifications = () => {
                 Agendamentos
               </Link>
             </div>
-          )}
+          ) : null}
 
-          {/* Fechamentos - Apenas para Admin e Consultores Invest Money */}
-          {user.tipo !== 'empresa' && !user.empresa_id && (
+          {/* Fechamentos - Apenas para Admin e Consultores Invest Money (NÃO para clínicas) */}
+          {user.tipo !== 'empresa' && !user.empresa_id && user.tipo !== 'clinica' && (
             <div className="nav-item">
               <Link
                 to="/fechamentos"
@@ -615,19 +634,41 @@ const AppContentWithNotifications = () => {
           )}
 
 
-          <div className="nav-item">
-            <Link
-              to="/clinicas"
-              className={`nav-link ${activeTab === 'clinicas' ? 'active' : ''}`}
-              onClick={handleMobileNavigation}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                <polyline points="9 22 9 12 15 12 15 22" />
-              </svg>
-              Clínicas
-            </Link>
-          </div>
+          {/* Clínicas - Não mostrar para usuários tipo clínica */}
+          {user.tipo !== 'clinica' && (
+            <div className="nav-item">
+              <Link
+                to="/clinicas"
+                className={`nav-link ${activeTab === 'clinicas' ? 'active' : ''}`}
+                onClick={handleMobileNavigation}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>
+                Clínicas
+              </Link>
+            </div>
+          )}
+
+          {/* Meus Documentos - Apenas para clínicas */}
+          {user.tipo === 'clinica' && (
+            <div className="nav-item">
+              <Link
+                to="/meus-documentos"
+                className={`nav-link ${activeTab === 'meus-documentos' ? 'active' : ''}`}
+                onClick={handleMobileNavigation}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14,2 14,8 20,8"/>
+                  <line x1="12" y1="18" x2="12" y2="12"/>
+                  <line x1="9" y1="15" x2="15" y2="15"/>
+                </svg>
+                Meus Documentos
+              </Link>
+            </div>
+          )}
 
           <div className="nav-item">
             <Link
@@ -646,18 +687,22 @@ const AppContentWithNotifications = () => {
             </Link>
           </div>
 
-          <div className="nav-item">
-            <Link
-              to="/idsf"
-              className={`nav-link ${activeTab === 'idsf' ? 'active' : ''}`}
-              onClick={handleMobileNavigation}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-              </svg>
-              Integração IDSF
-            </Link>
-          </div>
+          {/* Integração IDSF - Não mostrar para clínicas */}
+          {user.tipo !== 'clinica' && (
+            <div className="nav-item">
+              <Link
+                to="/idsf"
+                className={`nav-link ${activeTab === 'idsf' ? 'active' : ''}`}
+                onClick={handleMobileNavigation}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+                Integração IDSF
+              </Link>
+            </div>
+          )}
+
 
           {/* Consultores - Admin e Empresas */}
           {(user.tipo === 'admin' || user.tipo === 'empresa') && (

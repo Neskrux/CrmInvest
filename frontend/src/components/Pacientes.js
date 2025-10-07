@@ -4,7 +4,7 @@ import { useToast } from '../components/Toast';
 import TutorialPacientes from './TutorialPacientes';
 
 const Pacientes = () => {
-  const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isFreelancer } = useAuth();
+  const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isFreelancer, isClinica, deveFiltrarPorClinica } = useAuth();
   // Verificar se usuário é consultor
   const isConsultor = user?.tipo === 'consultor';
   const [pacientes, setPacientes] = useState([]);

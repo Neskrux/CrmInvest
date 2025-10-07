@@ -4,10 +4,11 @@ import { useToast } from '../components/Toast';
 import TutorialClinicas from './TutorialClinicas';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import config from '../config';
 
 const Clinicas = () => {
   const { makeRequest, user, isAdmin, podeAlterarStatus, isFreelancer, isConsultorInterno } = useAuth();
-  const { showSuccessToast, showErrorToast } = useToast();
+  const { showSuccessToast, showErrorToast, showWarningToast } = useToast();
   const [clinicas, setClinicas] = useState([]);
   const [novasClinicas, setNovasClinicas] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -16,6 +17,17 @@ const Clinicas = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false); // Estado para prevenir cliques duplos
   const [submittingNovaClinica, setSubmittingNovaClinica] = useState(false); // Estado para nova clínica
+  
+  // Estados para gerenciar acesso
+  const [showAcessoModal, setShowAcessoModal] = useState(false);
+  const [clinicaParaAcesso, setClinicaParaAcesso] = useState(null);
+  const [acessoFormData, setAcessoFormData] = useState({
+    email: '',
+    senha: '',
+    confirmarSenha: ''
+  });
+  const [salvandoAcesso, setSalvandoAcesso] = useState(false);
+  const [mostrarSenhaAcesso, setMostrarSenhaAcesso] = useState(false);
   const [activeTab, setActiveTab] = useState('clinicas');
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState('');
@@ -48,6 +60,10 @@ const Clinicas = () => {
     email: '',
     responsavel: '',
     status: 'ativa',
+    // Campos de acesso ao sistema
+    criar_acesso: false,
+    email_login: '',
+    senha: '',
     // Campos de documentação
     doc_cartao_cnpj: false,
     doc_contrato_social: false,
@@ -437,6 +453,92 @@ const Clinicas = () => {
     }
   };
 
+  const handleGerenciarAcesso = (clinica) => {
+    setClinicaParaAcesso(clinica);
+    setAcessoFormData({
+      email: (clinica.email_login || clinica.email || '').toLowerCase(),
+      senha: '',
+      confirmarSenha: ''
+    });
+    setShowAcessoModal(true);
+  };
+
+  const handleSalvarAcesso = async () => {
+    // Validações
+    if (!acessoFormData.email) {
+      showWarningToast('Por favor, informe o email de login');
+      return;
+    }
+
+    if (!acessoFormData.senha) {
+      showWarningToast('Por favor, informe a senha');
+      return;
+    }
+
+    if (acessoFormData.senha.length < 6) {
+      showWarningToast('A senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+
+    if (acessoFormData.senha !== acessoFormData.confirmarSenha) {
+      showWarningToast('As senhas não coincidem');
+      return;
+    }
+
+    setSalvandoAcesso(true);
+    try {
+      const response = await makeRequest(`/clinicas/${clinicaParaAcesso.id}/criar-acesso`, {
+        method: 'POST',
+        body: JSON.stringify({
+          email: acessoFormData.email.toLowerCase().trim(),
+          senha: acessoFormData.senha
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        showSuccessToast('Acesso criado/atualizado com sucesso!');
+        setShowAcessoModal(false);
+        setClinicaParaAcesso(null);
+        setAcessoFormData({ email: '', senha: '', confirmarSenha: '' });
+        fetchClinicas();
+      } else {
+        showErrorToast(data.error || 'Erro ao criar acesso');
+      }
+    } catch (error) {
+      console.error('Erro ao criar acesso:', error);
+      showErrorToast('Erro ao conectar com o servidor');
+    } finally {
+      setSalvandoAcesso(false);
+    }
+  };
+
+  const handleRemoverAcesso = async () => {
+    if (!window.confirm('Tem certeza que deseja remover o acesso desta clínica ao sistema?')) {
+      return;
+    }
+
+    try {
+      const response = await makeRequest(`/clinicas/${clinicaParaAcesso.id}/remover-acesso`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        showSuccessToast('Acesso removido com sucesso');
+        setShowAcessoModal(false);
+        setClinicaParaAcesso(null);
+        fetchClinicas();
+      } else {
+        const data = await response.json();
+        showErrorToast(data.error || 'Erro ao remover acesso');
+      }
+    } catch (error) {
+      console.error('Erro ao remover acesso:', error);
+      showErrorToast('Erro ao conectar com o servidor');
+    }
+  };
+
   const handleDeleteClinica = async (clinicaId) => {
     if (!window.confirm('Tem certeza que deseja excluir esta clínica? Esta ação não pode ser desfeita.')) {
       return;
@@ -639,23 +741,53 @@ const Clinicas = () => {
     setSubmitting(true);
     
     try {
+      // Normalizar email antes de enviar
+      const dadosParaEnviar = {
+        ...formData,
+        email: formData.email?.toLowerCase().trim(),
+        email_login: formData.email_login?.toLowerCase().trim()
+      };
+      
       let response;
       if (editingClinica) {
         response = await makeRequest(`/clinicas/${editingClinica.id}`, {
           method: 'PUT',
-          body: JSON.stringify(formData)
+          body: JSON.stringify(dadosParaEnviar)
         });
       } else {
         response = await makeRequest('/clinicas', {
           method: 'POST',
-          body: JSON.stringify(formData)
+          body: JSON.stringify(dadosParaEnviar)
         });
       }
 
       const data = await response.json();
       
       if (response.ok) {
-        showSuccessToast(editingClinica ? 'Clínica atualizada com sucesso!' : 'Clínica cadastrada com sucesso!');
+        // Se foi criada uma nova clínica e deve criar acesso
+        if (!editingClinica && formData.criar_acesso && data.clinica?.id) {
+          try {
+            const acessoResponse = await makeRequest(`/clinicas/${data.clinica.id}/criar-acesso`, {
+              method: 'POST',
+              body: JSON.stringify({
+                email: formData.email_login,
+                senha: formData.senha
+              })
+            });
+            
+            if (acessoResponse.ok) {
+              showSuccessToast('Clínica cadastrada e acesso criado com sucesso!');
+            } else {
+              showWarningToast('Clínica cadastrada, mas houve erro ao criar o acesso. Use a tela de Gerenciar Acesso.');
+            }
+          } catch (error) {
+            console.error('Erro ao criar acesso:', error);
+            showWarningToast('Clínica cadastrada, mas houve erro ao criar o acesso.');
+          }
+        } else {
+          showSuccessToast(editingClinica ? 'Clínica atualizada com sucesso!' : 'Clínica cadastrada com sucesso!');
+        }
+        
         setShowModal(false);
         setEditingClinica(null);
         setFormData({
@@ -669,7 +801,10 @@ const Clinicas = () => {
           telefone: '',
           email: '',
           responsavel: '',
-          status: 'ativa'
+          status: 'ativa',
+          criar_acesso: false,
+          email_login: '',
+          senha: ''
         });
         setCidadeCustomizada(false);
         fetchClinicas();
@@ -700,9 +835,13 @@ const Clinicas = () => {
       estado: estadoClinica,
       nicho: clinica.nicho || '',
       telefone: clinica.telefone || '',
-      email: clinica.email || '',
+      email: (clinica.email || '').toLowerCase(),
       responsavel: clinica.responsavel || '',
       status: clinica.status || 'ativo',
+      // Campos de acesso (não editar em clínica existente)
+      criar_acesso: false,
+      email_login: '',
+      senha: '',
       // Campos de documentação
       doc_cartao_cnpj: clinica.doc_cartao_cnpj || false,
       doc_contrato_social: clinica.doc_contrato_social || false,
@@ -900,6 +1039,9 @@ const Clinicas = () => {
       value = formatarCidade(value);
     } else if (name === 'cnpj') {
       value = formatarCNPJ(value);
+    } else if (name === 'email' || name === 'email_login') {
+      // Normalizar emails para minúsculas
+      value = value.toLowerCase();
     }
     
     // Limpar cidade se estado mudar
@@ -1051,6 +1193,88 @@ const Clinicas = () => {
 
   const startTutorial = () => {
     setShowTutorial(true);
+  };
+
+  // Função para visualizar documento com autenticação
+  const handleVisualizarDocumento = async (clinicaId, tipoDoc) => {
+    try {
+      const response = await makeRequest(`/clinicas/${clinicaId}/documentos/${tipoDoc}`);
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        
+        // Limpar o objeto URL após um tempo
+        setTimeout(() => window.URL.revokeObjectURL(url), 100);
+      } else {
+        showErrorToast('Erro ao carregar documento');
+      }
+    } catch (error) {
+      console.error('Erro ao visualizar documento:', error);
+      showErrorToast('Erro ao visualizar documento');
+    }
+  };
+
+  // Funções para aprovar/reprovar documentos
+  const handleAprovarDocumento = async (clinicaId, tipoDoc) => {
+    try {
+      const response = await makeRequest(`/clinicas/${clinicaId}/documentos/${tipoDoc}/aprovar`, {
+        method: 'PUT'
+      });
+      
+      if (response.ok) {
+        showSuccessToast('Documento aprovado com sucesso!');
+        // Atualizar a clínica no estado local
+        if (viewingClinica) {
+          setViewingClinica({
+            ...viewingClinica,
+            [`${tipoDoc}_aprovado`]: true
+          });
+        }
+        // Recarregar dados da clínica
+        await fetchClinicas();
+      } else {
+        const error = await response.json();
+        showErrorToast(error.error || 'Erro ao aprovar documento');
+      }
+    } catch (error) {
+      console.error('Erro ao aprovar documento:', error);
+      showErrorToast('Erro ao aprovar documento');
+    }
+  };
+
+  const handleReprovarDocumento = async (clinicaId, tipoDoc) => {
+    try {
+      const motivo = prompt('Motivo da reprovação (opcional):');
+      
+      const response = await makeRequest(`/clinicas/${clinicaId}/documentos/${tipoDoc}/reprovar`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ motivo })
+      });
+      
+      if (response.ok) {
+        showSuccessToast('Documento reprovado!');
+        // Atualizar a clínica no estado local
+        if (viewingClinica) {
+          setViewingClinica({
+            ...viewingClinica,
+            [`${tipoDoc}_aprovado`]: false
+          });
+        }
+        // Recarregar dados da clínica
+        await fetchClinicas();
+      } else {
+        const error = await response.json();
+        showErrorToast(error.error || 'Erro ao reprovar documento');
+      }
+    } catch (error) {
+      console.error('Erro ao reprovar documento:', error);
+      showErrorToast('Erro ao reprovar documento');
+    }
   };
 
   // Função para copiar link personalizado
@@ -1865,7 +2089,7 @@ const Clinicas = () => {
                         <div>{formatarTelefone(clinica.telefone)}</div>
                       )}
                       {clinica.email && (
-                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>{clinica.email}</div>
+                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>{clinica.email?.toLowerCase()}</div>
                       )}
                       {!clinica.telefone && !clinica.email && '-'}
                     </td>
@@ -1965,19 +2189,35 @@ const Clinicas = () => {
                             </>
                           )}
                           {isAdmin && (
-                            <button
-                              onClick={() => handleDeleteClinica(clinica.id)}
-                              className="btn-action"
-                              title="Excluir"
-                              style={{ marginLeft: '0.5rem', color: '#dc2626' }}
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <polyline points="3 6 5 6 21 6" />
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                <line x1="10" y1="11" x2="10" y2="17" />
-                                <line x1="14" y1="11" x2="14" y2="17" />
-                              </svg>
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleGerenciarAcesso(clinica)}
+                                className="btn-action"
+                                title={clinica.ativo_no_sistema ? "Editar Acesso" : "Criar Acesso"}
+                                style={{ 
+                                  marginLeft: '0.5rem', 
+                                  color: clinica.ativo_no_sistema ? '#10b981' : '#3b82f6' 
+                                }}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteClinica(clinica.id)}
+                                className="btn-action"
+                                title="Excluir"
+                                style={{ marginLeft: '0.5rem', color: '#dc2626' }}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <polyline points="3 6 5 6 21 6" />
+                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                  <line x1="10" y1="11" x2="10" y2="17" />
+                                  <line x1="14" y1="11" x2="14" y2="17" />
+                                </svg>
+                              </button>
+                            </>
                           )}
                         </>
                       )}
@@ -2090,7 +2330,7 @@ const Clinicas = () => {
                         <td style={{ display: isMobile ? 'none' : 'table-cell' }}>{formatarTelefone(clinica.telefone) || '-'}</td>
                         <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                           {clinica.email ? (
-                            <span style={{ fontSize: '0.875rem' }}>{clinica.email}</span>
+                            <span style={{ fontSize: '0.875rem' }}>{clinica.email?.toLowerCase()}</span>
                           ) : '-'}
                         </td>
                         <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
@@ -2239,6 +2479,62 @@ const Clinicas = () => {
                   />
                 </div>
               </div>
+
+              {/* Seção de Acesso ao Sistema */}
+              {isAdmin && (
+                <div style={{ 
+                  marginTop: '1.5rem', 
+                  padding: '1rem', 
+                  backgroundColor: '#f0f9ff', 
+                  borderRadius: '8px',
+                  border: '1px solid #0284c7'
+                }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: '#0c4a6e' }}>
+                    Acesso ao Sistema
+                  </h3>
+                  
+                  <div className="form-group">
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        name="criar_acesso"
+                        checked={formData.criar_acesso}
+                        onChange={(e) => setFormData({ ...formData, criar_acesso: e.target.checked })}
+                      />
+                      <span style={{ marginLeft: '0.5rem' }}>Criar acesso para a clínica</span>
+                    </label>
+                  </div>
+
+                  {formData.criar_acesso && (
+                    <div className="form-row" style={{ marginTop: '1rem' }}>
+                      <div className="form-group">
+                        <label className="form-label">Email de Login *</label>
+                        <input
+                          type="email"
+                          name="email_login"
+                          className="form-input"
+                          value={formData.email_login}
+                          onChange={handleInputChange}
+                          placeholder="email@clinica.com.br"
+                          required={formData.criar_acesso}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Senha *</label>
+                        <input
+                          type="password"
+                          name="senha"
+                          className="form-input"
+                          value={formData.senha}
+                          onChange={handleInputChange}
+                          placeholder="Mínimo 6 caracteres"
+                          required={formData.criar_acesso}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="form-group">
                 <label className="form-label">Endereço (Rua e Número) *</label>
@@ -3274,7 +3570,7 @@ const Clinicas = () => {
                  {viewingClinica.email && (
                    <div>
                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>E-mail</label>
-                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.email}</p>
+                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.email?.toLowerCase()}</p>
                    </div>
                  )}
                  
@@ -3351,250 +3647,89 @@ const Clinicas = () => {
                    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
                    gap: '1rem'
                  }}>
-                   {/* 1 - Cartão CNPJ */}
-                   <div style={{
-                     padding: '1rem',
-                     backgroundColor: '#f9fafb',
-                     borderRadius: '8px',
-                     border: '1px solid #e5e7eb'
-                   }}>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <div>
-                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>1. Cartão CNPJ</label>
-                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_cartao_cnpj ? '#059669' : '#dc2626' }}>
-                           {viewingClinica.doc_cartao_cnpj ? '✓ Enviado' : '✗ Pendente'}
-                         </p>
-                       </div>
-                       {viewingClinica.doc_cartao_cnpj && (
-                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
-                           Visualizar
-                         </button>
-                       )}
-                     </div>
-                   </div>
-                   
-                   {/* 2 - Contrato Social */}
-                   <div style={{
-                     padding: '1rem',
-                     backgroundColor: '#f9fafb',
-                     borderRadius: '8px',
-                     border: '1px solid #e5e7eb'
-                   }}>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <div>
-                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>2. Contrato Social</label>
-                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_contrato_social ? '#059669' : '#dc2626' }}>
-                           {viewingClinica.doc_contrato_social ? '✓ Enviado' : '✗ Pendente'}
-                         </p>
-                       </div>
-                       {viewingClinica.doc_contrato_social && (
-                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
-                           Visualizar
-                         </button>
-                       )}
-                     </div>
-                   </div>
-                   
-                   {/* 3 - Alvará Sanitário */}
-                   <div style={{
-                     padding: '1rem',
-                     backgroundColor: '#f9fafb',
-                     borderRadius: '8px',
-                     border: '1px solid #e5e7eb'
-                   }}>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <div>
-                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>3. Alvará Sanitário</label>
-                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_alvara_sanitario ? '#059669' : '#dc2626' }}>
-                           {viewingClinica.doc_alvara_sanitario ? '✓ Enviado' : '✗ Pendente'}
-                         </p>
-                       </div>
-                       {viewingClinica.doc_alvara_sanitario && (
-                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
-                           Visualizar
-                         </button>
-                       )}
-                     </div>
-                   </div>
-                   
-                   {/* 4 - Balanço/Balancete */}
-                   <div style={{
-                     padding: '1rem',
-                     backgroundColor: '#f9fafb',
-                     borderRadius: '8px',
-                     border: '1px solid #e5e7eb'
-                   }}>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <div>
-                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>4. Balanço/Balancete</label>
-                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_balanco ? '#059669' : '#dc2626' }}>
-                           {viewingClinica.doc_balanco ? '✓ Enviado' : '✗ Pendente'}
-                         </p>
-                       </div>
-                       {viewingClinica.doc_balanco && (
-                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
-                           Visualizar
-                         </button>
-                       )}
-                     </div>
-                   </div>
-                   
-                   {/* 5 - Comprovante de Endereço */}
-                   <div style={{
-                     padding: '1rem',
-                     backgroundColor: '#f9fafb',
-                     borderRadius: '8px',
-                     border: '1px solid #e5e7eb'
-                   }}>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <div>
-                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>5. Comprovante Endereço</label>
-                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_comprovante_endereco ? '#059669' : '#dc2626' }}>
-                           {viewingClinica.doc_comprovante_endereco ? '✓ Enviado' : '✗ Pendente'}
-                         </p>
-                       </div>
-                       {viewingClinica.doc_comprovante_endereco && (
-                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
-                           Visualizar
-                         </button>
-                       )}
-                     </div>
-                   </div>
-                   
-                   {/* 6 - Dados Bancários PJ */}
-                   <div style={{
-                     padding: '1rem',
-                     backgroundColor: '#f9fafb',
-                     borderRadius: '8px',
-                     border: '1px solid #e5e7eb'
-                   }}>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <div>
-                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>6. Dados Bancários PJ</label>
-                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_dados_bancarios ? '#059669' : '#dc2626' }}>
-                           {viewingClinica.doc_dados_bancarios ? '✓ Enviado' : '✗ Pendente'}
-                         </p>
-                       </div>
-                       {viewingClinica.doc_dados_bancarios && (
-                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
-                           Visualizar
-                         </button>
-                       )}
-                     </div>
-                   </div>
-                   
-                   {/* 7 - Documentos dos Sócios */}
-                   <div style={{
-                     padding: '1rem',
-                     backgroundColor: '#f9fafb',
-                     borderRadius: '8px',
-                     border: '1px solid #e5e7eb'
-                   }}>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <div>
-                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>7. Docs dos Sócios</label>
-                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_socios ? '#059669' : '#dc2626' }}>
-                           {viewingClinica.doc_socios ? '✓ Enviado' : '✗ Pendente'}
-                         </p>
-                       </div>
-                       {viewingClinica.doc_socios && (
-                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
-                           Visualizar
-                         </button>
-                       )}
-                     </div>
-                   </div>
-                   
-                   {/* 8 - Certidão Responsável Técnico */}
-                   <div style={{
-                     padding: '1rem',
-                     backgroundColor: '#f9fafb',
-                     borderRadius: '8px',
-                     border: '1px solid #e5e7eb'
-                   }}>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <div>
-                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>8. Certidão Resp. Técnico</label>
-                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_certidao_resp_tecnico ? '#059669' : '#dc2626' }}>
-                           {viewingClinica.doc_certidao_resp_tecnico ? '✓ Enviado' : '✗ Pendente'}
-                         </p>
-                       </div>
-                       {viewingClinica.doc_certidao_resp_tecnico && (
-                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
-                           Visualizar
-                         </button>
-                       )}
-                     </div>
-                   </div>
-                   
-                   {/* 9 - Docs Responsável Técnico */}
-                   <div style={{
-                     padding: '1rem',
-                     backgroundColor: '#f9fafb',
-                     borderRadius: '8px',
-                     border: '1px solid #e5e7eb'
-                   }}>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <div>
-                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>9. Docs Resp. Técnico</label>
-                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_resp_tecnico ? '#059669' : '#dc2626' }}>
-                           {viewingClinica.doc_resp_tecnico ? '✓ Enviado' : '✗ Pendente'}
-                         </p>
-                       </div>
-                       {viewingClinica.doc_resp_tecnico && (
-                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
-                           Visualizar
-                         </button>
-                       )}
-                     </div>
-                   </div>
-                   
-                   {/* 10 - Visita Online */}
-                   <div style={{
-                     padding: '1rem',
-                     backgroundColor: '#f9fafb',
-                     borderRadius: '8px',
-                     border: '1px solid #e5e7eb'
-                   }}>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <div>
-                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>10. Visita Online</label>
-                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.visita_online ? '#059669' : '#dc2626' }}>
-                           {viewingClinica.visita_online ? '✓ Realizada' : '✗ Pendente'}
-                         </p>
-                       </div>
-                       {viewingClinica.visita_online && (
-                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
-                           Ver Detalhes
-                         </button>
-                       )}
-                     </div>
-                   </div>
-                   
-                   {/* 11 - Certidão de Casamento */}
-                   <div style={{
-                     padding: '1rem',
-                     backgroundColor: '#f9fafb',
-                     borderRadius: '8px',
-                     border: '1px solid #e5e7eb'
-                   }}>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <div>
-                         <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>11. Certidão Casamento</label>
-                         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: viewingClinica.doc_certidao_casamento ? '#059669' : '#dc2626' }}>
-                           {viewingClinica.doc_certidao_casamento ? '✓ Enviado' : '✗ Não aplicável'}
-                         </p>
-                       </div>
-                       {viewingClinica.doc_certidao_casamento && (
-                         <button className="btn btn-sm btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
-                           Visualizar
-                         </button>
-                       )}
-                     </div>
-                   </div>
+                   {/* Renderizar todos os documentos dinamicamente */}
+                   {(() => {
+                     const documentos = [
+                       { key: 'doc_cartao_cnpj', label: '1. Cartão CNPJ' },
+                       { key: 'doc_contrato_social', label: '2. Contrato Social' },
+                       { key: 'doc_alvara_sanitario', label: '3. Alvará Sanitário' },
+                       { key: 'doc_balanco', label: '4. Balanço/Balancete' },
+                       { key: 'doc_comprovante_endereco', label: '5. Comprovante Endereço' },
+                       { key: 'doc_dados_bancarios', label: '6. Dados Bancários PJ' },
+                       { key: 'doc_socios', label: '7. Docs dos Sócios' },
+                       { key: 'doc_certidao_resp_tecnico', label: '8. Certidão Resp. Técnico' },
+                       { key: 'doc_resp_tecnico', label: '9. Docs Resp. Técnico' }
+                     ];
+                     
+                     return documentos.map((doc) => {
+                       const docStatus = viewingClinica[doc.key];
+                       const aprovadoStatus = viewingClinica[`${doc.key}_aprovado`];
+                       
+                       return (
+                         <div key={doc.key} style={{
+                           padding: '1rem',
+                           backgroundColor: '#f9fafb',
+                           borderRadius: '8px',
+                           border: `1px solid ${
+                             aprovadoStatus === true ? '#10b981' :
+                             aprovadoStatus === false ? '#ef4444' :
+                             docStatus ? '#f59e0b' : '#e5e7eb'
+                           }`
+                         }}>
+                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                               <div>
+                                 <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>{doc.label}</label>
+                                 <p style={{ 
+                                   margin: '0.25rem 0 0 0', 
+                                   fontSize: '0.75rem', 
+                                   fontWeight: '600',
+                                   color: aprovadoStatus === true ? '#059669' :
+                                          aprovadoStatus === false ? '#dc2626' :
+                                          docStatus ? '#d97706' : '#6b7280'
+                                 }}>
+                                   {aprovadoStatus === true ? '✓ Aprovado' :
+                                    aprovadoStatus === false ? '✗ Reprovado' :
+                                    docStatus ? '⏳ Em Análise' : '⚠️ Pendente'}
+                                 </p>
+                               </div>
+                               {docStatus && (
+                                 <button 
+                                   className="btn btn-sm btn-secondary" 
+                                   style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                   onClick={() => handleVisualizarDocumento(viewingClinica.id, doc.key)}
+                                 >
+                                   Visualizar
+                                 </button>
+                               )}
+                             </div>
+                             {/* Botões de aprovação (apenas admin) */}
+                             {isAdmin && docStatus && aprovadoStatus !== true && (
+                               <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                 <button 
+                                   className="btn btn-sm btn-success"
+                                   style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', flex: 1 }}
+                                   onClick={() => handleAprovarDocumento(viewingClinica.id, doc.key)}
+                                 >
+                                   Aprovar
+                                 </button>
+                                 <button 
+                                   className="btn btn-sm btn-danger"
+                                   style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', flex: 1 }}
+                                   onClick={() => handleReprovarDocumento(viewingClinica.id, doc.key)}
+                                 >
+                                   Reprovar
+                                 </button>
+                               </div>
+                             )}
+                           </div>
+                         </div>
+                       );
+                     });
+                   })()}
                  </div>
                  
-                 {/* Resumo dos Documentos */}
+                {/* Resumo dos Documentos */}
                  <div style={{ 
                    marginTop: '1.5rem', 
                    padding: '1rem', 
@@ -3607,26 +3742,36 @@ const Clinicas = () => {
                        <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1e40af', margin: 0 }}>
                          Status da Documentação
                        </h4>
-                       <p style={{ fontSize: '0.75rem', color: '#3730a3', margin: '0.25rem 0 0 0' }}>
-                         {(() => {
-                           const totalDocs = 11;
-                           const docsEnviados = [
-                             viewingClinica.doc_cartao_cnpj,
-                             viewingClinica.doc_contrato_social,
-                             viewingClinica.doc_alvara_sanitario,
-                             viewingClinica.doc_balanco,
-                             viewingClinica.doc_comprovante_endereco,
-                             viewingClinica.doc_dados_bancarios,
-                             viewingClinica.doc_socios,
-                             viewingClinica.doc_certidao_resp_tecnico,
-                             viewingClinica.doc_resp_tecnico,
-                             viewingClinica.visita_online,
-                             viewingClinica.doc_certidao_casamento
-                           ].filter(Boolean).length;
-                           
-                           return `${docsEnviados} de ${totalDocs} documentos completos`;
-                         })()}
-                       </p>
+                      <p style={{ fontSize: '0.75rem', color: '#3730a3', margin: '0.25rem 0 0 0' }}>
+                        {(() => {
+                          const totalDocs = 9;
+                          const docsEnviados = [
+                            viewingClinica.doc_cartao_cnpj,
+                            viewingClinica.doc_contrato_social,
+                            viewingClinica.doc_alvara_sanitario,
+                            viewingClinica.doc_balanco,
+                            viewingClinica.doc_comprovante_endereco,
+                            viewingClinica.doc_dados_bancarios,
+                            viewingClinica.doc_socios,
+                            viewingClinica.doc_certidao_resp_tecnico,
+                            viewingClinica.doc_resp_tecnico
+                          ].filter(Boolean).length;
+                          
+                          const docsAprovados = [
+                            viewingClinica.doc_cartao_cnpj_aprovado,
+                            viewingClinica.doc_contrato_social_aprovado,
+                            viewingClinica.doc_alvara_sanitario_aprovado,
+                            viewingClinica.doc_balanco_aprovado,
+                            viewingClinica.doc_comprovante_endereco_aprovado,
+                            viewingClinica.doc_dados_bancarios_aprovado,
+                            viewingClinica.doc_socios_aprovado,
+                            viewingClinica.doc_certidao_resp_tecnico_aprovado,
+                            viewingClinica.doc_resp_tecnico_aprovado
+                          ].filter(v => v === true).length;
+                          
+                          return `${docsEnviados} de ${totalDocs} enviados | ${docsAprovados} aprovados`;
+                        })()}
+                      </p>
                      </div>
                      <div style={{ 
                        width: '120px', 
@@ -3924,7 +4069,7 @@ const Clinicas = () => {
                 {viewingNovaClinica.email && (
                   <div>
                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>E-mail</label>
-                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingNovaClinica.email}</p>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingNovaClinica.email?.toLowerCase()}</p>
                   </div>
                 )}
                 
@@ -4345,6 +4490,160 @@ const Clinicas = () => {
         onClose={handleTutorialClose}
         onComplete={handleTutorialComplete}
       />
+
+      {/* Modal de Gerenciar Acesso */}
+      {showAcessoModal && clinicaParaAcesso && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">
+                {clinicaParaAcesso.ativo_no_sistema ? 'Editar' : 'Criar'} Acesso - {clinicaParaAcesso.nome}
+              </h2>
+              <button 
+                className="close-btn" 
+                onClick={() => {
+                  setShowAcessoModal(false);
+                  setClinicaParaAcesso(null);
+                  setAcessoFormData({ email: '', senha: '', confirmarSenha: '' });
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={(e) => { e.preventDefault(); handleSalvarAcesso(); }}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label">Email de Login *</label>
+                  <input
+                    type="email"
+                    className="form-input"
+                    value={acessoFormData.email}
+                    onChange={(e) => setAcessoFormData({ 
+                      ...acessoFormData, 
+                      email: e.target.value.toLowerCase() 
+                    })}
+                    placeholder="email@clinica.com.br"
+                    required
+                  />
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                    Este será o email usado pela clínica para fazer login no sistema
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Senha *</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={mostrarSenhaAcesso ? 'text' : 'password'}
+                      className="form-input"
+                      value={acessoFormData.senha}
+                      onChange={(e) => setAcessoFormData({ 
+                        ...acessoFormData, 
+                        senha: e.target.value 
+                      })}
+                      placeholder="Mínimo 6 caracteres"
+                      required
+                      style={{ paddingRight: '40px' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setMostrarSenhaAcesso(!mostrarSenhaAcesso)}
+                      style={{
+                        position: 'absolute',
+                        right: '10px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: '#6b7280',
+                        cursor: 'pointer',
+                        padding: '4px'
+                      }}
+                    >
+                      {mostrarSenhaAcesso ? (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                          <line x1="1" y1="1" x2="23" y2="23"/>
+                        </svg>
+                      ) : (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                          <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Confirmar Senha *</label>
+                  <input
+                    type={mostrarSenhaAcesso ? 'text' : 'password'}
+                    className="form-input"
+                    value={acessoFormData.confirmarSenha}
+                    onChange={(e) => setAcessoFormData({ 
+                      ...acessoFormData, 
+                      confirmarSenha: e.target.value 
+                    })}
+                    placeholder="Digite a senha novamente"
+                    required
+                  />
+                </div>
+
+                {clinicaParaAcesso.ativo_no_sistema && (
+                  <div style={{
+                    backgroundColor: '#fef3c7',
+                    border: '1px solid #f59e0b',
+                    borderRadius: '6px',
+                    padding: '0.75rem',
+                    marginTop: '1rem'
+                  }}>
+                    <strong style={{ color: '#92400e' }}>Atenção:</strong>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#92400e', fontSize: '0.875rem' }}>
+                      Ao alterar a senha, a clínica precisará usar a nova senha no próximo login.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-footer" style={{ display: 'flex', gap: '1rem', justifyContent: 'space-between' }}>
+                <div>
+                  {clinicaParaAcesso.ativo_no_sistema && (
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      onClick={handleRemoverAcesso}
+                    >
+                      Remover Acesso
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setShowAcessoModal(false);
+                      setClinicaParaAcesso(null);
+                      setAcessoFormData({ email: '', senha: '', confirmarSenha: '' });
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={salvandoAcesso}
+                  >
+                    {salvandoAcesso ? 'Salvando...' : 'Salvar'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

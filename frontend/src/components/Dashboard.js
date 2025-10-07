@@ -675,6 +675,9 @@ const Dashboard = () => {
   useEffect(() => {
     if (!user) return; // Aguardar usuário estar logado
     
+    // Clínicas não veem modais de boas-vindas e tutoriais
+    if (user?.tipo === 'clinica') return;
+    
     const hasSeenWelcome = localStorage.getItem('welcome-completed');
     const hasSeenTutorial = localStorage.getItem('tutorial-completed');
     
