@@ -14,7 +14,7 @@ const Dashboard = () => {
     valorTotalFechamentos: 0,
     agendamentosHoje: 0
   });
-  const { makeRequest, user, isAdmin, isConsultorInterno, podeVerTodosDados, isClinica, deveFiltrarPorClinica } = useAuth();
+  const { makeRequest, user, isAdmin, isConsultorInterno, podeVerTodosDados, isClinica } = useAuth();
   const [periodo, setPeriodo] = useState('total'); // total, semanal, mensal
   const [subPeriodo, setSubPeriodo] = useState(null); // para dias da semana
   const [semanaOpcao, setSemanaOpcao] = useState('atual'); // atual, proxima
@@ -535,23 +535,16 @@ const Dashboard = () => {
         if (filtroRegiao.estado) clinicasParams.append('estado', filtroRegiao.estado);
         if (filtroRegiao.cidade) clinicasParams.append('cidade', filtroRegiao.cidade);
         
-        const requests = [
+        const [pacientesRes, agendamentosRes, fechamentosRes, clinicasRes] = await Promise.all([
           makeRequest('/dashboard/pacientes'),
           makeRequest('/dashboard/agendamentos'),
-          makeRequest('/dashboard/fechamentos')
-        ];
-        
-        // Clínicas não precisam buscar lista de clínicas
-        if (user?.tipo !== 'clinica') {
-          requests.push(makeRequest(`/clinicas?${clinicasParams.toString()}`));
-        }
-        
-        const responses = await Promise.all(requests);
-        
-        let pacientes = await responses[0].json();
-        let agendamentos = await responses[1].json();
-        let fechamentos = await responses[2].json();
-        const clinicasFiltradas = user?.tipo === 'clinica' ? [] : await responses[3].json();
+          makeRequest('/dashboard/fechamentos'),
+          makeRequest(`/clinicas?${clinicasParams.toString()}`)
+        ]);
+        let pacientes = await pacientesRes.json();
+        let agendamentos = await agendamentosRes.json();
+        let fechamentos = await fechamentosRes.json();
+        const clinicasFiltradas = await clinicasRes.json();
         
         // Se for clínica, filtrar apenas dados relacionados a ela
         if (isClinica && user?.clinica_id) {
@@ -785,32 +778,39 @@ const Dashboard = () => {
         makeRequest(`/clinicas?${clinicasParams.toString()}`)
       ]);
 
-      const pacientes = await pacientesRes.json();
+      // Para gráfico de cidades e ranking, buscar dados gerais (não filtrados por consultor)
+      const [pacientesGeraisRes, agendamentosGeraisRes, fechamentosGeraisRes] = await Promise.all([
+        makeRequest('/dashboard/gerais/pacientes'),
+        makeRequest('/dashboard/gerais/agendamentos'),
+        makeRequest('/dashboard/gerais/fechamentos')
+      ]);
+
+      let pacientes = await pacientesRes.json();
       let agendamentos = await agendamentosRes.json();
       let fechamentos = await fechamentosRes.json();
       const consultores = await consultoresRes.json();
       const clinicasFiltradas = await clinicasRes.json();
 
-      // Para gráfico de cidades e ranking, buscar dados gerais (não filtrados por consultor)
-      // Clínicas NÃO devem ver dados gerais, apenas os seus
-      let pacientesGerais, agendamentosGerais, fechamentosGerais;
+      // Dados gerais para gráfico de cidades e ranking
+      let pacientesGerais = await pacientesGeraisRes.json();
+      let agendamentosGerais = await agendamentosGeraisRes.json();
+      let fechamentosGerais = await fechamentosGeraisRes.json();
       
-      if (user?.tipo === 'clinica') {
-        // Clínicas usam os mesmos dados filtrados
-        pacientesGerais = pacientes;
-        agendamentosGerais = agendamentos;
-        fechamentosGerais = fechamentos;
-      } else {
-        // Admin e consultores veem dados gerais
-        const [pacientesGeraisRes, agendamentosGeraisRes, fechamentosGeraisRes] = await Promise.all([
-          makeRequest('/dashboard/gerais/pacientes'),
-          makeRequest('/dashboard/gerais/agendamentos'),
-          makeRequest('/dashboard/gerais/fechamentos')
-        ]);
+      // Se for clínica, filtrar também os dados gerais
+      if (isClinica && user?.clinica_id) {
+        const clinicaId = user.clinica_id;
         
-        pacientesGerais = await pacientesGeraisRes.json();
-        agendamentosGerais = await agendamentosGeraisRes.json();
-        fechamentosGerais = await fechamentosGeraisRes.json();
+        agendamentosGerais = agendamentosGerais.filter(a => a.clinica_id === clinicaId);
+        fechamentosGerais = fechamentosGerais.filter(f => f.clinica_id === clinicaId);
+        
+        const pacientesIdsGerais = new Set();
+        agendamentosGerais.forEach(a => {
+          if (a.paciente_id) pacientesIdsGerais.add(a.paciente_id);
+        });
+        fechamentosGerais.forEach(f => {
+          if (f.paciente_id) pacientesIdsGerais.add(f.paciente_id);
+        });
+        pacientesGerais = pacientesGerais.filter(p => pacientesIdsGerais.has(p.id));
       }
 
 
@@ -1230,26 +1230,20 @@ const Dashboard = () => {
           const ano = data.getFullYear();
           
           const agendamentosMes = agendamentos.filter(a => {
-            // Corrigir problema de timezone: interpretar data como local
-            const [anoData, mesData, diaData] = a.data_agendamento.split('-');
-            const dataAgendamento = new Date(parseInt(anoData), parseInt(mesData) - 1, parseInt(diaData));
+            const dataAgendamento = new Date(a.data_agendamento);
             return dataAgendamento.getMonth() === mes && dataAgendamento.getFullYear() === ano;
           }).length;
           
           const fechamentosMes = fechamentos.filter(f => {
             if (f.aprovado === 'reprovado') return false;
-            // Corrigir problema de timezone: interpretar data como local
-            const [anoData, mesData, diaData] = f.data_fechamento.split('-');
-            const dataFechamento = new Date(parseInt(anoData), parseInt(mesData) - 1, parseInt(diaData));
+            const dataFechamento = new Date(f.data_fechamento);
             return dataFechamento.getMonth() === mes && dataFechamento.getFullYear() === ano;
           }).length;
           
           const valorMes = fechamentos
             .filter(f => {
               if (f.aprovado === 'reprovado') return false;
-              // Corrigir problema de timezone: interpretar data como local
-              const [anoData, mesData, diaData] = f.data_fechamento.split('-');
-              const dataFechamento = new Date(parseInt(anoData), parseInt(mesData) - 1, parseInt(diaData));
+              const dataFechamento = new Date(f.data_fechamento);
               return dataFechamento.getMonth() === mes && dataFechamento.getFullYear() === ano;
             })
             .reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0);
@@ -1266,35 +1260,17 @@ const Dashboard = () => {
         // 2. Próximos Agendamentos (próximos 7 dias)
         const dataLimite = new Date(hoje);
         dataLimite.setDate(hoje.getDate() + 7);
-        dataLimite.setHours(23, 59, 59, 999);
-        
-        const hojeInicio = new Date(hoje);
-        hojeInicio.setHours(0, 0, 0, 0);
         
         proximosAgendamentos = agendamentos
           .filter(a => {
-            // Corrigir problema de timezone: interpretar data como local
-            const [anoData, mesData, diaData] = a.data_agendamento.split('-');
-            const dataAgendamento = new Date(parseInt(anoData), parseInt(mesData) - 1, parseInt(diaData));
-            dataAgendamento.setHours(0, 0, 0, 0);
-            return dataAgendamento >= hojeInicio && dataAgendamento <= dataLimite;
+            const dataAgendamento = new Date(a.data_agendamento);
+            return dataAgendamento >= hoje && dataAgendamento <= dataLimite;
           })
-          .sort((a, b) => {
-            const [anoA, mesA, diaA] = a.data_agendamento.split('-');
-            const [anoB, mesB, diaB] = b.data_agendamento.split('-');
-            const dataA = new Date(parseInt(anoA), parseInt(mesA) - 1, parseInt(diaA));
-            const dataB = new Date(parseInt(anoB), parseInt(mesB) - 1, parseInt(diaB));
-            return dataA - dataB;
-          })
+          .sort((a, b) => new Date(a.data_agendamento) - new Date(b.data_agendamento))
           .slice(0, 10); // Limitar a 10 agendamentos
         
         // 3. Taxas de Comparecimento
-        const agendadosPassados = agendamentos.filter(a => {
-          // Corrigir problema de timezone: interpretar data como local
-          const [anoData, mesData, diaData] = a.data_agendamento.split('-');
-          const dataAgendamento = new Date(parseInt(anoData), parseInt(mesData) - 1, parseInt(diaData));
-          return dataAgendamento < hoje;
-        });
+        const agendadosPassados = agendamentos.filter(a => new Date(a.data_agendamento) < hoje);
         
         taxasComparecimento = {
           compareceu: pacientes.filter(p => p.status === 'compareceu').length,
@@ -2411,15 +2387,6 @@ const Dashboard = () => {
           <div className="card-body">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {(() => {
-                // Clínicas não devem ver ranking de consultores
-                if (user?.tipo === 'clinica') {
-                  return (
-                    <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
-                      <p>Esta seção não está disponível para clínicas</p>
-                    </div>
-                  );
-                }
-                
                 // Ordenar consultores e calcular posições
                 const consultoresOrdenados = [...stats.consultoresStats]
                   .sort((a, b) => {
