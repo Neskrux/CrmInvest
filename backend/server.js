@@ -271,7 +271,6 @@ const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
-
   if (!token) {
     return res.status(401).json({ error: 'Token de acesso requerido' });
   }
@@ -482,10 +481,7 @@ app.post('/api/login', async (req, res) => {
       senhaValida = await bcrypt.compare(senha, usuario.senha);
     }
     
-    // TEMPORÁRIO: Aceitar senha admin123 para admin
-    const senhaTemporaria = senha === 'admin123' && usuario.email === 'admin@crm.com';
-    
-    if (!senhaValida && !senhaTemporaria) {
+    if (!senhaValida) {
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
@@ -833,16 +829,13 @@ app.put('/api/consultores/:id/permissao', authenticateToken, async (req, res) =>
 
 app.get('/api/verify-token', authenticateToken, async (req, res) => {
   try {
-    console.log('🔍 Verificando token para usuário ID:', req.user.id, '| Tipo:', req.user.tipo);
-    
     let usuario = null;
     let tipo = req.user.tipo; // Usar tipo do token
     let consultor_id = null;
 
     // CRÍTICO: Usar o tipo do token para buscar na tabela correta
     if (req.user.tipo === 'admin') {
-      console.log('🔍 Buscando em USUARIOS (admin)...');
-      const { data: usuarioData, error: errorUsuario } = await supabaseAdmin
+      const { data: usuarioData } = await supabaseAdmin
         .from('usuarios')
         .select('*')
         .eq('id', req.user.id)
@@ -852,11 +845,9 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
       if (usuarioData) {
         usuario = usuarioData;
         consultor_id = usuario.consultor_id || null;
-        console.log('✅ Admin encontrado:', usuario.nome);
       }
     } else if (req.user.tipo === 'empresa') {
-      console.log('🔍 Buscando em EMPRESAS...');
-      const { data: empresaData, error: errorEmpresa } = await supabaseAdmin
+      const { data: empresaData } = await supabaseAdmin
         .from('empresas')
         .select('*')
         .eq('id', req.user.id)
@@ -867,11 +858,9 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
         usuario = empresaData;
         tipo = 'empresa';
         consultor_id = null;
-        console.log('✅ Empresa encontrada:', usuario.nome);
       }
     } else if (req.user.tipo === 'consultor') {
-      console.log('🔍 Buscando em CONSULTORES...');
-      const { data: consultorData, error: errorConsultor } = await supabaseAdmin
+      const { data: consultorData } = await supabaseAdmin
         .from('consultores')
         .select('*')
         .eq('id', req.user.id)
@@ -882,7 +871,19 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
         usuario = consultorData;
         tipo = 'consultor';
         consultor_id = usuario.id;
-        console.log('✅ Consultor encontrado:', usuario.nome);
+      }
+    } else if (req.user.tipo === 'clinica') {
+      // Nota: A tabela clinicas não possui coluna 'ativo', então não filtramos por ela
+      const { data: clinicaData } = await supabaseAdmin
+        .from('clinicas')
+        .select('*')
+        .eq('id', req.user.id)
+        .single();
+
+      if (clinicaData) {
+        usuario = clinicaData;
+        tipo = 'clinica';
+        consultor_id = clinicaData.consultor_id || null;
       }
     } else {
       // Fallback: tentar buscar em todas as tabelas (não deveria chegar aqui)
@@ -923,17 +924,27 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
             usuario = consultorData;
             tipo = 'consultor';
             consultor_id = usuario.id;
+          } else {
+            // Tentar buscar em clínicas também (sem filtro ativo pois a tabela não tem essa coluna)
+            const { data: clinicaData } = await supabaseAdmin
+              .from('clinicas')
+              .select('*')
+              .eq('id', req.user.id)
+              .single();
+
+            if (clinicaData) {
+              usuario = clinicaData;
+              tipo = 'clinica';
+              consultor_id = clinicaData.consultor_id || null;
+            }
           }
         }
       }
     }
 
     if (!usuario) {
-      console.error('❌ Usuário não encontrado ao verificar token');
       return res.status(401).json({ error: 'Usuário não encontrado' });
     }
-
-    console.log('✅ Token verificado com sucesso para:', usuario.email);
 
     // Remover senha do objeto antes de enviar para o front
     const { senha: _, senha_hash: __, ...dadosUsuario } = usuario;
@@ -941,13 +952,14 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
     res.json({
       usuario: {
         ...dadosUsuario,
+        email: tipo === 'clinica' ? usuario.email_login : usuario.email, // Clínicas usam email_login
         tipo,
         consultor_id,
         empresa_id: usuario.empresa_id || null, // Incluir empresa_id
         clinica_id: tipo === 'clinica' ? usuario.id : null, // Incluir clinica_id
-        podealterarstatus: usuario.podealterarstatus || tipo === 'admin' || false,
-        pode_ver_todas_novas_clinicas: usuario.pode_ver_todas_novas_clinicas || false,
-        is_freelancer: tipo === 'empresa' ? false : (usuario.is_freelancer !== false) // Empresas não são freelancers
+        podealterarstatus: (tipo === 'empresa' || tipo === 'clinica') ? false : (usuario.podealterarstatus || tipo === 'admin' || false),
+        pode_ver_todas_novas_clinicas: (tipo === 'empresa' || tipo === 'clinica') ? false : (usuario.pode_ver_todas_novas_clinicas || false),
+        is_freelancer: (tipo === 'empresa' || tipo === 'clinica') ? false : (usuario.is_freelancer !== false) // Empresas e clínicas não são freelancers
       }
     });
   } catch (error) {

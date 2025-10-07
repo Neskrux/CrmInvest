@@ -4,7 +4,7 @@ import { useToast } from '../components/Toast';
 import TutorialFechamentos from './TutorialFechamentos';
 
 const Fechamentos = () => {
-  const { makeRequest, isAdmin, user, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor } = useAuth();
+  const { makeRequest, isAdmin, user, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isClinica } = useAuth();
   const [fechamentos, setFechamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [consultores, setConsultores] = useState([]);
@@ -57,9 +57,8 @@ const Fechamentos = () => {
       setFiltroConsultor(String(user.consultor_id));
     }
     
-    // Verificar se tutorial foi completado
-    const completed = localStorage.getItem('tutorial-fechamentos-completed');
-    setTutorialCompleted(!!completed);
+    // Tutorial automático desabilitado
+    // Os usuários podem acessá-lo manualmente através do botão "Ver Tutorial"
   }, [deveFiltrarPorConsultor, user?.consultor_id]);
 
   // Detectar mudanças de tamanho da tela
@@ -672,52 +671,37 @@ const Fechamentos = () => {
             <h1 className="page-title">{isConsultor ? 'Visualizar Fechamentos' : 'Gerenciar Fechamentos'}</h1>
             <p className="page-subtitle">{isConsultor ? 'Visualize os fechamentos dos tratamentos dos seus pacientes' : 'Gerencie os fechamentos dos tratamentos dos pacientes'}</p>
           </div>
-          <button
-            onClick={startTutorial}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 16px',
-              border: '1px solid #d1d5db',
-              borderRadius: '8px',
-              backgroundColor: 'white',
-              color: '#374151',
-              fontSize: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = '#f9fafb';
-              e.target.style.borderColor = '#9ca3af';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'white';
-              e.target.style.borderColor = '#d1d5db';
-            }}
-            title="Ver tutorial da tela de fechamentos"
-          >
-            Ver Tutorial
-          </button>
+          {!isClinica && (
+            <button
+              onClick={startTutorial}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                backgroundColor: 'white',
+                color: '#374151',
+                fontSize: '14px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f9fafb';
+                e.target.style.borderColor = '#9ca3af';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'white';
+                e.target.style.borderColor = '#d1d5db';
+              }}
+              title="Ver tutorial da tela de fechamentos"
+            >
+              Ver Tutorial
+            </button>
+          )}
         </div>
-      </div>
-
-      <div style={{
-          backgroundColor: '#f0f9ff',
-          border: '1px solid #bae6fd',
-          borderRadius: '8px',
-          padding: '1rem',
-          marginTop: '1rem',
-          fontSize: '0.875rem',
-          marginBottom: '2rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-            <strong style={{ color: '#0c4a6e' }}>Ações</strong>
-          </div>
-          <div style={{ color: '#0c4a6e', lineHeight: '1.4' }}>
-            • Aqui em <strong>Fechamentos</strong> → Você pode visualizar os fechamentos dos tratamentos dos seus pacientes, baixar o contrato e filtrar por consultor, clínica e mês<br/>
-          </div>
       </div>
 
       {/* KPIs */}

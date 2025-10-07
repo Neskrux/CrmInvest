@@ -51,7 +51,6 @@ export const AuthProvider = ({ children }) => {
   const makeRequest = async (url, options = {}) => {
     const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
     
-    
     const headers = {
       'Content-Type': 'application/json',
       ...(options.headers || {})
@@ -67,7 +66,6 @@ export const AuthProvider = ({ children }) => {
       ...options,
       headers
     });
-
 
     if (response.status === 401) {
       // Token expirado ou inválido
@@ -162,14 +160,12 @@ export const AuthProvider = ({ children }) => {
         try {
           savedUserParsed = JSON.parse(savedUser);
         } catch (e) {
-          // Se não conseguir parsear, limpa tudo
           clearAllData();
           return;
         }
         
         // Se o tipo de usuário mudou, forçar novo login
         if (savedUserParsed && savedUserParsed.tipo !== usuarioBackend.tipo) {
-          console.log('⚠️ Tipo de usuário mudou, fazendo logout:', savedUserParsed.tipo, '->', usuarioBackend.tipo);
           clearAllData();
           return;
         }

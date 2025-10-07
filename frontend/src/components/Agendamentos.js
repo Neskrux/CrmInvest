@@ -4,7 +4,7 @@ import { useToast } from '../components/Toast';
 import TutorialAgendamentos from './TutorialAgendamentos';
 
 const Agendamentos = () => {
-  const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor } = useAuth();
+  const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isClinica } = useAuth();
   const { showSuccessToast, showErrorToast } = useToast();
   const [agendamentos, setAgendamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
@@ -80,9 +80,8 @@ const Agendamentos = () => {
       setFiltroConsultor(String(user.consultor_id));
     }
     
-    // Verificar se tutorial foi completado
-    const completed = localStorage.getItem('tutorial-agendamentos-completed');
-    setTutorialCompleted(!!completed);
+    // Tutorial automático desabilitado
+    // Os usuários podem acessá-lo manualmente através do botão "Ver Tutorial"
   }, [deveFiltrarPorConsultor, user?.consultor_id]);
 
   // Atualização automática dos dados a cada 30 segundos
@@ -586,54 +585,38 @@ const Agendamentos = () => {
             <h1 className="page-title">{isConsultor ? 'Visualizar Agendamentos' : 'Gerenciar Agendamentos'}</h1>
             <p className="page-subtitle">{isConsultor ? 'Visualize os agendamentos dos seus pacientes' : 'Gerencie os agendamentos dos pacientes'}</p>
           </div>
-          <button
-            onClick={startTutorial}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 16px',
-              border: '1px solid #d1d5db',
-              borderRadius: '8px',
-              backgroundColor: 'white',
-              color: '#374151',
-              fontSize: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = '#f9fafb';
-              e.target.style.borderColor = '#9ca3af';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'white';
-              e.target.style.borderColor = '#d1d5db';
-            }}
-            title="Ver tutorial da tela de agendamentos"
-          >
-            Ver Tutorial
-          </button>
+          {!isClinica && (
+            <button
+              onClick={startTutorial}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                backgroundColor: 'white',
+                color: '#374151',
+                fontSize: '14px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f9fafb';
+                e.target.style.borderColor = '#9ca3af';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'white';
+                e.target.style.borderColor = '#d1d5db';
+              }}
+              title="Ver tutorial da tela de agendamentos"
+            >
+              Ver Tutorial
+            </button>
+          )}
         </div>
       </div>
-
-      <div style={{
-          backgroundColor: '#f0f9ff',
-          border: '1px solid #bae6fd',
-          borderRadius: '8px',
-          padding: '1rem',
-          marginTop: '1rem',
-          fontSize: '0.875rem',
-          marginBottom: '2rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-            <strong style={{ color: '#0c4a6e' }}>Ações</strong>
-          </div>
-          <div style={{ color: '#0c4a6e', lineHeight: '1.4' }}>
-            • Aqui em <strong>Agendamentos</strong> → Você pode visualizar o status dos agendamentos dos seus pacientes e filtrar por consultor, clínica, data e status<br/>
-          </div>
-      </div>
-
       {/* Dashboard de Agendamentos */}
       <div className="stats-grid" style={{ marginBottom: '2rem' }}>
         <div className="stat-card">
@@ -935,7 +918,7 @@ const Agendamentos = () => {
                               <circle cx="12" cy="12" r="3"></circle>
                             </svg>
                           </button>
-                          {!isConsultor && (
+                          {!isConsultor && !isClinica && (
                             <button
                               onClick={() => handleEdit(agendamento)}
                               className="btn-action"
