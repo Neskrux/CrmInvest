@@ -1230,20 +1230,26 @@ const Dashboard = () => {
           const ano = data.getFullYear();
           
           const agendamentosMes = agendamentos.filter(a => {
-            const dataAgendamento = new Date(a.data_agendamento);
+            // Corrigir problema de timezone: interpretar data como local
+            const [anoData, mesData, diaData] = a.data_agendamento.split('-');
+            const dataAgendamento = new Date(parseInt(anoData), parseInt(mesData) - 1, parseInt(diaData));
             return dataAgendamento.getMonth() === mes && dataAgendamento.getFullYear() === ano;
           }).length;
           
           const fechamentosMes = fechamentos.filter(f => {
             if (f.aprovado === 'reprovado') return false;
-            const dataFechamento = new Date(f.data_fechamento);
+            // Corrigir problema de timezone: interpretar data como local
+            const [anoData, mesData, diaData] = f.data_fechamento.split('-');
+            const dataFechamento = new Date(parseInt(anoData), parseInt(mesData) - 1, parseInt(diaData));
             return dataFechamento.getMonth() === mes && dataFechamento.getFullYear() === ano;
           }).length;
           
           const valorMes = fechamentos
             .filter(f => {
               if (f.aprovado === 'reprovado') return false;
-              const dataFechamento = new Date(f.data_fechamento);
+              // Corrigir problema de timezone: interpretar data como local
+              const [anoData, mesData, diaData] = f.data_fechamento.split('-');
+              const dataFechamento = new Date(parseInt(anoData), parseInt(mesData) - 1, parseInt(diaData));
               return dataFechamento.getMonth() === mes && dataFechamento.getFullYear() === ano;
             })
             .reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0);
@@ -1260,17 +1266,35 @@ const Dashboard = () => {
         // 2. Próximos Agendamentos (próximos 7 dias)
         const dataLimite = new Date(hoje);
         dataLimite.setDate(hoje.getDate() + 7);
+        dataLimite.setHours(23, 59, 59, 999);
+        
+        const hojeInicio = new Date(hoje);
+        hojeInicio.setHours(0, 0, 0, 0);
         
         proximosAgendamentos = agendamentos
           .filter(a => {
-            const dataAgendamento = new Date(a.data_agendamento);
-            return dataAgendamento >= hoje && dataAgendamento <= dataLimite;
+            // Corrigir problema de timezone: interpretar data como local
+            const [anoData, mesData, diaData] = a.data_agendamento.split('-');
+            const dataAgendamento = new Date(parseInt(anoData), parseInt(mesData) - 1, parseInt(diaData));
+            dataAgendamento.setHours(0, 0, 0, 0);
+            return dataAgendamento >= hojeInicio && dataAgendamento <= dataLimite;
           })
-          .sort((a, b) => new Date(a.data_agendamento) - new Date(b.data_agendamento))
+          .sort((a, b) => {
+            const [anoA, mesA, diaA] = a.data_agendamento.split('-');
+            const [anoB, mesB, diaB] = b.data_agendamento.split('-');
+            const dataA = new Date(parseInt(anoA), parseInt(mesA) - 1, parseInt(diaA));
+            const dataB = new Date(parseInt(anoB), parseInt(mesB) - 1, parseInt(diaB));
+            return dataA - dataB;
+          })
           .slice(0, 10); // Limitar a 10 agendamentos
         
         // 3. Taxas de Comparecimento
-        const agendadosPassados = agendamentos.filter(a => new Date(a.data_agendamento) < hoje);
+        const agendadosPassados = agendamentos.filter(a => {
+          // Corrigir problema de timezone: interpretar data como local
+          const [anoData, mesData, diaData] = a.data_agendamento.split('-');
+          const dataAgendamento = new Date(parseInt(anoData), parseInt(mesData) - 1, parseInt(diaData));
+          return dataAgendamento < hoje;
+        });
         
         taxasComparecimento = {
           compareceu: pacientes.filter(p => p.status === 'compareceu').length,

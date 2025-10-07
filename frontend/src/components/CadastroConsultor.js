@@ -409,10 +409,39 @@ const CadastroConsultor = () => {
           <p style={{
             fontSize: '1rem',
             color: '#4b5563',
-            lineHeight: '1.5'
+            lineHeight: '1.5',
+            marginBottom: '1rem'
           }}>
             Preencha os dados abaixo para criar sua conta
           </p>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            fontSize: '0.875rem',
+            color: '#6b7280'
+          }}>
+            <span>Já possui uma conta?</span>
+            <button
+              type="button"
+              onClick={() => navigate('/login')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#1a1d23',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                padding: 0,
+                transition: 'color 0.15s ease'
+              }}
+              onMouseOver={(e) => e.target.style.color = '#0f1114'}
+              onMouseOut={(e) => e.target.style.color = '#1a1d23'}
+            >
+              Fazer login
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit}>

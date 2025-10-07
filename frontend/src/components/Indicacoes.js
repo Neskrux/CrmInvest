@@ -681,7 +681,7 @@ const Indicacoes = () => {
                 color: '#92400e',
                 fontWeight: '600'
               }}>
-                Para clínicas no Espírito Santo
+                Para clínicas no Espírito Santo ou Curitiba
               </div>
             </div>
             
