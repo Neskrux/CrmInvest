@@ -8,14 +8,6 @@ const tutorialSteps = [
     position: 'center'
   },
   {
-    id: 'produto-explicacao',
-    title: 'Como Funciona o Sistema',
-    content: 'Aqui você entende como a Investmoney funciona: a clínica recebe à vista e o paciente paga parcelado. Você ganha indicando ambos!',
-    targetSelector: '[data-tutorial="produto-explicacao"]',
-    position: 'bottom',
-    scrollTo: true
-  },
-  {
     id: 'comissoes',
     title: 'Suas Comissões',
     content: 'Veja quanto você ganha: R$ 100 por cada clínica aprovada e 1% do valor do tratamento por cada paciente que fechar. Não há limite de ganhos!',
@@ -28,6 +20,14 @@ const tutorialSteps = [
     title: 'Escolha o Tipo de Indicação',
     content: 'Primeiro escolha oque você quer indicar, clínica ou paciente?',
     targetSelector: '[data-tutorial="escolha-tipo"]',
+    position: 'bottom',
+    scrollTo: true
+  },
+  {
+    id: 'formulario-cadastro',
+    title: 'Cadastro Direto',
+    content: 'Você pode cadastrar clínicas e pacientes diretamente aqui! Preencha os dados e eles serão automaticamente atribuídos a você.',
+    targetSelector: '[data-tutorial="formulario-cadastro"]',
     position: 'bottom',
     scrollTo: true
   },

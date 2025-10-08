@@ -1543,25 +1543,27 @@ const Pacientes = () => {
           <div className="card">
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 className="card-title">Lista de Pacientes</h2>
-              <button 
-                className="btn btn-primary" 
-                onClick={() => {
-                  setShowModal(true);
-                  // Se for consultor, pré-preenche o consultor_id automaticamente
-                  if (isConsultor) {
-                    setFormData(prev => ({
-                      ...prev,
-                      consultor_id: String(user?.consultor_id || user?.id)
-                    }));
-                  }
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="12" y1="5" x2="12" y2="19"></line>
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-                Novo Paciente
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button 
+                  className="btn btn-primary" 
+                  onClick={() => {
+                    setShowModal(true);
+                    // Se for consultor, pré-preenche o consultor_id automaticamente
+                    if (isConsultor) {
+                      setFormData(prev => ({
+                        ...prev,
+                        consultor_id: String(user?.consultor_id || user?.id)
+                      }));
+                    }
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  Novo Paciente
+                </button>
+              </div>
             </div>
 
             {loading ? (
@@ -1972,17 +1974,493 @@ const Pacientes = () => {
         </>
       )}
 
-      {/* Modal de Cadastro/Edição */}
-      {showModal && (
+      {/* Modal de Cadastro - Formulário Simples (para freelancers) */}
+      {showModal && !editingPaciente && isConsultor && !isAdmin && !isConsultorInterno && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '700px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Cadastrar Novo Paciente</h2>
+              <button className="close-btn" onClick={resetForm}>×</button>
+            </div>
+
+            <form onSubmit={handleSubmit} style={{ padding: '2rem' }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: window.innerWidth <= 768 ? '1fr' : 'repeat(2, 1fr)',
+                gap: '1.5rem',
+                marginBottom: '1.5rem'
+              }}>
+                {/* Nome */}
+                <div style={{ gridColumn: window.innerWidth <= 768 ? '1' : 'span 2' }}>
+                  <label style={{
+                    display: 'block',
+                    fontWeight: '600',
+                    color: '#1e293b',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.95rem'
+                  }}>
+                    Nome do Paciente *
+                  </label>
+                  <input
+                    type="text"
+                    name="nome"
+                    value={formData.nome}
+                    onChange={handleInputChange}
+                    placeholder="Digite o nome do paciente"
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      fontSize: '1rem',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                {/* WhatsApp */}
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontWeight: '600',
+                    color: '#1e293b',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.95rem'
+                  }}>
+                    WhatsApp *
+                  </label>
+                  <input
+                    type="tel"
+                    name="telefone"
+                    value={formData.telefone}
+                    onChange={handleInputChange}
+                    placeholder="(11) 99999-9999"
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      fontSize: '1rem',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                {/* Estado */}
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontWeight: '600',
+                    color: '#1e293b',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.95rem'
+                  }}>
+                    Estado *
+                  </label>
+                  <select
+                    name="estado"
+                    value={formData.estado}
+                    onChange={handleInputChange}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      fontSize: '1rem',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="">Selecione o estado</option>
+                    {estadosBrasileiros.map(estado => (
+                      <option key={estado.sigla} value={estado.sigla}>
+                        {estado.sigla} - {estado.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Cidade */}
+                <div style={{ gridColumn: window.innerWidth <= 768 ? '1' : 'span 2' }}>
+                  <label style={{
+                    display: 'block',
+                    fontWeight: '600',
+                    color: '#1e293b',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.95rem'
+                  }}>
+                    Cidade *
+                  </label>
+                  {formData.estado && cidadesPorEstado[formData.estado] && !cidadeCustomizada ? (
+                    <select
+                      name="cidade"
+                      value={formData.cidade}
+                      onChange={(e) => {
+                        if (e.target.value === 'OUTRA') {
+                          setCidadeCustomizada(true);
+                          setFormData(prev => ({ ...prev, cidade: '' }));
+                        } else {
+                          handleInputChange(e);
+                        }
+                      }}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '10px',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="">Selecione a cidade</option>
+                      {cidadesPorEstado[formData.estado].map(cidade => (
+                        <option key={cidade} value={cidade}>{cidade}</option>
+                      ))}
+                      <option value="OUTRA">Outra cidade</option>
+                    </select>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1 }}>
+                        <input
+                          type="text"
+                          name="cidade"
+                          value={formData.cidade}
+                          onChange={handleInputChange}
+                          placeholder="Digite o nome da cidade"
+                          disabled={!formData.estado}
+                          required
+                          style={{
+                            width: '100%',
+                            padding: '0.875rem',
+                            border: '2px solid #e2e8f0',
+                            borderRadius: '10px',
+                            fontSize: '1rem',
+                            outline: 'none'
+                          }}
+                        />
+                      </div>
+                      {formData.estado && cidadesPorEstado[formData.estado] && cidadeCustomizada && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCidadeCustomizada(false);
+                            setFormData(prev => ({ ...prev, cidade: '' }));
+                          }}
+                          style={{
+                            padding: '0.875rem 1rem',
+                            background: '#e2e8f0',
+                            color: '#1e293b',
+                            border: 'none',
+                            borderRadius: '10px',
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          Voltar
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Observações */}
+                <div style={{ gridColumn: window.innerWidth <= 768 ? '1' : 'span 2' }}>
+                  <label style={{
+                    display: 'block',
+                    fontWeight: '600',
+                    color: '#1e293b',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.95rem'
+                  }}>
+                    Observações
+                  </label>
+                  <textarea
+                    name="observacoes"
+                    value={formData.observacoes}
+                    onChange={handleInputChange}
+                    placeholder="Adicione observações sobre o paciente (opcional)"
+                    rows="3"
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      fontSize: '1rem',
+                      outline: 'none',
+                      resize: 'vertical',
+                      fontFamily: 'inherit'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Botão de Submit */}
+              <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  style={{
+                    padding: '0.75rem 2rem',
+                    background: '#e2e8f0',
+                    color: '#1e293b',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    marginRight: '1rem'
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '0.75rem 2rem',
+                    background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '1rem',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cadastrar Paciente
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Cadastro - Formulário Completo (para admins e internos) */}
+      {showModal && !editingPaciente && (isAdmin || isConsultorInterno || !isConsultor) && (
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h2 className="modal-title">
-                {editingPaciente ? 'Editar Paciente' : 'Novo Paciente'}
-              </h2>
-              <button className="close-btn" onClick={resetForm}>
-                ×
-              </button>
+              <h2 className="modal-title">Novo Paciente</h2>
+              <button className="close-btn" onClick={resetForm}>×</button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="modal-body">
+              <div className="form-group">
+                <label className="form-label">Nome Completo *</label>
+                <input
+                  type="text"
+                  name="nome"
+                  className="form-input"
+                  value={formData.nome}
+                  onChange={handleInputChange}
+                  onBlur={handleNomeBlur}
+                  placeholder="Digite o nome do paciente"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">Telefone *</label>
+                  <input
+                    type="tel"
+                    name="telefone"
+                    className="form-input"
+                    value={formData.telefone}
+                    onChange={handleInputChange}
+                    placeholder="(11) 99999-9999"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">CPF *</label>
+                  <input
+                    type="text"
+                    name="cpf"
+                    className="form-input"
+                    value={formData.cpf}
+                    onChange={handleInputChange}
+                    placeholder="000.000.000-00"
+                    maxLength="14"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">Estado *</label>
+                  <select
+                    name="estado"
+                    className="form-select"
+                    value={formData.estado}
+                    onChange={handleInputChange}
+                    required
+                  >
+                    <option value="">Selecione o estado</option>
+                    {estadosBrasileiros.map(estado => (
+                      <option key={estado.sigla} value={estado.sigla}>
+                        {estado.sigla} - {estado.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Cidade *</label>
+                  {formData.estado && cidadesPorEstado[formData.estado] && !cidadeCustomizada ? (
+                    <select
+                      name="cidade"
+                      className="form-select"
+                      value={formData.cidade}
+                      onChange={(e) => {
+                        if (e.target.value === 'OUTRA') {
+                          setCidadeCustomizada(true);
+                          setFormData(prev => ({ ...prev, cidade: '' }));
+                        } else {
+                          handleInputChange(e);
+                        }
+                      }}
+                      required
+                    >
+                      <option value="">Selecione a cidade</option>
+                      {cidadesPorEstado[formData.estado].map(cidade => (
+                        <option key={cidade} value={cidade}>{cidade}</option>
+                      ))}
+                      <option value="OUTRA">Outra cidade</option>
+                    </select>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        name="cidade"
+                        className="form-input"
+                        value={formData.cidade}
+                        onChange={handleInputChange}
+                        placeholder="Digite o nome da cidade"
+                        disabled={!formData.estado}
+                        required
+                      />
+                      {formData.estado && cidadesPorEstado[formData.estado] && cidadeCustomizada && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ whiteSpace: 'nowrap', fontSize: '0.875rem', padding: '0.5rem' }}
+                          onClick={() => {
+                            setCidadeCustomizada(false);
+                            setFormData(prev => ({ ...prev, cidade: '' }));
+                          }}
+                        >
+                          Voltar
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Observações */}
+                <div style={{ gridColumn: window.innerWidth <= 768 ? '1' : 'span 2' }}>
+                  <label style={{
+                    display: 'block',
+                    fontWeight: '600',
+                    color: '#1e293b',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.95rem'
+                  }}>
+                    Observações
+                  </label>
+                  <textarea
+                    name="observacoes"
+                    value={formData.observacoes}
+                    onChange={handleInputChange}
+                    placeholder="Adicione observações sobre o paciente (opcional)"
+                    rows="3"
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      fontSize: '1rem',
+                      outline: 'none',
+                      resize: 'vertical',
+                      fontFamily: 'inherit'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Botão de Submit */}
+              <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  style={{
+                    padding: '0.75rem 2rem',
+                    background: '#e2e8f0',
+                    color: '#1e293b',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    marginRight: '1rem'
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '0.75rem 2rem',
+                    background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '1rem',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cadastrar Paciente
+                </button>
+              </div>
+
+              {/* Mensagem informativa */}
+              <div style={{
+                marginTop: '1.5rem',
+                padding: '1rem',
+                background: 'rgba(59, 130, 246, 0.1)',
+                borderLeft: '4px solid #3b82f6',
+                borderRadius: '8px'
+              }}>
+                <p style={{
+                  margin: 0,
+                  fontSize: '0.9rem',
+                  color: '#1e40af',
+                  lineHeight: '1.6'
+                }}>
+                  <strong>Dica:</strong> Ao cadastrar um paciente, ele será automaticamente atribuído a você e aparecerá na sua página de pacientes.
+                </p>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Cadastro - Formulário Completo (para admins e internos) */}
+      {showModal && !editingPaciente && (isAdmin || isConsultorInterno || !isConsultor) && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-header">
+              <h2 className="modal-title">Novo Paciente</h2>
+              <button className="close-btn" onClick={resetForm}>×</button>
             </div>
 
             <form onSubmit={handleSubmit} className="modal-body">
@@ -2101,8 +2579,6 @@ const Pacientes = () => {
                 </div>
               </div>
 
-
-
               <div className="grid grid-2">
                 <div className="form-group">
                   <label className="form-label">Tipo de Tratamento *</label>
@@ -2119,14 +2595,6 @@ const Pacientes = () => {
                     <option value="Ambos">Ambos</option>
                   </select>
                 </div>
-
-                {/* Remover o campo de status do formulário/modal de cadastro/edição: */}
-                {/* Substituir o bloco: */}
-                {/* <div className="form-group"> */}
-                {/*   <label className="form-label">Status</label> */}
-                {/*   <select ...>...</select> */}
-                {/* </div> */}
-                {/* por nada (remover do JSX) */}
               </div>
 
               <div className="form-group">
@@ -2163,7 +2631,192 @@ const Pacientes = () => {
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  {editingPaciente ? 'Atualizar' : 'Cadastrar'}
+                  Cadastrar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      
+      {/* Modal de Edição - Formulário Completo (para todos que podem editar) */}
+      {showModal && editingPaciente && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-header">
+              <h2 className="modal-title">Editar Paciente</h2>
+              <button className="close-btn" onClick={resetForm}>×</button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="modal-body">
+              <div className="form-group">
+                <label className="form-label">Nome Completo *</label>
+                <input
+                  type="text"
+                  name="nome"
+                  className="form-input"
+                  value={formData.nome}
+                  onChange={handleInputChange}
+                  onBlur={handleNomeBlur}
+                  placeholder="Digite o nome do paciente"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">Telefone *</label>
+                  <input
+                    type="tel"
+                    name="telefone"
+                    className="form-input"
+                    value={formData.telefone}
+                    onChange={handleInputChange}
+                    placeholder="(11) 99999-9999"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">CPF *</label>
+                  <input
+                    type="text"
+                    name="cpf"
+                    className="form-input"
+                    value={formData.cpf}
+                    onChange={handleInputChange}
+                    placeholder="000.000.000-00"
+                    maxLength="14"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">Estado *</label>
+                  <select
+                    name="estado"
+                    className="form-select"
+                    value={formData.estado}
+                    onChange={handleInputChange}
+                    required
+                  >
+                    <option value="">Selecione o estado</option>
+                    {estadosBrasileiros.map(estado => (
+                      <option key={estado.sigla} value={estado.sigla}>
+                        {estado.sigla} - {estado.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Cidade *</label>
+                  {formData.estado && cidadesPorEstado[formData.estado] && !cidadeCustomizada ? (
+                    <select
+                      name="cidade"
+                      className="form-select"
+                      value={formData.cidade}
+                      onChange={(e) => {
+                        if (e.target.value === 'OUTRA') {
+                          setCidadeCustomizada(true);
+                          setFormData(prev => ({ ...prev, cidade: '' }));
+                        } else {
+                          handleInputChange(e);
+                        }
+                      }}
+                      required
+                    >
+                      <option value="">Selecione a cidade</option>
+                      {cidadesPorEstado[formData.estado].map(cidade => (
+                        <option key={cidade} value={cidade}>{cidade}</option>
+                      ))}
+                      <option value="OUTRA">Outra cidade</option>
+                    </select>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        name="cidade"
+                        className="form-input"
+                        value={formData.cidade}
+                        onChange={handleInputChange}
+                        placeholder="Digite o nome da cidade"
+                        disabled={!formData.estado}
+                        required
+                      />
+                      {formData.estado && cidadesPorEstado[formData.estado] && cidadeCustomizada && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ whiteSpace: 'nowrap', fontSize: '0.875rem', padding: '0.5rem' }}
+                          onClick={() => {
+                            setCidadeCustomizada(false);
+                            setFormData(prev => ({ ...prev, cidade: '' }));
+                          }}
+                        >
+                          Voltar
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">Tipo de Tratamento *</label>
+                  <select
+                    name="tipo_tratamento"
+                    className="form-select"
+                    value={formData.tipo_tratamento}
+                    onChange={handleInputChange}
+                    required
+                  >
+                    <option value="">Selecione</option>
+                    <option value="Estético">Estético</option>
+                    <option value="Odontológico">Odontológico</option>
+                    <option value="Ambos">Ambos</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Consultor Responsável</label>
+                <select
+                  name="consultor_id"
+                  className="form-select"
+                  value={formData.consultor_id}
+                  onChange={handleInputChange}
+                >
+                  <option value="">Selecione (opcional)</option>
+                  {consultores.map(consultor => (
+                    <option key={consultor.id} value={consultor.id}>
+                      {consultor.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Observações</label>
+                <textarea
+                  name="observacoes"
+                  className="form-textarea"
+                  value={formData.observacoes}
+                  onChange={handleInputChange}
+                  placeholder="Informações adicionais..."
+                  rows="3"
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={resetForm}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Atualizar
                 </button>
               </div>
             </form>

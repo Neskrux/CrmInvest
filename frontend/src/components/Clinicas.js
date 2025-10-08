@@ -1424,8 +1424,8 @@ const Clinicas = () => {
         </div>
       </div>
 
-      {/* Navegação por abas - Mostrar apenas para admin e consultor interno */}
-      {(isAdmin || isConsultorInterno) && (
+      {/* Navegação por abas - Mostrar para admin, consultor interno E consultores (freelancers) */}
+      {(isAdmin || isConsultorInterno || isConsultor) && (
         <div className="tabs">
           <button
             className={`tab ${activeTab === 'clinicas' ? 'active' : ''}`}
@@ -1439,17 +1439,19 @@ const Clinicas = () => {
             onClick={() => setActiveTab('novas-clinicas')}
             style={{ position: 'relative' }}
           >
-            {isAdmin ? 'Novas Clínicas' : 'Indicar Clínicas'}
+            {isAdmin || isConsultorInterno ? 'Novas Clínicas' : 'Minhas Indicações'}
             {novasClinicas.length > 0 && (
               <span className="tab-badge">{novasClinicas.length}</span>
             )}
           </button>
-          <button
-            className={`tab ${activeTab === 'mapa' ? 'active' : ''}`}
-            onClick={() => setActiveTab('mapa')}
-          >
-            Mapa
-          </button>
+          {(isAdmin || isConsultorInterno) && (
+            <button
+              className={`tab ${activeTab === 'mapa' ? 'active' : ''}`}
+              onClick={() => setActiveTab('mapa')}
+            >
+              Mapa
+            </button>
+          )}
         </div>
       )}
 
@@ -1862,19 +1864,33 @@ const Clinicas = () => {
           </div>
 
           <div className="card">
-            <div className="card-header">
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 className="card-title">Lista de Clínicas</h2>
-            {!isConsultor && user?.tipo !== 'empresa' && (
-              <button 
-                className="btn btn-primary"
-                onClick={() => setShowModal(true)}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-                Nova Clínica
-              </button>
-            )}
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                {isConsultor && (
+                  <button 
+                    className="btn btn-primary"
+                    onClick={() => setShowNovaClinicaModal(true)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                    Indicar Clínica
+                  </button>
+                )}
+                {!isConsultor && user?.tipo !== 'empresa' && (
+                  <button 
+                    className="btn btn-primary"
+                    onClick={() => setShowModal(true)}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                    Nova Clínica
+                  </button>
+                )}
+              </div>
           </div>
 
         {/* Seção de Filtros */}
@@ -2002,7 +2018,7 @@ const Clinicas = () => {
           <p style={{ textAlign: 'center', color: '#6b7280', padding: '2rem' }}>
             {filtroEstado || filtroCity || filtroStatus
               ? 'Nenhuma clínica encontrada com os filtros aplicados.'
-              : 'Nenhuma clínica cadastrada ainda.'
+              : 'Nenhuma clínica aprovada ainda.'
             }
           </p>
         ) : (
@@ -2217,7 +2233,7 @@ const Clinicas = () => {
       {/* Conteúdo da aba Novas Clínicas */}
       {activeTab === 'novas-clinicas' && (
         <div className="card">
-          <div className="card-header">
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 className="card-title">Novas Clínicas Encontradas</h2>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
               <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
@@ -4125,8 +4141,330 @@ const Clinicas = () => {
         </div>
       )}
 
-      {/* Modal de Cadastro de Nova Clínica */}
-      {showNovaClinicaModal && (
+      {/* Modal de Cadastro de Nova Clínica - Formulário Simples (para freelancers) ou Completo (para admins) */}
+      {showNovaClinicaModal && isConsultor && !isAdmin && !isConsultorInterno && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '700px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Indicar Nova Clínica</h2>
+              <button 
+                className="close-btn"
+                onClick={() => {
+                  setShowNovaClinicaModal(false);
+                  setNovaClinicaFormData({ 
+                    nome: '',
+                    telefone: '',
+                    cidade: '',
+                    estado: '',
+                    observacoes: ''
+                  });
+                  setCidadeCustomizadaNova(false);
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleNovaClinicaSubmit} style={{ padding: '2rem' }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: window.innerWidth <= 768 ? '1fr' : 'repeat(2, 1fr)',
+                gap: '1.5rem',
+                marginBottom: '1.5rem'
+              }}>
+                {/* Nome */}
+                <div style={{ gridColumn: window.innerWidth <= 768 ? '1' : 'span 2' }}>
+                  <label style={{
+                    display: 'block',
+                    fontWeight: '600',
+                    color: '#1e293b',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.95rem'
+                  }}>
+                    Nome da Clínica *
+                  </label>
+                  <input
+                    type="text"
+                    name="nome"
+                    value={novaClinicaFormData.nome}
+                    onChange={handleNovaClinicaInputChange}
+                    placeholder="Digite o nome da clínica"
+                    disabled={submittingNovaClinica}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      fontSize: '1rem',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                {/* WhatsApp */}
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontWeight: '600',
+                    color: '#1e293b',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.95rem'
+                  }}>
+                    WhatsApp *
+                  </label>
+                  <input
+                    type="tel"
+                    name="telefone"
+                    value={novaClinicaFormData.telefone}
+                    onChange={handleNovaClinicaInputChange}
+                    placeholder="(11) 99999-9999"
+                    disabled={submittingNovaClinica}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      fontSize: '1rem',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                {/* Estado */}
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontWeight: '600',
+                    color: '#1e293b',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.95rem'
+                  }}>
+                    Estado *
+                  </label>
+                  <select
+                    name="estado"
+                    value={novaClinicaFormData.estado}
+                    onChange={handleNovaClinicaInputChange}
+                    disabled={submittingNovaClinica}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      fontSize: '1rem',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="">Selecione o estado</option>
+                    {estadosBrasileiros.map(estado => (
+                      <option key={estado.sigla} value={estado.sigla}>
+                        {estado.sigla} - {estado.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Cidade */}
+                <div style={{ gridColumn: window.innerWidth <= 768 ? '1' : 'span 2' }}>
+                  <label style={{
+                    display: 'block',
+                    fontWeight: '600',
+                    color: '#1e293b',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.95rem'
+                  }}>
+                    Cidade *
+                  </label>
+                  {novaClinicaFormData.estado && cidadesPorEstado[novaClinicaFormData.estado] && !cidadeCustomizadaNova ? (
+                    <select
+                      name="cidade"
+                      value={novaClinicaFormData.cidade}
+                      onChange={(e) => {
+                        if (e.target.value === 'OUTRA') {
+                          setCidadeCustomizadaNova(true);
+                          setNovaClinicaFormData(prev => ({ ...prev, cidade: '' }));
+                        } else {
+                          handleNovaClinicaInputChange(e);
+                        }
+                      }}
+                      disabled={submittingNovaClinica}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '10px',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="">Selecione a cidade</option>
+                      {cidadesPorEstado[novaClinicaFormData.estado].map(cidade => (
+                        <option key={cidade} value={cidade}>{cidade}</option>
+                      ))}
+                      <option value="OUTRA">Outra cidade</option>
+                    </select>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1 }}>
+                        <input
+                          type="text"
+                          name="cidade"
+                          value={novaClinicaFormData.cidade}
+                          onChange={handleNovaClinicaInputChange}
+                          placeholder="Digite o nome da cidade"
+                          disabled={submittingNovaClinica || !novaClinicaFormData.estado}
+                          required
+                          style={{
+                            width: '100%',
+                            padding: '0.875rem',
+                            border: '2px solid #e2e8f0',
+                            borderRadius: '10px',
+                            fontSize: '1rem',
+                            outline: 'none'
+                          }}
+                        />
+                      </div>
+                      {novaClinicaFormData.estado && cidadesPorEstado[novaClinicaFormData.estado] && cidadeCustomizadaNova && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCidadeCustomizadaNova(false);
+                            setNovaClinicaFormData(prev => ({ ...prev, cidade: '' }));
+                          }}
+                          disabled={submittingNovaClinica}
+                          style={{
+                            padding: '0.875rem 1rem',
+                            background: '#e2e8f0',
+                            color: '#1e293b',
+                            border: 'none',
+                            borderRadius: '10px',
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          Voltar
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Observações */}
+                <div style={{ gridColumn: window.innerWidth <= 768 ? '1' : 'span 2' }}>
+                  <label style={{
+                    display: 'block',
+                    fontWeight: '600',
+                    color: '#1e293b',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.95rem'
+                  }}>
+                    Observações
+                  </label>
+                  <textarea
+                    name="observacoes"
+                    value={novaClinicaFormData.observacoes}
+                    onChange={handleNovaClinicaInputChange}
+                    placeholder="Adicione observações sobre a clínica (opcional)"
+                    disabled={submittingNovaClinica}
+                    rows="3"
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      fontSize: '1rem',
+                      outline: 'none',
+                      resize: 'vertical',
+                      fontFamily: 'inherit'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Botão de Submit */}
+              <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!submittingNovaClinica) {
+                      setShowNovaClinicaModal(false);
+                      setNovaClinicaFormData({ 
+                        nome: '',
+                        telefone: '',
+                        cidade: '',
+                        estado: '',
+                        observacoes: ''
+                      });
+                      setCidadeCustomizadaNova(false);
+                    }
+                  }}
+                  disabled={submittingNovaClinica}
+                  style={{
+                    padding: '0.75rem 2rem',
+                    background: '#e2e8f0',
+                    color: '#1e293b',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: submittingNovaClinica ? 'not-allowed' : 'pointer',
+                    marginRight: '1rem',
+                    opacity: submittingNovaClinica ? 0.6 : 1
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingNovaClinica}
+                  style={{
+                    padding: '0.75rem 2rem',
+                    background: submittingNovaClinica 
+                      ? '#94a3b8' 
+                      : 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '1rem',
+                    fontWeight: '700',
+                    cursor: submittingNovaClinica ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  {submittingNovaClinica ? (
+                    <>
+                      <div style={{
+                        width: '16px',
+                        height: '16px',
+                        border: '2px solid rgba(255, 255, 255, 0.3)',
+                        borderTop: '2px solid white',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                      }} />
+                      Cadastrando...
+                    </>
+                  ) : (
+                    'Cadastrar Clínica'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Cadastro de Nova Clínica - Formulário Completo (para admins e internos) */}
+      {showNovaClinicaModal && (isAdmin || isConsultorInterno) && (
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: '700px' }}>
             <div className="modal-header">
