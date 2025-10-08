@@ -754,16 +754,23 @@ const Dashboard = () => {
           const cidadesRes = await makeRequest(`/clinicas/cidades?estado=${filtroRegiao.estado}`);
           if (cidadesRes.ok) {
             const cidades = await cidadesRes.json();
+            console.log('🏙️ Cidades recebidas (filtradas por estado):', cidades);
             setCidadesDisponiveis(cidades);
+          } else {
+            console.error('❌ Erro ao buscar cidades (com estado):', cidadesRes.status, await cidadesRes.text());
           }
         } else {
           const cidadesRes = await makeRequest('/clinicas/cidades');
           if (cidadesRes.ok) {
             const cidades = await cidadesRes.json();
+            console.log('🏙️ Cidades recebidas (todas):', cidades);
             setCidadesDisponiveis(cidades);
+          } else {
+            console.error('❌ Erro ao buscar cidades:', cidadesRes.status, await cidadesRes.text());
           }
         }
       } catch (error) {
+        console.error('❌ Erro ao buscar cidades:', error);
       }
     };
 
@@ -1333,9 +1340,13 @@ const Dashboard = () => {
       const estadosRes = await makeRequest('/clinicas/estados');
       if (estadosRes.ok) {
         const estados = await estadosRes.json();
+        console.log('📍 Estados recebidos:', estados);
         setEstadosDisponiveis(estados);
+      } else {
+        console.error('❌ Erro ao buscar estados:', estadosRes.status, await estadosRes.text());
       }
     } catch (error) {
+      console.error('❌ Erro ao buscar estados:', error);
     }
   };
 

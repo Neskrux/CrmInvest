@@ -1096,6 +1096,60 @@ app.put('/api/empresas/perfil', authenticateToken, async (req, res) => {
 
 // === CLÍNICAS === (Admin vê todas, Consultores vêem apenas públicas ou suas próprias)
 
+// IMPORTANTE: Rotas específicas devem vir ANTES de rotas parametrizadas
+// Caso contrário, Express vai tratar "cidades" e "estados" como :id
+
+// Buscar cidades disponíveis
+app.get('/api/clinicas/cidades', authenticateToken, async (req, res) => {
+  try {
+    const { estado } = req.query;
+    console.log('🏙️ GET /api/clinicas/cidades - Estado filtro:', estado || 'nenhum');
+    
+    let query = supabaseAdmin
+      .from('clinicas')
+      .select('cidade')
+      .not('cidade', 'is', null);
+
+    // Filtrar por estado se especificado
+    if (estado) {
+      query = query.eq('estado', estado);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+    
+    // Extrair cidades únicas e ordenar, filtrando vazios
+    const cidadesUnicas = [...new Set(data.map(c => c.cidade).filter(c => c && c.trim() !== ''))].sort();
+    console.log('🏙️ Cidades encontradas:', cidadesUnicas.length);
+    res.json(cidadesUnicas);
+  } catch (error) {
+    console.error('❌ Erro ao buscar cidades:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Buscar estados disponíveis
+app.get('/api/clinicas/estados', authenticateToken, async (req, res) => {
+  try {
+    console.log('📍 GET /api/clinicas/estados');
+    const { data, error } = await supabaseAdmin
+      .from('clinicas')
+      .select('estado')
+      .not('estado', 'is', null);
+
+    if (error) throw error;
+    
+    // Extrair estados únicos e ordenar, filtrando vazios
+    const estadosUnicos = [...new Set(data.map(c => c.estado).filter(e => e && e.trim() !== ''))].sort();
+    console.log('📍 Estados encontrados:', estadosUnicos.length, estadosUnicos);
+    res.json(estadosUnicos);
+  } catch (error) {
+    console.error('❌ Erro ao buscar estados:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Buscar uma clínica específica por ID
 app.get('/api/clinicas/:id', authenticateToken, async (req, res) => {
   try {
@@ -1227,51 +1281,6 @@ app.get('/api/clinicas', authenticateToken, async (req, res) => {
     // Freelancer de empresa já foi filtrado acima (query.eq)
     
     res.json(finalData);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/clinicas/cidades', authenticateToken, async (req, res) => {
-  try {
-    const { estado } = req.query;
-    
-    let query = supabase
-      .from('clinicas')
-      .select('cidade')
-      .not('cidade', 'is', null)
-      .not('cidade', 'eq', '');
-
-    // Filtrar por estado se especificado
-    if (estado) {
-      query = query.eq('estado', estado);
-    }
-
-    const { data, error } = await query;
-
-    if (error) throw error;
-    
-    // Extrair cidades únicas e ordenar
-    const cidadesUnicas = [...new Set(data.map(c => c.cidade))].sort();
-    res.json(cidadesUnicas);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/clinicas/estados', authenticateToken, async (req, res) => {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('clinicas')
-      .select('estado')
-      .not('estado', 'is', null)
-      .not('estado', 'eq', '');
-
-    if (error) throw error;
-    
-    // Extrair estados únicos e ordenar
-    const estadosUnicos = [...new Set(data.map(c => c.estado))].sort();
-    res.json(estadosUnicos);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
