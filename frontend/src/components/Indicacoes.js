@@ -26,6 +26,18 @@ const Indicacoes = () => {
   const [showTutorial, setShowTutorial] = useState(false);
   const [tutorialCompleted, setTutorialCompleted] = useState(false);
 
+  // Estados para o formulário de cadastro direto
+  const [formCadastro, setFormCadastro] = useState({
+    nome: '',
+    telefone: '',
+    cidade: '',
+    estado: '',
+    observacoes: ''
+  });
+  const [cidadeCustomizadaCadastro, setCidadeCustomizadaCadastro] = useState(false);
+  const [submittingCadastro, setSubmittingCadastro] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
+
   // Imagens para o carrossel
   const imagensClinicas = [
     {
@@ -144,6 +156,68 @@ const Indicacoes = () => {
       texto: `Prezado(a) proprietário(a),\n\nPara clínicas que desejam:\n• Aumentar o número de pacientes\n• Receber sempre à vista\n• Eliminar inadimplência\n• Melhorar a ocupação da agenda\n\nO problema: 60% dos pacientes não possuem cartão com limite suficiente.\nNossa solução: Antecipamos o pagamento via boleto.\n\nComo funciona:\n• Paciente sem cartão/dinheiro\n• Quer fazer tratamento de R$ 8.000\n• Parcela em 12x no boleto\n• Você recebe R$ 8.000 à vista\n• Nós gerenciamos a cobrança\n\nDiferenciais:\n• Aprovação em até 24h\n• Pagamento em D+1\n• Taxa menor que cartão de crédito\n• Atendimento a todas as classes sociais\n• Suporte completo\n\nMédia das nossas clínicas parceiras:\n• 20 novos pacientes por mês\n• Ticket médio: R$ 3.800\n• Taxa de conversão: 88%\n\nEntre em contato para mais informações:`
     }
   ];
+
+  // Estados brasileiros
+  const estadosBrasileiros = [
+    { sigla: 'AC', nome: 'Acre' },
+    { sigla: 'AL', nome: 'Alagoas' },
+    { sigla: 'AP', nome: 'Amapá' },
+    { sigla: 'AM', nome: 'Amazonas' },
+    { sigla: 'BA', nome: 'Bahia' },
+    { sigla: 'CE', nome: 'Ceará' },
+    { sigla: 'DF', nome: 'Distrito Federal' },
+    { sigla: 'ES', nome: 'Espírito Santo' },
+    { sigla: 'GO', nome: 'Goiás' },
+    { sigla: 'MA', nome: 'Maranhão' },
+    { sigla: 'MT', nome: 'Mato Grosso' },
+    { sigla: 'MS', nome: 'Mato Grosso do Sul' },
+    { sigla: 'MG', nome: 'Minas Gerais' },
+    { sigla: 'PA', nome: 'Pará' },
+    { sigla: 'PB', nome: 'Paraíba' },
+    { sigla: 'PR', nome: 'Paraná' },
+    { sigla: 'PE', nome: 'Pernambuco' },
+    { sigla: 'PI', nome: 'Piauí' },
+    { sigla: 'RJ', nome: 'Rio de Janeiro' },
+    { sigla: 'RN', nome: 'Rio Grande do Norte' },
+    { sigla: 'RS', nome: 'Rio Grande do Sul' },
+    { sigla: 'RO', nome: 'Rondônia' },
+    { sigla: 'RR', nome: 'Roraima' },
+    { sigla: 'SC', nome: 'Santa Catarina' },
+    { sigla: 'SP', nome: 'São Paulo' },
+    { sigla: 'SE', nome: 'Sergipe' },
+    { sigla: 'TO', nome: 'Tocantins' }
+  ];
+
+  // Principais cidades por estado
+  const cidadesPorEstado = {
+    'SP': ['São Paulo', 'Campinas', 'Santos', 'São Bernardo do Campo', 'Santo André', 'Osasco', 'Ribeirão Preto', 'Sorocaba'],
+    'RJ': ['Rio de Janeiro', 'Niterói', 'Nova Iguaçu', 'Duque de Caxias', 'Campos dos Goytacazes', 'Petrópolis', 'Volta Redonda'],
+    'MG': ['Belo Horizonte', 'Uberlândia', 'Contagem', 'Juiz de Fora', 'Betim', 'Montes Claros', 'Ribeirão das Neves'],
+    'ES': ['Vitória', 'Serra', 'Vila Velha', 'Cariacica', 'Linhares', 'Cachoeiro de Itapemirim', 'Colatina'],
+    'PR': ['Curitiba', 'Londrina', 'Maringá', 'Ponta Grossa', 'Cascavel', 'São José dos Pinhais', 'Foz do Iguaçu'],
+    'RS': ['Porto Alegre', 'Caxias do Sul', 'Pelotas', 'Canoas', 'Santa Maria', 'Gravataí', 'Viamão'],
+    'SC': ['Florianópolis', 'Joinville', 'Blumenau', 'São José', 'Criciúma', 'Chapecó', 'Itajaí'],
+    'BA': ['Salvador', 'Feira de Santana', 'Vitória da Conquista', 'Camaçari', 'Juazeiro', 'Ilhéus', 'Itabuna'],
+    'GO': ['Goiânia', 'Aparecida de Goiânia', 'Anápolis', 'Rio Verde', 'Luziânia', 'Águas Lindas de Goiás'],
+    'PE': ['Recife', 'Jaboatão dos Guararapes', 'Olinda', 'Caruaru', 'Petrolina', 'Paulista', 'Cabo de Santo Agostinho'],
+    'CE': ['Fortaleza', 'Caucaia', 'Juazeiro do Norte', 'Maracanaú', 'Sobral', 'Crato', 'Itapipoca'],
+    'DF': ['Brasília', 'Taguatinga', 'Ceilândia', 'Samambaia', 'Planaltina', 'Águas Claras', 'Guará'],
+    'MT': ['Cuiabá', 'Várzea Grande', 'Rondonópolis', 'Sinop', 'Tangará da Serra', 'Cáceres', 'Barra do Garças'],
+    'MS': ['Campo Grande', 'Dourados', 'Três Lagoas', 'Corumbá', 'Ponta Porã', 'Aquidauana', 'Naviraí'],
+    'AL': ['Maceió', 'Arapiraca', 'Rio Largo', 'Palmeira dos Índios', 'União dos Palmares', 'Penedo'],
+    'SE': ['Aracaju', 'Nossa Senhora do Socorro', 'Lagarto', 'Itabaiana', 'Estância', 'Tobias Barreto'],
+    'PB': ['João Pessoa', 'Campina Grande', 'Santa Rita', 'Patos', 'Bayeux', 'Sousa', 'Cajazeiras'],
+    'RN': ['Natal', 'Mossoró', 'Parnamirim', 'São Gonçalo do Amarante', 'Macaíba', 'Ceará-Mirim'],
+    'PI': ['Teresina', 'Parnaíba', 'Picos', 'Piripiri', 'Floriano', 'Campo Maior', 'Barras'],
+    'MA': ['São Luís', 'Imperatriz', 'São José de Ribamar', 'Timon', 'Caxias', 'Codó', 'Paço do Lumiar'],
+    'TO': ['Palmas', 'Araguaína', 'Gurupi', 'Porto Nacional', 'Paraíso do Tocantins', 'Colinas do Tocantins'],
+    'AC': ['Rio Branco', 'Cruzeiro do Sul', 'Sena Madureira', 'Tarauacá', 'Feijó', 'Brasileia'],
+    'RO': ['Porto Velho', 'Ji-Paraná', 'Ariquemes', 'Vilhena', 'Cacoal', 'Rolim de Moura'],
+    'RR': ['Boa Vista', 'Rorainópolis', 'Caracaraí', 'Alto Alegre', 'Mucajaí', 'Cantá'],
+    'AP': ['Macapá', 'Santana', 'Laranjal do Jari', 'Oiapoque', 'Mazagão', 'Porto Grande'],
+    'AM': ['Manaus', 'Parintins', 'Itacoatiara', 'Manacapuru', 'Coari', 'Tefé', 'Tabatinga'],
+    'PA': ['Belém', 'Ananindeua', 'Santarém', 'Marabá', 'Parauapebas', 'Castanhal', 'Abaetetuba']
+  };
 
   // Verificação de permissão - executada sempre
   useEffect(() => {
@@ -376,6 +450,182 @@ const Indicacoes = () => {
     setSelectedMessage(null);
     setSelectedImageIndex(0);
     setActiveTab(newTab);
+    // Limpar formulário de cadastro ao trocar de tab
+    setFormCadastro({
+      nome: '',
+      telefone: '',
+      cidade: '',
+      estado: '',
+      observacoes: ''
+    });
+    setCidadeCustomizadaCadastro(false);
+    setFormErrors({});
+  };
+
+  // Funções de formatação
+  const formatarTelefone = (value) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 10) {
+      return numbers.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+    } else {
+      return numbers.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    }
+  };
+
+  const formatarCidade = (value) => {
+    if (!value) return '';
+    
+    let cleanValue = value.replace(/[0-9!@#$%^&*()_+=\[\]{}|\\:";'<>?,./~`]/g, '');
+    const isTyping = value.endsWith(' ') && value.length > 0;
+    
+    if (isTyping) {
+      return cleanValue;
+    }
+    
+    cleanValue = cleanValue.replace(/\s+/g, ' ').trim();
+    
+    if (!cleanValue) return '';
+    if (cleanValue.length < 2) return cleanValue;
+    
+    const isAllUpperCase = cleanValue.length > 3 && cleanValue === cleanValue.toUpperCase();
+    
+    if (isAllUpperCase) {
+      return cleanValue.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+    }
+    
+    return cleanValue
+      .toLowerCase()
+      .split(' ')
+      .map((palavra, index) => {
+        const preposicoes = ['de', 'da', 'do', 'das', 'dos', 'e', 'em', 'na', 'no', 'nas', 'nos'];
+        
+        if (index === 0) {
+          return palavra.charAt(0).toUpperCase() + palavra.slice(1);
+        }
+        
+        if (preposicoes.includes(palavra)) {
+          return palavra;
+        }
+        
+        return palavra.charAt(0).toUpperCase() + palavra.slice(1);
+      })
+      .join(' ');
+  };
+
+  // Manipulação do formulário de cadastro
+  const handleCadastroInputChange = (e) => {
+    const { name, value } = e.target;
+    
+    if (name === 'telefone') {
+      const formattedValue = formatarTelefone(value);
+      setFormCadastro(prev => ({ ...prev, [name]: formattedValue }));
+    } else if (name === 'cidade') {
+      const formattedValue = formatarCidade(value);
+      setFormCadastro(prev => ({ ...prev, [name]: formattedValue }));
+    } else if (name === 'estado') {
+      setFormCadastro(prev => ({ ...prev, [name]: value, cidade: '' }));
+      setCidadeCustomizadaCadastro(false);
+    } else {
+      setFormCadastro(prev => ({ ...prev, [name]: value }));
+    }
+    
+    if (formErrors[name]) {
+      setFormErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  // Validação do formulário de cadastro
+  const validateCadastroForm = () => {
+    const newErrors = {};
+    
+    if (!formCadastro.nome.trim()) {
+      newErrors.nome = `Nome ${activeTab === 'clinicas' ? 'da clínica' : 'do paciente'} é obrigatório`;
+    } else if (formCadastro.nome.trim().length < 2) {
+      newErrors.nome = 'Nome deve ter pelo menos 2 caracteres';
+    }
+    
+    if (!formCadastro.telefone.trim()) {
+      newErrors.telefone = 'WhatsApp é obrigatório';
+    } else if (formCadastro.telefone.replace(/\D/g, '').length < 10) {
+      newErrors.telefone = 'WhatsApp deve ter pelo menos 10 dígitos';
+    }
+    
+    if (!formCadastro.estado) {
+      newErrors.estado = 'Estado é obrigatório';
+    }
+    
+    if (!formCadastro.cidade.trim()) {
+      newErrors.cidade = 'Cidade é obrigatória';
+    }
+    
+    setFormErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Submit do formulário de cadastro
+  const handleCadastroSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!validateCadastroForm()) {
+      showErrorToast('Por favor, preencha todos os campos obrigatórios');
+      return;
+    }
+    
+    setSubmittingCadastro(true);
+    
+    try {
+      const endpoint = activeTab === 'clinicas' ? '/novas-clinicas' : '/pacientes';
+      
+      const dataToSend = activeTab === 'clinicas' 
+        ? {
+            nome: formCadastro.nome,
+            telefone: formCadastro.telefone,
+            cidade: formCadastro.cidade,
+            estado: formCadastro.estado,
+            observacoes: formCadastro.observacoes,
+            status: 'tem_interesse'
+          }
+        : {
+            nome: formCadastro.nome,
+            telefone: formCadastro.telefone,
+            cidade: formCadastro.cidade,
+            estado: formCadastro.estado,
+            observacoes: formCadastro.observacoes,
+            consultor_id: user.id,
+            status: 'lead'
+          };
+      
+      const response = await makeRequest(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dataToSend)
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        showSuccessToast(`${activeTab === 'clinicas' ? 'Clínica' : 'Paciente'} cadastrado com sucesso!`);
+        // Limpar formulário
+        setFormCadastro({
+          nome: '',
+          telefone: '',
+          cidade: '',
+          estado: '',
+          observacoes: ''
+        });
+        setCidadeCustomizadaCadastro(false);
+        setFormErrors({});
+      } else {
+        showErrorToast(data.error || 'Erro ao cadastrar');
+      }
+    } catch (error) {
+      console.error('Erro ao cadastrar:', error);
+      showErrorToast('Erro de conexão. Tente novamente.');
+    } finally {
+      setSubmittingCadastro(false);
+    }
   };
 
   // Verificação final de permissão antes do render
@@ -478,74 +728,6 @@ const Indicacoes = () => {
         </button>
       </div>
 
-
-      {/* Seção Explicativa do Produto */}
-      <div style={{
-        maxWidth: '1200px',
-        margin: '2rem auto',
-        padding: '0 1rem'
-      }}>
-        <div 
-          data-tutorial="produto-explicacao"
-          style={{
-            background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-            borderRadius: '12px',
-            padding: '2rem',
-            border: '2px solid #93c5fd',
-            boxShadow: '0 4px 20px rgba(59, 130, 246, 0.15)'
-          }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '1.5rem',
-            marginBottom: '1rem'
-          }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}>
-              <Lightbulb size={28} color="white" />
-            </div>
-            <div style={{ flex: 1 }}>
-              <h3 style={{
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                color: '#1e40af',
-                marginBottom: '1rem'
-              }}>
-                O que o Solumn faz e como você faz parte disso?
-              </h3>
-              <p style={{
-                fontSize: '1.05rem',
-                color: '#1e3a8a',
-                lineHeight: '1.7',
-                marginBottom: '0'
-              }}>
-                A clínica faz um tratamento e o paciente paga em várias parcelas.
-                A Investmoney, empresa desenvolvedora da Solumn, adianta esse dinheiro pra clínica — e depois recebe os boletos aos poucos.
-                Isso ajuda clínicas a terem dinheiro agora e pacientes a fazerem o tratamento sem precisar de cartão de crédito e sem taxas abusivas.
-              </p>
-              <p style={{
-                fontSize: '1.05rem',
-                color: '#1e3a8a',
-                lineHeight: '1.7',
-                marginTop: '1rem',
-                marginBottom: '0',
-                fontWeight: '500'
-              }}>
-                <strong>Você </strong>faz parte indicando clínicas que querem receber à vista e pacientes que precisam parcelar com facilidade.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Seção de Comissões em Destaque */}
       <div 
         data-tutorial="comissoes"
@@ -558,14 +740,14 @@ const Indicacoes = () => {
         }}>
         <div style={{
           textAlign: 'center',
-          color: 'black',
+          color: '#1e293b ',
           marginBottom: '2rem'
         }}>
           <h2 style={{
             fontSize: '2rem',
             fontWeight: '700',
             marginBottom: '0.5rem',
-            color: 'black'
+            color: '#1e293b '
           }}>
             Quanto você ganha com suas indicações?
           </h2>
@@ -769,12 +951,14 @@ const Indicacoes = () => {
             </div>
           </div>
         </div>
+      </div>
+
         {/* Tabs executivas */}
       <h2 style={{
         fontSize: '2rem',
         fontWeight: '700',
         marginBottom: '1rem',
-        color: 'black',
+        color: '#1e293b ',
         textAlign: 'center',
         marginTop: '2rem'
       }}>Escolha o que você quer indicar</h2>
@@ -840,22 +1024,440 @@ const Indicacoes = () => {
               </button>
             </div>
           </div>
-      </div>
+      {/* Formulário de Cadastro Direto */}
+      <div style={{
+        maxWidth: '900px',
+        margin: '3rem auto 2rem',
+        padding: '0 1rem'
+      }}>
+        <div 
+          data-tutorial="formulario-cadastro"
+          style={{
+            borderRadius: '16px',
+            padding: '2.5rem',
+            border: '2px solid #1e293b',
+            boxShadow: '0 8px 32px rgba(59, 130, 246, 0.15)'
+          }}>
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
       <h2 style={{
-        fontSize: '2rem',
+              fontSize: '1.75rem',
         fontWeight: '700',
-        marginBottom: '1rem',
-        color: 'black',
-        textAlign: 'center',
-        marginTop: '2rem'
-      }}>Aqui te ensinaremos um jeito de começar:</h2>
+              color: '#1e293b',
+              marginBottom: '0.5rem'
+            }}>
+              Cadastro de {activeTab === 'clinicas' ? 'Clínica' : 'Paciente'}
+            </h2>
+            <p style={{
+              fontSize: '1rem',
+              color: '#1e293b',
+              marginBottom: 0
+            }}>
+              Preencha os dados abaixo para cadastrar {activeTab === 'clinicas' ? 'uma clínica' : 'um paciente'} diretamente no sistema
+            </p>
+          </div>
 
+          <form onSubmit={handleCadastroSubmit}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: window.innerWidth <= 768 ? '1fr' : 'repeat(2, 1fr)',
+              gap: '1.5rem',
+              marginBottom: '1.5rem'
+            }}>
+              {/* Nome */}
+              <div style={{ gridColumn: window.innerWidth <= 768 ? '1' : 'span 2' }}>
+                <label style={{
+                  display: 'block',
+                  fontWeight: '600',
+                  color: '#1e293b',
+                  marginBottom: '0.5rem',
+                  fontSize: '0.95rem'
+                }}>
+                  Nome {activeTab === 'clinicas' ? 'da Clínica' : 'do Paciente'} *
+                </label>
+                <input
+                  type="text"
+                  name="nome"
+                  value={formCadastro.nome}
+                  onChange={handleCadastroInputChange}
+                  placeholder={`Digite o nome ${activeTab === 'clinicas' ? 'da clínica' : 'do paciente'}`}
+                  disabled={submittingCadastro}
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    border: formErrors.nome ? '2px solid #ef4444' : '2px solid #1e293b ',
+                    borderRadius: '10px',
+                    fontSize: '1rem',
+                    transition: 'all 0.3s ease',
+                    backgroundColor: 'white',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => {
+                    if (!formErrors.nome) e.target.style.borderColor = '#1e293b ';
+                  }}
+                  onBlur={(e) => {
+                    if (!formErrors.nome) e.target.style.borderColor = '#1e293b ';
+                  }}
+                />
+                {formErrors.nome && (
+                  <span style={{
+                    color: '#1e293b ',
+                    fontSize: '0.875rem',
+                    marginTop: '0.25rem',
+                    display: 'block'
+                  }}>
+                    {formErrors.nome}
+                  </span>
+                )}
+              </div>
+
+              {/* WhatsApp */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontWeight: '600',
+                  color: '#1e293b ',
+                  marginBottom: '0.5rem',
+                  fontSize: '0.95rem'
+                }}>
+                  WhatsApp *
+                </label>
+                <input
+                  type="tel"
+                  name="telefone"
+                  value={formCadastro.telefone}
+                  onChange={handleCadastroInputChange}
+                  placeholder="(11) 99999-9999"
+                  disabled={submittingCadastro}
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    border: formErrors.telefone ? '2px solid #ef4444' : '2px solid #1e293b ',
+                    borderRadius: '10px',
+                    fontSize: '1rem',
+                    transition: 'all 0.3s ease',
+                    backgroundColor: 'white',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => {
+                    if (!formErrors.telefone) e.target.style.borderColor = '#1e293b ';
+                  }}
+                  onBlur={(e) => {
+                    if (!formErrors.telefone) e.target.style.borderColor = '#1e293b ';
+                  }}
+                />
+                {formErrors.telefone && (
+                  <span style={{
+                    color: '#1e293b ',
+                    fontSize: '0.875rem',
+                    marginTop: '0.25rem',
+                    display: 'block'
+                  }}>
+                    {formErrors.telefone}
+                  </span>
+                )}
+              </div>
+
+              {/* Estado */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontWeight: '600',
+                  color: '#1e293b ',
+                  marginBottom: '0.5rem',
+                  fontSize: '0.95rem'
+                }}>
+                  Estado *
+                </label>
+                <select
+                  name="estado"
+                  value={formCadastro.estado}
+                  onChange={handleCadastroInputChange}
+                  disabled={submittingCadastro}
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    border: formErrors.estado ? '2px solid #ef4444' : '2px solid #1e293b ',
+                    borderRadius: '10px',
+                    fontSize: '1rem',
+                    transition: 'all 0.3s ease',
+                    backgroundColor: 'white',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                  onFocus={(e) => {
+                    if (!formErrors.estado) e.target.style.borderColor = '#1e293b ';
+                  }}
+                  onBlur={(e) => {
+                    if (!formErrors.estado) e.target.style.borderColor = '#1e293b ';
+                  }}
+                >
+                  <option value="">Selecione o estado</option>
+                  {estadosBrasileiros.map(estado => (
+                    <option key={estado.sigla} value={estado.sigla}>
+                      {estado.sigla} - {estado.nome}
+                    </option>
+                  ))}
+                </select>
+                {formErrors.estado && (
+                  <span style={{
+                    color: '#1e293b ',
+                    fontSize: '0.875rem',
+                    marginTop: '0.25rem',
+                    display: 'block'
+                  }}>
+                    {formErrors.estado}
+                  </span>
+                )}
+              </div>
+
+              {/* Cidade */}
+              <div style={{ gridColumn: window.innerWidth <= 768 ? '1' : 'span 2' }}>
+                <label style={{
+                  display: 'block',
+                  fontWeight: '600',
+                  color: '#1e293b ',
+                  marginBottom: '0.5rem',
+                  fontSize: '0.95rem'
+                }}>
+                  Cidade *
+                </label>
+                {formCadastro.estado && cidadesPorEstado[formCadastro.estado] && !cidadeCustomizadaCadastro ? (
+                  <select
+                    name="cidade"
+                    value={formCadastro.cidade}
+                    onChange={(e) => {
+                      if (e.target.value === 'OUTRA') {
+                        setCidadeCustomizadaCadastro(true);
+                        setFormCadastro(prev => ({ ...prev, cidade: '' }));
+                      } else {
+                        handleCadastroInputChange(e);
+                      }
+                    }}
+                    disabled={submittingCadastro}
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: formErrors.cidade ? '2px solid #ef4444' : '2px solid #1e293b ',
+                      borderRadius: '10px',
+                      fontSize: '1rem',
+                      transition: 'all 0.3s ease',
+                      backgroundColor: 'white',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                    onFocus={(e) => {
+                      if (!formErrors.cidade) e.target.style.borderColor = '#1e293b ';
+                    }}
+                    onBlur={(e) => {
+                      if (!formErrors.cidade) e.target.style.borderColor = '#1e293b ';
+                    }}
+                  >
+                    <option value="">Selecione a cidade</option>
+                    {cidadesPorEstado[formCadastro.estado].map(cidade => (
+                      <option key={cidade} value={cidade}>{cidade}</option>
+                    ))}
+                    <option value="OUTRA">Outra cidade</option>
+                  </select>
+                ) : (
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1 }}>
+                      <input
+                        type="text"
+                        name="cidade"
+                        value={formCadastro.cidade}
+                        onChange={handleCadastroInputChange}
+                        placeholder="Digite o nome da cidade"
+                        disabled={submittingCadastro || !formCadastro.estado}
+                        style={{
+                          width: '100%',
+                          padding: '0.875rem',
+                          border: formErrors.cidade ? '2px solid #ef4444' : '2px solid #1e293b ',
+                          borderRadius: '10px',
+                          fontSize: '1rem',
+                          transition: 'all 0.3s ease',
+                          backgroundColor: 'white',
+                          outline: 'none'
+                        }}
+                        onFocus={(e) => {
+                          if (!formErrors.cidade) e.target.style.borderColor = '#1e293b ';
+                        }}
+                        onBlur={(e) => {
+                          if (!formErrors.cidade) e.target.style.borderColor = '#1e293b ';
+                        }}
+                      />
+                    </div>
+                    {formCadastro.estado && cidadesPorEstado[formCadastro.estado] && cidadeCustomizadaCadastro && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCidadeCustomizadaCadastro(false);
+                          setFormCadastro(prev => ({ ...prev, cidade: '' }));
+                        }}
+                        disabled={submittingCadastro}
+                        style={{
+                          padding: '0.875rem 1rem',
+                          background: '#1e293b ',
+                          color: '#1e293b ',
+                          border: '2px solid #1e293b ',
+                          borderRadius: '10px',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = '#1e293b ';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = '#1e293b ';
+                        }}
+                      >
+                        Voltar
+                      </button>
+                    )}
+                  </div>
+                )}
+                {formErrors.cidade && (
+                  <span style={{
+                    color: '#1e293b ',
+                    fontSize: '0.875rem',
+                    marginTop: '0.25rem',
+                    display: 'block'
+                  }}>
+                    {formErrors.cidade}
+                  </span>
+                )}
+              </div>
+
+              {/* Observações */}
+              <div style={{ gridColumn: window.innerWidth <= 768 ? '1' : 'span 2' }}>
+                <label style={{
+                  display: 'block',
+                  fontWeight: '600',
+                  color: '#1e293b ',
+                  marginBottom: '0.5rem',
+                  fontSize: '0.95rem'
+                }}>
+                  Observações
+                </label>
+                <textarea
+                  name="observacoes"
+                  value={formCadastro.observacoes}
+                  onChange={handleCadastroInputChange}
+                  placeholder={`Adicione observações sobre ${activeTab === 'clinicas' ? 'a clínica' : 'o paciente'} (opcional)`}
+                  disabled={submittingCadastro}
+                  rows="3"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    border: '2px solid #1e293b ',
+                    borderRadius: '10px',
+                    fontSize: '1rem',
+                    transition: 'all 0.3s ease',
+                    backgroundColor: 'white',
+                    outline: 'none',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#1e293b ';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#1e293b ';
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Botão de Submit */}
+            <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+              <button
+                type="submit"
+                disabled={submittingCadastro}
+                style={{
+                  padding: '1rem 3rem',
+                  background: submittingCadastro 
+                    ? '#1e293b ' 
+                    : 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '1.1rem',
+                  fontWeight: '700',
+                  cursor: submittingCadastro ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseEnter={(e) => {
+                  if (!submittingCadastro) {
+                    e.target.style.transform = 'translateY(-2px)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                }}
+              >
+                {submittingCadastro ? (
+                  <>
+                    <div style={{
+                      width: '20px',
+                      height: '20px',
+                      border: '3px solid rgba(255, 255, 255, 0.3)',
+                      borderTop: '3px solid white',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite'
+                    }} />
+                    Cadastrando...
+                  </>
+                ) : (
+                  <>
+                    Cadastrar {activeTab === 'clinicas' ? 'Clínica' : 'Paciente'}
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+
+          {/* Mensagem informativa */}
+          <div style={{
+            marginTop: '1.5rem',
+            padding: '1rem',
+            background: 'rgba(59, 130, 246, 0.1)',
+            borderLeft: '4px solid #3b82f6',
+            borderRadius: '8px'
+          }}>
+            <p style={{
+              margin: 0,
+              fontSize: '0.9rem',
+              color: '#1e40af',
+              lineHeight: '1.6'
+            }}>
+              <strong>Dica:</strong> {activeTab === 'clinicas' 
+                ? 'Ao cadastrar uma clínica, ela será automaticamente atribuída a você e aparecerá na sua página de clínicas.'
+                : 'Ao cadastrar um paciente, ele será automaticamente atribuído a você e aparecerá na sua página de pacientes.'}
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Processo executivo */}
       <div className="process-container">
+        
 
         {/* Passo 2: Mensagens Corporativas */}
         <div className="process-step" data-tutorial="mensagens">
+        <h2 style={{
+        fontSize: '2rem',
+        fontWeight: '700',
+        color: '#1e293b ',
+        textAlign: 'center',
+        marginBottom: '4rem',
+        padding: '1rem'}}>
+        Ou faça você mesmo o primeiro contato
+        </h2>
           <div className="step-header">
             <div className="step-number">1</div>
             <div className="step-content">
@@ -1242,6 +1844,14 @@ const Indicacoes = () => {
         onClose={handleTutorialClose}
         onComplete={handleTutorialComplete}
       />
+
+      {/* Animações CSS */}
+      <style jsx>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };

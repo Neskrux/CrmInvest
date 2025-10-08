@@ -121,10 +121,10 @@ const ComoFazer = () => {
             <div className="instruction-card">
               <div className="instruction-number">1</div>
               <div className="instruction-content">
-                <h3>Identifique Clínicas e compartilhe a mensagem completa com o link</h3>
+                <h3>Identifique Clínicas e as indique</h3>
                 <p>
                   Procure por clínicas odontológicas ou estéticas que possam ter interesse 
-                  em receber o valor à vista dos tratamentos. Compartilhe a mensagem completa com o link para que ela possa se cadastrar.
+                  em receber o valor à vista dos tratamentos. Crie ela diretamente pelo formulário ou compartilhe a mensagem completa com o link para que ela possa se cadastrar.
                 </p>
                 <div className="instruction-tip">
                   <span>Dica: Clínicas que aceitam parcelamento ou querem melhorar o fluxo de caixa são ótimas candidatas. Apresente os benefícios: receber à vista sem burocracia!</span>
@@ -177,11 +177,10 @@ const ComoFazer = () => {
             <div className="instruction-card">
               <div className="instruction-number">1</div>
               <div className="instruction-content">
-                <h3>Compartilhe seu Link Personalizado</h3>
+                <h3>Identifique Pacientes e os indique</h3>
                 <p>
-                  Vá até a página <strong>Indicações</strong> e copie sua mensagem completa com seu link. 
-                  Compartilhe esta mensagem em suas redes sociais, WhatsApp, ou com conhecidos que 
-                  tenham interesse em tratamentos odontológicos ou estéticos parcelados.
+                  Procure por pacientes que possam ter interesse em parcelar o valor dos tratamentos odontológicos ou estéticos. 
+                  Vá até a página <strong>Indicações</strong> e cadastre ele diretamente pelo formulário ou copie sua mensagem completa com seu link. 
                 </p>
                 <div className="instruction-tip">
                   <span>Dica: Use os materiais de apoio disponíveis na página Materiais para conhecer melhor o produto!</span>
@@ -259,7 +258,7 @@ const ComoFazer = () => {
               <div className="pos-venda-number">1</div>
               <h3>Você indica</h3>
               <p>
-                Coloque os dados da clínica ou do paciente no painel Solumn e envie.
+                Coloque os dados da clínica ou do paciente no formulário e envie.
               </p>
               <div className="pos-venda-destaque">
                 Pronto. Sua parte termina aqui.
