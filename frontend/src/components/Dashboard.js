@@ -611,12 +611,23 @@ const Dashboard = () => {
           valorTotalFechamentos: fechamentos.filter(f => f.aprovado !== 'reprovado').reduce((acc, f) => acc + parseFloat(f.valor_fechado || 0), 0),
           agendamentosHoje: agendamentos.filter(a => a.data_agendamento === new Date().toISOString().split('T')[0]).length
         });
+        
         // Calcular comissões filtradas
+        // Para consultores (não-admin), filtrar apenas seus fechamentos
+        // Para admin, mostrar comissão geral de todos os consultores
+        let fechamentosParaComissao = fechamentos.filter(f => f.aprovado !== 'reprovado');
+        
+        if (!isAdmin && user?.consultor_id) {
+          // Filtrar apenas fechamentos deste consultor
+          fechamentosParaComissao = fechamentosParaComissao.filter(f => f.consultor_id === user.consultor_id);
+        }
+        
         let total = 0, mes = 0;
         const hoje = new Date();
         const mesAtual = hoje.getMonth();
         const anoAtual = hoje.getFullYear();
-        fechamentos.filter(f => f.aprovado !== 'reprovado').forEach(f => {
+        
+        fechamentosParaComissao.forEach(f => {
           const valor = parseFloat(f.valor_fechado || 0);
           const comissao = calcularComissao(valor);
           total += comissao;
