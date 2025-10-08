@@ -1831,7 +1831,7 @@ const Dashboard = () => {
           </div>
           <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
             <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600' }}>Agendamentos</div>
-            <div className="stat-value" style={{ fontSize: '2.5rem' }}>{kpisPrincipais.totalAgendamentos}</div>
+            <div className="stat-value" style={{ fontSize: '2.5rem' }}>{pipelineFiltrado.agendado || 0}</div>
           </div>
           <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
             <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600' }}>Fechamentos</div>
