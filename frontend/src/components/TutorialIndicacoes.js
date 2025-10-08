@@ -4,7 +4,7 @@ const tutorialSteps = [
   {
     id: 'welcome',
     title: 'Boas-vindas às Indicações!',
-    content: 'Bem-vindo à página de Indicações! Aqui você encontrará tudo que precisa para começar a ganhar dinheiro indicando clínicas e pacientes. Vamos te mostrar como funciona!',
+    content: 'Bem vindo a página de indicações, aqui você encontrará tudo que precisa para começar a ganhar dinheiro.',
     position: 'center'
   },
   {
@@ -26,7 +26,7 @@ const tutorialSteps = [
   {
     id: 'escolha-tipo',
     title: 'Escolha o Tipo de Indicação',
-    content: 'Primeiro, escolha se quer indicar clínicas ou pacientes. Cada tipo tem mensagens e imagens específicas para facilitar sua divulgação.',
+    content: 'Primeiro escolha oque você quer indicar, clínica ou paciente?',
     targetSelector: '[data-tutorial="escolha-tipo"]',
     position: 'bottom',
     scrollTo: true
@@ -34,7 +34,7 @@ const tutorialSteps = [
   {
     id: 'mensagens',
     title: 'Mensagens Prontas',
-    content: 'Selecione um dos modelos de mensagem profissionais. Você pode visualizar o texto completo antes de escolher. Use essas mensagens para facilitar seu contato!',
+    content: 'Em seguida, escolha uma mensagem pronta, elas são opcionais, você pode mudar para o seu jeito!',
     targetSelector: '[data-tutorial="mensagens"]',
     position: 'bottom',
     scrollTo: true

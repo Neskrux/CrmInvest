@@ -841,6 +841,14 @@ const Indicacoes = () => {
             </div>
           </div>
       </div>
+      <h2 style={{
+        fontSize: '2rem',
+        fontWeight: '700',
+        marginBottom: '1rem',
+        color: 'black',
+        textAlign: 'center',
+        marginTop: '2rem'
+      }}>Aqui te ensinaremos um jeito de começar:</h2>
 
 
       {/* Processo executivo */}
