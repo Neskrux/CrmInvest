@@ -464,11 +464,26 @@ const Indicacoes = () => {
 
   // Funções de formatação
   const formatarTelefone = (value) => {
-    const numbers = value.replace(/\D/g, '');
-    if (numbers.length <= 10) {
-      return numbers.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+    // Remove tudo que não é número
+    let numbers = value.replace(/\D/g, '');
+    
+    // Remove zeros à esquerda (ex: 041 → 41)
+    numbers = numbers.replace(/^0+/, '');
+    
+    // Limita a 11 dígitos
+    numbers = numbers.substring(0, 11);
+    
+    // Formata baseado no tamanho
+    if (numbers.length === 0) {
+      return '';
+    } else if (numbers.length <= 2) {
+      return `(${numbers}`;
+    } else if (numbers.length <= 6) {
+      return `(${numbers.substring(0, 2)}) ${numbers.substring(2)}`;
+    } else if (numbers.length <= 10) {
+      return `(${numbers.substring(0, 2)}) ${numbers.substring(2, 6)}-${numbers.substring(6)}`;
     } else {
-      return numbers.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+      return `(${numbers.substring(0, 2)}) ${numbers.substring(2, 7)}-${numbers.substring(7, 11)}`;
     }
   };
 
@@ -583,7 +598,7 @@ const Indicacoes = () => {
             cidade: formCadastro.cidade,
             estado: formCadastro.estado,
             observacoes: formCadastro.observacoes,
-            status: 'tem_interesse'
+            status: 'sem_primeiro_contato'
           }
         : {
             nome: formCadastro.nome,
@@ -592,7 +607,7 @@ const Indicacoes = () => {
             estado: formCadastro.estado,
             observacoes: formCadastro.observacoes,
             consultor_id: user.id,
-            status: 'lead'
+            status: 'sem_primeiro_contato'
           };
       
       const response = await makeRequest(endpoint, {
@@ -800,7 +815,7 @@ const Indicacoes = () => {
               color: '#1f2937',
               marginBottom: '1rem'
             }}>
-              Indicação de Clínicas
+              Indicação de Clínicas Estéticas ou Odontológicas
             </h3>
             <div style={{
               fontSize: '3rem',
@@ -946,7 +961,8 @@ const Indicacoes = () => {
                 fontWeight: '600',
                 margin: 0
               }}>
-                ✓ Ex: Tratamento de R$ 3.000 = R$ 30 de comissão
+                  Ex: Tratamento de R$ 3.000 = R$ 30 de comissão<br /><br />
+                 ✓ Comissão após primeiro pagamento do tratamento
               </p>
             </div>
           </div>
@@ -977,7 +993,7 @@ const Indicacoes = () => {
               </div>
                      <div className="tab-info">
                        <span className="tab-text">Clínicas</span>
-                       <span className="tab-subtitle">Indicar clínicas</span>
+                       <span className="tab-subtitle">Indicar clínicas estéticas ou odontológicas</span>
                        <span style={{
                          display: 'inline-block',
                          marginTop: '0.25rem',
@@ -988,7 +1004,7 @@ const Indicacoes = () => {
                          fontWeight: '700',
                          borderRadius: '6px'
                        }}>
-                         R$ 100 por clínica
+                         R$ 100 por clínica indicada
                        </span>
                      </div>
             </div>
@@ -1017,7 +1033,8 @@ const Indicacoes = () => {
                          fontWeight: '700',
                          borderRadius: '6px'
                        }}>
-                         R$ 50 a cada R$ 5.000
+                         R$ 50 a cada R$ 5.000 <br />
+                         Após primeiro pagamento do tratamento
                        </span>
                      </div>
                     </div>

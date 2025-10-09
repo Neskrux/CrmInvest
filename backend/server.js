@@ -2416,8 +2416,8 @@ app.post('/api/clinicas/cadastro-publico', async (req, res) => {
       }
     }
     
-    // Decidir em qual tabela inserir baseado se é freelancer
-    const tabelaDestino = isFreelancer ? 'clinicas' : 'novas_clinicas';
+    // SEMPRE inserir em novas_clinicas com status "tem_interesse" para cadastros via link
+    const tabelaDestino = 'novas_clinicas';
     console.log(`💾 Inserindo clínica na tabela ${tabelaDestino}`);
     console.log(`   - Consultor ID: ${consultorId}`);
     console.log(`   - Consultor Nome: ${consultorNome}`);
@@ -2434,68 +2434,23 @@ app.post('/api/clinicas/cadastro-publico', async (req, res) => {
       telefone: telefoneNumeros,
       email: email.trim(),
       nicho: nicho || null,
+      responsavel: responsavel.trim(),
+      observacoes: observacoes ? observacoes.trim() : null,
+      status: 'tem_interesse', // SEMPRE tem_interesse para cadastros via link
+      criado_por_consultor_id: consultorId,
+      tipo_origem: 'aprovada',
       latitude,
       longitude
     };
 
-    let data, error;
+    // Inserir na tabela novas_clinicas
+    const result = await supabaseAdmin
+      .from('novas_clinicas')
+      .insert([dadosBase])
+      .select();
     
-    if (isFreelancer) {
-      // Inserir direto na tabela clinicas (para freelancers)
-      const result = await supabaseAdmin
-        .from('clinicas')
-        .insert([{ 
-          ...dadosBase,
-          responsavel: responsavel.trim(),
-          status: 'em_contato', // Clínicas de freelancers entram com status "Em contato"
-          tipo_origem: 'freelancer', // Identificar origem
-          consultor_id: consultorId // Vincular clínica ao freelancer
-        }])
-        .select();
-      data = result.data;
-      error = result.error;
-      
-      // Criar relacionamento consultor-clínica se a inserção foi bem-sucedida
-      if (!error && data && data[0] && consultorId) {
-        console.log('🔗 Criando relacionamento consultor-clínica para:');
-        console.log('   - Consultor ID:', consultorId);
-        console.log('   - Clínica ID:', data[0].id);
-        console.log('   - Clínica Nome:', data[0].nome);
-        
-        const { data: relData, error: relError } = await supabaseAdmin
-          .from('consultor_clinica')
-          .insert([{
-            consultor_id: consultorId,
-            clinica_id: data[0].id,
-            observacoes: `Clínica indicada via link personalizado - ${new Date().toLocaleDateString('pt-BR')}`
-          }])
-          .select();
-        
-        if (relError) {
-          console.error('❌ Erro ao criar relacionamento:', relError);
-          console.error('   Detalhes do erro:', JSON.stringify(relError, null, 2));
-          // Não falhar a operação principal por causa disso
-        } else {
-          console.log('✅ Relacionamento consultor-clínica criado com sucesso');
-          console.log('   ID do relacionamento:', relData?.[0]?.id);
-        }
-      }
-    } else {
-      // Inserir na tabela novas_clinicas (para não-freelancers)
-      const result = await supabaseAdmin
-        .from('novas_clinicas')
-        .insert([{ 
-          ...dadosBase,
-          responsavel: responsavel.trim(),
-          observacoes: observacoes ? observacoes.trim() : null,
-          status: 'tem_interesse',
-          criado_por_consultor_id: consultorId,
-          tipo_origem: 'aprovada'
-        }])
-        .select();
-      data = result.data;
-      error = result.error;
-    }
+    const data = result.data;
+    const error = result.error;
 
     if (error) {
       console.error('❌ Erro ao inserir clínica:', error);
