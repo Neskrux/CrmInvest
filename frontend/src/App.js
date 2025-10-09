@@ -29,6 +29,7 @@ import IDSFIntegration from './components/IDSFIntegration';
 import Indicacoes from './components/Indicacoes';
 import ComoFazer from './components/ComoFazer';
 import MeusDocumentos from './components/MeusDocumentos';
+import Evidencias from './components/Evidencias';
 import logoBrasao from './images/logobrasao.png';
 import logoHorizontal from './images/logohorizontal.png';
 import logoHorizontalPreto from './images/logohorizontalpreto.png';
@@ -259,6 +260,7 @@ const AppContentWithNotifications = () => {
         <Route path="/materiais" element={<Materiais />} />
         <Route path="/como-fazer" element={<ComoFazer />} />
         <Route path="/idsf" element={<IDSFIntegration />} />
+        <Route path="/evidencias" element={<Evidencias />} />
         <Route path="/perfil" element={<Perfil />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -691,6 +693,24 @@ const AppContentWithNotifications = () => {
                   <polyline points="10,9 9,9 8,9"/>
                 </svg>
                 Materiais de Apoio
+              </Link>
+            </div>
+          )}
+
+          {/* Evidências - Apenas Admin */}
+          {isAdmin && (
+            <div className="nav-item">
+              <Link
+                to="/evidencias"
+                className={`nav-link ${activeTab === 'evidencias' ? 'active' : ''}`}
+                onClick={handleMobileNavigation}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
+                Evidências
               </Link>
             </div>
           )}

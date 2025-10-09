@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import TutorialPacientes from './TutorialPacientes';
+import ModalEvidencia from './ModalEvidencia';
 
 const Pacientes = () => {
   const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isFreelancer, isClinica, deveFiltrarPorClinica } = useAuth();
@@ -64,6 +65,16 @@ const Pacientes = () => {
   const [statusTemporario, setStatusTemporario] = useState({});
   const { error: showErrorToast, success: showSuccessToast } = useToast();
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
+
+  // Estados para modal de evidência
+  const [showEvidenciaModal, setShowEvidenciaModal] = useState(false);
+  const [evidenciaData, setEvidenciaData] = useState({
+    pacienteId: null,
+    pacienteNome: '',
+    statusAnterior: '',
+    statusNovo: '',
+    evidenciaId: null
+  });
 
   // Estados para modal de agendamento
   const [showAgendamentoModal, setShowAgendamentoModal] = useState(false);
@@ -173,6 +184,20 @@ const Pacientes = () => {
     { value: 'reagendado', label: 'Reagendado', color: '#8b5cf6', description: 'Agendamento foi reagendado' }
   ];
 
+  // Status que requerem evidência obrigatória
+  const STATUS_COM_EVIDENCIA_PACIENTES = [
+    'cpf_reprovado',
+    'nao_passou_cpf',
+    'nao_tem_outro_cpf',
+    'nao_existe',
+    'nao_tem_interesse',
+    'nao_reconhece',
+    'nao_responde',
+    'sem_clinica',
+    'nao_fechou',
+    'nao_compareceu'
+  ];
+
   // Removido: fetchConsultorInfo - agora usando podeAlterarStatus do contexto
 
   useEffect(() => {
@@ -235,7 +260,7 @@ const Pacientes = () => {
 
   // Controlar scroll do body quando modal estiver aberto
   useEffect(() => {
-    if (showModal || showViewModal || showObservacoesModal || showAgendamentoModal || showPermissaoModal || showAtribuirConsultorModal) {
+    if (showModal || showViewModal || showObservacoesModal || showAgendamentoModal || showPermissaoModal || showAtribuirConsultorModal || showEvidenciaModal) {
       // Bloquear scroll da página
       document.body.style.overflow = 'hidden';
     } else {
@@ -247,7 +272,7 @@ const Pacientes = () => {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [showModal, showViewModal, showObservacoesModal, showAgendamentoModal, showFechamentoModal, showPermissaoModal, showAtribuirConsultorModal]);
+  }, [showModal, showViewModal, showObservacoesModal, showAgendamentoModal, showFechamentoModal, showPermissaoModal, showAtribuirConsultorModal, showEvidenciaModal]);
   
   //Sempre que FILTROS mudarem, voltar para a primeira página
   useEffect(() => {
@@ -447,6 +472,40 @@ const Pacientes = () => {
       console.error('Erro ao alterar status:', error);
       showErrorToast('Erro ao alterar status do lead');
     }
+  };
+
+  // Função chamada quando evidência é enviada com sucesso
+  const handleEvidenciaSuccess = async (evidenciaId) => {
+    console.log('✅ Evidência enviada, ID:', evidenciaId);
+    
+    // Atualizar status agora que temos a evidência
+    await updateStatus(evidenciaData.pacienteId, evidenciaData.statusNovo, evidenciaId);
+    
+    // Limpar status temporário
+    setStatusTemporario(prev => {
+      const newState = { ...prev };
+      delete newState[evidenciaData.pacienteId];
+      return newState;
+    });
+  };
+
+  // Função chamada quando modal de evidência é fechado/cancelado
+  const handleEvidenciaClose = () => {
+    // Limpar status temporário (voltar ao status anterior)
+    setStatusTemporario(prev => {
+      const newState = { ...prev };
+      delete newState[evidenciaData.pacienteId];
+      return newState;
+    });
+    
+    setShowEvidenciaModal(false);
+    setEvidenciaData({
+      pacienteId: null,
+      pacienteNome: '',
+      statusAnterior: '',
+      statusNovo: '',
+      evidenciaId: null
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -709,7 +768,7 @@ const Pacientes = () => {
     }
   };
 
-  const updateStatus = async (pacienteId, newStatus) => {
+  const updateStatus = async (pacienteId, newStatus, evidenciaId = null) => {
     // Verificar se o usuário tem permissão para alterar status
     if (!podeAlterarStatus) {
       showErrorToast('Você não tem permissão para alterar o status dos pacientes');
@@ -737,11 +796,33 @@ const Pacientes = () => {
       return;
     }
 
-    // Para outros status, atualizar normalmente
+    // VERIFICAR SE STATUS REQUER EVIDÊNCIA
+    if (STATUS_COM_EVIDENCIA_PACIENTES.includes(newStatus) && !evidenciaId) {
+      const paciente = pacientes.find(p => p.id === pacienteId);
+      if (paciente) {
+        // Definir status temporário para o select
+        setStatusTemporario(prev => ({ ...prev, [pacienteId]: newStatus }));
+        // Abrir modal de evidência
+        setEvidenciaData({
+          pacienteId: pacienteId,
+          pacienteNome: paciente.nome,
+          statusAnterior: paciente.status,
+          statusNovo: newStatus,
+          evidenciaId: null
+        });
+        setShowEvidenciaModal(true);
+      }
+      return;
+    }
+
+    // Para outros status ou quando já tem evidenciaId, atualizar normalmente
     try {
       const response = await makeRequest(`/pacientes/${pacienteId}/status`, {
         method: 'PUT',
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({ 
+          status: newStatus,
+          evidencia_id: evidenciaId 
+        })
       });
 
       const data = await response.json();
@@ -1281,8 +1362,8 @@ const Pacientes = () => {
           fontSize: '0.875rem'
         }}>
           
-          {/* Links personalizados para consultores */}
-          {isConsultor && (
+          {/* Links personalizados para consultores freelancers (não internos) */}
+          {isConsultor && !isConsultorInterno && (
             <div style={{ 
               marginTop: '1rem', 
               padding: '0.75rem', 
@@ -3303,6 +3384,18 @@ const Pacientes = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de Evidência de Status */}
+      <ModalEvidencia
+        isOpen={showEvidenciaModal}
+        onClose={handleEvidenciaClose}
+        onSuccess={handleEvidenciaSuccess}
+        tipo="paciente"
+        registroId={evidenciaData.pacienteId}
+        statusAnterior={evidenciaData.statusAnterior}
+        statusNovo={evidenciaData.statusNovo}
+        nomeRegistro={evidenciaData.pacienteNome}
+      />
 
       {/* Tutorial Overlay */}
       <TutorialPacientes

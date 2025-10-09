@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import TutorialClinicas from './TutorialClinicas';
+import ModalEvidencia from './ModalEvidencia';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import config from '../config';
@@ -11,6 +12,7 @@ const Clinicas = () => {
   const { showSuccessToast, showErrorToast, showWarningToast } = useToast();
   const [clinicas, setClinicas] = useState([]);
   const [novasClinicas, setNovasClinicas] = useState([]);
+  const [clinicasEmAnalise, setClinicasEmAnalise] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showNovaClinicaModal, setShowNovaClinicaModal] = useState(false);
   const [editingClinica, setEditingClinica] = useState(null);
@@ -78,7 +80,19 @@ const Clinicas = () => {
     visita_online_url: '',
     visita_online_data: '',
     visita_online_observacoes: '',
-    doc_certidao_casamento: false
+    doc_certidao_casamento: false,
+    // Novos campos de sócios
+    telefone_socios: '',
+    email_socios: '',
+    doc_comprovante_endereco_socios: false,
+    doc_carteirinha_cro: false,
+    // Dados bancários
+    banco_nome: '',
+    banco_conta: '',
+    banco_agencia: '',
+    banco_pix: '',
+    // Limite (apenas admin vê)
+    limite_credito: ''
   });
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
   const [novaClinicaFormData, setNovaClinicaFormData] = useState({
@@ -106,6 +120,17 @@ const Clinicas = () => {
   // Estado para modal de explicação de permissões
   const [showPermissaoModal, setShowPermissaoModal] = useState(false);
 
+  // Estados para modal de evidência
+  const [showEvidenciaModal, setShowEvidenciaModal] = useState(false);
+  const [evidenciaData, setEvidenciaData] = useState({
+    clinicaId: null,
+    clinicaNome: '',
+    statusAnterior: '',
+    statusNovo: '',
+    tipoClinica: '', // 'clinica' ou 'nova_clinica'
+    evidenciaId: null
+  });
+
   // Status disponíveis para clínicas gerais
   const statusClinicaOptions = [
     { value: 'ativa', label: 'Ativa', color: '#10b981' },
@@ -115,7 +140,8 @@ const Clinicas = () => {
     { value: 'aguardando_documentacao', label: 'Aguardando Documentação', color: '#f59e0b' },
     { value: 'nao_fechou', label: 'Não Fechou', color: '#f59e0b' },
     { value: 'nao_e_nosso_publico', label: 'Não é nosso público alvo', color: '#9ca3af' },
-    { value: 'nao_responde', label: 'Não responde', color: '#6b7280' }
+    { value: 'nao_responde', label: 'Não responde', color: '#6b7280' },
+    { value: 'nao_reconhece', label: 'Não reconhece', color: '#6b7280' }
   ];
 
   // Status disponíveis para novas clínicas
@@ -128,7 +154,26 @@ const Clinicas = () => {
     { value: 'aguardando_documentacao', label: 'Aguardando Documentação', color: '#f59e0b' },
     { value: 'nao_fechou', label: 'Não Fechou', color: '#f59e0b' },
     { value: 'nao_e_nosso_publico', label: 'Não é nosso público alvo', color: '#9ca3af' },
-    { value: 'nao_responde', label: 'Não responde', color: '#6b7280' }
+    { value: 'nao_responde', label: 'Não responde', color: '#6b7280' },
+    { value: 'nao_reconhece', label: 'Não reconhece', color: '#6b7280' }
+  ];
+
+  // Status disponíveis para clínicas em análise
+  const statusAnaliseOptions = [
+    { value: 'aguardando_documentacao', label: 'Aguardando Documentação', color: '#f59e0b' },
+    { value: 'documentacao_incompleta', label: 'Documentação Incompleta', color: '#ef4444' },
+    { value: 'em_analise', label: 'Em Análise', color: '#3b82f6' },
+    { value: 'documentacao_reprovada', label: 'Documentação Reprovada', color: '#dc2626' },
+    { value: 'ativa', label: 'Aprovada (Ativa)', color: '#10b981' },
+    { value: 'inativa', label: 'Inativa', color: '#6b7280' }
+  ];
+
+  // Status que requerem evidência obrigatória
+  const STATUS_COM_EVIDENCIA_CLINICAS = [
+    'nao_fechou',
+    'nao_e_nosso_publico',
+    'nao_responde',
+    'nao_tem_interesse'
   ];
 
   // Verificar se usuário é consultor
@@ -199,6 +244,11 @@ const Clinicas = () => {
   useEffect(() => {
     fetchClinicas();
     fetchNovasClinicas(); // Sempre carregar novas clínicas
+    
+    // Buscar clínicas em análise se for admin ou consultor interno
+    if (isAdmin || isConsultorInterno) {
+      fetchClinicasEmAnalise();
+    }
     
     // Buscar links personalizados se for consultor
     if (isConsultor) {
@@ -369,6 +419,23 @@ const Clinicas = () => {
       }
     } catch (error) {
       console.error('Erro ao carregar novas clínicas:', error);
+      showErrorToast('Erro ao conectar com o servidor');
+    }
+  };
+
+  const fetchClinicasEmAnalise = async () => {
+    try {
+      const response = await makeRequest('/clinicas/em-analise');
+      const data = await response.json();
+      
+      if (response.ok) {
+        setClinicasEmAnalise(data);
+      } else {
+        console.error('Erro ao carregar clínicas em análise:', data.error);
+        showErrorToast('Erro ao carregar clínicas em análise: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar clínicas em análise:', error);
       showErrorToast('Erro ao conectar com o servidor');
     }
   };
@@ -580,10 +647,57 @@ const Clinicas = () => {
     setSubmittingNovaClinica(true);
     
     try {
-      // Preparar dados com status correto
+      // Se for consultor interno, deve criar em análise via rota /clinicas
+      if (isConsultorInterno) {
       const dataToSend = {
         ...novaClinicaFormData,
-        // Usar "sem_primeiro_contato" para cadastros manuais
+          em_analise: true,
+          status: 'aguardando_documentacao',
+          // Remover formatação do CNPJ (manter apenas números)
+          cnpj: novaClinicaFormData.cnpj?.replace(/\D/g, '') || '',
+          email: novaClinicaFormData.email?.toLowerCase().trim() || ''
+        };
+        
+        console.log('📤 Consultor interno - Dados sendo enviados:', dataToSend);
+        
+        const response = await makeRequest('/clinicas', {
+          method: 'POST',
+          body: JSON.stringify(dataToSend)
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+          showSuccessToast('Clínica cadastrada com sucesso! Ela está em análise aguardando aprovação.');
+          setShowNovaClinicaModal(false);
+          setNovaClinicaFormData({
+            nome: '',
+            cnpj: '',
+            endereco: '',
+            bairro: '',
+            cidade: '',
+            estado: '',
+            nicho: '',
+            telefone: '',
+            email: '',
+            responsavel: '',
+            status: 'aguardando_documentacao',
+            observacoes: ''
+          });
+          setCidadeCustomizadaNova(false);
+          fetchClinicasEmAnalise();
+          return;
+        } else {
+          console.error('❌ Erro do servidor (consultor interno):', data);
+          showErrorToast('Erro ao cadastrar clínica: ' + data.error);
+          setSubmittingNovaClinica(false);
+          return;
+        }
+      }
+      
+      // Para admin ou outros, usar fluxo normal de novas clínicas
+      const dataToSend = {
+        ...novaClinicaFormData,
         status: 'sem_primeiro_contato'
       };
       
@@ -732,12 +846,22 @@ const Clinicas = () => {
     setSubmitting(true);
     
     try {
-      // Normalizar email antes de enviar
+      // Normalizar email e remover formatação de CNPJ antes de enviar
       const dadosParaEnviar = {
         ...formData,
         email: formData.email?.toLowerCase().trim(),
-        email_login: formData.email_login?.toLowerCase().trim()
+        email_login: formData.email_login?.toLowerCase().trim(),
+        // Remover formatação do CNPJ (manter apenas números)
+        cnpj: formData.cnpj?.replace(/\D/g, '') || ''
       };
+
+      // Se for consultor interno criando uma nova clínica, adicionar flag
+      if (!editingClinica && isConsultorInterno) {
+        dadosParaEnviar.em_analise = true;
+        dadosParaEnviar.status = 'aguardando_documentacao';
+      }
+      
+      console.log('📤 Dados sendo enviados:', dadosParaEnviar);
       
       let response;
       if (editingClinica) {
@@ -776,7 +900,11 @@ const Clinicas = () => {
             showWarningToast('Clínica cadastrada, mas houve erro ao criar o acesso.');
           }
         } else {
+          if (!editingClinica && isConsultorInterno) {
+            showSuccessToast('Clínica cadastrada com sucesso! Ela está em análise aguardando aprovação.');
+        } else {
           showSuccessToast(editingClinica ? 'Clínica atualizada com sucesso!' : 'Clínica cadastrada com sucesso!');
+          }
         }
         
         setShowModal(false);
@@ -799,12 +927,18 @@ const Clinicas = () => {
         });
         setCidadeCustomizada(false);
         fetchClinicas();
+        
+        // Atualizar também clínicas em análise
+        if (isAdmin || isConsultorInterno) {
+          fetchClinicasEmAnalise();
+        }
       } else {
+        console.error('❌ Erro do servidor:', data);
         showErrorToast('Erro ao salvar clínica: ' + data.error);
       }
     } catch (error) {
-      console.error('Erro ao salvar clínica:', error);
-      showErrorToast('Erro ao salvar clínica');
+      console.error('❌ Erro ao salvar clínica:', error);
+      showErrorToast('Erro ao salvar clínica: ' + error.message);
     } finally {
       setSubmitting(false);
     }
@@ -847,7 +981,17 @@ const Clinicas = () => {
       visita_online_url: clinica.visita_online_url || '',
       visita_online_data: clinica.visita_online_data || '',
       visita_online_observacoes: clinica.visita_online_observacoes || '',
-      doc_certidao_casamento: clinica.doc_certidao_casamento || false
+      doc_certidao_casamento: clinica.doc_certidao_casamento || false,
+      // Novos campos
+      telefone_socios: clinica.telefone_socios || '',
+      email_socios: clinica.email_socios || '',
+      doc_comprovante_endereco_socios: clinica.doc_comprovante_endereco_socios || false,
+      doc_carteirinha_cro: clinica.doc_carteirinha_cro || false,
+      banco_nome: clinica.banco_nome || '',
+      banco_conta: clinica.banco_conta || '',
+      banco_agencia: clinica.banco_agencia || '',
+      banco_pix: clinica.banco_pix || '',
+      limite_credito: clinica.limite_credito || ''
     });
     setCidadeCustomizada(cidadeEhCustomizada);
     setShowModal(true);
@@ -960,7 +1104,19 @@ const Clinicas = () => {
       doc_certidao_resp_tecnico: false,
       doc_resp_tecnico: false,
       visita_online: false,
-      doc_certidao_casamento: false
+      doc_certidao_casamento: false,
+      // Novos campos
+      telefone_socios: '',
+      email_socios: '',
+      doc_comprovante_endereco_socios: false,
+      doc_carteirinha_cro: false,
+      banco_nome: '',
+      banco_conta: '',
+      banco_agencia: '',
+      banco_pix: '',
+      limite_credito: '',
+      video_validacao: false,
+      video_validacao_url: ''
     });
     setCidadeCustomizada(false);
     setEditingClinica(null);
@@ -1081,11 +1237,36 @@ const Clinicas = () => {
     return statusNovaClinicaOptions.find(option => option.value === status) || statusNovaClinicaOptions[0];
   };
 
-  const alterarStatusNovaClinica = async (clinicaId, novoStatus) => {
+  const getStatusAnaliseInfo = (status) => {
+    return statusAnaliseOptions.find(option => option.value === status) || statusAnaliseOptions[0];
+  };
+
+  const alterarStatusNovaClinica = async (clinicaId, novoStatus, evidenciaId = null) => {
+    // VERIFICAR SE STATUS REQUER EVIDÊNCIA
+    if (STATUS_COM_EVIDENCIA_CLINICAS.includes(novoStatus) && !evidenciaId) {
+      const clinica = novasClinicas.find(c => c.id === clinicaId);
+      if (clinica) {
+        // Abrir modal de evidência
+        setEvidenciaData({
+          clinicaId: clinicaId,
+          clinicaNome: clinica.nome,
+          statusAnterior: clinica.status,
+          statusNovo: novoStatus,
+          tipoClinica: 'nova_clinica',
+          evidenciaId: null
+        });
+        setShowEvidenciaModal(true);
+      }
+      return;
+    }
+
     try {
       const response = await makeRequest(`/novas-clinicas/${clinicaId}/status`, {
         method: 'PUT',
-        body: JSON.stringify({ status: novoStatus })
+        body: JSON.stringify({ 
+          status: novoStatus,
+          evidencia_id: evidenciaId 
+        })
       });
 
       const data = await response.json();
@@ -1093,6 +1274,62 @@ const Clinicas = () => {
       if (response.ok) {
         showSuccessToast('Status atualizado com sucesso!');
         fetchNovasClinicas();
+      } else {
+        showErrorToast('Erro ao alterar status: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao alterar status:', error);
+      showErrorToast('Erro ao alterar status da clínica');
+    }
+  };
+
+  // Função chamada quando evidência é enviada com sucesso
+  const handleEvidenciaSuccess = async (evidenciaId) => {
+    console.log('✅ Evidência enviada, ID:', evidenciaId);
+    
+    // Atualizar status baseado no tipo de clínica
+    if (evidenciaData.tipoClinica === 'nova_clinica') {
+      await alterarStatusNovaClinica(evidenciaData.clinicaId, evidenciaData.statusNovo, evidenciaId);
+    } else {
+      // Para clínicas gerais, chamar updateClinicaStatus
+      await updateClinicaStatus(evidenciaData.clinicaId, evidenciaData.statusNovo, evidenciaId);
+    }
+  };
+
+  // Função chamada quando modal de evidência é fechado/cancelado
+  const handleEvidenciaClose = () => {
+    setShowEvidenciaModal(false);
+    setEvidenciaData({
+      clinicaId: null,
+      clinicaNome: '',
+      statusAnterior: '',
+      statusNovo: '',
+      tipoClinica: '',
+      evidenciaId: null
+    });
+  };
+
+  // Função auxiliar para atualizar status de clínicas gerais
+  const updateClinicaStatus = async (clinicaId, novoStatus, evidenciaId = null) => {
+    const clinica = clinicas.find(c => c.id === clinicaId);
+    if (!clinica) return;
+    
+    const clinicaParaAtualizar = { ...clinica, status: novoStatus };
+    
+    try {
+      const response = await makeRequest(`/clinicas/${clinicaId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          ...clinicaParaAtualizar,
+          evidencia_id: evidenciaId
+        })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        showSuccessToast('Status atualizado com sucesso!');
+        fetchClinicas();
       } else {
         showErrorToast('Erro ao alterar status: ' + data.error);
       }
@@ -1186,22 +1423,26 @@ const Clinicas = () => {
     }
   };
 
-  // Filtrar clínicas
+  // Filtrar clínicas (excluir as que estão em análise)
   const clinicasFiltradas = clinicas.filter(clinica => {
+    // Excluir clínicas em análise (elas aparecem na aba "Em Análise")
+    if (clinica.em_analise === true) return false;
+    
     const matchEstado = !filtroEstado || clinica.estado === filtroEstado;
     const matchCidade = !filtroCity || clinica.cidade?.toLowerCase().includes(filtroCity.toLowerCase());
     const matchStatus = !filtroStatus || clinica.status === filtroStatus;
     return matchEstado && matchCidade && matchStatus;
   });
 
-  // Obter listas únicas para filtros
+  // Obter listas únicas para filtros (excluindo clínicas em análise)
   const estadosDisponiveis = [...new Set(clinicas
+    .filter(c => !c.em_analise)
     .map(c => c.estado)
     .filter(estado => estado && estado.trim() !== '')
   )].sort();
 
   const cidadesDisponiveis = [...new Set(clinicas
-    .filter(c => !filtroEstado || c.estado === filtroEstado)
+    .filter(c => !c.em_analise && (!filtroEstado || c.estado === filtroEstado))
     .map(c => c.cidade)
     .filter(cidade => cidade && cidade.trim() !== '')
   )].sort();
@@ -1371,8 +1612,8 @@ const Clinicas = () => {
         }}>
           
           
-          {/* Links personalizados para consultores */}
-          {isConsultor && (
+          {/* Links personalizados para consultores freelancers (não internos) */}
+          {isConsultor && !isConsultorInterno && (
             <div style={{ 
               marginTop: '1rem', 
               padding: '0.75rem',  
@@ -1483,16 +1724,33 @@ const Clinicas = () => {
             Clínicas
           </button>
           
+          {(isAdmin || isConsultorInterno) && (
+            <button
+              className={`tab ${activeTab === 'em-analise' ? 'active' : ''}`}
+              onClick={() => setActiveTab('em-analise')}
+              style={{ position: 'relative' }}
+            >
+              Em Análise
+              {clinicasEmAnalise.length > 0 && (
+                <span className="tab-badge">{clinicasEmAnalise.length}</span>
+              )}
+            </button>
+          )}
+          
+          {/* Aba Novas Clínicas: apenas para Admin e Consultores Freelancers (NÃO consultor interno) */}
+          {(isAdmin || (isConsultor && !isConsultorInterno)) && (
           <button
             className={`tab ${activeTab === 'novas-clinicas' ? 'active' : ''}`}
             onClick={() => setActiveTab('novas-clinicas')}
             style={{ position: 'relative' }}
           >
-            {isAdmin || isConsultorInterno ? 'Novas Clínicas' : 'Minhas Indicações'}
+              {isAdmin ? 'Novas Clínicas' : 'Minhas Indicações'}
             {novasClinicas.length > 0 && (
               <span className="tab-badge">{novasClinicas.length}</span>
             )}
           </button>
+          )}
+          
           {(isAdmin || isConsultorInterno) && (
           <button
             className={`tab ${activeTab === 'mapa' ? 'active' : ''}`}
@@ -1893,22 +2151,22 @@ const Clinicas = () => {
           >
             <div className="stat-card">
               <div className="stat-label">Total</div>
-              <div className="stat-value">{clinicas.length}</div>
+              <div className="stat-value">{clinicas.filter(c => !c.em_analise).length}</div>
             </div>
             
             <div className="stat-card">
               <div className="stat-label">Odontológica</div>
-              <div className="stat-value">{clinicas.filter(c => c.nicho === 'Odontológico').length}</div>
+              <div className="stat-value">{clinicas.filter(c => c.nicho === 'Odontológico' && !c.em_analise).length}</div>
             </div>
             
             <div className="stat-card">
               <div className="stat-label">Estética</div>
-              <div className="stat-value">{clinicas.filter(c => c.nicho === 'Estético').length}</div>
+              <div className="stat-value">{clinicas.filter(c => c.nicho === 'Estético' && !c.em_analise).length}</div>
             </div>
             
             <div className="stat-card">
               <div className="stat-label">Ambos</div>
-              <div className="stat-value">{clinicas.filter(c => c.nicho === 'Ambos').length}</div>
+              <div className="stat-value">{clinicas.filter(c => c.nicho === 'Ambos' && !c.em_analise).length}</div>
             </div>
           </div>
 
@@ -1916,7 +2174,7 @@ const Clinicas = () => {
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 className="card-title">Lista de Clínicas</h2>
               <div style={{ display: 'flex', gap: '1rem' }}>
-                {isConsultor && (
+                {isConsultor && !isConsultorInterno && (
                   <button 
                     className="btn btn-primary"
                     onClick={() => setShowNovaClinicaModal(true)}
@@ -1928,7 +2186,7 @@ const Clinicas = () => {
                     Indicar Clínica
                   </button>
                 )}
-            {!isConsultor && user?.tipo !== 'empresa' && (
+            {(isAdmin || isConsultorInterno) && (
               <button 
                 className="btn btn-primary"
                 onClick={() => setShowModal(true)}
@@ -1936,7 +2194,7 @@ const Clinicas = () => {
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 5v14M5 12h14" />
                 </svg>
-                Nova Clínica
+                Cadastrar Nova Clínica
               </button>
             )}
               </div>
@@ -2146,6 +2404,22 @@ const Clinicas = () => {
                           value={clinica.status}
                           onChange={(e) => {
                             const novoStatus = e.target.value;
+                            
+                            // VERIFICAR SE STATUS REQUER EVIDÊNCIA
+                            if (STATUS_COM_EVIDENCIA_CLINICAS.includes(novoStatus)) {
+                              setEvidenciaData({
+                                clinicaId: clinica.id,
+                                clinicaNome: clinica.nome,
+                                statusAnterior: clinica.status,
+                                statusNovo: novoStatus,
+                                tipoClinica: 'clinica',
+                                evidenciaId: null
+                              });
+                              setShowEvidenciaModal(true);
+                              return;
+                            }
+                            
+                            // Para outros status, atualizar normalmente
                             const clinicaCompleta = clinicas.find(c => c.id === clinica.id);
                             if (clinicaCompleta) {
                               const clinicaParaAtualizar = { ...clinicaCompleta, status: novoStatus };
@@ -2468,6 +2742,315 @@ const Clinicas = () => {
         </div>
       )}
 
+      {/* Conteúdo da aba Em Análise */}
+      {activeTab === 'em-analise' && (
+        <div className="card">
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 className="card-title">Clínicas em Análise</h2>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                {clinicasEmAnalise.length} clínica(s) em análise
+              </div>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="loading">
+              <div className="spinner"></div>
+            </div>
+          ) : clinicasEmAnalise.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#6b7280', padding: '3rem' }}>
+              Nenhuma clínica em análise no momento.
+            </div>
+          ) : (
+            <div className="table-container">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Nicho</th>
+                    <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Contato</th>
+                    <th>Status</th>
+                    <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Documentação</th>
+                    <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Vídeo Validação</th>
+                    <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Cadastrado</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clinicasEmAnalise.map(clinica => {
+                    const statusInfo = getStatusAnaliseInfo(clinica.status);
+                    
+                    // Calcular progresso de documentação
+                    const totalDocs = 11;
+                    const docsEnviados = [
+                      clinica.doc_cartao_cnpj,
+                      clinica.doc_contrato_social,
+                      clinica.doc_alvara_sanitario,
+                      clinica.doc_balanco,
+                      clinica.doc_comprovante_endereco,
+                      clinica.doc_dados_bancarios,
+                      clinica.doc_socios,
+                      clinica.doc_certidao_resp_tecnico,
+                      clinica.doc_resp_tecnico,
+                      clinica.doc_comprovante_endereco_socios,
+                      clinica.doc_carteirinha_cro
+                    ].filter(Boolean).length;
+                    
+                    const docsAprovados = [
+                      clinica.doc_cartao_cnpj_aprovado,
+                      clinica.doc_contrato_social_aprovado,
+                      clinica.doc_alvara_sanitario_aprovado,
+                      clinica.doc_balanco_aprovado,
+                      clinica.doc_comprovante_endereco_aprovado,
+                      clinica.doc_dados_bancarios_aprovado,
+                      clinica.doc_socios_aprovado,
+                      clinica.doc_certidao_resp_tecnico_aprovado,
+                      clinica.doc_resp_tecnico_aprovado,
+                      clinica.doc_comprovante_endereco_socios_aprovado,
+                      clinica.doc_carteirinha_cro_aprovado
+                    ].filter(v => v === true).length;
+                    
+                    return (
+                      <tr key={clinica.id}>
+                        <td>
+                          <strong>{clinica.nome}</strong>
+                        </td>
+                        <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                          {clinica.nicho ? (
+                            <span className="badge" style={{ backgroundColor: '#e5e7eb', color: '#374151' }}>
+                              {clinica.nicho}
+                            </span>
+                          ) : '-'}
+                        </td>
+                        <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                          {clinica.telefone && (
+                            <div>{formatarTelefone(clinica.telefone)}</div>
+                          )}
+                          {clinica.email && (
+                            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>{clinica.email?.toLowerCase()}</div>
+                          )}
+                          {!clinica.telefone && !clinica.email && '-'}
+                        </td>
+                        <td>
+                          {isAdmin ? (
+                            <select
+                              value={clinica.status}
+                              onChange={async (e) => {
+                                const novoStatus = e.target.value;
+                                
+                                try {
+                                  const response = await makeRequest(`/clinicas/${clinica.id}`, {
+                                    method: 'PUT',
+                                    body: JSON.stringify({
+                                      ...clinica,
+                                      status: novoStatus,
+                                      em_analise: novoStatus !== 'ativa' // Remove de análise se status = ativa
+                                    })
+                                  });
+                                  
+                                  if (response.ok) {
+                                    showSuccessToast('Status atualizado com sucesso!');
+                                    fetchClinicasEmAnalise();
+                                    fetchClinicas(); // Atualizar clínicas gerais também
+                                  } else {
+                                    const data = await response.json();
+                                    showErrorToast('Erro ao alterar status: ' + data.error);
+                                  }
+                                } catch (error) {
+                                  console.error('Erro ao alterar status:', error);
+                                  showErrorToast('Erro ao alterar status da clínica');
+                                }
+                              }}
+                              className="form-select"
+                              style={{
+                                fontSize: '0.75rem',
+                                padding: '0.25rem 0.5rem',
+                                border: 'none',
+                                backgroundColor: statusInfo.color + '20',
+                                color: statusInfo.color,
+                                fontWeight: '600',
+                                borderRadius: '0.375rem'
+                              }}
+                            >
+                              {statusAnaliseOptions.map(option => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span 
+                              className="badge"
+                              style={{
+                                backgroundColor: statusInfo.color + '20',
+                                color: statusInfo.color,
+                                fontWeight: '600',
+                                borderRadius: '0.375rem'
+                              }}
+                            >
+                              {statusInfo.label}
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                            <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                              {docsEnviados}/{totalDocs} enviados
+                            </div>
+                            <div style={{ 
+                              width: '100px', 
+                              height: '6px', 
+                              backgroundColor: '#e5e7eb',
+                              borderRadius: '3px',
+                              overflow: 'hidden'
+                            }}>
+                              <div style={{ 
+                                width: `${(docsEnviados / totalDocs) * 100}%`,
+                                height: '100%',
+                                backgroundColor: docsAprovados === totalDocs ? '#10b981' : '#3b82f6',
+                                transition: 'width 0.3s ease'
+                              }} />
+                            </div>
+                            {docsAprovados > 0 && (
+                              <div style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: '600' }}>
+                                {docsAprovados} aprovados
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                          {clinica.video_validacao_url ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center' }}>
+                              <span style={{ 
+                                fontSize: '0.75rem', 
+                                color: '#10b981', 
+                                fontWeight: '600',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.25rem'
+                              }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <circle cx="12" cy="12" r="10"/>
+                                  <polyline points="10 8 16 12 10 16"/>
+                                </svg>
+                                Enviado
+                              </span>
+                              <button
+                                onClick={() => window.open(clinica.video_validacao_url, '_blank')}
+                                className="btn btn-sm btn-secondary"
+                                style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+                              >
+                                Assistir
+                              </button>
+                            </div>
+                          ) : (
+                            <label 
+                              className="btn btn-sm btn-primary" 
+                              style={{ fontSize: '0.7rem', padding: '0.3rem 0.5rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                            >
+                              <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                accept="video/mp4,video/avi,video/mov,video/wmv,video/webm,video/mkv"
+                                onChange={async (e) => {
+                                  const file = e.target.files[0];
+                                  if (!file) return;
+                                  
+                                  if (file.size > 250 * 1024 * 1024) {
+                                    showErrorToast('Vídeo muito grande! Máximo 250MB');
+                                    return;
+                                  }
+                                  
+                                  setUploadingDocs(prev => ({ ...prev, [`video_validacao_${clinica.id}`]: true }));
+                                  
+                                  const formData = new FormData();
+                                  formData.append('document', file);
+                                  
+                                  try {
+                                    const response = await fetch(`http://localhost:5000/api/documents/upload/${clinica.id}/video_validacao`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                                      },
+                                      body: formData
+                                    });
+                                    
+                                    if (response.ok) {
+                                      showSuccessToast('Vídeo enviado com sucesso!');
+                                      fetchClinicasEmAnalise();
+                                    } else {
+                                      const error = await response.json();
+                                      showErrorToast(error.error || 'Erro ao enviar vídeo');
+                                    }
+                                  } catch (error) {
+                                    console.error('Erro ao fazer upload:', error);
+                                    showErrorToast('Erro ao enviar vídeo');
+                                  } finally {
+                                    setUploadingDocs(prev => ({ ...prev, [`video_validacao_${clinica.id}`]: false }));
+                                  }
+                                }}
+                              />
+                              {uploadingDocs[`video_validacao_${clinica.id}`] ? 'Enviando...' : 'Enviar Vídeo'}
+                            </label>
+                          )}
+                        </td>
+                        <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                          {formatarData(clinica.created_at)}
+                        </td>
+                        <td>
+                          <button
+                            onClick={() => handleView(clinica)}
+                            className="btn-action"
+                            title="Visualizar"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          </button>
+                          {isAdmin && (
+                            <>
+                              <button
+                                onClick={() => handleGerenciarAcesso(clinica)}
+                                className="btn-action"
+                                title={clinica.ativo_no_sistema ? "Editar Acesso" : "Criar Acesso"}
+                                style={{ 
+                                  marginLeft: '0.5rem', 
+                                  color: clinica.ativo_no_sistema ? '#10b981' : '#3b82f6' 
+                                }}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteClinica(clinica.id)}
+                                className="btn-action"
+                                title="Excluir"
+                                style={{ marginLeft: '0.5rem', color: '#dc2626' }}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <polyline points="3 6 5 6 21 6" />
+                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                  <line x1="10" y1="11" x2="10" y2="17" />
+                                  <line x1="14" y1="11" x2="14" y2="17" />
+                                </svg>
+                              </button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Modal de Cadastro/Edição */}
       {showModal && (
         <div className="modal-overlay">
@@ -2724,6 +3307,8 @@ const Clinicas = () => {
                 </div>
               </div>
 
+              {/* Status da Clínica - Apenas para Admin */}
+              {isAdmin && (
               <div className="form-group">
                 <label className="form-label">Status da Clínica</label>
                 <select
@@ -2738,6 +3323,7 @@ const Clinicas = () => {
                   <option value="nao_fechou">Não Fechou</option>
                 </select>
               </div>
+              )}
               
               {/* Seção de Documentação - Apenas para Edição */}
               {editingClinica && (
@@ -2950,7 +3536,7 @@ const Clinicas = () => {
                             onChange={(e) => setFormData({...formData, doc_balanco: e.target.checked})}
                             disabled
                           />
-                          <span style={{ fontWeight: '600' }}>4. Balanço/Balancete Assinado</span>
+                          <span style={{ fontWeight: '600' }}>4. Balanço/Balancete Assinado (Últimos 12 meses)</span>
                         </label>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           {formData.doc_balanco ? (
@@ -3265,6 +3851,7 @@ const Clinicas = () => {
                       )}
                     </div>
                     
+                    {/* Novos Documentos */}
                     <div className="form-group" style={{ 
                       padding: '1rem',
                       backgroundColor: '#f9fafb',
@@ -3275,29 +3862,29 @@ const Clinicas = () => {
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           <input 
                             type="checkbox" 
-                            name="visita_online"
-                            checked={formData.visita_online || false}
-                            onChange={(e) => setFormData({...formData, visita_online: e.target.checked})}
-                            disabled={formData.visita_online_url ? true : false}
+                            name="doc_comprovante_endereco_socios"
+                            checked={formData.doc_comprovante_endereco_socios || false}
+                            onChange={(e) => setFormData({...formData, doc_comprovante_endereco_socios: e.target.checked})}
+                            disabled
                           />
-                          <span style={{ fontWeight: '600' }}>10. Visita Online (Vídeo)</span>
+                          <span style={{ fontWeight: '600' }}>10. Comprovante de Endereço dos Sócios</span>
                         </label>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          {formData.visita_online_url ? (
+                          {formData.doc_comprovante_endereco_socios ? (
                             <>
                               <button
                                 type="button"
                                 className="btn btn-sm btn-secondary"
                                 style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                                onClick={() => window.open(formData.visita_online_url, '_blank')}
+                                onClick={() => handleDownloadDocument('comprovante_endereco_socios')}
                               >
-                                Assistir
+                                Baixar
                               </button>
                               <button
                                 type="button"
                                 className="btn btn-sm btn-danger"
                                 style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                                onClick={() => handleDeleteDocument('visita_online')}
+                                onClick={() => handleDeleteDocument('comprovante_endereco_socios')}
                               >
                                 Excluir
                               </button>
@@ -3307,35 +3894,16 @@ const Clinicas = () => {
                               <input
                                 type="file"
                                 style={{ display: 'none' }}
-                                accept="video/mp4,video/avi,video/mov,video/wmv,video/webm,video/mkv"
-                                onChange={(e) => handleUploadDocument(e, 'visita_online')}
+                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                onChange={(e) => handleUploadDocument(e, 'comprovante_endereco_socios')}
                               />
-                              Enviar Vídeo
+                              Enviar
                             </label>
                           )}
-                        </div>
-                      </div>
-                      {uploadingDocs['visita_online'] && (
-                        <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando vídeo... (pode demorar alguns segundos)</div>
-                      )}
-                      {formData.visita_online_url && (
-                        <div style={{ marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
-                          <input
-                            type="date"
-                            className="form-control"
-                            value={formData.visita_online_data || ''}
-                            onChange={(e) => setFormData({...formData, visita_online_data: e.target.value})}
-                            placeholder="Data da visita"
-                            style={{ marginBottom: '0.5rem' }}
-                          />
-                          <textarea
-                            className="form-control"
-                            value={formData.visita_online_observacoes || ''}
-                            onChange={(e) => setFormData({...formData, visita_online_observacoes: e.target.value})}
-                            placeholder="Observações sobre a visita..."
-                            rows="2"
-                          />
-                        </div>
+                  </div>
+                </div>
+                      {uploadingDocs['comprovante_endereco_socios'] && (
+                        <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
                       )}
                     </div>
                     
@@ -3349,21 +3917,21 @@ const Clinicas = () => {
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           <input 
                             type="checkbox" 
-                            name="doc_certidao_casamento"
-                            checked={formData.doc_certidao_casamento || false}
-                            onChange={(e) => setFormData({...formData, doc_certidao_casamento: e.target.checked})}
+                            name="doc_carteirinha_cro"
+                            checked={formData.doc_carteirinha_cro || false}
+                            onChange={(e) => setFormData({...formData, doc_carteirinha_cro: e.target.checked})}
                             disabled
                           />
-                          <span style={{ fontWeight: '600' }}>11. Certidão de Casamento (se aplicável)</span>
+                          <span style={{ fontWeight: '600' }}>11. Carteirinha do Conselho (CRO/CFO)</span>
                         </label>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          {formData.doc_certidao_casamento ? (
+                          {formData.doc_carteirinha_cro ? (
                             <>
                               <button
                                 type="button"
                                 className="btn btn-sm btn-secondary"
                                 style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                                onClick={() => handleDownloadDocument('certidao_casamento')}
+                                onClick={() => handleDownloadDocument('carteirinha_cro')}
                               >
                                 Baixar
                               </button>
@@ -3371,7 +3939,7 @@ const Clinicas = () => {
                                 type="button"
                                 className="btn btn-sm btn-danger"
                                 style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                                onClick={() => handleDeleteDocument('certidao_casamento')}
+                                onClick={() => handleDeleteDocument('carteirinha_cro')}
                               >
                                 Excluir
                               </button>
@@ -3382,18 +3950,168 @@ const Clinicas = () => {
                                 type="file"
                                 style={{ display: 'none' }}
                                 accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                onChange={(e) => handleUploadDocument(e, 'certidao_casamento')}
+                                onChange={(e) => handleUploadDocument(e, 'carteirinha_cro')}
                               />
                               Enviar
                             </label>
                           )}
                         </div>
                       </div>
-                      {uploadingDocs['certidao_casamento'] && (
+                      {uploadingDocs['carteirinha_cro'] && (
                         <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
                       )}
                     </div>
                   </div>
+                  
+                  {/* Seção de Informações dos Sócios */}
+                  <h3 style={{ 
+                    fontSize: '1.125rem', 
+                    fontWeight: '700', 
+                    color: '#1a1d23', 
+                    marginTop: '2rem',
+                    marginBottom: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="9" cy="7" r="4"></circle>
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    Informações dos Sócios
+                  </h3>
+                  
+                  <div className="grid grid-2">
+                    <div className="form-group">
+                      <label className="form-label">Telefone dos Sócios</label>
+                      <input
+                        type="tel"
+                        name="telefone_socios"
+                        className="form-input"
+                        value={formData.telefone_socios}
+                        onChange={handleInputChange}
+                        placeholder="(11) 99999-9999"
+                      />
+                    </div>
+                    
+                    <div className="form-group">
+                      <label className="form-label">Email dos Sócios</label>
+                      <input
+                        type="email"
+                        name="email_socios"
+                        className="form-input"
+                        value={formData.email_socios}
+                        onChange={handleInputChange}
+                        placeholder="socios@email.com"
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Seção de Dados Bancários */}
+                  <h3 style={{ 
+                    fontSize: '1.125rem', 
+                    fontWeight: '700', 
+                    color: '#1a1d23', 
+                    marginTop: '2rem',
+                    marginBottom: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                      <line x1="1" y1="10" x2="23" y2="10"></line>
+                    </svg>
+                    Dados Bancários da Clínica (PJ)
+                  </h3>
+                  
+                  <div className="grid grid-2">
+                    <div className="form-group">
+                      <label className="form-label">Banco</label>
+                      <input
+                        type="text"
+                        name="banco_nome"
+                        className="form-input"
+                        value={formData.banco_nome}
+                        onChange={handleInputChange}
+                        placeholder="Ex: Banco do Brasil"
+                      />
+                    </div>
+                    
+                    <div className="form-group">
+                      <label className="form-label">Agência</label>
+                      <input
+                        type="text"
+                        name="banco_agencia"
+                        className="form-input"
+                        value={formData.banco_agencia}
+                        onChange={handleInputChange}
+                        placeholder="Ex: 0001"
+                      />
+                    </div>
+                    
+                    <div className="form-group">
+                      <label className="form-label">Conta</label>
+                      <input
+                        type="text"
+                        name="banco_conta"
+                        className="form-input"
+                        value={formData.banco_conta}
+                        onChange={handleInputChange}
+                        placeholder="Ex: 12345-6"
+                      />
+                    </div>
+                    
+                    <div className="form-group">
+                      <label className="form-label">Chave PIX</label>
+                      <input
+                        type="text"
+                        name="banco_pix"
+                        className="form-input"
+                        value={formData.banco_pix}
+                        onChange={handleInputChange}
+                        placeholder="CPF, CNPJ, Email ou Telefone"
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Limite de Crédito - Apenas Admin */}
+                  {isAdmin && (
+                    <div style={{ 
+                      marginTop: '2rem', 
+                      padding: '1rem', 
+                      backgroundColor: '#fef3c7', 
+                      borderRadius: '8px',
+                      border: '1px solid #f59e0b'
+                    }}>
+                      <h3 style={{ 
+                        fontSize: '1rem', 
+                        fontWeight: '700', 
+                        color: '#92400e', 
+                        marginBottom: '1rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}>
+                        Limite de Crédito (Visível apenas para Admin)
+                      </h3>
+                      
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Limite aprovado (R$)</label>
+                        <input
+                          type="number"
+                          name="limite_credito"
+                          className="form-input"
+                          value={formData.limite_credito}
+                          onChange={handleInputChange}
+                          placeholder="Ex: 50000"
+                          step="0.01"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -3617,7 +4335,7 @@ const Clinicas = () => {
                  {viewingClinica.email && (
                    <div>
                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>E-mail</label>
-                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.email?.toLowerCase()}</p>
+                     <p syle={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewingClinica.email?.toLowerCase()}</p>
                    </div>
                  )}
                  
@@ -3664,6 +4382,97 @@ const Clinicas = () => {
                      <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>{formatarData(viewingClinica.created_at)}</p>
                    </div>
                  )}
+                 
+                 {/* Dados dos Sócios */}
+                 <div style={{ 
+                   marginTop: '1.5rem', 
+                   paddingTop: '1.5rem', 
+                   borderTop: '2px solid #e5e7eb' 
+                 }}>
+                   <h4 style={{ fontSize: '1rem', fontWeight: '700', color: '#1a1d23', marginBottom: '1rem' }}>
+                    Informações dos Sócios
+                   </h4>
+                   
+                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                     <div>
+                       <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Telefone</label>
+                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                         {viewingClinica.telefone_socios ? formatarTelefone(viewingClinica.telefone_socios) : 'Não informado'}
+                       </p>
+                     </div>
+                     
+                     <div>
+                       <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Email</label>
+                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                         {viewingClinica.email_socios ? viewingClinica.email_socios.toLowerCase() : 'Não informado'}
+                       </p>
+                     </div>
+                   </div>
+                 </div>
+                 
+                 {/* Dados Bancários */}
+                 <div style={{ 
+                   marginTop: '1.5rem', 
+                   paddingTop: '1.5rem', 
+                   borderTop: '2px solid #e5e7eb' 
+                 }}>
+                   <h4 style={{ fontSize: '1rem', fontWeight: '700', color: '#1a1d23', marginBottom: '1rem' }}>
+                     Dados Bancários (PJ)
+                   </h4>
+                   
+                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                     <div>
+                       <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Banco</label>
+                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                         {viewingClinica.banco_nome || 'Não informado'}
+                       </p>
+                     </div>
+                     
+                     <div>
+                       <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Agência</label>
+                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                         {viewingClinica.banco_agencia || 'Não informado'}
+                       </p>
+                     </div>
+                     
+                     <div>
+                       <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Conta</label>
+                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                         {viewingClinica.banco_conta || 'Não informado'}
+                       </p>
+                     </div>
+                     
+                     <div>
+                       <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Chave PIX</label>
+                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937', fontFamily: 'monospace' }}>
+                         {viewingClinica.banco_pix || 'Não informado'}
+                       </p>
+                     </div>
+                   </div>
+                 </div>
+                 
+                 {/* Limite de Crédito - Apenas Admin */}
+                 {isAdmin && viewingClinica.limite_credito && (
+                   <div style={{ 
+                     marginTop: '1.5rem', 
+                     paddingTop: '1.5rem', 
+                     borderTop: '2px solid #e5e7eb',
+                     backgroundColor: '#fef3c7',
+                     padding: '1rem',
+                     borderRadius: '8px',
+                     border: '1px solid #f59e0b'
+                   }}>
+                     <h4 style={{ fontSize: '1rem', fontWeight: '700', color: '#92400e', marginBottom: '0.5rem' }}>
+                       Limite de Crédito Aprovad
+                     </h4>
+                     <p style={{ margin: '0.25rem 0 0 0', color: '#92400e', fontSize: '1.25rem', fontWeight: '700' }}>
+                       R$ {parseFloat(viewingClinica.limite_credito).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                     </p>
+                     <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#92400e' }}>
+                       Informação visível apenas para administradores
+                     </p>
+                   </div>
+                 )}
                </div>
                )}
 
@@ -3700,12 +4509,14 @@ const Clinicas = () => {
                        { key: 'doc_cartao_cnpj', label: '1. Cartão CNPJ' },
                        { key: 'doc_contrato_social', label: '2. Contrato Social' },
                        { key: 'doc_alvara_sanitario', label: '3. Alvará Sanitário' },
-                       { key: 'doc_balanco', label: '4. Balanço/Balancete' },
-                       { key: 'doc_comprovante_endereco', label: '5. Comprovante Endereço' },
+                       { key: 'doc_balanco', label: '4. Balanço/Balancete (12 meses)' },
+                       { key: 'doc_comprovante_endereco', label: '5. Comprovante Endereço Clínica' },
                        { key: 'doc_dados_bancarios', label: '6. Dados Bancários PJ' },
                        { key: 'doc_socios', label: '7. Docs dos Sócios' },
                        { key: 'doc_certidao_resp_tecnico', label: '8. Certidão Resp. Técnico' },
-                       { key: 'doc_resp_tecnico', label: '9. Docs Resp. Técnico' }
+                       { key: 'doc_resp_tecnico', label: '9. Docs Resp. Técnico' },
+                       { key: 'doc_comprovante_endereco_socios', label: '10. Comp. Endereço Sócios' },
+                       { key: 'doc_carteirinha_cro', label: '11. Carteirinha CRO/Conselho' }
                      ];
                      
                      return documentos.map((doc) => {
@@ -3791,7 +4602,7 @@ const Clinicas = () => {
                        </h4>
                       <p style={{ fontSize: '0.75rem', color: '#3730a3', margin: '0.25rem 0 0 0' }}>
                         {(() => {
-                          const totalDocs = 9;
+                          const totalDocs = 11;
                           const docsEnviados = [
                             viewingClinica.doc_cartao_cnpj,
                             viewingClinica.doc_contrato_social,
@@ -3801,7 +4612,9 @@ const Clinicas = () => {
                             viewingClinica.doc_dados_bancarios,
                             viewingClinica.doc_socios,
                             viewingClinica.doc_certidao_resp_tecnico,
-                            viewingClinica.doc_resp_tecnico
+                            viewingClinica.doc_resp_tecnico,
+                            viewingClinica.doc_comprovante_endereco_socios,
+                            viewingClinica.doc_carteirinha_cro
                           ].filter(Boolean).length;
                           
                           const docsAprovados = [
@@ -3813,7 +4626,9 @@ const Clinicas = () => {
                             viewingClinica.doc_dados_bancarios_aprovado,
                             viewingClinica.doc_socios_aprovado,
                             viewingClinica.doc_certidao_resp_tecnico_aprovado,
-                            viewingClinica.doc_resp_tecnico_aprovado
+                            viewingClinica.doc_resp_tecnico_aprovado,
+                            viewingClinica.doc_comprovante_endereco_socios_aprovado,
+                            viewingClinica.doc_carteirinha_cro_aprovado
                           ].filter(v => v === true).length;
                           
                           return `${docsEnviados} de ${totalDocs} enviados | ${docsAprovados} aprovados`;
@@ -4727,23 +5542,6 @@ const Clinicas = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Status da Clínica *</label>
-                <select
-                  name="status"
-                  className="form-select"
-                  value={novaClinicaFormData.status}
-                  onChange={handleNovaClinicaInputChange}
-                  required
-                >
-                  {statusNovaClinicaOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
                 <label className="form-label">Observações</label>
                 <textarea
                   name="observacoes"
@@ -4852,6 +5650,18 @@ const Clinicas = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de Evidência de Status */}
+      <ModalEvidencia
+        isOpen={showEvidenciaModal}
+        onClose={handleEvidenciaClose}
+        onSuccess={handleEvidenciaSuccess}
+        tipo={evidenciaData.tipoClinica}
+        registroId={evidenciaData.clinicaId}
+        statusAnterior={evidenciaData.statusAnterior}
+        statusNovo={evidenciaData.statusNovo}
+        nomeRegistro={evidenciaData.clinicaNome}
+      />
 
       {/* Tutorial Overlay */}
       <TutorialClinicas
