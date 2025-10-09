@@ -152,6 +152,7 @@ const Pacientes = () => {
 
   // Status disponíveis para o pipeline
   const statusOptions = [
+    { value: 'sem_primeiro_contato', label: 'Sem Primeiro Contato', color: '#6b7280', description: 'Cadastrado manualmente, aguardando primeiro contato' },
     { value: 'lead', label: 'Lead', color: '#f59e0b', description: 'Lead inicial' },
     { value: 'em_conversa', label: 'Em conversa', color: '#0ea5e9', description: 'Conversando com o cliente' },
     { value: 'cpf_aprovado', label: 'CPF Aprovado', color: '#10b981', description: 'CPF foi aprovado' },
@@ -458,9 +459,15 @@ const Pacientes = () => {
           body: JSON.stringify(formData)
         });
       } else {
+        // Ao criar novo paciente, usar status "sem_primeiro_contato" para cadastros manuais
+        const dataToSend = {
+          ...formData,
+          status: 'sem_primeiro_contato'
+        };
+        
         response = await makeRequest('/pacientes', {
           method: 'POST',
-          body: JSON.stringify(formData)
+          body: JSON.stringify(dataToSend)
         });
       }
 
@@ -529,7 +536,10 @@ const Pacientes = () => {
     if (!value) return '';
     
     // Remove todos os caracteres não numéricos (apenas números)
-    const numbers = value.replace(/\D/g, '');
+    let numbers = value.replace(/\D/g, '');
+    
+    // Remove zeros à esquerda (ex: 041 → 41)
+    numbers = numbers.replace(/^0+/, '');
     
     // Limita a 11 dígitos (máximo para celular brasileiro)
     const limitedNumbers = numbers.substring(0, 11);
@@ -1130,7 +1140,7 @@ const Pacientes = () => {
       cidade: '',
       estado: '',
       tipo_tratamento: '',
-      status: 'lead',
+      status: 'sem_primeiro_contato',
       observacoes: '',
       // Se for consultor, pré-preenche com o próprio ID
       consultor_id: isConsultor ? String(user?.consultor_id || user?.id) : ''
@@ -1544,25 +1554,25 @@ const Pacientes = () => {
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 className="card-title">Lista de Pacientes</h2>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button 
-                  className="btn btn-primary" 
-                  onClick={() => {
-                    setShowModal(true);
-                    // Se for consultor, pré-preenche o consultor_id automaticamente
-                    if (isConsultor) {
-                      setFormData(prev => ({
-                        ...prev,
-                        consultor_id: String(user?.consultor_id || user?.id)
-                      }));
-                    }
-                  }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                  </svg>
-                  Novo Paciente
-                </button>
+              <button 
+                className="btn btn-primary" 
+                onClick={() => {
+                  setShowModal(true);
+                  // Se for consultor, pré-preenche o consultor_id automaticamente
+                  if (isConsultor) {
+                    setFormData(prev => ({
+                      ...prev,
+                      consultor_id: String(user?.consultor_id || user?.id)
+                    }));
+                  }
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Novo Paciente
+              </button>
               </div>
             </div>
 
@@ -2164,7 +2174,7 @@ const Pacientes = () => {
                           }}
                         >
                           Voltar
-                        </button>
+              </button>
                       )}
                     </div>
                   )}
@@ -2595,7 +2605,7 @@ const Pacientes = () => {
                     <option value="Ambos">Ambos</option>
                   </select>
                 </div>
-              </div>
+                </div>
 
               <div className="form-group">
                 <label className="form-label">Consultor Responsável</label>

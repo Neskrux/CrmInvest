@@ -92,7 +92,7 @@ const Clinicas = () => {
     telefone: '',
     email: '',
     responsavel: '',
-    status: 'tem_interesse',
+    status: 'sem_primeiro_contato',
     observacoes: ''
   });
   const [cidadeCustomizadaNova, setCidadeCustomizadaNova] = useState(false);
@@ -113,7 +113,9 @@ const Clinicas = () => {
     { value: 'em_contato', label: 'Em Contato', color: '#3b82f6' },
     { value: 'reuniao_marcada', label: 'Reunião Marcada', color: '#8b5cf6' },
     { value: 'aguardando_documentacao', label: 'Aguardando Documentação', color: '#f59e0b' },
-    { value: 'nao_fechou', label: 'Não Fechou', color: '#f59e0b' }
+    { value: 'nao_fechou', label: 'Não Fechou', color: '#f59e0b' },
+    { value: 'nao_e_nosso_publico', label: 'Não é nosso público alvo', color: '#9ca3af' },
+    { value: 'nao_responde', label: 'Não responde', color: '#6b7280' }
   ];
 
   // Status disponíveis para novas clínicas
@@ -124,7 +126,9 @@ const Clinicas = () => {
     { value: 'em_contato', label: 'Em Contato', color: '#3b82f6' },
     { value: 'reuniao_marcada', label: 'Reunião Marcada', color: '#8b5cf6' },
     { value: 'aguardando_documentacao', label: 'Aguardando Documentação', color: '#f59e0b' },
-    { value: 'nao_fechou', label: 'Não Fechou', color: '#f59e0b' }
+    { value: 'nao_fechou', label: 'Não Fechou', color: '#f59e0b' },
+    { value: 'nao_e_nosso_publico', label: 'Não é nosso público alvo', color: '#9ca3af' },
+    { value: 'nao_responde', label: 'Não responde', color: '#6b7280' }
   ];
 
   // Verificar se usuário é consultor
@@ -576,9 +580,16 @@ const Clinicas = () => {
     setSubmittingNovaClinica(true);
     
     try {
+      // Preparar dados com status correto
+      const dataToSend = {
+        ...novaClinicaFormData,
+        // Usar "sem_primeiro_contato" para cadastros manuais
+        status: 'sem_primeiro_contato'
+      };
+      
       const response = await makeRequest('/novas-clinicas', {
         method: 'POST',
-        body: JSON.stringify(novaClinicaFormData)
+        body: JSON.stringify(dataToSend)
       });
 
       const data = await response.json();
@@ -597,7 +608,7 @@ const Clinicas = () => {
           telefone: '',
           email: '',
           responsavel: '',
-          status: 'tem_interesse',
+          status: 'sem_primeiro_contato',
           observacoes: ''
         });
         setCidadeCustomizadaNova(false);
@@ -1015,7 +1026,29 @@ const Clinicas = () => {
     let { name, value } = e.target;
     
     // Aplicar formatação específica baseada no campo
-    if (name === 'cidade') {
+    if (name === 'telefone') {
+      // Remove tudo que não é número
+      let numbers = value.replace(/\D/g, '');
+      
+      // Remove zeros à esquerda (ex: 041 → 41)
+      numbers = numbers.replace(/^0+/, '');
+      
+      // Limita a 11 dígitos
+      numbers = numbers.substring(0, 11);
+      
+      // Formata baseado no tamanho
+      if (numbers.length === 0) {
+        value = '';
+      } else if (numbers.length <= 2) {
+        value = `(${numbers}`;
+      } else if (numbers.length <= 6) {
+        value = `(${numbers.substring(0, 2)}) ${numbers.substring(2)}`;
+      } else if (numbers.length <= 10) {
+        value = `(${numbers.substring(0, 2)}) ${numbers.substring(2, 6)}-${numbers.substring(6)}`;
+      } else {
+        value = `(${numbers.substring(0, 2)}) ${numbers.substring(2, 7)}-${numbers.substring(7, 11)}`;
+      }
+    } else if (name === 'cidade') {
       value = formatarCidade(value);
     } else if (name === 'cnpj') {
       value = formatarCNPJ(value);
@@ -1074,11 +1107,27 @@ const Clinicas = () => {
     
     // Aplicar formatação específica baseada no campo
     if (name === 'telefone') {
-      value = value
-        .replace(/\D/g, '')
-        .replace(/(\d{2})(\d)/, '($1) $2')
-        .replace(/(\d{5})(\d)/, '$1-$2')
-        .replace(/(-\d{4})\d+?$/, '$1');
+      // Remove tudo que não é número
+      let numbers = value.replace(/\D/g, '');
+      
+      // Remove zeros à esquerda (ex: 041 → 41)
+      numbers = numbers.replace(/^0+/, '');
+      
+      // Limita a 11 dígitos
+      numbers = numbers.substring(0, 11);
+      
+      // Formata baseado no tamanho
+      if (numbers.length === 0) {
+        value = '';
+      } else if (numbers.length <= 2) {
+        value = `(${numbers}`;
+      } else if (numbers.length <= 6) {
+        value = `(${numbers.substring(0, 2)}) ${numbers.substring(2)}`;
+      } else if (numbers.length <= 10) {
+        value = `(${numbers.substring(0, 2)}) ${numbers.substring(2, 6)}-${numbers.substring(6)}`;
+      } else {
+        value = `(${numbers.substring(0, 2)}) ${numbers.substring(2, 7)}-${numbers.substring(7, 11)}`;
+      }
     } else if (name === 'cnpj') {
       value = formatarCNPJ(value);
     } else if (name === 'cidade') {
@@ -1445,12 +1494,12 @@ const Clinicas = () => {
             )}
           </button>
           {(isAdmin || isConsultorInterno) && (
-            <button
-              className={`tab ${activeTab === 'mapa' ? 'active' : ''}`}
-              onClick={() => setActiveTab('mapa')}
-            >
-              Mapa
-            </button>
+          <button
+            className={`tab ${activeTab === 'mapa' ? 'active' : ''}`}
+            onClick={() => setActiveTab('mapa')}
+          >
+            Mapa
+          </button>
           )}
         </div>
       )}
@@ -1879,17 +1928,17 @@ const Clinicas = () => {
                     Indicar Clínica
                   </button>
                 )}
-                {!isConsultor && user?.tipo !== 'empresa' && (
-                  <button 
-                    className="btn btn-primary"
-                    onClick={() => setShowModal(true)}
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M12 5v14M5 12h14" />
-                    </svg>
-                    Nova Clínica
-                  </button>
-                )}
+            {!isConsultor && user?.tipo !== 'empresa' && (
+              <button 
+                className="btn btn-primary"
+                onClick={() => setShowModal(true)}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Nova Clínica
+              </button>
+            )}
               </div>
           </div>
 
