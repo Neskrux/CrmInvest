@@ -11,22 +11,46 @@ const MeusDocumentos = () => {
   const [clinica, setClinica] = useState(null);
   const [loading, setLoading] = useState(true);
   const [uploadingDoc, setUploadingDoc] = useState(null);
+  const [editandoDados, setEditandoDados] = useState(false);
+  const [dadosForm, setDadosForm] = useState({
+    telefone_socios: '',
+    email_socios: '',
+    banco_nome: '',
+    banco_conta: '',
+    banco_agencia: '',
+    banco_pix: ''
+  });
 
   const documentos = [
     { key: 'doc_cartao_cnpj', label: '1. Cartão CNPJ' },
     { key: 'doc_contrato_social', label: '2. Contrato Social' },
     { key: 'doc_alvara_sanitario', label: '3. Alvará Sanitário' },
-    { key: 'doc_balanco', label: '4. Balanço Patrimonial' },
-    { key: 'doc_comprovante_endereco', label: '5. Comprovante de Endereço' },
-    { key: 'doc_dados_bancarios', label: '6. Dados Bancários' },
+    { key: 'doc_balanco', label: '4. Balanço/Balancete (Últimos 12 meses)', nota: 'Deve ser dos últimos 12 meses' },
+    { key: 'doc_comprovante_endereco', label: '5. Comprovante de Endereço da Clínica' },
+    { key: 'doc_dados_bancarios', label: '6. Dados Bancários PJ' },
     { key: 'doc_socios', label: '7. Documentos dos Sócios' },
     { key: 'doc_certidao_resp_tecnico', label: '8. Certidão Resp. Técnico' },
-    { key: 'doc_resp_tecnico', label: '9. Docs Resp. Técnico' }
+    { key: 'doc_resp_tecnico', label: '9. Docs Resp. Técnico' },
+    { key: 'doc_comprovante_endereco_socios', label: '10. Comprovante de Endereço dos Sócios' },
+    { key: 'doc_carteirinha_cro', label: '11. Carteirinha do Conselho (CRO/CFO)' }
   ];
 
   useEffect(() => {
     carregarDadosClinica();
   }, []);
+
+  useEffect(() => {
+    if (clinica) {
+      setDadosForm({
+        telefone_socios: clinica.telefone_socios || '',
+        email_socios: clinica.email_socios || '',
+        banco_nome: clinica.banco_nome || '',
+        banco_conta: clinica.banco_conta || '',
+        banco_agencia: clinica.banco_agencia || '',
+        banco_pix: clinica.banco_pix || ''
+      });
+    }
+  }, [clinica]);
 
   const carregarDadosClinica = async () => {
     try {
@@ -148,6 +172,27 @@ const MeusDocumentos = () => {
     }
   };
 
+  const handleSalvarDados = async () => {
+    try {
+      const response = await makeRequest(`/clinicas/${user.clinica_id}`, {
+        method: 'PUT',
+        body: JSON.stringify(dadosForm)
+      });
+
+      if (response.ok) {
+        showSuccessToast('Dados atualizados com sucesso!');
+        setEditandoDados(false);
+        carregarDadosClinica();
+      } else {
+        const data = await response.json();
+        showErrorToast(data.error || 'Erro ao atualizar dados');
+      }
+    } catch (error) {
+      console.error('Erro ao salvar dados:', error);
+      showErrorToast('Erro ao salvar dados');
+    }
+  };
+
   if (loading) {
     return (
       <div className="loading">
@@ -220,6 +265,174 @@ const MeusDocumentos = () => {
         </div>
       </div>
 
+      {/* Informações dos Sócios e Dados Bancários */}
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            Informações Adicionais
+          </h2>
+          {!editandoDados && (
+            <button 
+              className="btn btn-sm btn-primary"
+              onClick={() => setEditandoDados(true)}
+            >
+              Editar Informações
+            </button>
+          )}
+        </div>
+        <div className="card-body">
+          {/* Informações dos Sócios */}
+          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+            Dados dos Sócios
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+            <div>
+              <label style={{ color: '#6b7280', fontSize: '0.875rem', fontWeight: '600' }}>Telefone dos Sócios</label>
+              {editandoDados ? (
+                <input
+                  type="tel"
+                  className="form-input"
+                  value={dadosForm.telefone_socios}
+                  onChange={(e) => setDadosForm({...dadosForm, telefone_socios: e.target.value})}
+                  placeholder="(11) 99999-9999"
+                  style={{ marginTop: '0.25rem' }}
+                />
+              ) : (
+                <p style={{ fontWeight: '500', margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                  {clinica?.telefone_socios || 'Não informado'}
+                </p>
+              )}
+            </div>
+            <div>
+              <label style={{ color: '#6b7280', fontSize: '0.875rem', fontWeight: '600' }}>Email dos Sócios</label>
+              {editandoDados ? (
+                <input
+                  type="email"
+                  className="form-input"
+                  value={dadosForm.email_socios}
+                  onChange={(e) => setDadosForm({...dadosForm, email_socios: e.target.value})}
+                  placeholder="socios@email.com"
+                  style={{ marginTop: '0.25rem' }}
+                />
+              ) : (
+                <p style={{ fontWeight: '500', margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                  {clinica?.email_socios || 'Não informado'}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Dados Bancários */}
+          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+            Dados Bancários (PJ)
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            <div>
+              <label style={{ color: '#6b7280', fontSize: '0.875rem', fontWeight: '600' }}>Banco</label>
+              {editandoDados ? (
+                <input
+                  type="text"
+                  className="form-input"
+                  value={dadosForm.banco_nome}
+                  onChange={(e) => setDadosForm({...dadosForm, banco_nome: e.target.value})}
+                  placeholder="Ex: Banco do Brasil"
+                  style={{ marginTop: '0.25rem' }}
+                />
+              ) : (
+                <p style={{ fontWeight: '500', margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                  {clinica?.banco_nome || 'Não informado'}
+                </p>
+              )}
+            </div>
+            <div>
+              <label style={{ color: '#6b7280', fontSize: '0.875rem', fontWeight: '600' }}>Agência</label>
+              {editandoDados ? (
+                <input
+                  type="text"
+                  className="form-input"
+                  value={dadosForm.banco_agencia}
+                  onChange={(e) => setDadosForm({...dadosForm, banco_agencia: e.target.value})}
+                  placeholder="Ex: 0001"
+                  style={{ marginTop: '0.25rem' }}
+                />
+              ) : (
+                <p style={{ fontWeight: '500', margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                  {clinica?.banco_agencia || 'Não informado'}
+                </p>
+              )}
+            </div>
+            <div>
+              <label style={{ color: '#6b7280', fontSize: '0.875rem', fontWeight: '600' }}>Conta</label>
+              {editandoDados ? (
+                <input
+                  type="text"
+                  className="form-input"
+                  value={dadosForm.banco_conta}
+                  onChange={(e) => setDadosForm({...dadosForm, banco_conta: e.target.value})}
+                  placeholder="Ex: 12345-6"
+                  style={{ marginTop: '0.25rem' }}
+                />
+              ) : (
+                <p style={{ fontWeight: '500', margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                  {clinica?.banco_conta || 'Não informado'}
+                </p>
+              )}
+            </div>
+            <div>
+              <label style={{ color: '#6b7280', fontSize: '0.875rem', fontWeight: '600' }}>Chave PIX</label>
+              {editandoDados ? (
+                <input
+                  type="text"
+                  className="form-input"
+                  value={dadosForm.banco_pix}
+                  onChange={(e) => setDadosForm({...dadosForm, banco_pix: e.target.value})}
+                  placeholder="CPF, CNPJ, Email ou Telefone"
+                  style={{ marginTop: '0.25rem' }}
+                />
+              ) : (
+                <p style={{ fontWeight: '500', margin: '0.25rem 0 0 0', color: '#1f2937', fontFamily: 'monospace' }}>
+                  {clinica?.banco_pix || 'Não informado'}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Botões de ação quando editando */}
+          {editandoDados && (
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e5e7eb' }}>
+              <button 
+                className="btn btn-secondary"
+                onClick={() => {
+                  setEditandoDados(false);
+                  setDadosForm({
+                    telefone_socios: clinica?.telefone_socios || '',
+                    email_socios: clinica?.email_socios || '',
+                    banco_nome: clinica?.banco_nome || '',
+                    banco_conta: clinica?.banco_conta || '',
+                    banco_agencia: clinica?.banco_agencia || '',
+                    banco_pix: clinica?.banco_pix || ''
+                  });
+                }}
+              >
+                Cancelar
+              </button>
+              <button 
+                className="btn btn-primary"
+                onClick={handleSalvarDados}
+              >
+                Salvar Alterações
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Lista de Documentos */}
       <div className="card">
         <div className="card-header">
@@ -252,6 +465,11 @@ const MeusDocumentos = () => {
                       <h4 style={{ fontSize: '1rem', fontWeight: '600', margin: '0' }}>
                         {doc.label}
                       </h4>
+                      {doc.nota && (
+                        <p style={{ fontSize: '0.75rem', color: '#f59e0b', margin: '0.25rem 0', fontWeight: '500' }}>
+                          ⚠️ {doc.nota}
+                        </p>
+                      )}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
                         <StatusIcon size={16} color={statusInfo.color} />
                         <span style={{ fontSize: '0.875rem', color: statusInfo.color, fontWeight: '500' }}>

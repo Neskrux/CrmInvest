@@ -3044,7 +3044,7 @@ const Dashboard = () => {
                 borderBottom: '2px solid #10b981'
               }}>
                 <h3 className="card-title" style={{ color: '#059669', fontWeight: '700' }}>
-                  👥 Pacientes Fechados (Meta: 120/mês)
+                  Pacientes Fechados (Meta: 120/mês)
                 </h3>
                 <div style={{ display: 'flex', gap: '2rem', marginTop: '0.5rem' }}>
                   <div style={{ fontSize: '0.875rem' }}>

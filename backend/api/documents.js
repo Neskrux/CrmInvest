@@ -127,7 +127,11 @@ router.post('/upload/:clinicaId/:docType', upload.single('document'), async (req
       'certidao_resp_tecnico': 'doc_certidao_resp_tecnico',
       'resp_tecnico': 'doc_resp_tecnico',
       'certidao_casamento': 'doc_certidao_casamento',
-      'visita_online': 'visita_online'
+      'visita_online': 'visita_online',
+      // Novos documentos
+      'comprovante_endereco_socios': 'doc_comprovante_endereco_socios',
+      'carteirinha_cro': 'doc_carteirinha_cro',
+      'video_validacao': 'video_validacao'
     };
     
     const docField = docFieldMap[docType];
@@ -181,7 +185,11 @@ router.delete('/delete/:clinicaId/:docType', async (req, res) => {
       'certidao_resp_tecnico': 'doc_certidao_resp_tecnico',
       'resp_tecnico': 'doc_resp_tecnico',
       'certidao_casamento': 'doc_certidao_casamento',
-      'visita_online': 'visita_online'
+      'visita_online': 'visita_online',
+      // Novos documentos
+      'comprovante_endereco_socios': 'doc_comprovante_endereco_socios',
+      'carteirinha_cro': 'doc_carteirinha_cro',
+      'video_validacao': 'video_validacao'
     };
     
     const docField = docFieldMap[docType];
@@ -261,7 +269,11 @@ router.get('/download/:clinicaId/:docType', async (req, res) => {
       'certidao_resp_tecnico': 'doc_certidao_resp_tecnico',
       'resp_tecnico': 'doc_resp_tecnico',
       'certidao_casamento': 'doc_certidao_casamento',
-      'visita_online': 'visita_online'
+      'visita_online': 'visita_online',
+      // Novos documentos
+      'comprovante_endereco_socios': 'doc_comprovante_endereco_socios',
+      'carteirinha_cro': 'doc_carteirinha_cro',
+      'video_validacao': 'video_validacao'
     };
     
     const docField = docFieldMap[docType];

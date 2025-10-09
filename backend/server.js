@@ -84,6 +84,24 @@ const upload = multer({
   }
 });
 
+// Middleware específico para upload de evidências (imagens)
+const evidenciaFilter = (req, file, cb) => {
+  // Permitir apenas imagens JPG e PNG
+  if (file.mimetype === 'image/jpeg' || file.mimetype === 'image/png') {
+    cb(null, true);
+  } else {
+    cb(new Error('Apenas arquivos JPG e PNG são permitidos!'), false);
+  }
+};
+
+const uploadEvidencia = multer({
+  storage: storage,
+  fileFilter: evidenciaFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // Limite de 5MB
+  }
+});
+
 // Supabase client - usando apenas variáveis de ambiente
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
@@ -288,6 +306,17 @@ const authenticateToken = (req, res, next) => {
 const requireAdmin = (req, res, next) => {
   if (req.user.tipo !== 'admin') {
     return res.status(403).json({ error: 'Acesso negado. Apenas administradores.' });
+  }
+  next();
+};
+
+// Middleware para verificar se é admin ou consultor interno
+const requireAdminOrConsultorInterno = (req, res, next) => {
+  const isConsultorInterno = req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true;
+  const isAdmin = req.user.tipo === 'admin' || req.user.tipo === 'root';
+  
+  if (!isAdmin && !isConsultorInterno) {
+    return res.status(403).json({ error: 'Acesso negado. Apenas administradores ou consultores internos.' });
   }
   next();
 };
@@ -1150,6 +1179,48 @@ app.get('/api/clinicas/estados', authenticateToken, async (req, res) => {
   }
 });
 
+// Endpoint para buscar clínicas em análise (admin e consultor interno)
+// IMPORTANTE: Esta rota DEVE vir ANTES de /api/clinicas/:id para não ser capturada como ID
+app.get('/api/clinicas/em-analise', authenticateToken, async (req, res) => {
+  try {
+    // Verificar se é admin ou consultor interno
+    const isConsultorInterno = req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true;
+    const isAdmin = req.user.tipo === 'admin' || req.user.tipo === 'root';
+    
+    if (!isAdmin && !isConsultorInterno) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    const { data, error } = await supabase
+      .from('clinicas')
+      .select(`
+        *,
+        consultores!consultor_id(
+          nome, 
+          empresa_id,
+          empresas(nome)
+        )
+      `)
+      .eq('em_analise', true)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    
+    // Reformatar dados
+    const formattedData = data.map(clinica => ({
+      ...clinica,
+      consultor_nome: clinica.consultores?.nome,
+      empresa_id: clinica.empresa_id || clinica.consultores?.empresa_id || null,
+      empresa_nome: clinica.consultores?.empresas?.nome || null
+    }));
+    
+    res.json(formattedData);
+  } catch (error) {
+    console.error('Erro ao buscar clínicas em análise:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Buscar uma clínica específica por ID
 app.get('/api/clinicas/:id', authenticateToken, async (req, res) => {
   try {
@@ -1286,9 +1357,15 @@ app.get('/api/clinicas', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/clinicas', authenticateToken, requireAdmin, async (req, res) => {
+app.post('/api/clinicas', authenticateToken, requireAdminOrConsultorInterno, async (req, res) => {
   try {
-    let { nome, endereco, bairro, cidade, estado, nicho, telefone, email, status } = req.body;
+    console.log('📥 POST /api/clinicas - Body recebido:', req.body);
+    
+    let { 
+      nome, endereco, bairro, cidade, estado, nicho, telefone, email, status, em_analise, cnpj, responsavel,
+      // Novos campos
+      telefone_socios, email_socios, banco_nome, banco_conta, banco_agencia, banco_pix, limite_credito
+    } = req.body;
     
     // Normalizar email
     if (email) {
@@ -1316,27 +1393,55 @@ app.post('/api/clinicas', authenticateToken, requireAdmin, async (req, res) => {
       }
     }
     
+    const clinicaData = { 
+      nome, 
+      endereco, 
+      bairro, 
+      cidade, 
+      estado, 
+      nicho, 
+      telefone, 
+      email, 
+      status: status || 'ativo',
+      latitude,
+      longitude,
+      tipo_origem: 'direta',
+      em_analise: em_analise || false
+    };
+
+    // Adicionar campos opcionais se fornecidos
+    if (cnpj) clinicaData.cnpj = cnpj;
+    if (responsavel) clinicaData.responsavel = responsavel;
+    if (telefone_socios) clinicaData.telefone_socios = telefone_socios;
+    if (email_socios) clinicaData.email_socios = email_socios?.toLowerCase().trim();
+    if (banco_nome) clinicaData.banco_nome = banco_nome;
+    if (banco_conta) clinicaData.banco_conta = banco_conta;
+    if (banco_agencia) clinicaData.banco_agencia = banco_agencia;
+    if (banco_pix) clinicaData.banco_pix = banco_pix;
+    if (limite_credito) clinicaData.limite_credito = parseFloat(limite_credito);
+
+    // Se for consultor interno criando, adicionar consultor_id
+    const isConsultorInterno = req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true;
+    if (isConsultorInterno) {
+      clinicaData.consultor_id = req.user.id;
+    }
+
+    console.log('📝 Dados que serão inseridos:', clinicaData);
+
     const { data, error } = await supabaseAdmin
       .from('clinicas')
-      .insert([{ 
-        nome, 
-        endereco, 
-        bairro, 
-        cidade, 
-        estado, 
-        nicho, 
-        telefone, 
-        email, 
-        status: status || 'ativo', // Padrão: desbloqueado
-        latitude,
-        longitude,
-        tipo_origem: 'direta' // Clínicas criadas diretamente por admin
-      }])
+      .insert([clinicaData])
       .select();
 
-    if (error) throw error;
-    res.json({ id: data[0].id, message: 'Clínica cadastrada com sucesso!' });
+    if (error) {
+      console.error('❌ Erro ao inserir clínica:', error);
+      throw error;
+    }
+    
+    console.log('✅ Clínica inserida com sucesso:', data[0].id);
+    res.json({ clinica: data[0], message: 'Clínica cadastrada com sucesso!' });
   } catch (error) {
+    console.error('❌ Erro geral ao cadastrar clínica:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1673,19 +1778,26 @@ app.delete('/api/clinicas/:id/remover-acesso', authenticateToken, requireAdmin, 
 app.put('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const { evidencia_id } = req.body;
     console.log('🔧 PUT /api/clinicas/:id recebido');
     console.log('🔧 ID da clínica:', id);
     console.log('🔧 Body recebido:', req.body);
     console.log('🔧 Usuário autenticado:', req.user);
     
     // Permitir atualização parcial: só atualiza os campos enviados
-    const camposPermitidos = ['nome', 'endereco', 'bairro', 'cidade', 'estado', 'nicho', 'telefone', 'email', 'status'];
+    const camposPermitidos = [
+      'nome', 'endereco', 'bairro', 'cidade', 'estado', 'nicho', 'telefone', 'email', 'status', 'em_analise', 'cnpj', 'responsavel',
+      // Novos campos
+      'telefone_socios', 'email_socios', 'banco_nome', 'banco_conta', 'banco_agencia', 'banco_pix', 'limite_credito'
+    ];
     const updateData = {};
     for (const campo of camposPermitidos) {
       if (req.body[campo] !== undefined) {
-        // Normalizar email se for o campo email
-        if (campo === 'email' && req.body[campo]) {
+        // Normalizar email se for o campo email ou email_socios
+        if ((campo === 'email' || campo === 'email_socios') && req.body[campo]) {
           updateData[campo] = req.body[campo].toLowerCase().trim();
+        } else if (campo === 'limite_credito' && req.body[campo]) {
+          updateData[campo] = parseFloat(req.body[campo]);
         } else {
           updateData[campo] = req.body[campo];
         }
@@ -1695,6 +1807,32 @@ app.put('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) =
       return res.status(400).json({ error: 'Nenhum campo válido para atualizar.' });
     }
     console.log('🔧 Dados para atualizar:', updateData);
+    
+    // VALIDAR SE STATUS REQUER EVIDÊNCIA
+    if (updateData.status && STATUS_COM_EVIDENCIA.clinicas.includes(updateData.status)) {
+      if (!evidencia_id) {
+        return res.status(400).json({ 
+          error: 'Este status requer envio de evidência (print)!',
+          requer_evidencia: true 
+        });
+      }
+      
+      // Verificar se a evidência existe e pertence a esta clínica
+      const { data: evidencia, error: evidenciaError } = await supabaseAdmin
+        .from('historico_status_evidencias')
+        .select('*')
+        .eq('id', evidencia_id)
+        .eq('tipo', 'clinica')
+        .eq('registro_id', parseInt(id))
+        .eq('status_novo', updateData.status)
+        .single();
+      
+      if (evidenciaError || !evidencia) {
+        return res.status(400).json({ error: 'Evidência inválida ou não encontrada!' });
+      }
+      
+      console.log('✅ Evidência validada:', evidencia.id);
+    }
     
     const { data, error } = await supabaseAdmin
       .from('clinicas')
@@ -3165,7 +3303,7 @@ app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
 app.put('/api/pacientes/:id/status', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, evidencia_id } = req.body;
     
     // Verificar se é consultor freelancer - freelancers não podem alterar status
     if (req.user.tipo === 'consultor' && req.user.podealterarstatus !== true) {
@@ -3182,6 +3320,32 @@ app.put('/api/pacientes/:id/status', authenticateToken, async (req, res) => {
     if (pacienteError) throw pacienteError;
     if (!paciente) {
       return res.status(404).json({ error: 'Paciente não encontrado' });
+    }
+
+    // VALIDAR SE STATUS REQUER EVIDÊNCIA
+    if (STATUS_COM_EVIDENCIA.pacientes.includes(status)) {
+      if (!evidencia_id) {
+        return res.status(400).json({ 
+          error: 'Este status requer envio de evidência (print)!',
+          requer_evidencia: true 
+        });
+      }
+      
+      // Verificar se a evidência existe e pertence a este paciente
+      const { data: evidencia, error: evidenciaError } = await supabaseAdmin
+        .from('historico_status_evidencias')
+        .select('*')
+        .eq('id', evidencia_id)
+        .eq('tipo', 'paciente')
+        .eq('registro_id', parseInt(id))
+        .eq('status_novo', status)
+        .single();
+      
+      if (evidenciaError || !evidencia) {
+        return res.status(400).json({ error: 'Evidência inválida ou não encontrada!' });
+      }
+      
+      console.log('✅ Evidência validada:', evidencia.id);
     }
 
     // Atualizar status do paciente
@@ -3733,7 +3897,7 @@ app.put('/api/novas-clinicas/:id/pegar', authenticateToken, async (req, res) => 
 app.put('/api/novas-clinicas/:id/status', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, evidencia_id } = req.body;
     
     console.log('🔧 PUT /api/novas-clinicas/:id/status recebido');
     console.log('🔧 ID da clínica:', id);
@@ -3748,7 +3912,9 @@ app.put('/api/novas-clinicas/:id/status', authenticateToken, async (req, res) =>
       'em_contato', 
       'reuniao_marcada', 
       'aguardando_documentacao', 
-      'nao_fechou'
+      'nao_fechou',
+      'nao_e_nosso_publico',
+      'nao_responde'
     ];
     if (!status || !statusValidos.includes(status)) {
       return res.status(400).json({ error: 'Status inválido! Status válidos: ' + statusValidos.join(', ') });
@@ -3776,6 +3942,32 @@ app.put('/api/novas-clinicas/:id/status', authenticateToken, async (req, res) =>
     
     if (!clinicaAtual) {
       return res.status(404).json({ error: 'Clínica não encontrada!' });
+    }
+    
+    // VALIDAR SE STATUS REQUER EVIDÊNCIA
+    if (STATUS_COM_EVIDENCIA.novas_clinicas.includes(status)) {
+      if (!evidencia_id) {
+        return res.status(400).json({ 
+          error: 'Este status requer envio de evidência (print)!',
+          requer_evidencia: true 
+        });
+      }
+      
+      // Verificar se a evidência existe e pertence a esta clínica
+      const { data: evidencia, error: evidenciaError } = await supabaseAdmin
+        .from('historico_status_evidencias')
+        .select('*')
+        .eq('id', evidencia_id)
+        .eq('tipo', 'nova_clinica')
+        .eq('registro_id', parseInt(id))
+        .eq('status_novo', status)
+        .single();
+      
+      if (evidenciaError || !evidencia) {
+        return res.status(400).json({ error: 'Evidência inválida ou não encontrada!' });
+      }
+      
+      console.log('✅ Evidência validada:', evidencia.id);
     }
     
     // Atualizar o status
@@ -3879,6 +4071,234 @@ app.get('/api/dashboard/agendamentos', authenticateToken, async (req, res) => {
 
     res.json(formattedData);
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// EVIDÊNCIAS DE STATUS
+// ============================================
+
+// Status que requerem evidência obrigatória
+const STATUS_COM_EVIDENCIA = {
+  pacientes: [
+    'cpf_reprovado',
+    'nao_passou_cpf',
+    'nao_tem_outro_cpf',
+    'nao_existe',
+    'nao_tem_interesse',
+    'nao_reconhece',
+    'nao_responde',
+    'sem_clinica',
+    'nao_fechou',
+    'nao_compareceu'
+  ],
+  clinicas: [
+    'nao_fechou',
+    'nao_e_nosso_publico',
+    'nao_responde',
+    'nao_tem_interesse'
+  ],
+  novas_clinicas: [
+    'nao_fechou',
+    'nao_e_nosso_publico',
+    'nao_responde',
+    'nao_tem_interesse'
+  ]
+};
+
+// Upload de evidência de status
+app.post('/api/evidencias/upload', authenticateUpload, uploadEvidencia.single('evidencia'), async (req, res) => {
+  try {
+    const { tipo, registro_id, status_anterior, status_novo, observacao } = req.body;
+    
+    console.log('📸 Upload de evidência recebido:', {
+      tipo,
+      registro_id,
+      status_anterior,
+      status_novo,
+      file: req.file?.originalname
+    });
+    
+    // Validações
+    if (!tipo || !registro_id || !status_novo) {
+      return res.status(400).json({ error: 'Tipo, registro_id e status_novo são obrigatórios!' });
+    }
+    
+    if (!['paciente', 'clinica', 'nova_clinica'].includes(tipo)) {
+      return res.status(400).json({ error: 'Tipo inválido! Use: paciente, clinica ou nova_clinica' });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'Arquivo de evidência é obrigatório!' });
+    }
+    
+    // Validar tipo de arquivo (apenas imagens)
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      return res.status(400).json({ error: 'Apenas arquivos JPG e PNG são permitidos!' });
+    }
+    
+    // Validar tamanho (máx 5MB)
+    if (req.file.size > 5 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Arquivo muito grande! Máximo 5MB.' });
+    }
+    
+    // Gerar nome único para o arquivo
+    const timestamp = Date.now();
+    const extensao = req.file.originalname.split('.').pop();
+    const fileName = `${tipo}s/${registro_id}/${timestamp}_${status_novo}.${extensao}`;
+    
+    console.log('📤 Fazendo upload para Supabase Storage:', fileName);
+    
+    // Upload para Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+      .from('evidencias-status')
+      .upload(fileName, req.file.buffer, {
+        contentType: req.file.mimetype,
+        cacheControl: '3600',
+        upsert: false
+      });
+    
+    if (uploadError) {
+      console.error('❌ Erro no upload:', uploadError);
+      throw uploadError;
+    }
+    
+    // Obter URL pública (assinada para bucket privado)
+    const { data: urlData } = await supabaseAdmin.storage
+      .from('evidencias-status')
+      .createSignedUrl(fileName, 31536000); // 1 ano
+    
+    const evidenciaUrl = urlData?.signedUrl;
+    
+    console.log('✅ Upload concluído. URL:', evidenciaUrl);
+    
+    // Salvar registro na tabela de histórico
+    const { data: historicoData, error: historicoError } = await supabaseAdmin
+      .from('historico_status_evidencias')
+      .insert([{
+        tipo,
+        registro_id: parseInt(registro_id),
+        status_anterior: status_anterior || null,
+        status_novo,
+        evidencia_url: evidenciaUrl,
+        evidencia_filename: req.file.originalname,
+        observacao: observacao || null,
+        alterado_por_id: req.user?.id || null,
+        alterado_por_nome: req.user?.nome || req.user?.username || null
+      }])
+      .select();
+    
+    if (historicoError) {
+      console.error('❌ Erro ao salvar histórico:', historicoError);
+      // Tentar deletar arquivo do storage se falhou salvar no banco
+      await supabaseAdmin.storage.from('evidencias-status').remove([fileName]);
+      throw historicoError;
+    }
+    
+    console.log('✅ Evidência salva com sucesso:', historicoData[0]);
+    
+    res.json({
+      id: historicoData[0].id,
+      evidencia_url: evidenciaUrl,
+      message: 'Evidência enviada com sucesso!'
+    });
+    
+  } catch (error) {
+    console.error('❌ Erro ao fazer upload de evidência:', error);
+    res.status(500).json({ error: error.message || 'Erro ao enviar evidência' });
+  }
+});
+
+// Buscar evidências de um registro (apenas admin)
+app.get('/api/evidencias/:tipo/:registroId', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { tipo, registroId } = req.params;
+    
+    // Validar tipo
+    if (!['paciente', 'clinica', 'nova_clinica'].includes(tipo)) {
+      return res.status(400).json({ error: 'Tipo inválido!' });
+    }
+    
+    // Buscar evidências
+    const { data, error } = await supabaseAdmin
+      .from('historico_status_evidencias')
+      .select('*')
+      .eq('tipo', tipo)
+      .eq('registro_id', parseInt(registroId))
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    res.json(data || []);
+  } catch (error) {
+    console.error('Erro ao buscar evidências:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Listar TODAS as evidências (apenas admin)
+app.get('/api/evidencias/todas', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    console.log('📋 Buscando todas as evidências para admin');
+    
+    // Buscar todas as evidências ordenadas por data
+    const { data: evidencias, error } = await supabaseAdmin
+      .from('historico_status_evidencias')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('❌ Erro ao buscar evidências:', error);
+      throw error;
+    }
+    
+    // Enriquecer evidências com nomes dos pacientes/clínicas
+    const evidenciasEnriquecidas = await Promise.all(evidencias.map(async (ev) => {
+      let nomeRegistro = null;
+      
+      try {
+        if (ev.tipo === 'paciente') {
+          const { data: paciente } = await supabaseAdmin
+            .from('pacientes')
+            .select('nome')
+            .eq('id', ev.registro_id)
+            .single();
+          nomeRegistro = paciente?.nome;
+        } else if (ev.tipo === 'clinica') {
+          const { data: clinica } = await supabaseAdmin
+            .from('clinicas')
+            .select('nome')
+            .eq('id', ev.registro_id)
+            .single();
+          nomeRegistro = clinica?.nome;
+        } else if (ev.tipo === 'nova_clinica') {
+          const { data: clinica } = await supabaseAdmin
+            .from('novas_clinicas')
+            .select('nome')
+            .eq('id', ev.registro_id)
+            .single();
+          nomeRegistro = clinica?.nome;
+        }
+      } catch (err) {
+        console.warn(`⚠️ Não foi possível buscar nome para ${ev.tipo} ID ${ev.registro_id}`);
+      }
+      
+      return {
+        ...ev,
+        nome_registro: nomeRegistro || `ID ${ev.registro_id}`
+      };
+    }));
+    
+    console.log(`✅ ${evidenciasEnriquecidas?.length || 0} evidências encontradas`);
+    
+    res.json({
+      evidencias: evidenciasEnriquecidas || [],
+      total: evidenciasEnriquecidas?.length || 0
+    });
+  } catch (error) {
+    console.error('❌ Erro ao buscar todas as evidências:', error);
     res.status(500).json({ error: error.message });
   }
 });
