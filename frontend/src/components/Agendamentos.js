@@ -620,30 +620,15 @@ const Agendamentos = () => {
       {/* Dashboard de Agendamentos */}
       <div className="stats-grid" style={{ marginBottom: '2rem' }}>
         <div className="stat-card">
+          <div className="stat-label">Total</div>
+          <div className="stat-value" style={{ color: '#2563eb' }}>
+            {agendamentos.length}
+          </div>
+        </div>
+        <div className="stat-card">
           <div className="stat-label">Agendados</div>
           <div className="stat-value" style={{ color: '#2563eb' }}>
             {agendamentos.filter(a => a.status === 'agendado').length}
-          </div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-label">Lembrados</div>
-          <div className="stat-value" style={{ color: '#059669' }}>
-            {agendamentos.filter(a => a.status === 'lembrado').length}
-          </div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-label">Compareceram</div>
-          <div className="stat-value" style={{ color: '#10b981' }}>
-            {agendamentos.filter(a => a.status === 'compareceu').length}
-          </div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-label">Fechados</div>
-          <div className="stat-value" style={{ color: '#059669' }}>
-            {agendamentos.filter(a => a.status === 'fechado').length}
           </div>
         </div>
       </div>

@@ -17,12 +17,6 @@ if (!supabaseUrl || !supabaseServiceKey) {
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 const STORAGE_BUCKET = 'documentos';
 
-// Configurar o diretório de uploads (temporário)
-const uploadsDir = path.join(__dirname, '..', 'uploads', 'clinicas');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
 // Configurar multer para upload em memória (para enviar ao Supabase)
 const storage = multer.memoryStorage();
 

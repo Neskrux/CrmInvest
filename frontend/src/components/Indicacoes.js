@@ -30,6 +30,7 @@ const Indicacoes = () => {
   const [formCadastro, setFormCadastro] = useState({
     nome: '',
     telefone: '',
+    responsavel: '',
     cidade: '',
     estado: '',
     observacoes: ''
@@ -395,7 +396,6 @@ const Indicacoes = () => {
           showSuccessToast('Compartilhe e escolha "Salvar Imagem" para salvar nas fotos!');
           return;
         } catch (shareError) {
-          console.log('Share API falhou, tentando método alternativo:', shareError);
         }
       }
       
@@ -454,6 +454,7 @@ const Indicacoes = () => {
     setFormCadastro({
       nome: '',
       telefone: '',
+      responsavel: '',
       cidade: '',
       estado: '',
       observacoes: ''
@@ -559,6 +560,15 @@ const Indicacoes = () => {
       newErrors.nome = 'Nome deve ter pelo menos 2 caracteres';
     }
     
+    // Validar responsável apenas para clínicas
+    if (activeTab === 'clinicas') {
+      if (!formCadastro.responsavel.trim()) {
+        newErrors.responsavel = 'Nome do responsável é obrigatório';
+      } else if (formCadastro.responsavel.trim().length < 2) {
+        newErrors.responsavel = 'Nome do responsável deve ter pelo menos 2 caracteres';
+      }
+    }
+    
     if (!formCadastro.telefone.trim()) {
       newErrors.telefone = 'WhatsApp é obrigatório';
     } else if (formCadastro.telefone.replace(/\D/g, '').length < 10) {
@@ -595,6 +605,7 @@ const Indicacoes = () => {
         ? {
             nome: formCadastro.nome,
             telefone: formCadastro.telefone,
+            responsavel: formCadastro.responsavel,
             cidade: formCadastro.cidade,
             estado: formCadastro.estado,
             observacoes: formCadastro.observacoes,
@@ -626,6 +637,7 @@ const Indicacoes = () => {
         setFormCadastro({
           nome: '',
           telefone: '',
+          responsavel: '',
           cidade: '',
           estado: '',
           observacoes: ''
@@ -1101,7 +1113,7 @@ const Indicacoes = () => {
                   style={{
                     width: '100%',
                     padding: '0.875rem',
-                    border: formErrors.nome ? '2px solid #ef4444' : '2px solid #1e293b ',
+                    border: formErrors.nome ? '2px solid #ef4444' : '2px solid #1e293b',
                     borderRadius: '10px',
                     fontSize: '1rem',
                     transition: 'all 0.3s ease',
@@ -1109,15 +1121,15 @@ const Indicacoes = () => {
                     outline: 'none'
                   }}
                   onFocus={(e) => {
-                    if (!formErrors.nome) e.target.style.borderColor = '#1e293b ';
+                    if (!formErrors.nome) e.target.style.borderColor = '#1e293b';
                   }}
                   onBlur={(e) => {
-                    if (!formErrors.nome) e.target.style.borderColor = '#1e293b ';
+                    if (!formErrors.nome) e.target.style.borderColor = '#1e293b';
                   }}
                 />
                 {formErrors.nome && (
                   <span style={{
-                    color: '#1e293b ',
+                    color: '#ef4444',
                     fontSize: '0.875rem',
                     marginTop: '0.25rem',
                     display: 'block'
@@ -1127,16 +1139,65 @@ const Indicacoes = () => {
                 )}
               </div>
 
+              {/* Responsável - apenas para clínicas */}
+              {activeTab === 'clinicas' && (
+                <div style={{ gridColumn: window.innerWidth <= 768 ? '1' : 'span 2' }}>
+                  <label style={{
+                    display: 'block',
+                    fontWeight: '600',
+                    color: '#1e293b',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.95rem'
+                  }}>
+                    Responsável pela Clínica *
+                  </label>
+                  <input
+                    type="text"
+                    name="responsavel"
+                    value={formCadastro.responsavel}
+                    onChange={handleCadastroInputChange}
+                    placeholder="Digite o nome do responsável"
+                    disabled={submittingCadastro}
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: formErrors.responsavel ? '2px solid #ef4444' : '2px solid #1e293b',
+                      borderRadius: '10px',
+                      fontSize: '1rem',
+                      transition: 'all 0.3s ease',
+                      backgroundColor: 'white',
+                      outline: 'none'
+                    }}
+                    onFocus={(e) => {
+                      if (!formErrors.responsavel) e.target.style.borderColor = '#1e293b';
+                    }}
+                    onBlur={(e) => {
+                      if (!formErrors.responsavel) e.target.style.borderColor = '#1e293b';
+                    }}
+                  />
+                  {formErrors.responsavel && (
+                    <span style={{
+                      color: '#ef4444',
+                      fontSize: '0.875rem',
+                      marginTop: '0.25rem',
+                      display: 'block'
+                    }}>
+                      {formErrors.responsavel}
+                    </span>
+                  )}
+                </div>
+              )}
+
               {/* WhatsApp */}
               <div>
                 <label style={{
                   display: 'block',
                   fontWeight: '600',
-                  color: '#1e293b ',
+                  color: '#1e293b',
                   marginBottom: '0.5rem',
                   fontSize: '0.95rem'
                 }}>
-                  WhatsApp *
+                  WhatsApp (Celular) *
                 </label>
                 <input
                   type="tel"
@@ -1148,7 +1209,7 @@ const Indicacoes = () => {
                   style={{
                     width: '100%',
                     padding: '0.875rem',
-                    border: formErrors.telefone ? '2px solid #ef4444' : '2px solid #1e293b ',
+                    border: formErrors.telefone ? '2px solid #ef4444' : '2px solid #1e293b',
                     borderRadius: '10px',
                     fontSize: '1rem',
                     transition: 'all 0.3s ease',
@@ -1156,15 +1217,23 @@ const Indicacoes = () => {
                     outline: 'none'
                   }}
                   onFocus={(e) => {
-                    if (!formErrors.telefone) e.target.style.borderColor = '#1e293b ';
+                    if (!formErrors.telefone) e.target.style.borderColor = '#1e293b';
                   }}
                   onBlur={(e) => {
-                    if (!formErrors.telefone) e.target.style.borderColor = '#1e293b ';
+                    if (!formErrors.telefone) e.target.style.borderColor = '#1e293b';
                   }}
                 />
+                <div style={{
+                  fontSize: '0.75rem',
+                  color: '#6b7280',
+                  marginTop: '0.25rem',
+                  fontStyle: 'italic'
+                }}>
+                  Apenas número de celular (não aceita telefone fixo)
+                </div>
                 {formErrors.telefone && (
                   <span style={{
-                    color: '#1e293b ',
+                    color: '#ef4444',
                     fontSize: '0.875rem',
                     marginTop: '0.25rem',
                     display: 'block'

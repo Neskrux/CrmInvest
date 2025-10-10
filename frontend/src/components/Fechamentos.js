@@ -587,39 +587,29 @@ const Fechamentos = () => {
 
   const downloadContrato = async (fechamento) => {
     try {
-      const API_BASE_URL = process.env.NODE_ENV === 'production' ? 'https://crminvest-backend.fly.dev/api' : 'http://localhost:5000/api';
-      
-      const token = localStorage.getItem('token');
-      if (!token || token === 'null' || token.trim() === '') {
-        showErrorToast('Sua sessão expirou. Faça login novamente.');
-        window.location.href = '/login';
+      if (!fechamento.contrato_arquivo) {
+        showErrorToast('Nenhum contrato anexado a este fechamento');
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/fechamentos/${fechamento.id}/contrato`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
+      // Solicitar URL assinada ao backend (gerada sob demanda)
+      const response = await makeRequest(`/fechamentos/${fechamento.id}/contrato-url`);
+      
       if (!response.ok) {
         const data = await response.json();
-        showErrorToast('Erro ao baixar contrato: ' + (data.error || 'Erro desconhecido'));
+        showErrorToast('Erro ao gerar link de download: ' + (data.error || 'Erro desconhecido'));
         return;
       }
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fechamento.contrato_nome_original || 'contrato.pdf';
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const { url, nome } = await response.json();
+
+      // Abrir URL assinada em nova aba
+      window.open(url, '_blank');
+      
+      showSuccessToast(`Contrato "${nome}" aberto. Link válido por 5 minutos.`);
     } catch (error) {
-      console.error('Erro ao baixar contrato:', error);
-      showErrorToast('Erro ao baixar contrato: ' + error.message);
+      console.error('Erro ao abrir contrato:', error);
+      showErrorToast('Erro ao abrir contrato: ' + error.message);
     }
   };
 
@@ -1315,31 +1305,6 @@ const Fechamentos = () => {
                       {viewingFechamento.tipo_tratamento || 'Não informado'}
                     </div>
                   </div>
-
-                  <div>
-                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Status de Aprovação</label>
-                    <div style={{ 
-                      padding: '0.75rem', 
-                      backgroundColor: '#f9fafb', 
-                      borderRadius: '6px',
-                      border: '1px solid #e5e7eb',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
-                    }}>
-                      <span style={{
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '4px',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        backgroundColor: viewingFechamento.aprovado === 1 ? '#dcfce7' : '#fef3c7',
-                        color: viewingFechamento.aprovado === 1 ? '#166534' : '#92400e'
-                      }}>
-                        {viewingFechamento.aprovado === 1 ? 'Aprovado' : 'Pendente'}
-                      </span>
-                    </div>
-                  </div>
-
                   {viewingFechamento.observacoes && (
                     <div>
                       <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Observações</label>
@@ -1391,9 +1356,8 @@ const Fechamentos = () => {
                         </div>
                       </div>
                       
-                      <a
-                        href={`/api/fechamentos/download-contrato/${viewingFechamento.id}`}
-                        download
+                      <button
+                        onClick={() => downloadContrato(viewingFechamento)}
                         className="btn btn-primary"
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
                       >
@@ -1403,7 +1367,7 @@ const Fechamentos = () => {
                           <line x1="12" y1="15" x2="12" y2="3"></line>
                         </svg>
                         Baixar Contrato
-                      </a>
+                      </button>
                     </div>
                   ) : (
                     <div style={{

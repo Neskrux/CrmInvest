@@ -11,6 +11,7 @@ const Pacientes = () => {
   const [pacientes, setPacientes] = useState([]);
   const [novosLeads, setNovosLeads] = useState([]);
   const [consultores, setConsultores] = useState([]);
+  const [agendamentos, setAgendamentos] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingPaciente, setEditingPaciente] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -204,6 +205,7 @@ const Pacientes = () => {
     fetchPacientes();
     fetchConsultores();
     fetchClinicas();
+    fetchAgendamentos();
     
     // Buscar novos leads apenas se pode alterar status (não freelancer) ou é consultor interno
     if (podeAlterarStatus || isConsultorInterno) {
@@ -241,6 +243,7 @@ const Pacientes = () => {
   useEffect(() => {
     const interval = setInterval(() => {
       fetchPacientes();
+      fetchAgendamentos();
       // Buscar novos leads apenas se pode alterar status (não freelancer) ou é consultor interno
       if (podeAlterarStatus || isConsultorInterno) {
         fetchNovosLeads();
@@ -334,6 +337,23 @@ const Pacientes = () => {
       }
     } catch (error) {
       console.error('Erro ao carregar clínicas:', error);
+    }
+  };
+
+  const fetchAgendamentos = async () => {
+    try {
+      // Usar endpoint geral se for freelancer, endpoint filtrado caso contrário
+      const endpoint = isFreelancer ? '/dashboard/agendamentos' : '/dashboard/gerais/agendamentos';
+      const response = await makeRequest(endpoint);
+      const data = await response.json();
+      
+      if (response.ok) {
+        setAgendamentos(data);
+      } else {
+        console.error('Erro ao carregar agendamentos:', data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar agendamentos:', error);
     }
   };
 
@@ -476,7 +496,6 @@ const Pacientes = () => {
 
   // Função chamada quando evidência é enviada com sucesso
   const handleEvidenciaSuccess = async (evidenciaId) => {
-    console.log('✅ Evidência enviada, ID:', evidenciaId);
     
     // Atualizar status agora que temos a evidência
     await updateStatus(evidenciaData.pacienteId, evidenciaData.statusNovo, evidenciaId);
@@ -1039,12 +1058,16 @@ const Pacientes = () => {
     }
   };
 
+  // Estados adicionais para modal de fechamento
+  const [clinicaFechamento, setClinicaFechamento] = useState('');
+
   // Funções do modal de fechamento
   const abrirModalFechamento = (paciente, novoStatus = null) => {
     setPacienteParaFechar({ ...paciente, novoStatus });
     setValorFechamento('');
     setValorFormatado('');
     setContratoFechamento(null);
+    setClinicaFechamento('');
     setTipoTratamentoFechamento(paciente.tipo_tratamento || '');
     setObservacoesFechamento('');
     setDataFechamento(new Date().toISOString().split('T')[0]);
@@ -1066,6 +1089,7 @@ const Pacientes = () => {
     setValorFechamento('');
     setValorFormatado('');
     setContratoFechamento(null);
+    setClinicaFechamento('');
     setTipoTratamentoFechamento('');
     setObservacoesFechamento('');
     setDataFechamento(new Date().toISOString().split('T')[0]);
@@ -1137,6 +1161,11 @@ const Pacientes = () => {
       return;
     }
 
+    if (!clinicaFechamento) {
+      showErrorToast('Por favor, selecione a clínica!');
+      return;
+    }
+
     if (!contratoFechamento) {
       showErrorToast('Por favor, selecione o contrato em PDF!');
       return;
@@ -1158,7 +1187,7 @@ const Pacientes = () => {
       const formData = new FormData();
       formData.append('paciente_id', pacienteParaFechar.id);
       formData.append('consultor_id', pacienteParaFechar.consultor_id || '');
-      formData.append('clinica_id', ''); // Não temos clínica associada diretamente ao paciente
+      formData.append('clinica_id', clinicaFechamento);
       formData.append('valor_fechado', parseFloat(valorFechamento));
       formData.append('data_fechamento', dataFechamento);
       formData.append('tipo_tratamento', tipoTratamentoFechamento || '');
@@ -1498,8 +1527,8 @@ const Pacientes = () => {
             </div>
             
             <div className="stat-card">
-              <div className="stat-label">Agendados</div>
-              <div className="stat-value">{pacientesFiltrados.filter(p => p.status === 'agendado').length}</div>
+              <div className="stat-label">Agendamentos</div>
+              <div className="stat-value">{agendamentos.length}</div>
             </div>
             
             <div className="stat-card">
@@ -2119,7 +2148,7 @@ const Pacientes = () => {
                     marginBottom: '0.5rem',
                     fontSize: '0.95rem'
                   }}>
-                    WhatsApp *
+                    WhatsApp (Celular) *
                   </label>
                   <input
                     type="tel"
@@ -2137,6 +2166,14 @@ const Pacientes = () => {
                       outline: 'none'
                     }}
                   />
+                  <div style={{
+                    fontSize: '0.75rem',
+                    color: '#6b7280',
+                    marginTop: '0.25rem',
+                    fontStyle: 'italic'
+                  }}>
+                    Apenas número de celular (não aceita telefone fixo)
+                  </div>
                 </div>
 
                 {/* Estado */}
@@ -3150,6 +3187,20 @@ const Pacientes = () => {
               </div>
 
               <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Clínica *</label>
+                <select 
+                  className="form-select"
+                  value={clinicaFechamento}
+                  onChange={(e) => setClinicaFechamento(e.target.value)}
+                >
+                  <option value="">Selecione uma clínica</option>
+                  {clinicas.map(c => (
+                    <option key={c.id} value={c.id}>{c.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
                 <label className="form-label">Valor do Fechamento *</label>
                 <input 
                   type="text"
@@ -3232,7 +3283,7 @@ const Pacientes = () => {
                   type="button"
                   className="btn btn-primary"
                   onClick={confirmarFechamento}
-                  disabled={salvandoFechamento || !valorFechamento}
+                  disabled={salvandoFechamento || !valorFechamento || !clinicaFechamento}
                 >
                   {salvandoFechamento ? (
                     <>
