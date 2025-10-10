@@ -3011,7 +3011,12 @@ app.get('/api/consultores/:id', authenticateToken, requireAdmin, async (req, res
 // === PACIENTES === (Admin vê todos, Consultor vê apenas os seus)
 app.get('/api/pacientes', authenticateToken, async (req, res) => {
   try {
-    let query = supabase
+    console.log('🔍 GET /api/pacientes - Usuário:', {
+      id: req.user.id,
+      tipo: req.user.tipo,
+      nome: req.user.nome
+    });
+    let query = supabaseAdmin
       .from('pacientes')
       .select(`
         *,
@@ -3019,24 +3024,32 @@ app.get('/api/pacientes', authenticateToken, async (req, res) => {
       `)
       .order('created_at', { ascending: false });
 
-    // Se for clínica, filtrar apenas pacientes que têm agendamentos nesta clínica
+    // Se for clínica, buscar pacientes que têm agendamentos nesta clínica OU foram cadastrados por ela
     if (req.user.tipo === 'clinica') {
+      console.log('🏥 Clínica acessando pacientes:', {
+        clinica_id: req.user.id,
+        clinica_nome: req.user.nome
+      });
+      
       // Buscar pacientes com agendamentos nesta clínica
       const { data: agendamentos, error: agendError } = await supabaseAdmin
         .from('agendamentos')
         .select('paciente_id')
-        .eq('clinica_id', req.user.clinica_id);
+        .eq('clinica_id', req.user.id);
 
       if (agendError) throw agendError;
 
-      const pacienteIds = [...new Set(agendamentos.map(a => a.paciente_id))]; // Remove duplicatas
+      const pacienteIds = agendamentos ? agendamentos.map(a => a.paciente_id).filter(id => id !== null) : [];
+      
+      // Combinar: pacientes com agendamentos na clínica OU cadastrados pela clínica
+      const conditions = [`clinica_id.eq.${req.user.id}`];
       
       if (pacienteIds.length > 0) {
-        query = query.in('id', pacienteIds);
-      } else {
-        // Se a clínica não tem agendamentos, retorna array vazio
-        return res.json([]);
+        conditions.push(`id.in.(${pacienteIds.join(',')})`);
       }
+      
+      // Aplicar filtro OR
+      query = query.or(conditions.join(','));
     }
     // Se for consultor freelancer (não tem as duas permissões), filtrar pacientes atribuídos a ele OU vinculados através de agendamentos
     // Consultores internos (com pode_ver_todas_novas_clinicas=true E podealterarstatus=true) veem todos os pacientes
@@ -3142,7 +3155,7 @@ app.get('/api/dashboard/pacientes', authenticateToken, async (req, res) => {
 
 app.post('/api/pacientes', authenticateToken, async (req, res) => {
   try {
-    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado } = req.body;
+    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado, cadastrado_por_clinica, clinica_id } = req.body;
     
     // Normalizar telefone e CPF (remover formatação)
     const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
@@ -3193,6 +3206,16 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
     // Lógica de diferenciação: se tem consultor = paciente, se não tem = lead
     const statusFinal = status || (consultorId ? 'paciente' : 'lead');
     
+    // Se é clínica criando paciente, definir valores específicos
+    const isClinica = req.user.tipo === 'clinica';
+    let finalClinicaId = clinica_id;
+    let finalCadastradoPorClinica = cadastrado_por_clinica || false;
+    
+    if (isClinica) {
+      finalClinicaId = req.user.clinica_id || req.user.id;
+      finalCadastradoPorClinica = true;
+    }
+    
     const { data, error } = await supabaseAdmin
       .from('pacientes')
       .insert([{ 
@@ -3204,7 +3227,9 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
         observacoes,
         consultor_id: consultorId,
         cidade,
-        estado
+        estado,
+        clinica_id: finalClinicaId,
+        cadastrado_por_clinica: finalCadastradoPorClinica
       }])
       .select();
 
@@ -3218,11 +3243,27 @@ app.post('/api/pacientes', authenticateToken, async (req, res) => {
 app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado } = req.body;
+    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado, cadastrado_por_clinica, clinica_id } = req.body;
     
     // Verificar se é consultor freelancer - freelancers não podem editar pacientes completamente
     if (req.user.tipo === 'consultor' && req.user.podealterarstatus !== true) {
       return res.status(403).json({ error: 'Você não tem permissão para editar pacientes.' });
+    }
+    
+    // Se é clínica, verificar se está editando um paciente próprio
+    if (req.user.tipo === 'clinica') {
+      const { data: paciente, error: fetchError } = await supabaseAdmin
+        .from('pacientes')
+        .select('cadastrado_por_clinica, clinica_id')
+        .eq('id', id)
+        .single();
+        
+      if (fetchError) throw fetchError;
+      
+      // Clínica só pode editar pacientes que ela mesma cadastrou
+      if (!paciente.cadastrado_por_clinica || paciente.clinica_id !== (req.user.clinica_id || req.user.id)) {
+        return res.status(403).json({ error: 'Você só pode editar pacientes cadastrados pela sua clínica.' });
+      }
     }
     
     // Normalizar telefone e CPF (remover formatação)
@@ -3277,19 +3318,30 @@ app.put('/api/pacientes/:id', authenticateToken, async (req, res) => {
     // Mas só aplica se o status não foi explicitamente definido
     const statusFinal = status || (consultorId ? 'paciente' : 'lead');
     
+    // Se é clínica editando, manter os campos específicos
+    const updateData = {
+      nome, 
+      telefone: telefoneNumeros, // Usar telefone normalizado
+      cpf: cpfNumeros, // Usar CPF normalizado
+      tipo_tratamento, 
+      status: statusFinal, // Usar status diferenciado
+      observacoes,
+      consultor_id: consultorId,
+      cidade,
+      estado
+    };
+    
+    // Se tem informações de clínica, incluir
+    if (cadastrado_por_clinica !== undefined) {
+      updateData.cadastrado_por_clinica = cadastrado_por_clinica;
+    }
+    if (clinica_id !== undefined) {
+      updateData.clinica_id = clinica_id;
+    }
+    
     const { data, error } = await supabaseAdmin
       .from('pacientes')
-      .update({ 
-        nome, 
-        telefone: telefoneNumeros, // Usar telefone normalizado
-        cpf: cpfNumeros, // Usar CPF normalizado
-        tipo_tratamento, 
-        status: statusFinal, // Usar status diferenciado
-        observacoes,
-        consultor_id: consultorId,
-        cidade,
-        estado
-      })
+      .update(updateData)
       .eq('id', id)
       .select();
 
@@ -6651,6 +6703,196 @@ app.use('/api/documents', documentsRoutes);
 // ===== ROTAS IDSF API =====
 const idsfRoutes = require('./api/idsf-api');
 app.use('/api/idsf', idsfRoutes);
+
+// ===== ROTAS PARA GESTÃO FINANCEIRA DE PACIENTES =====
+app.get('/api/pacientes-financeiro', authenticateToken, async (req, res) => {
+  try {
+    let query = supabaseAdmin
+      .from('pacientes')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    // Se for clínica, filtrar apenas pacientes da clínica
+    if (req.user.tipo === 'clinica') {
+      query = query.eq('clinica_id', req.user.id);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+    res.json(data || []);
+  } catch (error) {
+    console.error('Erro ao buscar pacientes financeiros:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/pacientes-financeiro', authenticateToken, async (req, res) => {
+  try {
+    const {
+      cpf, nome, contato, valor_parcela, numero_parcelas, vencimento,
+      valor_tratamento, antecipacao_meses, data_operacao, entregue,
+      analise, responsavel, observacoes_financeiras, status
+    } = req.body;
+
+    const { data, error } = await supabaseAdmin
+      .from('pacientes')
+      .insert([{
+        cpf, 
+        nome, 
+        telefone: contato,
+        valor_parcela: valor_parcela ? parseFloat(valor_parcela.replace(/[^\d,-]/g, '').replace(',', '.')) : null,
+        numero_parcelas: numero_parcelas ? parseInt(numero_parcelas) : null,
+        vencimento,
+        valor_tratamento: valor_tratamento ? parseFloat(valor_tratamento.replace(/[^\d,-]/g, '').replace(',', '.')) : null,
+        antecipacao_meses: antecipacao_meses ? parseInt(antecipacao_meses) : null,
+        data_operacao,
+        entregue: entregue || false,
+        analise,
+        responsavel,
+        observacoes_financeiras,
+        status: status || 'novo',
+        tipo_tratamento: 'Financeiro'
+      }])
+      .select();
+
+    if (error) throw error;
+    res.json(data[0]);
+  } catch (error) {
+    console.error('Erro ao criar paciente financeiro:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/pacientes-financeiro/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      cpf, nome, contato, valor_parcela, numero_parcelas, vencimento,
+      valor_tratamento, antecipacao_meses, data_operacao, entregue,
+      analise, responsavel, observacoes_financeiras, status
+    } = req.body;
+
+    const updateData = {
+      cpf, 
+      nome, 
+      telefone: contato,
+      valor_parcela: valor_parcela ? parseFloat(valor_parcela.replace(/[^\d,-]/g, '').replace(',', '.')) : null,
+      numero_parcelas: numero_parcelas ? parseInt(numero_parcelas) : null,
+      vencimento,
+      valor_tratamento: valor_tratamento ? parseFloat(valor_tratamento.replace(/[^\d,-]/g, '').replace(',', '.')) : null,
+      antecipacao_meses: antecipacao_meses ? parseInt(antecipacao_meses) : null,
+      data_operacao,
+      entregue: entregue || false,
+      analise,
+      responsavel,
+      observacoes_financeiras,
+      status
+    };
+
+    const { data, error } = await supabaseAdmin
+      .from('pacientes')
+      .update(updateData)
+      .eq('id', id)
+      .select();
+
+    if (error) throw error;
+    res.json(data[0]);
+  } catch (error) {
+    console.error('Erro ao atualizar paciente financeiro:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/pacientes-financeiro/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Verificar se é admin
+    if (req.user.tipo !== 'admin') {
+      return res.status(403).json({ error: 'Apenas administradores podem excluir pacientes' });
+    }
+
+    const { error } = await supabaseAdmin
+      .from('pacientes')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    res.json({ message: 'Paciente excluído com sucesso' });
+  } catch (error) {
+    console.error('Erro ao excluir paciente financeiro:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Upload de documentos para pacientes
+const pacienteDocumentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Tipo de arquivo não permitido'), false);
+    }
+  }
+});
+
+app.post('/api/pacientes-financeiro/:id/upload-documento', 
+  authenticateToken, 
+  pacienteDocumentUpload.single('documento'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { tipo } = req.body; // tipo: selfie_doc, documento, comprovante_residencia, etc.
+      
+      if (!req.file) {
+        return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+      }
+
+      // Gerar nome único para o arquivo
+      const timestamp = Date.now();
+      const fileName = `pacientes/${id}/${tipo}-${timestamp}-${req.file.originalname}`;
+      
+      // Upload para Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+        .from('pacientes-documentos')
+        .upload(fileName, req.file.buffer, {
+          contentType: req.file.mimetype,
+          cacheControl: '3600'
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Obter URL pública
+      const { data: { publicUrl } } = supabaseAdmin.storage
+        .from('pacientes-documentos')
+        .getPublicUrl(fileName);
+
+      // Atualizar o campo correspondente no paciente
+      const updateField = `${tipo}_url`;
+      const { error: updateError } = await supabaseAdmin
+        .from('pacientes')
+        .update({ [updateField]: publicUrl })
+        .eq('id', id);
+
+      if (updateError) throw updateError;
+
+      res.json({ 
+        message: 'Documento enviado com sucesso',
+        url: publicUrl,
+        tipo: tipo
+      });
+    } catch (error) {
+      console.error('Erro ao fazer upload de documento:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
 
 // ===== ROTAS DE METAS (APENAS ADMIN) =====
 
