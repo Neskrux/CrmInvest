@@ -7,7 +7,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
-const MetaAdsAPI = require('./meta-ads-api');
+const MetaAdsAPI = require('./api/meta-ads-api');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 const nodemailer = require('nodemailer');
@@ -32,7 +32,6 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/health',
       api: '/api',
-      whatsapp: '/api/whatsapp',
       documents: '/api/documents',
       idsf: '/api/idsf'
     }
@@ -4632,14 +4631,17 @@ app.get('/api/fechamentos', authenticateToken, async (req, res) => {
     if (error) throw error;
 
     // Reformatar dados para compatibilidade com frontend
-    const formattedData = data.map(fechamento => ({
-      ...fechamento,
-      paciente_nome: fechamento.pacientes?.nome,
-      paciente_telefone: fechamento.pacientes?.telefone,
-      paciente_cpf: fechamento.pacientes?.cpf,
-      consultor_nome: fechamento.consultores?.nome,
-      clinica_nome: fechamento.clinicas?.nome
-    }));
+    const formattedData = data.map(fechamento => {
+      // NÃO gerar URL aqui - será gerada sob demanda quando o usuário clicar para baixar
+      return {
+        ...fechamento,
+        paciente_nome: fechamento.pacientes?.nome,
+        paciente_telefone: fechamento.pacientes?.telefone,
+        paciente_cpf: fechamento.pacientes?.cpf,
+        consultor_nome: fechamento.consultores?.nome,
+        clinica_nome: fechamento.clinicas?.nome
+      };
+    });
 
     res.json(formattedData);
   } catch (error) {
@@ -4770,14 +4772,17 @@ app.get('/api/dashboard/fechamentos', authenticateToken, async (req, res) => {
     if (error) throw error;
 
     // Reformatar dados para compatibilidade com frontend
-    const formattedData = data.map(fechamento => ({
-      ...fechamento,
-      paciente_nome: fechamento.pacientes?.nome,
-      paciente_telefone: fechamento.pacientes?.telefone,
-      paciente_cpf: fechamento.pacientes?.cpf,
-      consultor_nome: fechamento.consultores?.nome,
-      clinica_nome: fechamento.clinicas?.nome
-    }));
+    const formattedData = data.map(fechamento => {
+      // NÃO gerar URL aqui - será gerada sob demanda quando o usuário clicar para baixar
+      return {
+        ...fechamento,
+        paciente_nome: fechamento.pacientes?.nome,
+        paciente_telefone: fechamento.pacientes?.telefone,
+        paciente_cpf: fechamento.pacientes?.cpf,
+        consultor_nome: fechamento.consultores?.nome,
+        clinica_nome: fechamento.clinicas?.nome
+      };
+    });
 
     res.json(formattedData);
   } catch (error) {
@@ -4810,6 +4815,11 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
       (typeof consultor_id === 'number' ? consultor_id : parseInt(consultor_id)) : null;
     const clinicaId = clinica_id && clinica_id !== '' ? 
       (typeof clinica_id === 'number' ? clinica_id : parseInt(clinica_id)) : null;
+
+    // Validar que clínica é obrigatória
+    if (!clinicaId) {
+      return res.status(400).json({ error: 'Clínica é obrigatória para criar um fechamento!' });
+    }
 
     // Validar valor_fechado para garantir que não seja null/NaN
     const valorFechado = parseFloat(valor_fechado);
@@ -4873,7 +4883,25 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
         .eq('id', paciente_id);
     }
 
-
+    // Criar agendamento automaticamente com status "compareceu"
+    if (paciente_id && clinicaId) {
+      try {
+        await supabaseAdmin
+          .from('agendamentos')
+          .insert([{
+            paciente_id: parseInt(paciente_id),
+            consultor_id: consultorId,
+            clinica_id: clinicaId,
+            data_agendamento: data_fechamento, // Usar a mesma data do fechamento
+            horario: '00:00', // Horário padrão
+            status: 'compareceu', // Status automático "compareceu"
+            observacoes: 'Agendamento criado automaticamente a partir do fechamento'
+          }]);
+      } catch (agendamentoError) {
+        console.error('Erro ao criar agendamento automático:', agendamentoError);
+        // Não bloquear o fechamento se houver erro no agendamento
+      }
+    }
 
     res.json({ 
       id: data[0].id, 
@@ -4983,7 +5011,47 @@ app.delete('/api/fechamentos/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Rota para download de contratos (aceita token via header Authorization)
+// Rota para gerar URL assinada do contrato (sob demanda, apenas quando usuário clica)
+app.get('/api/fechamentos/:id/contrato-url', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Buscar dados do fechamento
+    const { data: fechamento, error } = await supabaseAdmin
+      .from('fechamentos')
+      .select('contrato_arquivo, contrato_nome_original')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+
+    if (!fechamento?.contrato_arquivo) {
+      return res.status(404).json({ error: 'Contrato não encontrado!' });
+    }
+
+    // Gerar URL assinada com validade de 5 minutos (300 segundos)
+    const { data: urlData, error: urlError } = await supabaseAdmin.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrl(fechamento.contrato_arquivo, 300);
+
+    if (urlError) {
+      console.error('Erro ao gerar URL assinada:', urlError);
+      return res.status(500).json({ error: 'Erro ao gerar URL de download' });
+    }
+
+    // Retornar apenas a URL assinada
+    res.json({ 
+      url: urlData.signedUrl,
+      nome: fechamento.contrato_nome_original || 'contrato.pdf',
+      expiraEm: '5 minutos'
+    });
+  } catch (error) {
+    console.error('Erro ao gerar URL do contrato:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Rota para download de contratos (DEPRECATED - mantida por compatibilidade)
 app.get('/api/fechamentos/:id/contrato', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -6430,8 +6498,6 @@ server.headersTimeout = 320000; // 5min + 20s
 server.listen(PORT, async () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
   console.log(`🌐 Acesse: http://localhost:${PORT}`);
-  console.log(`📱 WhatsApp API: http://localhost:${PORT}/api/whatsapp`);
-  console.log(`🔗 Webhook WhatsApp: http://localhost:${PORT}/api/whatsapp/webhook`);
   console.log(`🗄️ Usando Supabase como banco de dados`);
   console.log(`⏱️ Timeout configurado: ${server.timeout}ms (${server.timeout/1000}s)`);
   
@@ -6798,10 +6864,6 @@ app.get('/api/meta-ads/advanced-metrics', authenticateToken, requireAdmin, async
 
 // ===== SERVIR ARQUIVOS DE UPLOAD =====
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// ===== ROTAS WHATSAPP =====
-const whatsappRoutes = require('./api/whatsapp');
-app.use('/api/whatsapp', whatsappRoutes);
 
 // ===== ROTAS DE DOCUMENTOS =====
 const documentsRoutes = require('./api/documents');

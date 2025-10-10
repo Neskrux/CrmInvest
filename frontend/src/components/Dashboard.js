@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, Area, AreaChart, ReferenceLine, ComposedChart } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, Area, ReferenceLine, ComposedChart } from 'recharts';
 import { TrendingUp, Calendar, BarChart3, CheckCircle, XCircle, RotateCcw } from 'lucide-react';
 import TutorialOverlay from './TutorialOverlay';
 import WelcomeModal from './WelcomeModal';
@@ -14,12 +14,13 @@ const Dashboard = () => {
     valorTotalFechamentos: 0,
     agendamentosHoje: 0
   });
-  const { makeRequest, user, isAdmin, isConsultorInterno, podeVerTodosDados, isClinica } = useAuth();
+  const { makeRequest, user, isAdmin, isConsultorInterno, podeVerTodosDados, isClinica, isFreelancer } = useAuth();
   const [periodo, setPeriodo] = useState('total'); // total, semanal, mensal
   const [subPeriodo, setSubPeriodo] = useState(null); // para dias da semana
   const [semanaOpcao, setSemanaOpcao] = useState('atual'); // atual, proxima
   const [mesAno, setMesAno] = useState(new Date()); // para navegação mensal
   const [filtroRegiao, setFiltroRegiao] = useState({ cidade: '', estado: '' });
+  const [paginaConversaoCidades, setPaginaConversaoCidades] = useState(0);
   const [cidadesDisponiveis, setCidadesDisponiveis] = useState([]);
   const [estadosDisponiveis, setEstadosDisponiveis] = useState([]);
   const [rankingGeral, setRankingGeral] = useState([]);
@@ -535,9 +536,13 @@ const Dashboard = () => {
         if (filtroRegiao.estado) clinicasParams.append('estado', filtroRegiao.estado);
         if (filtroRegiao.cidade) clinicasParams.append('cidade', filtroRegiao.cidade);
         
+        // Determinar qual endpoint usar baseado no tipo de usuário
+        // Freelancers veem apenas seus dados; Admin e consultores internos veem todos
+        const usarDadosFiltrados = isFreelancer;
+        
         const [pacientesRes, agendamentosRes, fechamentosRes, clinicasRes] = await Promise.all([
           makeRequest('/dashboard/pacientes'),
-          makeRequest('/dashboard/agendamentos'),
+          makeRequest(usarDadosFiltrados ? '/dashboard/agendamentos' : '/dashboard/gerais/agendamentos'),
           makeRequest('/dashboard/fechamentos'),
           makeRequest(`/clinicas?${clinicasParams.toString()}`)
         ]);
@@ -582,17 +587,38 @@ const Dashboard = () => {
             return clinicasIds.includes(fechamento.clinica_id);
           });
           
-          // Filtrar pacientes por região (via agendamentos ou fechamentos)
+          // Filtrar pacientes por região de 3 formas:
+          // 1. Pacientes com cidade/estado correspondente diretamente
+          // 2. Pacientes com agendamentos na região
+          // 3. Pacientes com fechamentos na região
           const pacientesIdsComRegiao = new Set();
           
-          // Adicionar IDs de pacientes que têm agendamentos na região
+          // 1. Adicionar pacientes que têm cidade/estado correspondente
+          pacientes.forEach(paciente => {
+            let incluir = false;
+            
+            // Se filtrou por estado e cidade
+            if (filtroRegiao.estado && filtroRegiao.cidade) {
+              incluir = paciente.estado === filtroRegiao.estado && paciente.cidade === filtroRegiao.cidade;
+            }
+            // Se filtrou apenas por estado
+            else if (filtroRegiao.estado && !filtroRegiao.cidade) {
+              incluir = paciente.estado === filtroRegiao.estado;
+            }
+            
+            if (incluir) {
+              pacientesIdsComRegiao.add(paciente.id);
+            }
+          });
+          
+          // 2. Adicionar IDs de pacientes que têm agendamentos na região
           agendamentos.forEach(agendamento => {
             if (agendamento.paciente_id) {
               pacientesIdsComRegiao.add(agendamento.paciente_id);
             }
           });
           
-          // Adicionar IDs de pacientes que têm fechamentos na região
+          // 3. Adicionar IDs de pacientes que têm fechamentos na região
           fechamentos.forEach(fechamento => {
             if (fechamento.paciente_id) {
               pacientesIdsComRegiao.add(fechamento.paciente_id);
@@ -604,10 +630,21 @@ const Dashboard = () => {
         }
         
         setDadosFiltrados({ pacientes, agendamentos, fechamentos });
+        
+        // Calcular pipeline baseado nos pacientes por status
+        const pipeline = pacientes.reduce((acc, p) => {
+          acc[p.status] = (acc[p.status] || 0) + 1;
+          return acc;
+        }, {});
+        
+        // Corrigir o número de fechados para usar a mesma fonte de dados (fechamentos aprovados)
+        const fechadosReais = fechamentos.filter(f => f.aprovado !== 'reprovado').length;
+        pipeline.fechado = fechadosReais;
+        
         setKpisPrincipais({
           totalPacientes: pacientes.length,
-          totalAgendamentos: agendamentos.length,
-          totalFechamentos: fechamentos.filter(f => f.aprovado !== 'reprovado').length,
+          totalAgendamentos: agendamentos.length, // Total de agendamentos (registros na tabela)
+          totalFechamentos: fechadosReais,
           valorTotalFechamentos: fechamentos.filter(f => f.aprovado !== 'reprovado').reduce((acc, f) => acc + parseFloat(f.valor_fechado || 0), 0),
           agendamentosHoje: agendamentos.filter(a => a.data_agendamento === new Date().toISOString().split('T')[0]).length
         });
@@ -683,16 +720,7 @@ const Dashboard = () => {
           crescimentoValor
         });
         
-        // Calcular pipeline filtrado baseado nos dados reais
-        const pipeline = pacientes.reduce((acc, p) => {
-          acc[p.status] = (acc[p.status] || 0) + 1;
-          return acc;
-        }, {});
-        
-        // Corrigir o número de fechados para usar a mesma fonte de dados
-        const fechadosReais = fechamentos.filter(f => f.aprovado !== 'reprovado').length;
-        pipeline.fechado = fechadosReais;
-        
+        // Pipeline já foi calculado acima e está na variável pipeline
         setPipelineFiltrado(pipeline);
       } catch (error) {
         // fallback: não altera kpisPrincipais
@@ -751,23 +779,47 @@ const Dashboard = () => {
     const fetchCidades = async () => {
       try {
         if (filtroRegiao.estado) {
-          const cidadesRes = await makeRequest(`/clinicas/cidades?estado=${filtroRegiao.estado}`);
-          if (cidadesRes.ok) {
-            const cidades = await cidadesRes.json();
-            console.log('🏙️ Cidades recebidas (filtradas por estado):', cidades);
-            setCidadesDisponiveis(cidades);
-          } else {
-            console.error('❌ Erro ao buscar cidades (com estado):', cidadesRes.status, await cidadesRes.text());
+          // Buscar cidades das clínicas
+          const cidadesClinicasRes = await makeRequest(`/clinicas/cidades?estado=${filtroRegiao.estado}`);
+          let cidadesClinicas = [];
+          if (cidadesClinicasRes.ok) {
+            cidadesClinicas = await cidadesClinicasRes.json();
           }
+          
+          // Buscar cidades dos pacientes desse estado
+          const pacientesRes = await makeRequest('/dashboard/gerais/pacientes');
+          let cidadesPacientes = [];
+          if (pacientesRes.ok) {
+            const pacientes = await pacientesRes.json();
+            cidadesPacientes = [...new Set(
+              pacientes
+                .filter(p => p.estado === filtroRegiao.estado && p.cidade)
+                .map(p => p.cidade)
+            )];
+          }
+          
+          // Combinar e remover duplicatas
+          const todasCidades = [...new Set([...cidadesClinicas, ...cidadesPacientes])].sort();
+          setCidadesDisponiveis(todasCidades);
         } else {
-          const cidadesRes = await makeRequest('/clinicas/cidades');
-          if (cidadesRes.ok) {
-            const cidades = await cidadesRes.json();
-            console.log('🏙️ Cidades recebidas (todas):', cidades);
-            setCidadesDisponiveis(cidades);
-          } else {
-            console.error('❌ Erro ao buscar cidades:', cidadesRes.status, await cidadesRes.text());
+          // Buscar todas as cidades das clínicas
+          const cidadesClinicasRes = await makeRequest('/clinicas/cidades');
+          let cidadesClinicas = [];
+          if (cidadesClinicasRes.ok) {
+            cidadesClinicas = await cidadesClinicasRes.json();
           }
+          
+          // Buscar todas as cidades dos pacientes
+          const pacientesRes = await makeRequest('/dashboard/gerais/pacientes');
+          let cidadesPacientes = [];
+          if (pacientesRes.ok) {
+            const pacientes = await pacientesRes.json();
+            cidadesPacientes = [...new Set(pacientes.filter(p => p.cidade).map(p => p.cidade))];
+          }
+          
+          // Combinar e remover duplicatas
+          const todasCidades = [...new Set([...cidadesClinicas, ...cidadesPacientes])].sort();
+          setCidadesDisponiveis(todasCidades);
         }
       } catch (error) {
         console.error('❌ Erro ao buscar cidades:', error);
@@ -788,9 +840,13 @@ const Dashboard = () => {
       if (filtroRegiao.estado) clinicasParams.append('estado', filtroRegiao.estado);
       if (filtroRegiao.cidade) clinicasParams.append('cidade', filtroRegiao.cidade);
       
+      // Determinar qual endpoint usar baseado no tipo de usuário
+      // Freelancers veem apenas seus dados; Admin e consultores internos veem todos
+      const usarDadosFiltrados = isFreelancer;
+      
       const [pacientesRes, agendamentosRes, fechamentosRes, consultoresRes, clinicasRes] = await Promise.all([
         makeRequest('/dashboard/pacientes'),
-        makeRequest('/dashboard/agendamentos'),
+        makeRequest(usarDadosFiltrados ? '/dashboard/agendamentos' : '/dashboard/gerais/agendamentos'),
         makeRequest('/dashboard/fechamentos'),
         makeRequest('/consultores'),
         makeRequest(`/clinicas?${clinicasParams.toString()}`)
@@ -888,6 +944,47 @@ const Dashboard = () => {
           if (!fechamento.clinica_id) return false; // excluir fechamentos sem clínica quando há filtro
           return clinicasIds.includes(fechamento.clinica_id);
         });
+        
+        // Filtrar pacientes por região de 3 formas:
+        // 1. Pacientes com cidade/estado correspondente diretamente
+        // 2. Pacientes com agendamentos na região
+        // 3. Pacientes com fechamentos na região
+        const pacientesIdsComRegiao = new Set();
+        
+        // 1. Adicionar pacientes que têm cidade/estado correspondente
+        pacientes.forEach(paciente => {
+          let incluir = false;
+          
+          // Se filtrou por estado e cidade
+          if (filtroRegiao.estado && filtroRegiao.cidade) {
+            incluir = paciente.estado === filtroRegiao.estado && paciente.cidade === filtroRegiao.cidade;
+          }
+          // Se filtrou apenas por estado
+          else if (filtroRegiao.estado && !filtroRegiao.cidade) {
+            incluir = paciente.estado === filtroRegiao.estado;
+          }
+          
+          if (incluir) {
+            pacientesIdsComRegiao.add(paciente.id);
+          }
+        });
+        
+        // 2. Adicionar IDs de pacientes que têm agendamentos na região
+        agendamentos.forEach(agendamento => {
+          if (agendamento.paciente_id) {
+            pacientesIdsComRegiao.add(agendamento.paciente_id);
+          }
+        });
+        
+        // 3. Adicionar IDs de pacientes que têm fechamentos na região
+        fechamentos.forEach(fechamento => {
+          if (fechamento.paciente_id) {
+            pacientesIdsComRegiao.add(fechamento.paciente_id);
+          }
+        });
+        
+        // Filtrar pacientes baseado nos IDs encontrados
+        pacientes = pacientes.filter(paciente => pacientesIdsComRegiao.has(paciente.id));
       }
 
       const hojeStr = hoje.toISOString().split('T')[0];
@@ -1051,68 +1148,76 @@ const Dashboard = () => {
         clinicasMap[clinica.id] = clinica;
       });
       
-      // Agrupar pacientes por cidade (usando a clínica do agendamento mais recente ou primeira clínica)
+      // Criar mapa de consultores para pegar a cidade/região
+      const consultoresRegiao = {};
+      consultores.forEach(consultor => {
+        if (consultor.cidade || consultor.estado) {
+          consultoresRegiao[consultor.id] = {
+            cidade: consultor.cidade,
+            estado: consultor.estado
+          };
+        }
+      });
+      
+      // Agrupar TODOS os pacientes por cidade (incluindo leads sem agendamento)
       // Usar dados gerais para gráfico de cidades
       pacientesGerais.forEach(paciente => {
-        // Buscar agendamento mais recente do paciente para determinar a cidade
-        const agendamentoPaciente = agendamentosGerais.find(a => a.paciente_id === paciente.id);
         let cidade = null;
+        let estado = null;
         
+        // 1. Priorizar: buscar pelo agendamento mais recente (cidade da clínica)
+        const agendamentoPaciente = agendamentosGerais.find(a => a.paciente_id === paciente.id);
         if (agendamentoPaciente && agendamentoPaciente.clinica_id) {
           const clinica = clinicasMap[agendamentoPaciente.clinica_id];
           if (clinica) {
             cidade = clinica.cidade;
+            estado = clinica.estado;
           }
         }
         
-        // Se não encontrou cidade pelo agendamento, tentar pelo fechamento
+        // 2. Se não tem agendamento, usar campo cidade/estado direto do paciente
+        if (!cidade && paciente.cidade) {
+          cidade = paciente.cidade;
+          estado = paciente.estado;
+        }
+        
+        // 3. Se não encontrou cidade pelo agendamento, tentar pelo fechamento
         if (!cidade) {
           const fechamentoPaciente = fechamentosGerais.find(f => f.paciente_id === paciente.id && f.aprovado !== 'reprovado');
           if (fechamentoPaciente && fechamentoPaciente.clinica_id) {
             const clinica = clinicasMap[fechamentoPaciente.clinica_id];
             if (clinica) {
               cidade = clinica.cidade;
+              estado = clinica.estado;
             }
           }
         }
         
-        if (cidade) {
-          if (!dadosPorCidade[cidade]) {
-            dadosPorCidade[cidade] = {
-              cidade: cidade,
-              pacientes: 0,
-              agendamentos: 0,
-              fechamentos: 0
-            };
-          }
-          dadosPorCidade[cidade].pacientes++;
+        // 4. Se ainda não tem cidade, tentar pelo consultor responsável
+        if (!cidade && paciente.consultor_id && consultoresRegiao[paciente.consultor_id]) {
+          cidade = consultoresRegiao[paciente.consultor_id].cidade;
+          estado = consultoresRegiao[paciente.consultor_id].estado;
         }
+        
+        // 5. Se ainda não tem cidade, usar estado ou "Região não definida"
+        if (!cidade && estado) {
+          cidade = estado; // Usar estado como fallback
+        } else if (!cidade) {
+          cidade = 'Região não definida';
+        }
+        
+        // Sempre adicionar o paciente, mesmo sem localização definida
+        if (!dadosPorCidade[cidade]) {
+          dadosPorCidade[cidade] = {
+            cidade: cidade,
+            pacientes: 0,
+            pacientesComAgendamento: new Set(), // Pacientes únicos que têm agendamento
+            agendamentos: 0,
+            fechamentos: 0
+          };
+        }
+        dadosPorCidade[cidade].pacientes++;
       });
-      
-      // Se não há pacientes, mas há fechamentos, criar entradas de cidade baseadas nos fechamentos
-      if (pacientesGerais.length === 0 && fechamentosGerais.length > 0) {
-        fechamentosGerais
-          .filter(f => f.aprovado !== 'reprovado')
-          .forEach(fechamento => {
-            if (fechamento.clinica_id) {
-              const clinica = clinicasMap[fechamento.clinica_id];
-              if (clinica && clinica.cidade) {
-                const cidade = clinica.cidade;
-                if (!dadosPorCidade[cidade]) {
-                  dadosPorCidade[cidade] = {
-                    cidade: cidade,
-                    pacientes: 0,
-                    agendamentos: 0,
-                    fechamentos: 0
-                  };
-                }
-                // Não incrementar pacientes aqui, apenas garantir que a cidade existe
-              }
-            }
-          });
-      }
-      
-      
       
       // Agrupar agendamentos por cidade das clínicas
       agendamentosGerais.forEach(agendamento => {
@@ -1124,11 +1229,16 @@ const Dashboard = () => {
               dadosPorCidade[cidade] = {
                 cidade: cidade,
                 pacientes: 0,
+                pacientesComAgendamento: new Set(),
                 agendamentos: 0,
                 fechamentos: 0
               };
             }
             dadosPorCidade[cidade].agendamentos++;
+            // Adicionar paciente ao set de pacientes com agendamento
+            if (agendamento.paciente_id) {
+              dadosPorCidade[cidade].pacientesComAgendamento.add(agendamento.paciente_id);
+            }
           }
         }
       });
@@ -1146,6 +1256,7 @@ const Dashboard = () => {
                 dadosPorCidade[cidade] = {
                   cidade: cidade,
                   pacientes: 0,
+                  pacientesComAgendamento: new Set(),
                   agendamentos: 0,
                   fechamentos: 0
                 };
@@ -1156,17 +1267,35 @@ const Dashboard = () => {
         });
         
 
-      // Converter para array e ordenar por total (pacientes + agendamentos + fechamentos)
-      const limiteCidades = window.innerWidth <= 768 ? 3 : 10; // Limitar a 3 cidades em mobile, 10 em desktop
+      // Converter para array e ordenar por fechamentos, depois agendamentos, depois pacientes
+      const limiteCidadesGrafico = window.innerWidth <= 768 ? 3 : 10; // Top 10 para gráfico
+      const limiteCidadesConversao = 15; // Top 15 para taxa de conversão
+      
       const agendamentosPorCidadeArray = Object.values(dadosPorCidade)
-        .map(item => ({
-          ...item,
-          total: item.pacientes + item.agendamentos + item.fechamentos,
-          conversaoAgendamento: item.pacientes > 0 ? ((item.agendamentos / item.pacientes) * 100).toFixed(1) : 0,
-          conversaoFechamento: item.agendamentos > 0 ? ((item.fechamentos / item.agendamentos) * 100).toFixed(1) : 0
-        }))
-        .sort((a, b) => b.total - a.total)
-        .slice(0, limiteCidades); // Mostrar top cidades baseado no dispositivo
+        .filter(item => item.cidade !== 'Região não definida') // Filtrar "Região não definida"
+        .map(item => {
+          // Converter Set para número
+          const numPacientesComAgendamento = item.pacientesComAgendamento.size;
+          return {
+            ...item,
+            pacientesComAgendamento: numPacientesComAgendamento, // Converter Set para número
+            total: item.pacientes + item.agendamentos + item.fechamentos,
+            conversaoAgendamento: item.pacientes > 0 ? ((item.agendamentos / item.pacientes) * 100).toFixed(1) : 0,
+            conversaoFechamento: item.agendamentos > 0 ? ((item.fechamentos / item.agendamentos) * 100).toFixed(1) : 0
+          };
+        })
+        .sort((a, b) => {
+          // Ordenar por: 1º fechamentos, 2º agendamentos, 3º pacientes
+          if (b.fechamentos !== a.fechamentos) return b.fechamentos - a.fechamentos;
+          if (b.agendamentos !== a.agendamentos) return b.agendamentos - a.agendamentos;
+          return b.pacientes - a.pacientes;
+        });
+        
+      // Array para gráfico (top 10)
+      const agendamentosPorCidadeGrafico = agendamentosPorCidadeArray.slice(0, limiteCidadesGrafico);
+      
+      // Array completo para taxa de conversão (top 15 com paginação)
+      const agendamentosPorCidadeConversao = agendamentosPorCidadeArray.slice(0, limiteCidadesConversao);
         
         
 
@@ -1319,7 +1448,8 @@ const Dashboard = () => {
         valorPeriodo,
         novosLeadsPeriodo,
         estatisticasPorDia,
-        agendamentosPorCidade: agendamentosPorCidadeArray,
+        agendamentosPorCidade: agendamentosPorCidadeGrafico,
+        agendamentosPorCidadeCompleto: agendamentosPorCidadeArray, // Array completo para taxa de conversão
         // Crescimentos dinâmicos
         crescimentoPacientes,
         crescimentoFechamentos,
@@ -1337,14 +1467,25 @@ const Dashboard = () => {
 
   const fetchRegioesDisponiveis = async () => {
     try {
-      const estadosRes = await makeRequest('/clinicas/estados');
-      if (estadosRes.ok) {
-        const estados = await estadosRes.json();
-        console.log('📍 Estados recebidos:', estados);
-        setEstadosDisponiveis(estados);
-      } else {
-        console.error('❌ Erro ao buscar estados:', estadosRes.status, await estadosRes.text());
+      // Buscar estados das clínicas
+      const estadosClinicasRes = await makeRequest('/clinicas/estados');
+      let estadosClinicas = [];
+      if (estadosClinicasRes.ok) {
+        estadosClinicas = await estadosClinicasRes.json();
       }
+      
+      // Buscar estados dos pacientes
+      const pacientesRes = await makeRequest('/dashboard/gerais/pacientes');
+      let estadosPacientes = [];
+      if (pacientesRes.ok) {
+        const pacientes = await pacientesRes.json();
+        estadosPacientes = [...new Set(pacientes.filter(p => p.estado).map(p => p.estado))];
+      }
+      
+      // Combinar e remover duplicatas
+      const todosEstados = [...new Set([...estadosClinicas, ...estadosPacientes])].sort();
+      setEstadosDisponiveis(todosEstados);
+      
     } catch (error) {
       console.error('❌ Erro ao buscar estados:', error);
     }
@@ -1842,7 +1983,7 @@ const Dashboard = () => {
           </div>
           <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
             <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600' }}>Agendamentos</div>
-            <div className="stat-value" style={{ fontSize: '2.5rem' }}>{pipelineFiltrado.agendado || 0}</div>
+            <div className="stat-value" style={{ fontSize: '2.5rem' }}>{kpisPrincipais.totalAgendamentos}</div>
           </div>
           <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
             <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600' }}>Fechamentos</div>
@@ -2263,25 +2404,34 @@ const Dashboard = () => {
                 Taxa de Conversão por Cidade
               </h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                {stats.agendamentosPorCidade.map((cidade, index) => (
-                  <div key={index} style={{ 
-                    padding: '1rem',
-                    backgroundColor: 'white',
-                    borderRadius: '10px',
-                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.06)',
-                    border: '1px solid #e5e7eb',
-                    transition: 'all 0.2s ease',
-                    cursor: 'pointer'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.06)';
-                  }}
-                  >
+                {(() => {
+                  const itensPorPagina = 15;
+                  const inicio = paginaConversaoCidades * itensPorPagina;
+                  const fim = inicio + itensPorPagina;
+                  const cidadesPagina = (stats.agendamentosPorCidadeCompleto || []).slice(inicio, fim);
+                  const totalPaginas = Math.ceil((stats.agendamentosPorCidadeCompleto || []).length / itensPorPagina);
+                  
+                  return (
+                    <>
+                      {cidadesPagina.map((cidade, index) => (
+                        <div key={inicio + index} style={{ 
+                          padding: '1rem',
+                          backgroundColor: 'white',
+                          borderRadius: '10px',
+                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.06)',
+                          border: '1px solid #e5e7eb',
+                          transition: 'all 0.2s ease',
+                          cursor: 'pointer'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.06)';
+                        }}
+                        >
                     <div style={{ 
                       fontWeight: '700', 
                       marginBottom: '0.75rem', 
@@ -2347,7 +2497,68 @@ const Dashboard = () => {
                       </div>
                     </div>
                   </div>
-                ))}
+                        ))}
+                      
+                      {/* Paginação */}
+                      {totalPaginas > 1 && (
+                        <div style={{ 
+                          gridColumn: '1 / -1', 
+                          display: 'flex', 
+                          justifyContent: 'center', 
+                          alignItems: 'center', 
+                          gap: '0.5rem',
+                          marginTop: '1.5rem',
+                          padding: '1rem'
+                        }}>
+                          <button
+                            onClick={() => setPaginaConversaoCidades(Math.max(0, paginaConversaoCidades - 1))}
+                            disabled={paginaConversaoCidades === 0}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '8px',
+                              background: paginaConversaoCidades === 0 ? '#f9fafb' : 'white',
+                              color: paginaConversaoCidades === 0 ? '#9ca3af' : '#374151',
+                              cursor: paginaConversaoCidades === 0 ? 'not-allowed' : 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: '500',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            Anterior
+                          </button>
+                          
+                          <span style={{ 
+                            padding: '0.5rem 1rem',
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            color: '#374151'
+                          }}>
+                            Página {paginaConversaoCidades + 1} de {totalPaginas}
+                          </span>
+                          
+                          <button
+                            onClick={() => setPaginaConversaoCidades(Math.min(totalPaginas - 1, paginaConversaoCidades + 1))}
+                            disabled={paginaConversaoCidades === totalPaginas - 1}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '8px',
+                              background: paginaConversaoCidades === totalPaginas - 1 ? '#f9fafb' : 'white',
+                              color: paginaConversaoCidades === totalPaginas - 1 ? '#9ca3af' : '#374151',
+                              cursor: paginaConversaoCidades === totalPaginas - 1 ? 'not-allowed' : 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: '500',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            Próxima
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -2806,7 +3017,7 @@ const Dashboard = () => {
                 color: '#1a1d23',
                 marginBottom: '0.5rem'
               }}>
-                {pipelineFiltrado.agendado || 0}
+                {kpisPrincipais.totalAgendamentos}
               </div>
               <div style={{ 
                 fontSize: '0.75rem', 
@@ -3568,4 +3779,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard; 
+export default Dashboard;

@@ -677,8 +677,6 @@ const Clinicas = () => {
           email: novaClinicaFormData.email?.toLowerCase().trim() || ''
         };
         
-        console.log('📤 Editando nova clínica - Dados sendo enviados:', dataToSend);
-        
         const response = await makeRequest(`/novas-clinicas/${editingNovaClinica.id}`, {
           method: 'PUT',
           body: JSON.stringify(dataToSend)
@@ -725,8 +723,6 @@ const Clinicas = () => {
           cnpj: novaClinicaFormData.cnpj?.replace(/\D/g, '') || '',
           email: novaClinicaFormData.email?.toLowerCase().trim() || ''
         };
-        
-        console.log('📤 Consultor interno - Dados sendo enviados:', dataToSend);
         
         const response = await makeRequest('/clinicas', {
           method: 'POST',
@@ -1058,8 +1054,6 @@ const Clinicas = () => {
         dadosParaEnviar.em_analise = true;
         dadosParaEnviar.status = 'aguardando_documentacao';
       }
-      
-      console.log('📤 Dados sendo enviados:', dadosParaEnviar);
       
       let response;
       if (editingClinica) {
@@ -1620,7 +1614,6 @@ const Clinicas = () => {
 
   // Função chamada quando evidência é enviada com sucesso
   const handleEvidenciaSuccess = async (evidenciaId) => {
-    console.log('✅ Evidência enviada, ID:', evidenciaId);
     
     // Atualizar status baseado no tipo de clínica
     if (evidenciaData.tipoClinica === 'nova_clinica') {
@@ -5526,6 +5519,36 @@ const Clinicas = () => {
                   />
                 </div>
 
+                {/* Responsável */}
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontWeight: '600',
+                    color: '#1e293b',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.95rem'
+                  }}>
+                    Responsável pela Clínica *
+                  </label>
+                  <input
+                    type="text"
+                    name="responsavel"
+                    value={novaClinicaFormData.responsavel}
+                    onChange={handleNovaClinicaInputChange}
+                    placeholder="Digite o nome do responsável"
+                    disabled={submittingNovaClinica}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      fontSize: '1rem',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
                 {/* WhatsApp */}
                 <div>
                   <label style={{
@@ -5535,7 +5558,7 @@ const Clinicas = () => {
                     marginBottom: '0.5rem',
                     fontSize: '0.95rem'
                   }}>
-                    WhatsApp *
+                    WhatsApp (Celular) *
                   </label>
                   <input
                     type="tel"
@@ -5554,6 +5577,14 @@ const Clinicas = () => {
                       outline: 'none'
                     }}
                   />
+                  <div style={{
+                    fontSize: '0.75rem',
+                    color: '#6b7280',
+                    marginTop: '0.25rem',
+                    fontStyle: 'italic'
+                  }}>
+                    Apenas número de celular (não aceita telefone fixo)
+                  </div>
                 </div>
 
                 {/* Estado */}

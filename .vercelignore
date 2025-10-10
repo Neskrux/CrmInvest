@@ -33,4 +33,5 @@ backend/uploads/
 
 # Git
 .git/
-.gitignore 
+.gitignore
+

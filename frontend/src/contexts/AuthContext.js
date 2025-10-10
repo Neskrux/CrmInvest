@@ -106,9 +106,6 @@ export const AuthProvider = ({ children }) => {
 
       const { token: newToken, usuario } = data;
       
-      console.log('🔐 Usuario recebido do backend:', usuario);
-      console.log('🔑 clinica_id:', usuario?.clinica_id);
-      
       // Limpar flags de tutoriais e modais (importante para evitar confusion entre tipos de usuário)
       localStorage.removeItem('welcome-completed');
       localStorage.removeItem('tutorial-completed');
