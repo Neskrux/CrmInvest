@@ -20,20 +20,34 @@ const MeusDocumentos = () => {
     banco_agencia: '',
     banco_pix: ''
   });
+  
+  // Estados para controlar seções de documentos (acordeão)
+  const [secaoDadosEmpresa, setSecaoDadosEmpresa] = useState(true);
+  const [secaoFaturamento, setSecaoFaturamento] = useState(false);
+  const [secaoSocios, setSecaoSocios] = useState(false);
+  const [secaoRespTecnico, setSecaoRespTecnico] = useState(false);
 
-  const documentos = [
-    { key: 'doc_cartao_cnpj', label: '1. Cartão CNPJ' },
-    { key: 'doc_contrato_social', label: '2. Contrato Social' },
-    { key: 'doc_alvara_sanitario', label: '3. Alvará Sanitário' },
-    { key: 'doc_balanco', label: '4. Balanço/Balancete (Últimos 12 meses)', nota: 'Deve ser dos últimos 12 meses' },
-    { key: 'doc_comprovante_endereco', label: '5. Comprovante de Endereço da Clínica' },
-    { key: 'doc_dados_bancarios', label: '6. Dados Bancários PJ' },
-    { key: 'doc_socios', label: '7. Documentos dos Sócios' },
-    { key: 'doc_certidao_resp_tecnico', label: '8. Certidão Resp. Técnico' },
-    { key: 'doc_resp_tecnico', label: '9. Docs Resp. Técnico' },
-    { key: 'doc_comprovante_endereco_socios', label: '10. Comprovante de Endereço dos Sócios' },
-    { key: 'doc_carteirinha_cro', label: '11. Carteirinha do Conselho (CRO/CFO)' }
-  ];
+  // Documentos organizados por categoria
+  const documentosPorSecao = {
+    dadosEmpresa: [
+      { key: 'doc_cartao_cnpj', label: 'Cartão CNPJ' },
+      { key: 'doc_contrato_social', label: 'Contrato Social' },
+      { key: 'doc_alvara_sanitario', label: 'Alvará de Funcionamento Sanitário' },
+      { key: 'doc_comprovante_endereco', label: 'Comprovante de Endereço da Clínica' }
+    ],
+    faturamento: [
+      { key: 'doc_balanco', label: 'Balanço/Balancete Assinado (Últimos 12 meses)', nota: 'Deve ser dos últimos 12 meses' }
+    ],
+    socios: [
+      { key: 'doc_socios', label: 'Documentos dos Sócios' },
+      { key: 'doc_comprovante_endereco_socios', label: 'Comprovante de Endereço dos Sócios' }
+    ],
+    respTecnico: [
+      { key: 'doc_certidao_resp_tecnico', label: 'Certidão de Responsabilidade Técnica' },
+      { key: 'doc_resp_tecnico', label: 'Documentos do Responsável Técnico' },
+      { key: 'doc_carteirinha_cro', label: 'Carteirinha do Conselho (CRO/CFO)' }
+    ]
+  };
 
   useEffect(() => {
     carregarDadosClinica();
@@ -106,8 +120,12 @@ const MeusDocumentos = () => {
     if (!file) return;
 
     // Validar tipo de arquivo
-    if (file.type !== 'application/pdf') {
-      showErrorToast('Apenas arquivos PDF são permitidos');
+    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/jpg', 'image/png'];
+    const allowedExtensions = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'];
+    
+    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+    if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+      showErrorToast('Apenas arquivos PDF, DOC, DOCX, JPG, JPEG e PNG são permitidos');
       return;
     }
 
@@ -170,6 +188,71 @@ const MeusDocumentos = () => {
       console.error('Erro ao baixar documento:', error);
       showErrorToast('Erro ao baixar documento');
     }
+  };
+
+  const handleDadosInputChange = (e) => {
+    let { name, value } = e.target;
+    
+    // Aplicar formatação específica baseada no campo
+    if (name === 'telefone_socios') {
+      // Remove tudo que não é número
+      let numbers = value.replace(/\D/g, '');
+      
+      // Remove zeros à esquerda
+      numbers = numbers.replace(/^0+/, '');
+      
+      // Limita a 11 dígitos
+      numbers = numbers.substring(0, 11);
+      
+      // Formata baseado no tamanho
+      if (numbers.length === 0) {
+        value = '';
+      } else if (numbers.length <= 2) {
+        value = `(${numbers}`;
+      } else if (numbers.length <= 6) {
+        value = `(${numbers.substring(0, 2)}) ${numbers.substring(2)}`;
+      } else if (numbers.length <= 10) {
+        value = `(${numbers.substring(0, 2)}) ${numbers.substring(2, 6)}-${numbers.substring(6)}`;
+      } else {
+        value = `(${numbers.substring(0, 2)}) ${numbers.substring(2, 7)}-${numbers.substring(7, 11)}`;
+      }
+    } else if (name === 'email_socios') {
+      // Normalizar email para minúsculas
+      value = value.toLowerCase();
+    } else if (name === 'banco_pix') {
+      // Detectar e formatar PIX (CPF, CNPJ, telefone ou email)
+      const numbers = value.replace(/\D/g, '');
+      
+      // Se parecer CPF (11 dígitos)
+      if (numbers.length === 11 && !value.includes('@') && !value.includes('.')) {
+        value = numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+      }
+      // Se parecer CNPJ (14 dígitos)
+      else if (numbers.length === 14 && !value.includes('@') && !value.includes('.')) {
+        value = numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+      }
+      // Se parecer telefone (10 ou 11 dígitos)
+      else if ((numbers.length === 10 || numbers.length === 11) && !value.includes('@')) {
+        if (numbers.length === 11) {
+          value = numbers.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+        } else {
+          value = numbers.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+        }
+      }
+      // Email - normalizar para minúsculas
+      else if (value.includes('@')) {
+        value = value.toLowerCase();
+      }
+      // Caso contrário, manter como está
+    } else if (name === 'banco_agencia') {
+      // Remove tudo que não é número ou hífen
+      value = value.replace(/[^\d-]/g, '');
+    } else if (name === 'banco_conta') {
+      // Remove tudo que não é número ou hífen
+      value = value.replace(/[^\d-]/g, '');
+    }
+    
+    setDadosForm({ ...dadosForm, [name]: value });
   };
 
   const handleSalvarDados = async () => {
@@ -297,15 +380,26 @@ const MeusDocumentos = () => {
               {editandoDados ? (
                 <input
                   type="tel"
+                  name="telefone_socios"
                   className="form-input"
                   value={dadosForm.telefone_socios}
-                  onChange={(e) => setDadosForm({...dadosForm, telefone_socios: e.target.value})}
+                  onChange={handleDadosInputChange}
                   placeholder="(11) 99999-9999"
                   style={{ marginTop: '0.25rem' }}
                 />
               ) : (
                 <p style={{ fontWeight: '500', margin: '0.25rem 0 0 0', color: '#1f2937' }}>
-                  {clinica?.telefone_socios || 'Não informado'}
+                  {clinica?.telefone_socios ? (
+                    (() => {
+                      const tel = clinica.telefone_socios.replace(/\D/g, '');
+                      if (tel.length === 11) {
+                        return `(${tel.substring(0, 2)}) ${tel.substring(2, 7)}-${tel.substring(7)}`;
+                      } else if (tel.length === 10) {
+                        return `(${tel.substring(0, 2)}) ${tel.substring(2, 6)}-${tel.substring(6)}`;
+                      }
+                      return clinica.telefone_socios;
+                    })()
+                  ) : 'Não informado'}
                 </p>
               )}
             </div>
@@ -314,15 +408,16 @@ const MeusDocumentos = () => {
               {editandoDados ? (
                 <input
                   type="email"
+                  name="email_socios"
                   className="form-input"
                   value={dadosForm.email_socios}
-                  onChange={(e) => setDadosForm({...dadosForm, email_socios: e.target.value})}
+                  onChange={handleDadosInputChange}
                   placeholder="socios@email.com"
                   style={{ marginTop: '0.25rem' }}
                 />
               ) : (
                 <p style={{ fontWeight: '500', margin: '0.25rem 0 0 0', color: '#1f2937' }}>
-                  {clinica?.email_socios || 'Não informado'}
+                  {clinica?.email_socios ? clinica.email_socios.toLowerCase() : 'Não informado'}
                 </p>
               )}
             </div>
@@ -338,9 +433,10 @@ const MeusDocumentos = () => {
               {editandoDados ? (
                 <input
                   type="text"
+                  name="banco_nome"
                   className="form-input"
                   value={dadosForm.banco_nome}
-                  onChange={(e) => setDadosForm({...dadosForm, banco_nome: e.target.value})}
+                  onChange={handleDadosInputChange}
                   placeholder="Ex: Banco do Brasil"
                   style={{ marginTop: '0.25rem' }}
                 />
@@ -355,9 +451,10 @@ const MeusDocumentos = () => {
               {editandoDados ? (
                 <input
                   type="text"
+                  name="banco_agencia"
                   className="form-input"
                   value={dadosForm.banco_agencia}
-                  onChange={(e) => setDadosForm({...dadosForm, banco_agencia: e.target.value})}
+                  onChange={handleDadosInputChange}
                   placeholder="Ex: 0001"
                   style={{ marginTop: '0.25rem' }}
                 />
@@ -372,9 +469,10 @@ const MeusDocumentos = () => {
               {editandoDados ? (
                 <input
                   type="text"
+                  name="banco_conta"
                   className="form-input"
                   value={dadosForm.banco_conta}
-                  onChange={(e) => setDadosForm({...dadosForm, banco_conta: e.target.value})}
+                  onChange={handleDadosInputChange}
                   placeholder="Ex: 12345-6"
                   style={{ marginTop: '0.25rem' }}
                 />
@@ -389,9 +487,10 @@ const MeusDocumentos = () => {
               {editandoDados ? (
                 <input
                   type="text"
+                  name="banco_pix"
                   className="form-input"
                   value={dadosForm.banco_pix}
-                  onChange={(e) => setDadosForm({...dadosForm, banco_pix: e.target.value})}
+                  onChange={handleDadosInputChange}
                   placeholder="CPF, CNPJ, Email ou Telefone"
                   style={{ marginTop: '0.25rem' }}
                 />
@@ -433,103 +532,394 @@ const MeusDocumentos = () => {
         </div>
       </div>
 
-      {/* Lista de Documentos */}
+      {/* Lista de Documentos com Acordeão */}
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Documentação Necessária</h2>
         </div>
         <div className="card-body">
-          <div style={{ display: 'grid', gap: '1rem' }}>
-            {documentos.map((doc) => {
-              const statusInfo = getStatusInfo(doc);
-              const StatusIcon = statusInfo.icon;
-              
-              return (
-                <div
-                  key={doc.key}
-                  style={{
-                    padding: '1.5rem',
-                    backgroundColor: '#f9fafb',
-                    borderRadius: '8px',
-                    border: '1px solid #e5e7eb',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '1rem',
-                    flexWrap: 'wrap'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: '1', minWidth: '200px' }}>
-                    <FileText size={24} color="#6b7280" />
-                    <div>
-                      <h4 style={{ fontSize: '1rem', fontWeight: '600', margin: '0' }}>
-                        {doc.label}
-                      </h4>
-                      {doc.nota && (
-                        <p style={{ fontSize: '0.75rem', color: '#f59e0b', margin: '0.25rem 0', fontWeight: '500' }}>
-                          ⚠️ {doc.nota}
-                        </p>
-                      )}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
-                        <StatusIcon size={16} color={statusInfo.color} />
-                        <span style={{ fontSize: '0.875rem', color: statusInfo.color, fontWeight: '500' }}>
-                          {statusInfo.text}
-                        </span>
+          {/* SEÇÃO 1: DADOS DA EMPRESA */}
+          <div style={{ marginBottom: '1rem', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+            <button
+              type="button"
+              onClick={() => setSecaoDadosEmpresa(!secaoDadosEmpresa)}
+              style={{
+                width: '100%',
+                padding: '1rem',
+                backgroundColor: secaoDadosEmpresa ? '#eff6ff' : '#f9fafb',
+                border: 'none',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '1rem',
+                color: '#1e40af'
+              }}
+            >
+              <span>Dados da Empresa</span>
+              <span style={{ fontSize: '1.25rem' }}>{secaoDadosEmpresa ? '−' : '+'}</span>
+            </button>
+            {secaoDadosEmpresa && (
+              <div style={{ padding: '1rem', backgroundColor: '#ffffff' }}>
+                {documentosPorSecao.dadosEmpresa.map((doc) => {
+                  const statusInfo = getStatusInfo(doc);
+                  const StatusIcon = statusInfo.icon;
+                  
+                  return (
+                    <div
+                      key={doc.key}
+                      style={{
+                        padding: '1rem',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '8px',
+                        border: '1px solid #e5e7eb',
+                        marginBottom: '0.75rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '1rem',
+                        flexWrap: 'wrap'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: '1', minWidth: '200px' }}>
+                        <FileText size={20} color="#6b7280" />
+                        <div>
+                          <h4 style={{ fontSize: '0.9rem', fontWeight: '600', margin: '0' }}>
+                            {doc.label}
+                          </h4>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                            <StatusIcon size={14} color={statusInfo.color} />
+                            <span style={{ fontSize: '0.75rem', color: statusInfo.color, fontWeight: '500' }}>
+                              {statusInfo.text}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        {clinica[doc.key] && (
+                          <button
+                            className="btn btn-sm btn-secondary"
+                            onClick={() => handleDownloadDocumento(doc.key)}
+                            title="Baixar documento"
+                            style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                          >
+                            Baixar
+                          </button>
+                        )}
+                        <label
+                          htmlFor={`upload-${doc.key}`}
+                          className="btn btn-sm btn-primary"
+                          style={{ cursor: uploadingDoc === doc.key ? 'not-allowed' : 'pointer', fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                        >
+                          {uploadingDoc === doc.key ? 'Enviando...' : (clinica[doc.key] ? 'Reenviar' : 'Enviar')}
+                        </label>
+                        <input
+                          id={`upload-${doc.key}`}
+                          type="file"
+                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                          style={{ display: 'none' }}
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              handleUploadDocumento(doc.key, e.target.files[0]);
+                            }
+                          }}
+                          disabled={uploadingDoc === doc.key}
+                        />
                       </div>
                     </div>
-                  </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    {/* Botão de Download - só aparece se o documento foi enviado */}
-                    {clinica[doc.key] && (
-                      <button
-                        className="btn btn-sm btn-secondary"
-                        onClick={() => handleDownloadDocumento(doc.key)}
-                        title="Baixar documento"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                          <polyline points="7 10 12 15 17 10"/>
-                          <line x1="12" y1="15" x2="12" y2="3"/>
-                        </svg>
-                        Baixar
-                      </button>
-                    )}
-
-                    {/* Botão de Upload/Reenviar */}
-                    <label
-                      htmlFor={`upload-${doc.key}`}
-                      className={`btn btn-sm ${clinica[doc.key] ? 'btn-primary' : 'btn-primary'}`}
-                      style={{ cursor: uploadingDoc === doc.key ? 'not-allowed' : 'pointer' }}
-                    >
-                      {uploadingDoc === doc.key ? (
-                        <>
-                          <div className="spinner" style={{ width: '14px', height: '14px', marginRight: '4px' }}></div>
-                          Enviando...
-                        </>
-                      ) : (
-                        <>
-                          <Upload size={16} style={{ marginRight: '4px' }} />
-                          {clinica[doc.key] ? 'Reenviar' : 'Enviar'}
-                        </>
-                      )}
-                    </label>
-                    <input
-                      id={`upload-${doc.key}`}
-                      type="file"
-                      accept=".pdf"
-                      style={{ display: 'none' }}
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          handleUploadDocumento(doc.key, e.target.files[0]);
-                        }
+          {/* SEÇÃO 2: FATURAMENTO E BANCÁRIO */}
+          <div style={{ marginBottom: '1rem', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+            <button
+              type="button"
+              onClick={() => setSecaoFaturamento(!secaoFaturamento)}
+              style={{
+                width: '100%',
+                padding: '1rem',
+                backgroundColor: secaoFaturamento ? '#eff6ff' : '#f9fafb',
+                border: 'none',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '1rem',
+                color: '#1e40af'
+              }}
+            >
+              <span>Faturamento e Bancário</span>
+              <span style={{ fontSize: '1.25rem' }}>{secaoFaturamento ? '−' : '+'}</span>
+            </button>
+            {secaoFaturamento && (
+              <div style={{ padding: '1rem', backgroundColor: '#ffffff' }}>
+                {documentosPorSecao.faturamento.map((doc) => {
+                  const statusInfo = getStatusInfo(doc);
+                  const StatusIcon = statusInfo.icon;
+                  
+                  return (
+                    <div
+                      key={doc.key}
+                      style={{
+                        padding: '1rem',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '8px',
+                        border: '1px solid #e5e7eb',
+                        marginBottom: '0.75rem'
                       }}
-                      disabled={uploadingDoc === doc.key}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: '1', minWidth: '200px' }}>
+                          <FileText size={20} color="#6b7280" />
+                          <div>
+                            <h4 style={{ fontSize: '0.9rem', fontWeight: '600', margin: '0' }}>
+                              {doc.label}
+                            </h4>
+                            {doc.nota && (
+                              <p style={{ fontSize: '0.7rem', color: '#f59e0b', margin: '0.25rem 0', fontWeight: '500' }}>
+                                ⚠️ {doc.nota}
+                              </p>
+                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                              <StatusIcon size={14} color={statusInfo.color} />
+                              <span style={{ fontSize: '0.75rem', color: statusInfo.color, fontWeight: '500' }}>
+                                {statusInfo.text}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          {clinica[doc.key] && (
+                            <button
+                              className="btn btn-sm btn-secondary"
+                              onClick={() => handleDownloadDocumento(doc.key)}
+                              title="Baixar documento"
+                              style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                            >
+                              Baixar
+                            </button>
+                          )}
+                          <label
+                            htmlFor={`upload-${doc.key}`}
+                            className="btn btn-sm btn-primary"
+                            style={{ cursor: uploadingDoc === doc.key ? 'not-allowed' : 'pointer', fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                          >
+                            {uploadingDoc === doc.key ? 'Enviando...' : (clinica[doc.key] ? 'Reenviar' : 'Enviar')}
+                          </label>
+                          <input
+                            id={`upload-${doc.key}`}
+                            type="file"
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                            style={{ display: 'none' }}
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                handleUploadDocumento(doc.key, e.target.files[0]);
+                              }
+                            }}
+                            disabled={uploadingDoc === doc.key}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* SEÇÃO 3: DADOS DOS SÓCIOS */}
+          <div style={{ marginBottom: '1rem', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+            <button
+              type="button"
+              onClick={() => setSecaoSocios(!secaoSocios)}
+              style={{
+                width: '100%',
+                padding: '1rem',
+                backgroundColor: secaoSocios ? '#eff6ff' : '#f9fafb',
+                border: 'none',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '1rem',
+                color: '#1e40af'
+              }}
+            >
+              <span>Dados dos Sócios</span>
+              <span style={{ fontSize: '1.25rem' }}>{secaoSocios ? '−' : '+'}</span>
+            </button>
+            {secaoSocios && (
+              <div style={{ padding: '1rem', backgroundColor: '#ffffff' }}>
+                {documentosPorSecao.socios.map((doc) => {
+                  const statusInfo = getStatusInfo(doc);
+                  const StatusIcon = statusInfo.icon;
+                  
+                  return (
+                    <div
+                      key={doc.key}
+                      style={{
+                        padding: '1rem',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '8px',
+                        border: '1px solid #e5e7eb',
+                        marginBottom: '0.75rem'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: '1', minWidth: '200px' }}>
+                          <FileText size={20} color="#6b7280" />
+                          <div>
+                            <h4 style={{ fontSize: '0.9rem', fontWeight: '600', margin: '0' }}>
+                              {doc.label}
+                            </h4>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                              <StatusIcon size={14} color={statusInfo.color} />
+                              <span style={{ fontSize: '0.75rem', color: statusInfo.color, fontWeight: '500' }}>
+                                {statusInfo.text}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          {clinica[doc.key] && (
+                            <button
+                              className="btn btn-sm btn-secondary"
+                              onClick={() => handleDownloadDocumento(doc.key)}
+                              title="Baixar documento"
+                              style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                            >
+                              Baixar
+                            </button>
+                          )}
+                          <label
+                            htmlFor={`upload-${doc.key}`}
+                            className="btn btn-sm btn-primary"
+                            style={{ cursor: uploadingDoc === doc.key ? 'not-allowed' : 'pointer', fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                          >
+                            {uploadingDoc === doc.key ? 'Enviando...' : (clinica[doc.key] ? 'Reenviar' : 'Enviar')}
+                          </label>
+                          <input
+                            id={`upload-${doc.key}`}
+                            type="file"
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                            style={{ display: 'none' }}
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                handleUploadDocumento(doc.key, e.target.files[0]);
+                              }
+                            }}
+                            disabled={uploadingDoc === doc.key}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* SEÇÃO 4: RESPONSÁVEL TÉCNICO */}
+          <div style={{ marginBottom: '1rem', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+            <button
+              type="button"
+              onClick={() => setSecaoRespTecnico(!secaoRespTecnico)}
+              style={{
+                width: '100%',
+                padding: '1rem',
+                backgroundColor: secaoRespTecnico ? '#eff6ff' : '#f9fafb',
+                border: 'none',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '1rem',
+                color: '#1e40af'
+              }}
+            >
+              <span>Responsável Técnico</span>
+              <span style={{ fontSize: '1.25rem' }}>{secaoRespTecnico ? '−' : '+'}</span>
+            </button>
+            {secaoRespTecnico && (
+              <div style={{ padding: '1rem', backgroundColor: '#ffffff' }}>
+                {documentosPorSecao.respTecnico.map((doc) => {
+                  const statusInfo = getStatusInfo(doc);
+                  const StatusIcon = statusInfo.icon;
+                  
+                  return (
+                    <div
+                      key={doc.key}
+                      style={{
+                        padding: '1rem',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '8px',
+                        border: '1px solid #e5e7eb',
+                        marginBottom: '0.75rem'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: '1', minWidth: '200px' }}>
+                          <FileText size={20} color="#6b7280" />
+                          <div>
+                            <h4 style={{ fontSize: '0.9rem', fontWeight: '600', margin: '0' }}>
+                              {doc.label}
+                            </h4>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                              <StatusIcon size={14} color={statusInfo.color} />
+                              <span style={{ fontSize: '0.75rem', color: statusInfo.color, fontWeight: '500' }}>
+                                {statusInfo.text}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          {clinica[doc.key] && (
+                            <button
+                              className="btn btn-sm btn-secondary"
+                              onClick={() => handleDownloadDocumento(doc.key)}
+                              title="Baixar documento"
+                              style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                            >
+                              Baixar
+                            </button>
+                          )}
+                          <label
+                            htmlFor={`upload-${doc.key}`}
+                            className="btn btn-sm btn-primary"
+                            style={{ cursor: uploadingDoc === doc.key ? 'not-allowed' : 'pointer', fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                          >
+                            {uploadingDoc === doc.key ? 'Enviando...' : (clinica[doc.key] ? 'Reenviar' : 'Enviar')}
+                          </label>
+                          <input
+                            id={`upload-${doc.key}`}
+                            type="file"
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                            style={{ display: 'none' }}
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                handleUploadDocumento(doc.key, e.target.files[0]);
+                              }
+                            }}
+                            disabled={uploadingDoc === doc.key}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -544,7 +934,7 @@ const MeusDocumentos = () => {
                 Informações Importantes
               </h4>
               <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#1e40af' }}>
-                <li>Apenas arquivos PDF são aceitos</li>
+                <li>Formatos aceitos: PDF, DOC, DOCX, JPG, JPEG e PNG</li>
                 <li>Tamanho máximo por arquivo: 10MB</li>
                 <li>Os documentos serão analisados pela equipe administrativa</li>
                 <li>Você será notificado sobre aprovações ou solicitações de reenvio</li>
