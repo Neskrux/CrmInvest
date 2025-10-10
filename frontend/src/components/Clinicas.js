@@ -16,6 +16,7 @@ const Clinicas = () => {
   const [showModal, setShowModal] = useState(false);
   const [showNovaClinicaModal, setShowNovaClinicaModal] = useState(false);
   const [editingClinica, setEditingClinica] = useState(null);
+  const [editingNovaClinica, setEditingNovaClinica] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false); // Estado para prevenir cliques duplos
   const [submittingNovaClinica, setSubmittingNovaClinica] = useState(false); // Estado para nova clínica
@@ -66,26 +67,38 @@ const Clinicas = () => {
     criar_acesso: false,
     email_login: '',
     senha: '',
-    // Campos de documentação
+    // Campos de documentação (com URLs)
     doc_cartao_cnpj: false,
+    doc_cartao_cnpj_url: '',
     doc_contrato_social: false,
+    doc_contrato_social_url: '',
     doc_alvara_sanitario: false,
+    doc_alvara_sanitario_url: '',
     doc_balanco: false,
+    doc_balanco_url: '',
     doc_comprovante_endereco: false,
+    doc_comprovante_endereco_url: '',
     doc_dados_bancarios: false,
+    doc_dados_bancarios_url: '',
     doc_socios: false,
+    doc_socios_url: '',
     doc_certidao_resp_tecnico: false,
+    doc_certidao_resp_tecnico_url: '',
     doc_resp_tecnico: false,
+    doc_resp_tecnico_url: '',
     visita_online: false,
     visita_online_url: '',
     visita_online_data: '',
     visita_online_observacoes: '',
     doc_certidao_casamento: false,
+    doc_certidao_casamento_url: '',
     // Novos campos de sócios
     telefone_socios: '',
     email_socios: '',
     doc_comprovante_endereco_socios: false,
+    doc_comprovante_endereco_socios_url: '',
     doc_carteirinha_cro: false,
+    doc_carteirinha_cro_url: '',
     // Dados bancários
     banco_nome: '',
     banco_conta: '',
@@ -95,6 +108,13 @@ const Clinicas = () => {
     limite_credito: ''
   });
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
+  
+  // Estados para controlar seções de documentos (acordeão)
+  const [secaoDadosEmpresa, setSecaoDadosEmpresa] = useState(true);
+  const [secaoFaturamento, setSecaoFaturamento] = useState(false);
+  const [secaoSocios, setSecaoSocios] = useState(false);
+  const [secaoRespTecnico, setSecaoRespTecnico] = useState(false);
+  
   const [novaClinicaFormData, setNovaClinicaFormData] = useState({
     nome: '',
     cnpj: '',
@@ -112,6 +132,7 @@ const Clinicas = () => {
   const [cidadeCustomizadaNova, setCidadeCustomizadaNova] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [uploadingDocs, setUploadingDocs] = useState({});
+  const [sociosDocsList, setSociosDocsList] = useState([]);
 
   // Estados para controlar o tutorial
   const [showTutorial, setShowTutorial] = useState(false);
@@ -492,7 +513,7 @@ const Clinicas = () => {
       const data = await response.json();
       
       if (response.ok) {
-        showSuccessToast('Clínica aprovada e movida para clínicas parceiras com sucesso!');
+        showSuccessToast('Clínica aprovada e movida para análise com sucesso!');
         fetchNovasClinicas();
         fetchClinicas(); // Atualizar também a lista de clínicas gerais
       } else {
@@ -605,6 +626,7 @@ const Clinicas = () => {
       if (response.ok) {
         showSuccessToast('Clínica excluída com sucesso!');
         fetchClinicas();
+        fetchClinicasEmAnalise(); // Atualizar também a aba Em Análise
       } else {
         showErrorToast('Erro ao excluir clínica: ' + data.error);
       }
@@ -647,6 +669,52 @@ const Clinicas = () => {
     setSubmittingNovaClinica(true);
     
     try {
+      // Se estiver editando uma nova clínica
+      if (editingNovaClinica) {
+        const dataToSend = {
+          ...novaClinicaFormData,
+          cnpj: novaClinicaFormData.cnpj?.replace(/\D/g, '') || '',
+          email: novaClinicaFormData.email?.toLowerCase().trim() || ''
+        };
+        
+        console.log('📤 Editando nova clínica - Dados sendo enviados:', dataToSend);
+        
+        const response = await makeRequest(`/novas-clinicas/${editingNovaClinica.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(dataToSend)
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+          showSuccessToast('Nova clínica atualizada com sucesso!');
+          setShowNovaClinicaModal(false);
+          setEditingNovaClinica(null);
+          setNovaClinicaFormData({
+            nome: '',
+            cnpj: '',
+            endereco: '',
+            bairro: '',
+            cidade: '',
+            estado: '',
+            nicho: '',
+            telefone: '',
+            email: '',
+            responsavel: '',
+            status: 'sem_primeiro_contato',
+            observacoes: ''
+          });
+          setCidadeCustomizadaNova(false);
+          fetchNovasClinicas();
+          return;
+        } else {
+          console.error('❌ Erro do servidor (edição nova clínica):', data);
+          showErrorToast('Erro ao atualizar nova clínica: ' + data.error);
+          setSubmittingNovaClinica(false);
+          return;
+        }
+      }
+      
       // Se for consultor interno, deve criar em análise via rota /clinicas
       if (isConsultorInterno) {
       const dataToSend = {
@@ -761,12 +829,18 @@ const Clinicas = () => {
         const data = await response.json();
         showSuccessToast('Documento enviado com sucesso!');
         
-        // Atualizar o estado do formulário
+        // Atualizar o estado do formulário com a URL do documento
         const docField = `doc_${docType}`;
-        setFormData(prev => ({ ...prev, [docField]: true }));
+        const docUrlField = `doc_${docType}_url`;
+        setFormData(prev => ({ 
+          ...prev, 
+          [docField]: true,
+          [docUrlField]: data.publicUrl || ''
+        }));
         
         // Recarregar dados da clínica
-        fetchClinicas();
+        await fetchClinicas();
+        await fetchClinicasEmAnalise();
       } else {
         const error = await response.json();
         showErrorToast(error.error || 'Erro ao enviar documento');
@@ -778,29 +852,147 @@ const Clinicas = () => {
       setUploadingDocs(prev => ({ ...prev, [docType]: false }));
     }
   };
-  
-  const handleDownloadDocument = async (docType) => {
+
+  // Upload múltiplo de documentos (para doc_socios)
+  const handleUploadMultipleDocuments = async (event, docType) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    setUploadingDocs(prev => ({ ...prev, [docType]: true }));
+    
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+      formData.append('documents', files[i]);
+    }
+    
     try {
-      // Buscar a URL do documento no banco de dados
-      const response = await fetch(`http://localhost:5000/api/clinicas/${editingClinica.id}`, {
+      const response = await fetch(`http://localhost:5000/api/documents/upload-multiple/${editingClinica.id}/${docType}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formData
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        showSuccessToast(data.message || 'Documentos enviados com sucesso!');
+        
+        // Atualizar o estado do formulário
+        const docField = `doc_${docType}`;
+        setFormData(prev => ({ ...prev, [docField]: true }));
+        
+        // Recarregar dados da clínica
+        await fetchClinicas();
+        await fetchClinicasEmAnalise();
+        
+        // Buscar dados atualizados da clínica e recarregar lista de documentos
+        try {
+          const clinicaResponse = await makeRequest(`/clinicas/${editingClinica.id}`);
+          if (clinicaResponse.ok) {
+            const clinicaData = await clinicaResponse.json();
+            loadSociosDocsList(clinicaData);
+          }
+        } catch (error) {
+          console.error('Erro ao recarregar lista de documentos:', error);
+        }
+      } else {
+        const error = await response.json();
+        showErrorToast(error.error || 'Erro ao enviar documentos');
+      }
+    } catch (error) {
+      console.error('Erro ao fazer upload múltiplo:', error);
+      showErrorToast('Erro ao enviar documentos');
+    } finally {
+      setUploadingDocs(prev => ({ ...prev, [docType]: false }));
+      // Limpar o input
+      event.target.value = '';
+    }
+  };
+  
+  // Carregar lista de documentos dos sócios
+  const loadSociosDocsList = async (clinica) => {
+    if (clinica && clinica.doc_socios_url) {
+      try {
+        const docs = JSON.parse(clinica.doc_socios_url);
+        if (Array.isArray(docs)) {
+          setSociosDocsList(docs);
+        } else {
+          // Formato antigo (string única)
+          setSociosDocsList([{ publicUrl: clinica.doc_socios_url, originalName: 'Documento' }]);
+        }
+      } catch {
+        // Formato antigo (string única)
+        setSociosDocsList([{ publicUrl: clinica.doc_socios_url, originalName: 'Documento' }]);
+      }
+    } else {
+      setSociosDocsList([]);
+    }
+  };
+
+  // Deletar um documento individual do array
+  const handleDeleteSociosDocument = async (index) => {
+    if (!window.confirm('Tem certeza que deseja excluir este documento?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/documents/delete-from-array/${editingClinica.id}/socios/${index}`, {
+        method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
-      
+
       if (response.ok) {
-        const clinica = await response.json();
-        const docField = `doc_${docType}_url`;
-        const docUrl = clinica[docField];
+        showSuccessToast('Documento excluído com sucesso!');
         
-        if (docUrl) {
-          // Abrir o documento em uma nova aba
-          window.open(docUrl, '_blank');
-        } else {
-          showErrorToast('Documento não encontrado');
+        // Recarregar listas
+        await fetchClinicas();
+        await fetchClinicasEmAnalise();
+        
+        // Buscar dados atualizados da clínica e recarregar lista de documentos
+        try {
+          const clinicaResponse = await makeRequest(`/clinicas/${editingClinica.id}`);
+          if (clinicaResponse.ok) {
+            const clinicaData = await clinicaResponse.json();
+            loadSociosDocsList(clinicaData);
+            
+            // Atualizar formData se não há mais documentos
+            if (!clinicaData.doc_socios) {
+              setFormData(prev => ({ ...prev, doc_socios: false }));
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao recarregar lista de documentos:', error);
         }
       } else {
-        showErrorToast('Erro ao buscar documento');
+        const error = await response.json();
+        showErrorToast(error.error || 'Erro ao excluir documento');
+      }
+    } catch (error) {
+      console.error('Erro ao excluir documento:', error);
+      showErrorToast('Erro ao excluir documento');
+    }
+  };
+
+  const handleDownloadDocument = async (docType) => {
+    try {
+      // Adicionar prefixo 'doc_' se não tiver (para compatibilidade com a rota do backend)
+      const tipoCompleto = docType.startsWith('doc_') ? docType : `doc_${docType}`;
+      
+      // Usar a mesma rota que funciona no modal de visualização
+      const response = await makeRequest(`/clinicas/${editingClinica.id}/documentos/${tipoCompleto}`);
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        
+        // Limpar o objeto URL após um tempo
+        setTimeout(() => window.URL.revokeObjectURL(url), 100);
+      } else {
+        showErrorToast('Documento não encontrado');
       }
     } catch (error) {
       console.error('Erro ao baixar:', error);
@@ -824,10 +1016,16 @@ const Clinicas = () => {
         
         // Atualizar o estado do formulário
         const docField = `doc_${docType}`;
-        setFormData(prev => ({ ...prev, [docField]: false }));
+        const docUrlField = `doc_${docType}_url`;
+        setFormData(prev => ({ 
+          ...prev, 
+          [docField]: false,
+          [docUrlField]: ''
+        }));
         
         // Recarregar dados da clínica
-        fetchClinicas();
+        await fetchClinicas();
+        await fetchClinicasEmAnalise();
       } else {
         showErrorToast('Erro ao excluir documento');
       }
@@ -967,26 +1165,38 @@ const Clinicas = () => {
       criar_acesso: false,
       email_login: '',
       senha: '',
-      // Campos de documentação
+      // Campos de documentação (incluindo URLs)
       doc_cartao_cnpj: clinica.doc_cartao_cnpj || false,
+      doc_cartao_cnpj_url: clinica.doc_cartao_cnpj_url || '',
       doc_contrato_social: clinica.doc_contrato_social || false,
+      doc_contrato_social_url: clinica.doc_contrato_social_url || '',
       doc_alvara_sanitario: clinica.doc_alvara_sanitario || false,
+      doc_alvara_sanitario_url: clinica.doc_alvara_sanitario_url || '',
       doc_balanco: clinica.doc_balanco || false,
+      doc_balanco_url: clinica.doc_balanco_url || '',
       doc_comprovante_endereco: clinica.doc_comprovante_endereco || false,
+      doc_comprovante_endereco_url: clinica.doc_comprovante_endereco_url || '',
       doc_dados_bancarios: clinica.doc_dados_bancarios || false,
+      doc_dados_bancarios_url: clinica.doc_dados_bancarios_url || '',
       doc_socios: clinica.doc_socios || false,
+      doc_socios_url: clinica.doc_socios_url || '',
       doc_certidao_resp_tecnico: clinica.doc_certidao_resp_tecnico || false,
+      doc_certidao_resp_tecnico_url: clinica.doc_certidao_resp_tecnico_url || '',
       doc_resp_tecnico: clinica.doc_resp_tecnico || false,
+      doc_resp_tecnico_url: clinica.doc_resp_tecnico_url || '',
       visita_online: clinica.visita_online || false,
       visita_online_url: clinica.visita_online_url || '',
       visita_online_data: clinica.visita_online_data || '',
       visita_online_observacoes: clinica.visita_online_observacoes || '',
       doc_certidao_casamento: clinica.doc_certidao_casamento || false,
+      doc_certidao_casamento_url: clinica.doc_certidao_casamento_url || '',
       // Novos campos
       telefone_socios: clinica.telefone_socios || '',
       email_socios: clinica.email_socios || '',
       doc_comprovante_endereco_socios: clinica.doc_comprovante_endereco_socios || false,
+      doc_comprovante_endereco_socios_url: clinica.doc_comprovante_endereco_socios_url || '',
       doc_carteirinha_cro: clinica.doc_carteirinha_cro || false,
+      doc_carteirinha_cro_url: clinica.doc_carteirinha_cro_url || '',
       banco_nome: clinica.banco_nome || '',
       banco_conta: clinica.banco_conta || '',
       banco_agencia: clinica.banco_agencia || '',
@@ -994,6 +1204,100 @@ const Clinicas = () => {
       limite_credito: clinica.limite_credito || ''
     });
     setCidadeCustomizada(cidadeEhCustomizada);
+    loadSociosDocsList(clinica); // Carregar lista de documentos dos sócios
+    setShowModal(true);
+  };
+
+  // Função para editar Nova Clínica
+  const handleEditNovaClinica = (clinica) => {
+    setEditingNovaClinica(clinica);
+    const estadoClinica = clinica.estado || '';
+    const cidadeClinica = clinica.cidade || '';
+    const cidadesDoEstado = estadoClinica ? (cidadesPorEstado[estadoClinica] || []) : [];
+    const cidadeEhCustomizada = cidadesDoEstado.length > 0 && !cidadesDoEstado.includes(cidadeClinica) && cidadeClinica !== '';
+    
+    setNovaClinicaFormData({
+      nome: clinica.nome || '',
+      cnpj: clinica.cnpj || '',
+      endereco: clinica.endereco || '',
+      bairro: clinica.bairro || '',
+      cidade: cidadeClinica,
+      estado: estadoClinica,
+      nicho: clinica.nicho || '',
+      telefone: clinica.telefone || '',
+      email: (clinica.email || '').toLowerCase(),
+      responsavel: clinica.responsavel || '',
+      status: clinica.status || 'aguardando_contato',
+      observacoes: clinica.observacoes || ''
+    });
+    setCidadeCustomizadaNova(cidadeEhCustomizada);
+    setShowNovaClinicaModal(true);
+  };
+
+  // Função para editar Clínica em Análise
+  const handleEditClinicaAnalise = (clinica) => {
+    setEditingClinica(clinica);
+    const estadoClinica = clinica.estado || '';
+    const cidadeClinica = clinica.cidade || '';
+    const cidadesDoEstado = estadoClinica ? (cidadesPorEstado[estadoClinica] || []) : [];
+    const cidadeEhCustomizada = cidadesDoEstado.length > 0 && !cidadesDoEstado.includes(cidadeClinica) && cidadeClinica !== '';
+    
+    setFormData({
+      nome: clinica.nome || '',
+      cnpj: clinica.cnpj || '',
+      endereco: clinica.endereco || '',
+      bairro: clinica.bairro || '',
+      cidade: cidadeClinica,
+      estado: estadoClinica,
+      nicho: clinica.nicho || '',
+      telefone: clinica.telefone || '',
+      email: (clinica.email || '').toLowerCase(),
+      responsavel: clinica.responsavel || '',
+      status: clinica.status || 'aguardando_documentacao',
+      // Campos de acesso (não editar em clínica existente)
+      criar_acesso: false,
+      email_login: '',
+      senha: '',
+      // Campos de documentação (incluindo URLs)
+      doc_cartao_cnpj: clinica.doc_cartao_cnpj || false,
+      doc_cartao_cnpj_url: clinica.doc_cartao_cnpj_url || '',
+      doc_contrato_social: clinica.doc_contrato_social || false,
+      doc_contrato_social_url: clinica.doc_contrato_social_url || '',
+      doc_alvara_sanitario: clinica.doc_alvara_sanitario || false,
+      doc_alvara_sanitario_url: clinica.doc_alvara_sanitario_url || '',
+      doc_balanco: clinica.doc_balanco || false,
+      doc_balanco_url: clinica.doc_balanco_url || '',
+      doc_comprovante_endereco: clinica.doc_comprovante_endereco || false,
+      doc_comprovante_endereco_url: clinica.doc_comprovante_endereco_url || '',
+      doc_dados_bancarios: clinica.doc_dados_bancarios || false,
+      doc_dados_bancarios_url: clinica.doc_dados_bancarios_url || '',
+      doc_socios: clinica.doc_socios || false,
+      doc_socios_url: clinica.doc_socios_url || '',
+      doc_certidao_resp_tecnico: clinica.doc_certidao_resp_tecnico || false,
+      doc_certidao_resp_tecnico_url: clinica.doc_certidao_resp_tecnico_url || '',
+      doc_resp_tecnico: clinica.doc_resp_tecnico || false,
+      doc_resp_tecnico_url: clinica.doc_resp_tecnico_url || '',
+      visita_online: clinica.visita_online || false,
+      visita_online_url: clinica.visita_online_url || '',
+      visita_online_data: clinica.visita_online_data || '',
+      visita_online_observacoes: clinica.visita_online_observacoes || '',
+      doc_certidao_casamento: clinica.doc_certidao_casamento || false,
+      doc_certidao_casamento_url: clinica.doc_certidao_casamento_url || '',
+      // Novos campos
+      telefone_socios: clinica.telefone_socios || '',
+      email_socios: clinica.email_socios || '',
+      doc_comprovante_endereco_socios: clinica.doc_comprovante_endereco_socios || false,
+      doc_comprovante_endereco_socios_url: clinica.doc_comprovante_endereco_socios_url || '',
+      doc_carteirinha_cro: clinica.doc_carteirinha_cro || false,
+      doc_carteirinha_cro_url: clinica.doc_carteirinha_cro_url || '',
+      banco_nome: clinica.banco_nome || '',
+      banco_conta: clinica.banco_conta || '',
+      banco_agencia: clinica.banco_agencia || '',
+      banco_pix: clinica.banco_pix || '',
+      limite_credito: clinica.limite_credito || ''
+    });
+    setCidadeCustomizada(cidadeEhCustomizada);
+    loadSociosDocsList(clinica); // Carregar lista de documentos dos sócios
     setShowModal(true);
   };
 
@@ -1182,7 +1486,7 @@ const Clinicas = () => {
     let { name, value } = e.target;
     
     // Aplicar formatação específica baseada no campo
-    if (name === 'telefone') {
+    if (name === 'telefone' || name === 'telefone_socios') {
       // Remove tudo que não é número
       let numbers = value.replace(/\D/g, '');
       
@@ -1208,9 +1512,40 @@ const Clinicas = () => {
       value = formatarCidade(value);
     } else if (name === 'cnpj') {
       value = formatarCNPJ(value);
-    } else if (name === 'email' || name === 'email_login') {
+    } else if (name === 'email' || name === 'email_login' || name === 'email_socios') {
       // Normalizar emails para minúsculas
       value = value.toLowerCase();
+    } else if (name === 'banco_pix') {
+      // Detectar e formatar PIX (CPF, CNPJ, telefone ou email)
+      const numbers = value.replace(/\D/g, '');
+      
+      // Se parecer CPF (11 dígitos)
+      if (numbers.length === 11 && !value.includes('@') && !value.includes('.')) {
+        value = numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+      }
+      // Se parecer CNPJ (14 dígitos)
+      else if (numbers.length === 14 && !value.includes('@') && !value.includes('.')) {
+        value = numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+      }
+      // Se parecer telefone (10 ou 11 dígitos)
+      else if ((numbers.length === 10 || numbers.length === 11) && !value.includes('@')) {
+        if (numbers.length === 11) {
+          value = numbers.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+        } else {
+          value = numbers.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+        }
+      }
+      // Email - normalizar para minúsculas
+      else if (value.includes('@')) {
+        value = value.toLowerCase();
+      }
+      // Caso contrário, manter como está
+    } else if (name === 'banco_agencia') {
+      // Remove tudo que não é número ou hífen
+      value = value.replace(/[^\d-]/g, '');
+    } else if (name === 'banco_conta') {
+      // Remove tudo que não é número ou hífen
+      value = value.replace(/[^\d-]/g, '');
     }
     
     // Limpar cidade se estado mudar
@@ -2705,6 +3040,17 @@ const Clinicas = () => {
                           {isAdmin && (
                             <>
                               <button
+                                onClick={() => handleEditNovaClinica(clinica)}
+                                className="btn-action"
+                                title="Editar"
+                                style={{ marginLeft: '0.5rem' }}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                </svg>
+                              </button>
+                              <button
                                 onClick={() => handleDeleteNovaClinica(clinica.id)}
                                 className="btn-action"
                                 title="Excluir"
@@ -2768,13 +3114,12 @@ const Clinicas = () => {
                 <thead>
                   <tr>
                     <th>Nome</th>
-                    <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Nicho</th>
-                    <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Contato</th>
+                    <th style={{ display: isMobile ? 'none' : 'table-cell', width: '100px', maxWidth: '100px' }}>Nicho</th>
                     <th>Status</th>
                     <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Documentação</th>
                     <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Vídeo Validação</th>
                     <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Cadastrado</th>
-                    <th>Ações</th>
+                    <th style={{ width: '280px' }}>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2816,21 +3161,19 @@ const Clinicas = () => {
                         <td>
                           <strong>{clinica.nome}</strong>
                         </td>
-                        <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                        <td style={{ display: isMobile ? 'none' : 'table-cell', width: '100px', maxWidth: '100px' }}>
                           {clinica.nicho ? (
-                            <span className="badge" style={{ backgroundColor: '#e5e7eb', color: '#374151' }}>
+                            <span className="badge" style={{ 
+                              backgroundColor: '#e5e7eb', 
+                              color: '#374151',
+                              display: 'block',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}>
                               {clinica.nicho}
                             </span>
                           ) : '-'}
-                        </td>
-                        <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
-                          {clinica.telefone && (
-                            <div>{formatarTelefone(clinica.telefone)}</div>
-                          )}
-                          {clinica.email && (
-                            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>{clinica.email?.toLowerCase()}</div>
-                          )}
-                          {!clinica.telefone && !clinica.email && '-'}
                         </td>
                         <td>
                           {isAdmin ? (
@@ -2937,7 +3280,7 @@ const Clinicas = () => {
                                 Enviado
                               </span>
                               <button
-                                onClick={() => window.open(clinica.video_validacao_url, '_blank')}
+                                onClick={() => window.open(`http://localhost:5000/api/documents/download/${clinica.id}/video_validacao`, '_blank')}
                                 className="btn btn-sm btn-secondary"
                                 style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
                               >
@@ -3011,6 +3354,17 @@ const Clinicas = () => {
                           </button>
                           {isAdmin && (
                             <>
+                              <button
+                                onClick={() => handleEditClinicaAnalise(clinica)}
+                                className="btn-action"
+                                title="Editar"
+                                style={{ marginLeft: '0.5rem' }}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                </svg>
+                              </button>
                               <button
                                 onClick={() => handleGerenciarAcesso(clinica)}
                                 className="btn-action"
@@ -3110,8 +3464,8 @@ const Clinicas = () => {
                 </div>
               </div>
 
-              {/* Seção de Acesso ao Sistema */}
-              {isAdmin && (
+              {/* Seção de Acesso ao Sistema - Apenas ao criar nova clínica */}
+              {isAdmin && !editingClinica && (
                 <div style={{ 
                   marginTop: '1.5rem', 
                   padding: '1rem', 
@@ -3354,8 +3708,31 @@ const Clinicas = () => {
                     <strong>Nota:</strong> Faça upload dos documentos clicando no botão "Enviar" ao lado de cada item. Formatos aceitos: PDF, DOC, DOCX, JPG, JPEG e PNG (máx. 10MB).
                   </div>
                   
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1rem' }}>
-                    {/* Upload de documentos */}
+                  {/* SEÇÃO 1: DADOS DA EMPRESA */}
+                  <div style={{ marginBottom: '1rem', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+                    <button
+                      type="button"
+                      onClick={() => setSecaoDadosEmpresa(!secaoDadosEmpresa)}
+                      style={{
+                        width: '100%',
+                        padding: '1rem',
+                        backgroundColor: secaoDadosEmpresa ? '#eff6ff' : '#f9fafb',
+                        border: 'none',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        fontSize: '1rem',
+                        color: '#1e40af'
+                      }}
+                    >
+                      <span>Dados da Empresa</span>
+                      <span style={{ fontSize: '1.25rem' }}>{secaoDadosEmpresa ? '−' : '+'}</span>
+                    </button>
+                    {secaoDadosEmpresa && (
+                      <div style={{ padding: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1rem', backgroundColor: '#ffffff' }}>
+                        {/* Documentos da seção */}
                     <div className="form-group" style={{ 
                       padding: '1rem',
                       backgroundColor: '#f9fafb',
@@ -3371,7 +3748,7 @@ const Clinicas = () => {
                             onChange={(e) => setFormData({...formData, doc_cartao_cnpj: e.target.checked})}
                             disabled
                           />
-                          <span style={{ fontWeight: '600' }}>1. Cartão CNPJ</span>
+                          <span style={{ fontWeight: '600' }}>Cartão CNPJ</span>
                         </label>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           {formData.doc_cartao_cnpj ? (
@@ -3426,7 +3803,7 @@ const Clinicas = () => {
                             onChange={(e) => setFormData({...formData, doc_contrato_social: e.target.checked})}
                             disabled
                           />
-                          <span style={{ fontWeight: '600' }}>2. Contrato Social</span>
+                          <span style={{ fontWeight: '600' }}>Contrato Social</span>
                         </label>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           {formData.doc_contrato_social ? (
@@ -3481,7 +3858,7 @@ const Clinicas = () => {
                             onChange={(e) => setFormData({...formData, doc_alvara_sanitario: e.target.checked})}
                             disabled
                           />
-                          <span style={{ fontWeight: '600' }}>3. Alvará de Funcionamento Sanitário</span>
+                          <span style={{ fontWeight: '600' }}>Alvará de Funcionamento Sanitário</span>
                         </label>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           {formData.doc_alvara_sanitario ? (
@@ -3531,12 +3908,150 @@ const Clinicas = () => {
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           <input 
                             type="checkbox" 
+                            name="doc_comprovante_endereco"
+                            checked={formData.doc_comprovante_endereco || false}
+                            onChange={(e) => setFormData({...formData, doc_comprovante_endereco: e.target.checked})}
+                            disabled
+                          />
+                          <span style={{ fontWeight: '600' }}>Comprovante de Endereço da Clínica</span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          {formData.doc_comprovante_endereco ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-secondary"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDownloadDocument('comprovante_endereco')}
+                              >
+                                Baixar
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDeleteDocument('comprovante_endereco')}
+                              >
+                                Excluir
+                              </button>
+                            </>
+                          ) : (
+                            <label className="btn btn-sm btn-primary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', cursor: 'pointer', color: 'white' }}>
+                              <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                onChange={(e) => handleUploadDocument(e, 'comprovante_endereco')}
+                              />
+                              Enviar
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                      {uploadingDocs['comprovante_endereco'] && (
+                        <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
+                      )}
+                    </div>
+
+                    <div className="form-group" style={{ 
+                      padding: '1rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input 
+                            type="checkbox" 
+                            name="doc_carteirinha_cro"
+                            checked={formData.doc_carteirinha_cro || false}
+                            onChange={(e) => setFormData({...formData, doc_carteirinha_cro: e.target.checked})}
+                            disabled
+                          />
+                          <span style={{ fontWeight: '600' }}>Carteirinha do Conselho (CRO/CFO)</span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          {formData.doc_carteirinha_cro ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-secondary"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDownloadDocument('carteirinha_cro')}
+                              >
+                                Baixar
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger"
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                onClick={() => handleDeleteDocument('carteirinha_cro')}
+                              >
+                                Excluir
+                              </button>
+                            </>
+                          ) : (
+                            <label className="btn btn-sm btn-primary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', cursor: 'pointer', color: 'white' }}>
+                              <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                onChange={(e) => handleUploadDocument(e, 'carteirinha_cro')}
+                              />
+                              Enviar
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                      {uploadingDocs['carteirinha_cro'] && (
+                        <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
+                      )}
+                    </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* SEÇÃO 2: FATURAMENTO E BANCÁRIO */}
+                  <div style={{ marginBottom: '1rem', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+                    <button
+                      type="button"
+                      onClick={() => setSecaoFaturamento(!secaoFaturamento)}
+                      style={{
+                        width: '100%',
+                        padding: '1rem',
+                        backgroundColor: secaoFaturamento ? '#eff6ff' : '#f9fafb',
+                        border: 'none',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        fontSize: '1rem',
+                        color: '#1e40af'
+                      }}
+                    >
+                      <span>Faturamento e Bancário</span>
+                      <span style={{ fontSize: '1.25rem' }}>{secaoFaturamento ? '−' : '+'}</span>
+                    </button>
+                    {secaoFaturamento && (
+                      <div style={{ padding: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1rem', backgroundColor: '#ffffff' }}>
+                    
+                    <div className="form-group" style={{ 
+                      padding: '1rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input 
+                            type="checkbox" 
                             name="doc_balanco"
                             checked={formData.doc_balanco || false}
                             onChange={(e) => setFormData({...formData, doc_balanco: e.target.checked})}
                             disabled
                           />
-                          <span style={{ fontWeight: '600' }}>4. Balanço/Balancete Assinado (Últimos 12 meses)</span>
+                          <span style={{ fontWeight: '600' }}>Balanço/Balancete Assinado (Últimos 12 meses)</span>
                         </label>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           {formData.doc_balanco ? (
@@ -3576,60 +4091,89 @@ const Clinicas = () => {
                       )}
                     </div>
                     
-                    <div className="form-group" style={{ 
-                      padding: '1rem',
-                      backgroundColor: '#f9fafb',
-                      borderRadius: '8px',
-                      border: '1px solid #e5e7eb'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <input 
-                            type="checkbox" 
-                            name="doc_comprovante_endereco"
-                            checked={formData.doc_comprovante_endereco || false}
-                            onChange={(e) => setFormData({...formData, doc_comprovante_endereco: e.target.checked})}
-                            disabled
+                    {/* Campos de dados bancários */}
+                    <div style={{ padding: '1rem', backgroundColor: '#f0f9ff', borderRadius: '8px', gridColumn: '1 / -1' }}>
+                      <h4 style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '1rem', color: '#0c4a6e' }}>
+                        Dados Bancários da Clínica (PJ)
+                      </h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                        <div className="form-group">
+                          <label className="form-label">Banco</label>
+                          <input
+                            type="text"
+                            name="banco_nome"
+                            className="form-input"
+                            value={formData.banco_nome}
+                            onChange={handleInputChange}
+                            placeholder="Ex: Banco do Brasil"
                           />
-                          <span style={{ fontWeight: '600' }}>5. Comprovante de Endereço da Clínica</span>
-                        </label>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          {formData.doc_comprovante_endereco ? (
-                            <>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-secondary"
-                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                                onClick={() => handleDownloadDocument('comprovante_endereco')}
-                              >
-                                Baixar
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-danger"
-                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                                onClick={() => handleDeleteDocument('comprovante_endereco')}
-                              >
-                                Excluir
-                              </button>
-                            </>
-                          ) : (
-                            <label className="btn btn-sm btn-primary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', cursor: 'pointer', color: 'white' }}>
-                              <input
-                                type="file"
-                                style={{ display: 'none' }}
-                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                onChange={(e) => handleUploadDocument(e, 'comprovante_endereco')}
-                              />
-                              Enviar
-                            </label>
-                          )}
+                        </div>
+                        
+                        <div className="form-group">
+                          <label className="form-label">Agência</label>
+                          <input
+                            type="text"
+                            name="banco_agencia"
+                            className="form-input"
+                            value={formData.banco_agencia}
+                            onChange={handleInputChange}
+                            placeholder="Ex: 0001"
+                          />
+                        </div>
+                        
+                        <div className="form-group">
+                          <label className="form-label">Conta</label>
+                          <input
+                            type="text"
+                            name="banco_conta"
+                            className="form-input"
+                            value={formData.banco_conta}
+                            onChange={handleInputChange}
+                            placeholder="Ex: 12345-6"
+                          />
+                        </div>
+                        
+                        <div className="form-group">
+                          <label className="form-label">Chave PIX</label>
+                          <input
+                            type="text"
+                            name="banco_pix"
+                            className="form-input"
+                            value={formData.banco_pix}
+                            onChange={handleInputChange}
+                            placeholder="CPF, CNPJ, Email ou Telefone"
+                          />
                         </div>
                       </div>
-                      {uploadingDocs['comprovante_endereco'] && (
-                        <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
-                      )}
                     </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* SEÇÃO 3: DADOS DOS SÓCIOS */}
+                  <div style={{ marginBottom: '1rem', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+                    <button
+                      type="button"
+                      onClick={() => setSecaoSocios(!secaoSocios)}
+                      style={{
+                        width: '100%',
+                        padding: '1rem',
+                        backgroundColor: secaoSocios ? '#eff6ff' : '#f9fafb',
+                        border: 'none',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        fontSize: '1rem',
+                        color: '#1e40af'
+                      }}
+                    >
+                      <span>Dados dos Sócios</span>
+                      <span style={{ fontSize: '1.25rem' }}>{secaoSocios ? '−' : '+'}</span>
+                    </button>
+                    {secaoSocios && (
+                      <div style={{ padding: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1rem', backgroundColor: '#ffffff' }}>
                     
                     <div className="form-group" style={{ 
                       padding: '1rem',
@@ -3637,63 +4181,8 @@ const Clinicas = () => {
                       borderRadius: '8px',
                       border: '1px solid #e5e7eb'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <input 
-                            type="checkbox" 
-                            name="doc_dados_bancarios"
-                            checked={formData.doc_dados_bancarios || false}
-                            onChange={(e) => setFormData({...formData, doc_dados_bancarios: e.target.checked})}
-                            disabled
-                          />
-                          <span style={{ fontWeight: '600' }}>6. Dados Bancários PJ</span>
-                        </label>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          {formData.doc_dados_bancarios ? (
-                            <>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-secondary"
-                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                                onClick={() => handleDownloadDocument('dados_bancarios')}
-                              >
-                                Baixar
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-danger"
-                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                                onClick={() => handleDeleteDocument('dados_bancarios')}
-                              >
-                                Excluir
-                              </button>
-                            </>
-                          ) : (
-                            <label className="btn btn-sm btn-primary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', cursor: 'pointer', color: 'white' }}>
-                              <input
-                                type="file"
-                                style={{ display: 'none' }}
-                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                onChange={(e) => handleUploadDocument(e, 'dados_bancarios')}
-                              />
-                              Enviar
-                            </label>
-                          )}
-                        </div>
-                      </div>
-                      {uploadingDocs['dados_bancarios'] && (
-                        <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
-                      )}
-                    </div>
-                    
-                    <div className="form-group" style={{ 
-                      padding: '1rem',
-                      backgroundColor: '#f9fafb',
-                      borderRadius: '8px',
-                      border: '1px solid #e5e7eb'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <div style={{ marginBottom: '0.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                           <input 
                             type="checkbox" 
                             name="doc_socios"
@@ -3701,16 +4190,105 @@ const Clinicas = () => {
                             onChange={(e) => setFormData({...formData, doc_socios: e.target.checked})}
                             disabled
                           />
-                          <span style={{ fontWeight: '600' }}>7. Documentos dos Sócios</span>
+                          <span style={{ fontWeight: '600' }}>Documentos dos Sócios</span>
+                          {sociosDocsList.length > 0 && (
+                            <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                              ({sociosDocsList.length} arquivo{sociosDocsList.length !== 1 ? 's' : ''})
+                            </span>
+                          )}
+                        </label>
+                        
+                        {/* Lista de documentos */}
+                        {sociosDocsList.length > 0 && (
+                          <div style={{ marginBottom: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            {sociosDocsList.map((doc, index) => (
+                              <div key={index} style={{ 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                alignItems: 'center',
+                                padding: '0.5rem',
+                                backgroundColor: '#ffffff',
+                                borderRadius: '4px',
+                                border: '1px solid #e5e7eb'
+                              }}>
+                                <span style={{ fontSize: '0.875rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {doc.originalName || `Documento ${index + 1}`}
+                                </span>
+                                <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-secondary"
+                                    style={{ fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
+                                    onClick={() => window.open(doc.publicUrl, '_blank')}
+                                    title="Baixar"
+                                  >
+                                    Baixar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-danger"
+                                    style={{ fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
+                                    onClick={() => handleDeleteSociosDocument(index)}
+                                    title="Excluir"
+                                  >
+                                    Excluir
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {/* Botão de upload múltiplo */}
+                        <label className="btn btn-sm btn-primary" style={{ 
+                          fontSize: '0.75rem', 
+                          padding: '0.25rem 0.5rem', 
+                          cursor: 'pointer', 
+                          color: 'white',
+                          display: 'inline-block'
+                        }}>
+                          <input
+                            type="file"
+                            multiple
+                            style={{ display: 'none' }}
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                            onChange={(e) => handleUploadMultipleDocuments(e, 'socios')}
+                          />
+                          {sociosDocsList.length > 0 ? 'Adicionar mais documentos' : 'Enviar documentos'}
+                        </label>
+                      </div>
+                      {uploadingDocs['socios'] && (
+                        <div style={{ fontSize: '0.75rem', color: '#3b82f6', marginTop: '0.5rem' }}>Enviando...</div>
+                      )}
+                    </div>
+                    
+                    
+                    {/* Novos Documentos */}
+                    <div className="form-group" style={{ 
+                      padding: '1rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input 
+                            type="checkbox" 
+                            name="doc_comprovante_endereco_socios"
+                            checked={formData.doc_comprovante_endereco_socios || false}
+                            onChange={(e) => setFormData({...formData, doc_comprovante_endereco_socios: e.target.checked})}
+                            disabled
+                          />
+                          <span style={{ fontWeight: '600' }}>Comprovante de Endereço dos Sócios</span>
                         </label>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          {formData.doc_socios ? (
+                          {formData.doc_comprovante_endereco_socios ? (
                             <>
                               <button
                                 type="button"
                                 className="btn btn-sm btn-secondary"
                                 style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                                onClick={() => handleDownloadDocument('socios')}
+                                onClick={() => handleDownloadDocument('comprovante_endereco_socios')}
                               >
                                 Baixar
                               </button>
@@ -3718,7 +4296,7 @@ const Clinicas = () => {
                                 type="button"
                                 className="btn btn-sm btn-danger"
                                 style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                                onClick={() => handleDeleteDocument('socios')}
+                                onClick={() => handleDeleteDocument('comprovante_endereco_socios')}
                               >
                                 Excluir
                               </button>
@@ -3729,17 +4307,77 @@ const Clinicas = () => {
                                 type="file"
                                 style={{ display: 'none' }}
                                 accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                onChange={(e) => handleUploadDocument(e, 'socios')}
+                                onChange={(e) => handleUploadDocument(e, 'comprovante_endereco_socios')}
                               />
                               Enviar
                             </label>
                           )}
-                        </div>
-                      </div>
-                      {uploadingDocs['socios'] && (
+                  </div>
+                </div>
+                      {uploadingDocs['comprovante_endereco_socios'] && (
                         <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
                       )}
                     </div>
+                    
+                    {/* Campos de informação dos sócios */}
+                    <div style={{ padding: '1rem', backgroundColor: '#f0f9ff', borderRadius: '8px', gridColumn: '1 / -1' }}>
+                      <h4 style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '1rem', color: '#0c4a6e' }}>
+                        Informações de Contato dos Sócios
+                      </h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+                        <div className="form-group">
+                          <label className="form-label">Telefone dos Sócios</label>
+                          <input
+                            type="tel"
+                            name="telefone_socios"
+                            className="form-input"
+                            value={formData.telefone_socios}
+                            onChange={handleInputChange}
+                            placeholder="(11) 99999-9999"
+                          />
+                        </div>
+                        
+                        <div className="form-group">
+                          <label className="form-label">Email dos Sócios</label>
+                          <input
+                            type="email"
+                            name="email_socios"
+                            className="form-input"
+                            value={formData.email_socios}
+                            onChange={handleInputChange}
+                            placeholder="socios@email.com"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* SEÇÃO 4: RESPONSÁVEL TÉCNICO */}
+                  <div style={{ marginBottom: '1rem', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+                    <button
+                      type="button"
+                      onClick={() => setSecaoRespTecnico(!secaoRespTecnico)}
+                      style={{
+                        width: '100%',
+                        padding: '1rem',
+                        backgroundColor: secaoRespTecnico ? '#eff6ff' : '#f9fafb',
+                        border: 'none',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        fontSize: '1rem',
+                        color: '#1e40af'
+                      }}
+                    >
+                      <span>Responsável Técnico</span>
+                      <span style={{ fontSize: '1.25rem' }}>{secaoRespTecnico ? '−' : '+'}</span>
+                    </button>
+                    {secaoRespTecnico && (
+                      <div style={{ padding: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1rem', backgroundColor: '#ffffff' }}>
                     
                     <div className="form-group" style={{ 
                       padding: '1rem',
@@ -3756,7 +4394,7 @@ const Clinicas = () => {
                             onChange={(e) => setFormData({...formData, doc_certidao_resp_tecnico: e.target.checked})}
                             disabled
                           />
-                          <span style={{ fontWeight: '600' }}>8. Certidão de Responsabilidade Técnica</span>
+                          <span style={{ fontWeight: '600' }}>Certidão de Responsabilidade Técnica</span>
                         </label>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           {formData.doc_certidao_resp_tecnico ? (
@@ -3811,7 +4449,7 @@ const Clinicas = () => {
                             onChange={(e) => setFormData({...formData, doc_resp_tecnico: e.target.checked})}
                             disabled
                           />
-                          <span style={{ fontWeight: '600' }}>9. Documentos do Responsável Técnico</span>
+                          <span style={{ fontWeight: '600' }}>Documentos do Responsável Técnico</span>
                         </label>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           {formData.doc_resp_tecnico ? (
@@ -3850,232 +4488,12 @@ const Clinicas = () => {
                         <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
                       )}
                     </div>
-                    
-                    {/* Novos Documentos */}
-                    <div className="form-group" style={{ 
-                      padding: '1rem',
-                      backgroundColor: '#f9fafb',
-                      borderRadius: '8px',
-                      border: '1px solid #e5e7eb'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <input 
-                            type="checkbox" 
-                            name="doc_comprovante_endereco_socios"
-                            checked={formData.doc_comprovante_endereco_socios || false}
-                            onChange={(e) => setFormData({...formData, doc_comprovante_endereco_socios: e.target.checked})}
-                            disabled
-                          />
-                          <span style={{ fontWeight: '600' }}>10. Comprovante de Endereço dos Sócios</span>
-                        </label>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          {formData.doc_comprovante_endereco_socios ? (
-                            <>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-secondary"
-                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                                onClick={() => handleDownloadDocument('comprovante_endereco_socios')}
-                              >
-                                Baixar
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-danger"
-                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                                onClick={() => handleDeleteDocument('comprovante_endereco_socios')}
-                              >
-                                Excluir
-                              </button>
-                            </>
-                          ) : (
-                            <label className="btn btn-sm btn-primary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', cursor: 'pointer', color: 'white' }}>
-                              <input
-                                type="file"
-                                style={{ display: 'none' }}
-                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                onChange={(e) => handleUploadDocument(e, 'comprovante_endereco_socios')}
-                              />
-                              Enviar
-                            </label>
-                          )}
-                  </div>
-                </div>
-                      {uploadingDocs['comprovante_endereco_socios'] && (
-                        <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
-                      )}
-                    </div>
-                    
-                    <div className="form-group" style={{ 
-                      padding: '1rem',
-                      backgroundColor: '#f9fafb',
-                      borderRadius: '8px',
-                      border: '1px solid #e5e7eb'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <input 
-                            type="checkbox" 
-                            name="doc_carteirinha_cro"
-                            checked={formData.doc_carteirinha_cro || false}
-                            onChange={(e) => setFormData({...formData, doc_carteirinha_cro: e.target.checked})}
-                            disabled
-                          />
-                          <span style={{ fontWeight: '600' }}>11. Carteirinha do Conselho (CRO/CFO)</span>
-                        </label>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          {formData.doc_carteirinha_cro ? (
-                            <>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-secondary"
-                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                                onClick={() => handleDownloadDocument('carteirinha_cro')}
-                              >
-                                Baixar
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-danger"
-                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                                onClick={() => handleDeleteDocument('carteirinha_cro')}
-                              >
-                                Excluir
-                              </button>
-                            </>
-                          ) : (
-                            <label className="btn btn-sm btn-primary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', cursor: 'pointer', color: 'white' }}>
-                              <input
-                                type="file"
-                                style={{ display: 'none' }}
-                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                onChange={(e) => handleUploadDocument(e, 'carteirinha_cro')}
-                              />
-                              Enviar
-                            </label>
-                          )}
-                        </div>
                       </div>
-                      {uploadingDocs['carteirinha_cro'] && (
-                        <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Enviando...</div>
-                      )}
-                    </div>
+                    )}
                   </div>
                   
-                  {/* Seção de Informações dos Sócios */}
-                  <h3 style={{ 
-                    fontSize: '1.125rem', 
-                    fontWeight: '700', 
-                    color: '#1a1d23', 
-                    marginTop: '2rem',
-                    marginBottom: '1rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                      <circle cx="9" cy="7" r="4"></circle>
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                    </svg>
-                    Informações dos Sócios
-                  </h3>
-                  
-                  <div className="grid grid-2">
-                    <div className="form-group">
-                      <label className="form-label">Telefone dos Sócios</label>
-                      <input
-                        type="tel"
-                        name="telefone_socios"
-                        className="form-input"
-                        value={formData.telefone_socios}
-                        onChange={handleInputChange}
-                        placeholder="(11) 99999-9999"
-                      />
-                    </div>
-                    
-                    <div className="form-group">
-                      <label className="form-label">Email dos Sócios</label>
-                      <input
-                        type="email"
-                        name="email_socios"
-                        className="form-input"
-                        value={formData.email_socios}
-                        onChange={handleInputChange}
-                        placeholder="socios@email.com"
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Seção de Dados Bancários */}
-                  <h3 style={{ 
-                    fontSize: '1.125rem', 
-                    fontWeight: '700', 
-                    color: '#1a1d23', 
-                    marginTop: '2rem',
-                    marginBottom: '1rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
-                      <line x1="1" y1="10" x2="23" y2="10"></line>
-                    </svg>
-                    Dados Bancários da Clínica (PJ)
-                  </h3>
-                  
-                  <div className="grid grid-2">
-                    <div className="form-group">
-                      <label className="form-label">Banco</label>
-                      <input
-                        type="text"
-                        name="banco_nome"
-                        className="form-input"
-                        value={formData.banco_nome}
-                        onChange={handleInputChange}
-                        placeholder="Ex: Banco do Brasil"
-                      />
-                    </div>
-                    
-                    <div className="form-group">
-                      <label className="form-label">Agência</label>
-                      <input
-                        type="text"
-                        name="banco_agencia"
-                        className="form-input"
-                        value={formData.banco_agencia}
-                        onChange={handleInputChange}
-                        placeholder="Ex: 0001"
-                      />
-                    </div>
-                    
-                    <div className="form-group">
-                      <label className="form-label">Conta</label>
-                      <input
-                        type="text"
-                        name="banco_conta"
-                        className="form-input"
-                        value={formData.banco_conta}
-                        onChange={handleInputChange}
-                        placeholder="Ex: 12345-6"
-                      />
-                    </div>
-                    
-                    <div className="form-group">
-                      <label className="form-label">Chave PIX</label>
-                      <input
-                        type="text"
-                        name="banco_pix"
-                        className="form-input"
-                        value={formData.banco_pix}
-                        onChange={handleInputChange}
-                        placeholder="CPF, CNPJ, Email ou Telefone"
-                      />
-                    </div>
-                  </div>
+                  {/* Seção de Dados Bancários - REMOVIDA (agora está dentro do acordeão) */}
+                  {/* Seção de Informações dos Sócios - REMOVIDA (agora está dentro do acordeão) */}
                   
                   {/* Limite de Crédito - Apenas Admin */}
                   {isAdmin && (
@@ -4115,7 +4533,7 @@ const Clinicas = () => {
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
                 <button 
                   type="button"
                   className="btn btn-secondary"
@@ -4355,6 +4773,47 @@ const Clinicas = () => {
                          {getStatusClinicaInfo(viewingClinica.status).label}
                        </span>
                      </p>
+                   </div>
+                 )}
+                 
+                 {/* Vídeo de Validação */}
+                 {viewingClinica.video_validacao && (
+                   <div>
+                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Vídeo de Validação</label>
+                     <div style={{ margin: '0.5rem 0 0 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                       <span 
+                         className="badge"
+                         style={{
+                           backgroundColor: '#10b981',
+                           color: 'white',
+                           fontWeight: '600',
+                           borderRadius: '0.375rem',
+                           padding: '0.25rem 0.75rem',
+                           fontSize: '0.75rem'
+                         }}
+                       >
+                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.25rem', verticalAlign: 'middle' }}>
+                           <polygon points="5 3 19 12 5 21 5 3"/>
+                         </svg>
+                         Vídeo Enviado
+                       </span>
+                       <button
+                         onClick={() => window.open(`http://localhost:5000/api/documents/download/${viewingClinica.id}/video_validacao`, '_blank')}
+                         className="btn btn-sm btn-secondary"
+                         style={{ 
+                           fontSize: '0.75rem', 
+                           padding: '0.25rem 0.75rem',
+                           display: 'flex',
+                           alignItems: 'center',
+                           gap: '0.25rem'
+                         }}
+                       >
+                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                           <polygon points="5 3 19 12 5 21 5 3"/>
+                         </svg>
+                         Assistir
+                       </button>
+                     </div>
                    </div>
                  )}
                  
@@ -5010,11 +5469,12 @@ const Clinicas = () => {
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: '700px' }}>
             <div className="modal-header">
-              <h2 className="modal-title">Indicar Nova Clínica</h2>
+              <h2 className="modal-title">{editingNovaClinica ? 'Editar Nova Clínica' : 'Indicar Nova Clínica'}</h2>
               <button 
                 className="close-btn"
                 onClick={() => {
                   setShowNovaClinicaModal(false);
+                  setEditingNovaClinica(null);
                   setNovaClinicaFormData({ 
                     nome: '',
                     telefone: '',
@@ -5260,6 +5720,7 @@ const Clinicas = () => {
                   onClick={() => {
                     if (!submittingNovaClinica) {
                       setShowNovaClinicaModal(false);
+                      setEditingNovaClinica(null);
                       setNovaClinicaFormData({ 
                         nome: '',
                         telefone: '',
@@ -5332,11 +5793,12 @@ const Clinicas = () => {
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: '700px' }}>
             <div className="modal-header">
-              <h2 className="modal-title">Cadastrar Nova Clínica</h2>
+              <h2 className="modal-title">{editingNovaClinica ? 'Editar Nova Clínica' : 'Cadastrar Nova Clínica'}</h2>
               <button 
                 className="close-btn"
                 onClick={() => {
                   setShowNovaClinicaModal(false);
+                  setEditingNovaClinica(null);
                   setNovaClinicaFormData({ 
                     nome: '',
                     cnpj: '',
@@ -5565,6 +6027,7 @@ const Clinicas = () => {
                   onClick={() => {
                     if (!submittingNovaClinica) {
                       setShowNovaClinicaModal(false);
+                      setEditingNovaClinica(null);
                       setNovaClinicaFormData({ 
                         nome: '',
                         cnpj: '',

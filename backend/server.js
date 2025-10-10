@@ -1775,7 +1775,7 @@ app.delete('/api/clinicas/:id/remover-acesso', authenticateToken, requireAdmin, 
   }
 });
 
-app.put('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.put('/api/clinicas/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { evidencia_id } = req.body;
@@ -1784,7 +1784,23 @@ app.put('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) =
     console.log('🔧 Body recebido:', req.body);
     console.log('🔧 Usuário autenticado:', req.user);
     
-    // Permitir atualização parcial: só atualiza os campos enviados
+    // Verificar se é admin, ou se é a própria clínica editando seus dados
+    const isAdmin = req.user.tipo === 'admin';
+    const isPropriaClinica = req.user.tipo === 'clinica' && req.user.clinica_id === parseInt(id);
+    
+    if (!isAdmin && !isPropriaClinica) {
+      return res.status(403).json({ error: 'Acesso negado. Você não tem permissão para editar esta clínica.' });
+    }
+    
+    // Campos que apenas admin pode editar
+    const camposApenasAdmin = ['nome', 'cnpj', 'status', 'em_analise', 'limite_credito'];
+    
+    // Campos que clínicas podem editar sobre si mesmas
+    const camposClinicaPodeEditar = [
+      'telefone_socios', 'email_socios', 'banco_nome', 'banco_conta', 'banco_agencia', 'banco_pix'
+    ];
+    
+    // Todos os campos permitidos (para admin)
     const camposPermitidos = [
       'nome', 'endereco', 'bairro', 'cidade', 'estado', 'nicho', 'telefone', 'email', 'status', 'em_analise', 'cnpj', 'responsavel',
       // Novos campos
@@ -1793,6 +1809,14 @@ app.put('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res) =
     const updateData = {};
     for (const campo of camposPermitidos) {
       if (req.body[campo] !== undefined) {
+        // Se for clínica, verificar se pode editar este campo
+        if (isPropriaClinica && !isAdmin) {
+          if (!camposClinicaPodeEditar.includes(campo)) {
+            console.log(`⚠️ Clínica tentou editar campo não permitido: ${campo}`);
+            continue; // Pular este campo
+          }
+        }
+        
         // Normalizar email se for o campo email ou email_socios
         if ((campo === 'email' || campo === 'email_socios') && req.body[campo]) {
           updateData[campo] = req.body[campo].toLowerCase().trim();
@@ -1869,19 +1893,6 @@ app.delete('/api/clinicas/:id', authenticateToken, requireAdmin, async (req, res
     console.log('🗑️ DELETE /api/clinicas/:id recebido');
     console.log('🗑️ ID da clínica:', id);
     console.log('🗑️ Usuário autenticado:', req.user);
-
-    // Verificar se existem pacientes associados a esta clínica
-    const { data: pacientes, error: pacientesError } = await supabaseAdmin
-      .from('pacientes')
-      .select('id')
-      .eq('clinica_id', id)
-      .limit(1);
-
-    if (pacientesError) throw pacientesError;
-
-    if (pacientes && pacientes.length > 0) {
-      return res.status(400).json({ error: 'Não é possível excluir a clínica pois existem pacientes associados.' });
-    }
 
     // Verificar se existem agendamentos associados a esta clínica
     const { data: agendamentos, error: agendamentosError } = await supabaseAdmin
@@ -3824,6 +3835,101 @@ app.post('/api/novas-clinicas', authenticateToken, async (req, res) => {
   }
 });
 
+// Editar nova clínica - Admin
+app.put('/api/novas-clinicas/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nome, cnpj, responsavel, endereco, bairro, cidade, estado, nicho, telefone, email, status, observacoes } = req.body;
+    
+    // Normalizar telefone e CNPJ (remover formatação)
+    const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
+    const cnpjNumeros = cnpj ? cnpj.replace(/\D/g, '') : '';
+    
+    // Verificar se telefone já existe (excluindo a própria clínica)
+    if (telefoneNumeros) {
+      const { data: telefoneExistente, error: telefoneError } = await supabaseAdmin
+        .from('novas_clinicas')
+        .select('id, nome, created_at')
+        .eq('telefone', telefoneNumeros)
+        .neq('id', id)
+        .limit(1);
+
+      if (telefoneError) throw telefoneError;
+      
+      if (telefoneExistente && telefoneExistente.length > 0) {
+        const clinicaExistente = telefoneExistente[0];
+        const dataCadastro = new Date(clinicaExistente.created_at).toLocaleDateString('pt-BR');
+        return res.status(400).json({ 
+          error: `Este número de telefone já está cadastrado para ${clinicaExistente.nome} (cadastrado em ${dataCadastro}).` 
+        });
+      }
+    }
+    
+    // Geocodificar endereço se tiver cidade e estado
+    let latitude = null;
+    let longitude = null;
+    
+    if (cidade && estado) {
+      try {
+        const address = `${endereco ? endereco + ', ' : ''}${cidade}, ${estado}, Brasil`;
+        const geocodeUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
+        const geocodeResponse = await fetch(geocodeUrl);
+        const geocodeData = await geocodeResponse.json();
+        
+        if (geocodeData && geocodeData.length > 0) {
+          latitude = parseFloat(geocodeData[0].lat);
+          longitude = parseFloat(geocodeData[0].lon);
+        }
+      } catch (geocodeError) {
+        console.error('Erro ao geocodificar:', geocodeError);
+        // Continua sem coordenadas se falhar
+      }
+    }
+    
+    // Preparar dados para atualização
+    const clinicaData = {
+      nome,
+      cnpj: cnpjNumeros,
+      responsavel,
+      endereco,
+      bairro,
+      cidade,
+      estado,
+      nicho,
+      telefone: telefoneNumeros,
+      email,
+      status: status || 'tem_interesse',
+      observacoes,
+      latitude,
+      longitude
+    };
+    
+    const { data, error } = await supabaseAdmin
+      .from('novas_clinicas')
+      .update(clinicaData)
+      .eq('id', id)
+      .select();
+
+    if (error) throw error;
+    
+    if (!data || data.length === 0) {
+      return res.status(404).json({ error: 'Nova clínica não encontrada' });
+    }
+    
+    console.log('✅ Nova clínica atualizada com sucesso:', {
+      id: data[0].id,
+      nome: data[0].nome,
+      cidade: data[0].cidade,
+      estado: data[0].estado
+    });
+    
+    res.json({ message: 'Nova clínica atualizada com sucesso!', clinica: data[0] });
+  } catch (error) {
+    console.error('Erro ao atualizar nova clínica:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.put('/api/novas-clinicas/:id/pegar', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -3846,7 +3952,7 @@ app.put('/api/novas-clinicas/:id/pegar', authenticateToken, async (req, res) => 
       return res.status(403).json({ error: 'Apenas administradores podem aprovar clínicas!' });
     }
 
-    // Mover a clínica da tabela novas_clinicas para clinicas
+    // Mover a clínica da tabela novas_clinicas para clinicas (Em Análise)
     const clinicaParaMover = {
       nome: clinicaAtual.nome,
       endereco: clinicaAtual.endereco,
@@ -3856,7 +3962,8 @@ app.put('/api/novas-clinicas/:id/pegar', authenticateToken, async (req, res) => 
       nicho: clinicaAtual.nicho,
       telefone: clinicaAtual.telefone,
       email: clinicaAtual.email,
-      status: 'ativo',
+      status: 'em_analise',
+      em_analise: true, // Marcar como em análise
       consultor_id: clinicaAtual.criado_por_consultor_id, // Definir consultor_id baseado em quem criou
       empresa_id: clinicaAtual.empresa_id, // Transferir empresa_id se foi empresa que cadastrou
       tipo_origem: 'aprovada' // Clínicas aprovadas da aba "Novas Clínicas"
@@ -3887,7 +3994,7 @@ app.put('/api/novas-clinicas/:id/pegar', authenticateToken, async (req, res) => 
       setTimeout(() => updateClinicasCount(), 100);
     }
 
-    res.json({ message: 'Clínica aprovada e movida para clínicas parceiras com sucesso!' });
+    res.json({ message: 'Clínica aprovada e movida para análise com sucesso!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
