@@ -1465,8 +1465,9 @@ const Pacientes = () => {
         </div>
       </div>
 
-      {/* Navegação por abas - Ocultar para freelancers */}
-      {(isAdmin || isConsultorInterno) && (
+      {/* Navegação por abas - Diferente para cada tipo de usuário */}
+      {/* Para Admin e Consultor Interno */}
+      {(isAdmin || isConsultorInterno) && !isClinica && (
         <div className="tabs">
           <button
             className={`tab ${activeTab === 'pacientes' ? 'active' : ''}`}
@@ -1483,6 +1484,30 @@ const Pacientes = () => {
             {novosLeads.length > 0 && (
               <span className="tab-badge">{novosLeads.length}</span>
             )}
+          </button>
+        </div>
+      )}
+      
+      {/* Para Clínicas - Abas especiais */}
+      {isClinica && (
+        <div className="tabs">
+          <button
+            className={`tab ${activeTab === 'leads-clinica' ? 'active' : ''}`}
+            onClick={() => setActiveTab('leads-clinica')}
+          >
+            Leads
+            <span style={{ marginLeft: '0.5rem', fontSize: '0.875rem', opacity: 0.8 }}>
+              ({pacientes.filter(p => p.status !== 'fechado' && p.status !== 'sem_interesse' && p.status !== 'nao_elegivel' && !p.cadastrado_por_clinica).length})
+            </span>
+          </button>
+          <button
+            className={`tab ${activeTab === 'meus-pacientes' ? 'active' : ''}`}
+            onClick={() => setActiveTab('meus-pacientes')}
+          >
+            Meus Pacientes
+            <span style={{ marginLeft: '0.5rem', fontSize: '0.875rem', opacity: 0.8 }}>
+              ({pacientes.filter(p => p.cadastrado_por_clinica === true).length})
+            </span>
           </button>
         </div>
       )}
@@ -2060,6 +2085,221 @@ const Pacientes = () => {
                   </tbody>
                 </table>
               </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Conteúdo da aba Leads (apenas para clínicas) */}
+      {activeTab === 'leads-clinica' && isClinica && (
+        <>
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Leads Atribuídos à Clínica</h2>
+              <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                Leads com agendamentos marcados para sua clínica
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="loading">
+                <div className="spinner"></div>
+              </div>
+            ) : (
+              <>
+                {pacientes.filter(p => p.status !== 'fechado' && p.status !== 'sem_interesse' && p.status !== 'nao_elegivel' && !p.cadastrado_por_clinica).length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: '0 auto 1rem', opacity: 0.3 }}>
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                      <line x1="9" y1="9" x2="15" y2="9"></line>
+                      <line x1="9" y1="13" x2="15" y2="13"></line>
+                      <line x1="9" y1="17" x2="11" y2="17"></line>
+                    </svg>
+                    <p>Nenhum lead atribuído à sua clínica no momento.</p>
+                  </div>
+                ) : (
+                  <div className="table-container">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Nome</th>
+                          <th>Telefone</th>
+                          <th>Tipo</th>
+                          <th>Status</th>
+                          <th>Consultor</th>
+                          <th>Data</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pacientes
+                          .filter(p => p.status !== 'fechado' && p.status !== 'sem_interesse' && p.status !== 'nao_elegivel' && !p.cadastrado_por_clinica)
+                          .map(paciente => {
+                            const statusInfo = statusOptions.find(s => s.value === paciente.status) || statusOptions[0];
+                            return (
+                              <tr key={paciente.id}>
+                                <td><strong>{paciente.nome}</strong></td>
+                                <td>{formatarTelefone(paciente.telefone)}</td>
+                                <td>
+                                  {paciente.tipo_tratamento && (
+                                    <span className={`badge badge-${paciente.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
+                                      {paciente.tipo_tratamento}
+                                    </span>
+                                  )}
+                                </td>
+                                <td>
+                                  <span className="badge" style={{ backgroundColor: statusInfo.color + '20', color: statusInfo.color }}>
+                                    {statusInfo.label}
+                                  </span>
+                                </td>
+                                <td>{paciente.consultor_nome || '-'}</td>
+                                <td>{formatarData(paciente.created_at)}</td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Conteúdo da aba Meus Pacientes (apenas para clínicas) */}
+      {activeTab === 'meus-pacientes' && isClinica && (
+        <>
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Meus Pacientes</h2>
+              <button 
+                className="btn btn-primary" 
+                onClick={() => {
+                  setEditingPaciente(null);
+                  setFormData({
+                    nome: '',
+                    telefone: '',
+                    cpf: '',
+                    cidade: '',
+                    estado: '',
+                    tipo_tratamento: '',
+                    status: 'compareceu',
+                    observacoes: '',
+                    consultor_id: '',
+                    cadastrado_por_clinica: true,
+                    clinica_id: user?.clinica_id || user?.id
+                  });
+                  setShowModal(true);
+                }}
+              >
+                + Cadastrar Paciente
+              </button>
+            </div>
+
+            {loading ? (
+              <div className="loading">
+                <div className="spinner"></div>
+              </div>
+            ) : (
+              <>
+                {pacientes.filter(p => p.cadastrado_por_clinica === true).length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: '0 auto 1rem', opacity: 0.3 }}>
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="9" cy="7" r="4"></circle>
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <p>Você ainda não cadastrou nenhum paciente.</p>
+                    <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                      Clique em "Cadastrar Paciente" para adicionar pacientes próprios da clínica.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="table-container">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Nome</th>
+                          <th>Telefone</th>
+                          <th>CPF</th>
+                          <th>Tipo</th>
+                          <th>Documentos</th>
+                          <th>Data Cadastro</th>
+                          <th>Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pacientes
+                          .filter(p => p.cadastrado_por_clinica === true)
+                          .map(paciente => (
+                            <tr key={paciente.id}>
+                              <td><strong>{paciente.nome}</strong></td>
+                              <td>{formatarTelefone(paciente.telefone)}</td>
+                              <td>{formatarCPF(paciente.cpf)}</td>
+                              <td>
+                                {paciente.tipo_tratamento && (
+                                  <span className={`badge badge-${paciente.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
+                                    {paciente.tipo_tratamento}
+                                  </span>
+                                )}
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                  {paciente.selfie_doc_url && (
+                                    <span title="Selfie com documento" style={{ fontSize: '1.2rem' }}>📷</span>
+                                  )}
+                                  {paciente.documento_url && (
+                                    <span title="Documento" style={{ fontSize: '1.2rem' }}>📄</span>
+                                  )}
+                                  {paciente.comprovante_residencia_url && (
+                                    <span title="Comprovante de residência" style={{ fontSize: '1.2rem' }}>🏠</span>
+                                  )}
+                                  {paciente.contrato_servico_url && (
+                                    <span title="Contrato de serviço" style={{ fontSize: '1.2rem' }}>📑</span>
+                                  )}
+                                  {paciente.confirmacao_sacado_url && (
+                                    <span title="Confirmação do sacado" style={{ fontSize: '1.2rem' }}>✅</span>
+                                  )}
+                                  {!paciente.selfie_doc_url && !paciente.documento_url && !paciente.comprovante_residencia_url && 
+                                   !paciente.contrato_servico_url && !paciente.confirmacao_sacado_url && (
+                                    <span style={{ color: '#9ca3af', fontSize: '0.875rem' }}>Sem documentos</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td>{formatarData(paciente.created_at)}</td>
+                              <td>
+                                <button
+                                  className="btn-action"
+                                  onClick={() => {
+                                    setEditingPaciente(paciente);
+                                    setFormData({
+                                      nome: paciente.nome,
+                                      telefone: paciente.telefone,
+                                      cpf: paciente.cpf,
+                                      cidade: paciente.cidade || '',
+                                      estado: paciente.estado || '',
+                                      tipo_tratamento: paciente.tipo_tratamento || '',
+                                      status: paciente.status,
+                                      observacoes: paciente.observacoes || '',
+                                      consultor_id: paciente.consultor_id || '',
+                                      cadastrado_por_clinica: true,
+                                      clinica_id: user?.clinica_id || user?.id
+                                    });
+                                    setShowModal(true);
+                                  }}
+                                  title="Editar/Upload documentos"
+                                >
+                                  ✏️
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </>
@@ -3001,6 +3241,272 @@ const Pacientes = () => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Cadastro/Edição para Clínicas com Upload de Documentos */}
+      {showModal && isClinica && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '900px', maxHeight: '90vh', overflow: 'auto' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">
+                {editingPaciente ? 'Editar Paciente' : 'Cadastrar Novo Paciente'}
+              </h2>
+              <button className="close-btn" onClick={resetForm}>×</button>
+            </div>
+
+            <form onSubmit={handleSubmit} style={{ padding: '2rem' }}>
+              {/* Dados básicos */}
+              <h3 style={{ marginBottom: '1rem', color: '#1e293b' }}>Dados Básicos</h3>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: '1.5rem',
+                marginBottom: '2rem'
+              }}>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem' }}>
+                    Nome do Paciente *
+                  </label>
+                  <input
+                    type="text"
+                    name="nome"
+                    value={formData.nome}
+                    onChange={handleInputChange}
+                    placeholder="Digite o nome completo"
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem' }}>
+                    Telefone/WhatsApp *
+                  </label>
+                  <input
+                    type="text"
+                    name="telefone"
+                    value={formData.telefone}
+                    onChange={handleInputChange}
+                    placeholder="(00) 00000-0000"
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem' }}>
+                    CPF *
+                  </label>
+                  <input
+                    type="text"
+                    name="cpf"
+                    value={formData.cpf}
+                    onChange={handleInputChange}
+                    placeholder="000.000.000-00"
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem' }}>
+                    Cidade
+                  </label>
+                  <input
+                    type="text"
+                    name="cidade"
+                    value={formData.cidade}
+                    onChange={handleInputChange}
+                    placeholder="Digite a cidade"
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem' }}>
+                    Estado
+                  </label>
+                  <input
+                    type="text"
+                    name="estado"
+                    value={formData.estado}
+                    onChange={handleInputChange}
+                    placeholder="UF"
+                    maxLength="2"
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      fontSize: '1rem',
+                      textTransform: 'uppercase'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem' }}>
+                    Tipo de Tratamento
+                  </label>
+                  <select
+                    name="tipo_tratamento"
+                    value={formData.tipo_tratamento}
+                    onChange={handleInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      fontSize: '1rem'
+                    }}
+                  >
+                    <option value="">Selecione</option>
+                    <option value="Estético">Estético</option>
+                    <option value="Odontológico">Odontológico</option>
+                  </select>
+                </div>
+
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem' }}>
+                    Observações
+                  </label>
+                  <textarea
+                    name="observacoes"
+                    value={formData.observacoes}
+                    onChange={handleInputChange}
+                    placeholder="Adicione observações sobre o paciente"
+                    rows="3"
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      fontSize: '1rem',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Upload de Documentos - apenas se estiver editando */}
+              {editingPaciente && (
+                <>
+                  <h3 style={{ marginBottom: '1rem', color: '#1e293b', borderTop: '1px solid #e5e7eb', paddingTop: '2rem' }}>
+                    Upload de Documentos
+                  </h3>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: '1.5rem',
+                    marginBottom: '2rem'
+                  }}>
+                    {/* Campo de upload para cada tipo de documento */}
+                    {[
+                      { key: 'selfie_doc', label: 'Selfie com Documento', icon: '📷' },
+                      { key: 'documento', label: 'Documento (RG/CNH)', icon: '📄' },
+                      { key: 'comprovante_residencia', label: 'Comprovante de Residência', icon: '🏠' },
+                      { key: 'contrato_servico', label: 'Contrato de Serviço', icon: '📑' },
+                      { key: 'confirmacao_sacado', label: 'Confirmação do Sacado', icon: '✅' }
+                    ].map(doc => (
+                      <div key={doc.key}>
+                        <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem' }}>
+                          {doc.icon} {doc.label}
+                        </label>
+                        <input
+                          type="file"
+                          accept={doc.key === 'contrato_servico' ? '.pdf' : 'image/*,.pdf'}
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              // Aqui você implementaria o upload
+                              console.log(`Upload de ${doc.label}:`, file);
+                            }
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem',
+                            border: '2px solid #e2e8f0',
+                            borderRadius: '10px',
+                            fontSize: '0.875rem'
+                          }}
+                        />
+                        {editingPaciente[`${doc.key}_url`] && (
+                          <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#059669' }}>
+                            ✓ Documento já enviado
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                gap: '1rem',
+                borderTop: '1px solid #e5e7eb',
+                paddingTop: '1.5rem'
+              }}>
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  style={{
+                    padding: '0.875rem 2rem',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '10px',
+                    backgroundColor: '#fff',
+                    color: '#64748b',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '0.875rem 2rem',
+                    border: 'none',
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                    color: '#fff',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {editingPaciente ? 'Salvar Alterações' : 'Cadastrar Paciente'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
