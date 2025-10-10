@@ -19,7 +19,7 @@ RUN chown -R node:node /app
 COPY package*.json ./
 
 # Instalar dependências
-RUN npm ci --production
+RUN npm ci --omit=dev
 
 # Copiar código da aplicação
 COPY --chown=node:node . .

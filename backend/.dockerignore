@@ -3,29 +3,47 @@
 
 # Include only essential files
 !package.json
+!package-lock.json
 !server.js
 !Dockerfile
 !fly.toml
-!migrations/
 !api/
-!scripts/
-!uploads/
 !utils/
-!whatsapp/
-!meta-ads-api.js
-!whatsapp-fallback.js
-
-# Include specific migration files
-!migrations/add_tipo_origem.sql
+!database.sqlite
 
 # Exclude all node_modules
 node_modules/
 **/node_modules/
 
-# Exclude all lock files
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
+# Exclude development files
+.env
+.env.local
+.env.development
+.env.test
+
+# Exclude logs
+*.log
+npm-debug.log*
+
+# Exclude temporary files
+.DS_Store
+Thumbs.db
+
+# Exclude git
+.git/
+.gitignore
+
+# Exclude IDE files
+.vscode/
+.idea/
+
+# Exclude scripts (não mais necessários)
+*.ps1
+*.sh
+
+# Exclude documentation
+*.md
+README*
 
 # Exclude all hidden files and directories
 .*
