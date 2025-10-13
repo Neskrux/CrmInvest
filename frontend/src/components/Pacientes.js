@@ -164,7 +164,7 @@ const Pacientes = () => {
 
   // Status disponíveis para o pipeline
   const statusOptions = [
-    { value: 'sem_primeiro_contato', label: 'Sem Primeiro Contato', color: '#6b7280', description: 'Cadastrado manualmente, aguardando primeiro contato' },
+    { value: 'sem_primeiro_contato', label: 'Prospecção Ativa', color: '#6b7280', description: 'Cadastrado manualmente, aguardando primeiro contato' },
     { value: 'lead', label: 'Lead', color: '#f59e0b', description: 'Lead inicial' },
     { value: 'em_conversa', label: 'Em conversa', color: '#0ea5e9', description: 'Conversando com o cliente' },
     { value: 'cpf_aprovado', label: 'CPF Aprovado', color: '#10b981', description: 'CPF foi aprovado' },
