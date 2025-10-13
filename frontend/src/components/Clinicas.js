@@ -167,7 +167,7 @@ const Clinicas = () => {
 
   // Status disponíveis para novas clínicas
   const statusNovaClinicaOptions = [
-    { value: 'sem_primeiro_contato', label: 'Sem Primeiro Contato', color: '#6b7280' },
+    { value: 'sem_primeiro_contato', label: 'Prospecção Ativa', color: '#6b7280' },
     { value: 'tem_interesse', label: 'Tem Interesse', color: '#10b981' },
     { value: 'nao_tem_interesse', label: 'Não tem Interesse', color: '#ef4444' },
     { value: 'em_contato', label: 'Em Contato', color: '#3b82f6' },

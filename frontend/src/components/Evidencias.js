@@ -68,7 +68,7 @@ const Evidencias = () => {
   const getStatusLabel = (status) => {
     const statusMap = {
       // Pacientes
-      'sem_primeiro_contato': 'Sem Primeiro Contato',
+      'sem_primeiro_contato': 'Prospecção Ativa',
       'lead': 'Lead',
       'em_conversa': 'Em Conversa',
       'cpf_aprovado': 'CPF Aprovado',
