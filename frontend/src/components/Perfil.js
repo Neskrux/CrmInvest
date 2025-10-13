@@ -951,7 +951,7 @@ const Perfil = () => {
                 textAlign: 'center'
               }}>
                 <div style={{ color: '#dc2626', fontSize: '16px', marginBottom: '8px' }}>
-                  ⚠️ Links personalizados não encontrados
+                  Links personalizados não encontrados
                 </div>
                 <div style={{ color: '#6b7280', fontSize: '14px' }}>
                   Entre em contato com o administrador para gerar seus links personalizados.

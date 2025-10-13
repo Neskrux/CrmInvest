@@ -92,7 +92,7 @@ const IDSFIntegration = () => {
           )}
           {!connectionStatus && (
             <div className="status-pending">
-              ⏳ Clique em "Testar Conexão" para verificar
+              Clique em "Testar Conexão" para verificar
             </div>
           )}
         </div>

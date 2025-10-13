@@ -12,10 +12,12 @@ const Pacientes = () => {
   const [novosLeads, setNovosLeads] = useState([]);
   const [consultores, setConsultores] = useState([]);
   const [agendamentos, setAgendamentos] = useState([]);
+  const [fechamentos, setFechamentos] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingPaciente, setEditingPaciente] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('pacientes');
+  // Define aba inicial baseada no tipo de usuário
+  const [activeTab, setActiveTab] = useState(isClinica ? 'meus-pacientes' : 'pacientes');
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [filtroNome, setFiltroNome] = useState('');
   const [filtroTelefone, setFiltroTelefone] = useState('');
@@ -43,6 +45,11 @@ const Pacientes = () => {
   const [viewPaciente, setViewPaciente] = useState(null);
   const [showObservacoesModal, setShowObservacoesModal] = useState(false);
   const [observacoesAtual, setObservacoesAtual] = useState('');
+  const [activeViewTab, setActiveViewTab] = useState('informacoes');
+  const [uploadingDocs, setUploadingDocs] = useState({});
+  const [activeObservacoesTab, setActiveObservacoesTab] = useState('observacoes');
+  const [evidenciasPaciente, setEvidenciasPaciente] = useState([]);
+  const [pacienteObservacoes, setPacienteObservacoes] = useState(null);
 
   // Estados para controlar o tutorial
   const [showTutorial, setShowTutorial] = useState(false);
@@ -61,6 +68,32 @@ const Pacientes = () => {
   const [tipoTratamentoFechamento, setTipoTratamentoFechamento] = useState('');
   const [observacoesFechamento, setObservacoesFechamento] = useState('');
   const [dataFechamento, setDataFechamento] = useState(new Date().toISOString().split('T')[0]);
+
+  // Estados para cadastro completo da clínica
+  const [showCadastroCompletoModal, setShowCadastroCompletoModal] = useState(false);
+  const [dadosCompletosClinica, setDadosCompletosClinica] = useState({
+    // Dados do paciente
+    nome: '',
+    telefone: '',
+    cpf: '',
+    cidade: '',
+    estado: '',
+    tipo_tratamento: '',
+    observacoes: '',
+    // Dados do fechamento
+    valor_fechado: '',
+    valor_fechado_formatado: '',
+    contrato_arquivo: null,
+    observacoes_fechamento: '',
+    data_fechamento: new Date().toISOString().split('T')[0],
+    // Dados do parcelamento
+    valor_parcela: '',
+    valor_parcela_formatado: '',
+    numero_parcelas: '',
+    vencimento: '',
+    antecipacao_meses: ''
+  });
+  const [salvandoCadastroCompleto, setSalvandoCadastroCompleto] = useState(false);
 
   // Estado para controlar valores temporários dos selects (quando modal está aberto)
   const [statusTemporario, setStatusTemporario] = useState({});
@@ -206,6 +239,7 @@ const Pacientes = () => {
     fetchConsultores();
     fetchClinicas();
     fetchAgendamentos();
+    fetchFechamentos();
     
     // Buscar novos leads apenas se pode alterar status (não freelancer) ou é consultor interno
     if (podeAlterarStatus || isConsultorInterno) {
@@ -244,6 +278,7 @@ const Pacientes = () => {
     const interval = setInterval(() => {
       fetchPacientes();
       fetchAgendamentos();
+      fetchFechamentos();
       // Buscar novos leads apenas se pode alterar status (não freelancer) ou é consultor interno
       if (podeAlterarStatus || isConsultorInterno) {
         fetchNovosLeads();
@@ -263,7 +298,7 @@ const Pacientes = () => {
 
   // Controlar scroll do body quando modal estiver aberto
   useEffect(() => {
-    if (showModal || showViewModal || showObservacoesModal || showAgendamentoModal || showPermissaoModal || showAtribuirConsultorModal || showEvidenciaModal) {
+    if (showModal || showViewModal || showObservacoesModal || showAgendamentoModal || showPermissaoModal || showAtribuirConsultorModal || showEvidenciaModal || showCadastroCompletoModal) {
       // Bloquear scroll da página
       document.body.style.overflow = 'hidden';
     } else {
@@ -275,7 +310,7 @@ const Pacientes = () => {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [showModal, showViewModal, showObservacoesModal, showAgendamentoModal, showFechamentoModal, showPermissaoModal, showAtribuirConsultorModal, showEvidenciaModal]);
+  }, [showModal, showViewModal, showObservacoesModal, showAgendamentoModal, showFechamentoModal, showPermissaoModal, showAtribuirConsultorModal, showEvidenciaModal, showCadastroCompletoModal]);
   
   //Sempre que FILTROS mudarem, voltar para a primeira página
   useEffect(() => {
@@ -354,6 +389,21 @@ const Pacientes = () => {
       }
     } catch (error) {
       console.error('Erro ao carregar agendamentos:', error);
+    }
+  };
+
+  const fetchFechamentos = async () => {
+    try {
+      const response = await makeRequest('/fechamentos');
+      const data = await response.json();
+      
+      if (response.ok) {
+        setFechamentos(data);
+      } else {
+        console.error('Erro ao carregar fechamentos:', data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar fechamentos:', error);
     }
   };
 
@@ -601,11 +651,96 @@ const Pacientes = () => {
 
   const handleView = (paciente) => {
     setViewPaciente(paciente);
+    setActiveViewTab('informacoes');
     setShowViewModal(true);
   };
 
-  const handleViewObservacoes = (observacoes) => {
+  const handleTabChange = (tab) => {
+    setActiveViewTab(tab);
+  };
+
+  const closeViewModal = () => {
+    setShowViewModal(false);
+    setViewPaciente(null);
+    setActiveViewTab('informacoes');
+  };
+
+  // Função para upload de documentos do paciente
+  const handleUploadDocumentoPaciente = async (event, pacienteId, docType) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Validar tamanho (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      showErrorToast('Arquivo muito grande! Máximo 10MB');
+      return;
+    }
+    
+    setUploadingDocs(prev => ({ ...prev, [docType]: true }));
+    
+    const formData = new FormData();
+    formData.append('document', file);
+    
+    try {
+      const API_BASE_URL = process.env.NODE_ENV === 'production' ? 'https://crminvest-backend.fly.dev/api' : 'http://localhost:5000/api';
+      const response = await fetch(`${API_BASE_URL}/documents/upload-paciente/${pacienteId}/${docType}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formData
+      });
+      
+      if (response.ok) {
+        showSuccessToast('Documento enviado com sucesso!');
+        
+        // Buscar dados atualizados
+        const pacientesRes = await makeRequest('/pacientes');
+        const pacientesData = await pacientesRes.json();
+        setPacientes(Array.isArray(pacientesData) ? pacientesData : []);
+        
+        // Atualizar visualização se modal estiver aberto
+        if (viewPaciente && viewPaciente.id === pacienteId) {
+          const pacienteAtualizado = Array.isArray(pacientesData) ? pacientesData.find(p => p.id === pacienteId) : null;
+          if (pacienteAtualizado) {
+            setViewPaciente(pacienteAtualizado);
+          }
+        }
+      } else {
+        const error = await response.json();
+        showErrorToast(error.error || 'Erro ao enviar documento');
+      }
+    } catch (error) {
+      console.error('Erro ao fazer upload:', error);
+      showErrorToast('Erro ao enviar documento');
+    } finally {
+      setUploadingDocs(prev => ({ ...prev, [docType]: false }));
+      // Limpar o input
+      event.target.value = '';
+    }
+  };
+
+  const handleViewObservacoes = async (observacoes, paciente) => {
     setObservacoesAtual(observacoes || 'Nenhuma observação cadastrada.');
+    setPacienteObservacoes(paciente);
+    setActiveObservacoesTab('observacoes');
+    
+    // Buscar evidências do paciente
+    if (paciente && paciente.id) {
+      try {
+        const response = await makeRequest(`/evidencias?tipo=paciente&registro_id=${paciente.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setEvidenciasPaciente(Array.isArray(data) ? data : []);
+        } else {
+          setEvidenciasPaciente([]);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar evidências:', error);
+        setEvidenciasPaciente([]);
+      }
+    }
+    
     setShowObservacoesModal(true);
   };
 
@@ -979,6 +1114,48 @@ const Pacientes = () => {
     return cpf;
   };
 
+  const formatarMoeda = (valor) => {
+    if (!valor) return 'R$ 0,00';
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(valor);
+  };
+
+  const downloadContrato = async (fechamento) => {
+    try {
+      if (!fechamento || !fechamento.id) {
+        showErrorToast('Fechamento inválido');
+        console.error('Fechamento sem ID:', fechamento);
+        return;
+      }
+
+      if (!fechamento.contrato_arquivo) {
+        showErrorToast('Nenhum contrato anexado a este fechamento');
+        return;
+      }
+
+      // Solicitar URL assinada ao backend (gerada sob demanda)
+      const response = await makeRequest(`/fechamentos/${fechamento.id}/contrato-url`);
+      
+      if (!response.ok) {
+        const data = await response.json();
+        showErrorToast('Erro ao gerar link de download: ' + (data.error || 'Erro desconhecido'));
+        return;
+      }
+
+      const { url, nome } = await response.json();
+
+      // Abrir URL assinada em nova aba
+      window.open(url, '_blank');
+      
+      showSuccessToast(`Contrato "${nome}" aberto com sucesso!`);
+    } catch (error) {
+      console.error('Erro ao abrir contrato:', error);
+      showErrorToast('Erro ao abrir contrato: ' + error.message);
+    }
+  };
+
   // Funções do modal de agendamento
   const abrirModalAgendamento = (paciente, novoStatus = null) => {
     setPacienteParaAgendar({ ...paciente, novoStatus });
@@ -1060,6 +1237,11 @@ const Pacientes = () => {
 
   // Estados adicionais para modal de fechamento
   const [clinicaFechamento, setClinicaFechamento] = useState('');
+  const [valorParcelaFechamento, setValorParcelaFechamento] = useState('');
+  const [valorParcelaFormatado, setValorParcelaFormatado] = useState('');
+  const [numeroParcelasFechamento, setNumeroParcelasFechamento] = useState('');
+  const [vencimentoFechamento, setVencimentoFechamento] = useState('');
+  const [antecipacaoFechamento, setAntecipacaoFechamento] = useState('');
 
   // Funções do modal de fechamento
   const abrirModalFechamento = (paciente, novoStatus = null) => {
@@ -1071,6 +1253,11 @@ const Pacientes = () => {
     setTipoTratamentoFechamento(paciente.tipo_tratamento || '');
     setObservacoesFechamento('');
     setDataFechamento(new Date().toISOString().split('T')[0]);
+    setValorParcelaFechamento('');
+    setValorParcelaFormatado('');
+    setNumeroParcelasFechamento('');
+    setVencimentoFechamento('');
+    setAntecipacaoFechamento('');
     setShowFechamentoModal(true);
   };
 
@@ -1093,6 +1280,11 @@ const Pacientes = () => {
     setTipoTratamentoFechamento('');
     setObservacoesFechamento('');
     setDataFechamento(new Date().toISOString().split('T')[0]);
+    setValorParcelaFechamento('');
+    setValorParcelaFormatado('');
+    setNumeroParcelasFechamento('');
+    setVencimentoFechamento('');
+    setAntecipacaoFechamento('');
   };
 
   // Funções do modal de atribuir consultor
@@ -1155,6 +1347,277 @@ const Pacientes = () => {
     setValorFechamento(valorNumerico);
   };
 
+  const handleValorParcelaChange = (e) => {
+    const valorDigitado = e.target.value;
+    const valorFormatado = formatarValorInput(valorDigitado);
+    const valorNumerico = desformatarValor(valorFormatado);
+    
+    setValorParcelaFormatado(valorFormatado);
+    setValorParcelaFechamento(valorNumerico);
+  };
+
+  // Funções para cadastro completo da clínica
+  const resetCadastroCompleto = () => {
+    setDadosCompletosClinica({
+      // Dados do paciente
+      nome: '',
+      telefone: '',
+      cpf: '',
+      cidade: '',
+      estado: '',
+      tipo_tratamento: '',
+      observacoes: '',
+      // Dados do fechamento
+      valor_fechado: '',
+      valor_fechado_formatado: '',
+      contrato_arquivo: null,
+      observacoes_fechamento: '',
+      data_fechamento: new Date().toISOString().split('T')[0],
+      // Dados do parcelamento
+      valor_parcela: '',
+      valor_parcela_formatado: '',
+      numero_parcelas: '',
+      vencimento: '',
+      antecipacao_meses: ''
+    });
+    setShowCadastroCompletoModal(false);
+    setCidadeCustomizada(false);
+  };
+
+  const handleInputChangeCadastroCompleto = (e) => {
+    let { name, value, type, checked } = e.target;
+    
+    if (type === 'checkbox') {
+      value = checked;
+    } else if (type === 'file') {
+      value = e.target.files[0];
+    } else {
+      // Aplicar formatação
+      if (name === 'telefone') {
+        value = value.replace(/\D/g, '');
+        if (value.length > 0) {
+          value = maskTelefone(value);
+        }
+      } else if (name === 'cpf') {
+        value = maskCPF(value);
+      } else if (name === 'nome') {
+        value = value;
+      } else if (name === 'cidade') {
+        value = formatarCidade(value);
+      }
+    }
+    
+    // Se mudou o estado, limpar a cidade
+    if (name === 'estado') {
+      setCidadeCustomizada(false);
+      setDadosCompletosClinica(prev => ({
+        ...prev,
+        [name]: value,
+        cidade: ''
+      }));
+    } else {
+      setDadosCompletosClinica(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
+
+  const handleValorFechadoCompleto = (e) => {
+    const valorDigitado = e.target.value;
+    const valorFormatado = formatarValorInput(valorDigitado);
+    const valorNumerico = desformatarValor(valorFormatado);
+    
+    setDadosCompletosClinica(prev => ({
+      ...prev,
+      valor_fechado_formatado: valorFormatado,
+      valor_fechado: valorNumerico
+    }));
+  };
+
+  const handleValorParcelaCompleto = (e) => {
+    const valorDigitado = e.target.value;
+    const valorFormatado = formatarValorInput(valorDigitado);
+    const valorNumerico = desformatarValor(valorFormatado);
+    
+    setDadosCompletosClinica(prev => ({
+      ...prev,
+      valor_parcela_formatado: valorFormatado,
+      valor_parcela: valorNumerico
+    }));
+  };
+
+  const handleNomeBlurCompleto = (e) => {
+    const { value } = e.target;
+    if (value && value.trim()) {
+      const nomeFormatado = formatarNome(value);
+      setDadosCompletosClinica(prev => ({
+        ...prev,
+        nome: nomeFormatado
+      }));
+    }
+  };
+
+  const confirmarCadastroCompleto = async () => {
+    const dados = dadosCompletosClinica;
+    
+    // Validações básicas
+    if (!dados.nome || !dados.telefone || !dados.cpf) {
+      showErrorToast('Por favor, preencha nome, telefone e CPF!');
+      return;
+    }
+    
+    if (!dados.valor_fechado || dados.valor_fechado <= 0) {
+      showErrorToast('Por favor, informe um valor válido para o fechamento!');
+      return;
+    }
+    
+    if (!dados.contrato_arquivo) {
+      showErrorToast('Por favor, selecione o contrato em PDF!');
+      return;
+    }
+    
+    if (dados.contrato_arquivo && dados.contrato_arquivo.type !== 'application/pdf') {
+      showErrorToast('Apenas arquivos PDF são permitidos para o contrato!');
+      return;
+    }
+    
+    if (dados.contrato_arquivo && dados.contrato_arquivo.size > 10 * 1024 * 1024) {
+      showErrorToast('O arquivo deve ter no máximo 10MB!');
+      return;
+    }
+
+    // Validações dos campos de parcelamento obrigatórios
+    if (!dados.valor_parcela || dados.valor_parcela <= 0) {
+      showErrorToast('Por favor, informe um valor válido para a parcela!');
+      return;
+    }
+    
+    if (!dados.numero_parcelas || dados.numero_parcelas <= 0) {
+      showErrorToast('Por favor, informe o número de parcelas!');
+      return;
+    }
+    
+    if (!dados.vencimento) {
+      showErrorToast('Por favor, informe a data de vencimento!');
+      return;
+    }
+    
+    if (!dados.antecipacao_meses || dados.antecipacao_meses <= 0) {
+      showErrorToast('Por favor, informe quantas parcelas quer antecipar!');
+      return;
+    }
+
+    setSalvandoCadastroCompleto(true);
+    
+    try {
+      const clinicaId = user?.clinica_id || user?.id;
+      const token = localStorage.getItem('token');
+      const API_BASE_URL = process.env.NODE_ENV === 'production' ? 'https://crminvest-backend.fly.dev/api' : 'http://localhost:5000/api';
+      
+      // 1. Criar o paciente
+      const pacienteData = {
+        nome: dados.nome,
+        telefone: dados.telefone,
+        cpf: dados.cpf,
+        cidade: dados.cidade,
+        estado: dados.estado,
+        tipo_tratamento: dados.tipo_tratamento,
+        status: 'fechado', // Já criamos como fechado
+        observacoes: dados.observacoes
+      };
+      
+      const pacienteResponse = await makeRequest('/pacientes', {
+        method: 'POST',
+        body: JSON.stringify(pacienteData)
+      });
+      
+      if (!pacienteResponse.ok) {
+        const errorData = await pacienteResponse.json();
+        throw new Error(errorData.error || 'Erro ao criar paciente');
+      }
+      
+      const pacienteCriado = await pacienteResponse.json();
+      console.log('Paciente criado:', pacienteCriado);
+      
+      // 2. Criar o agendamento com valores padrão
+      const hoje = new Date().toISOString().split('T')[0];
+      const agendamentoData = {
+        paciente_id: pacienteCriado.id,
+        consultor_id: pacienteCriado.consultor_id || null,
+        clinica_id: parseInt(clinicaId),
+        data_agendamento: hoje, // Data de hoje
+        horario: '09:00', // Horário padrão
+        status: 'compareceu',
+        observacoes: 'Agendamento criado automaticamente pelo cadastro da clínica'
+      };
+      
+      const agendamentoResponse = await makeRequest('/agendamentos', {
+        method: 'POST',
+        body: JSON.stringify(agendamentoData)
+      });
+      
+      if (!agendamentoResponse.ok) {
+        const errorData = await agendamentoResponse.json();
+        console.error('Erro ao criar agendamento:', errorData);
+        // Não parar o processo por causa do agendamento
+      }
+      
+      // 3. Criar o fechamento com contrato
+      const fechamentoFormData = new FormData();
+      fechamentoFormData.append('paciente_id', pacienteCriado.id);
+      fechamentoFormData.append('consultor_id', pacienteCriado.consultor_id || '');
+      fechamentoFormData.append('clinica_id', clinicaId);
+      fechamentoFormData.append('valor_fechado', parseFloat(dados.valor_fechado));
+      fechamentoFormData.append('data_fechamento', dados.data_fechamento);
+      fechamentoFormData.append('tipo_tratamento', dados.tipo_tratamento || '');
+      fechamentoFormData.append('observacoes', dados.observacoes_fechamento || 'Fechamento criado automaticamente pela clínica');
+      
+      // Dados do parcelamento (obrigatórios)
+      fechamentoFormData.append('valor_parcela', parseFloat(dados.valor_parcela));
+      fechamentoFormData.append('numero_parcelas', parseInt(dados.numero_parcelas));
+      fechamentoFormData.append('vencimento', dados.vencimento);
+      fechamentoFormData.append('antecipacao_meses', parseInt(dados.antecipacao_meses));
+      
+      // Contrato
+      if (dados.contrato_arquivo) {
+        fechamentoFormData.append('contrato', dados.contrato_arquivo);
+      }
+      
+      const fechamentoResponse = await fetch(`${API_BASE_URL}/fechamentos`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: fechamentoFormData
+      });
+      
+      if (!fechamentoResponse.ok) {
+        const errorData = await fechamentoResponse.json();
+        throw new Error(errorData.error || 'Erro ao criar fechamento');
+      }
+      
+      showSuccessToast(`Paciente ${dados.nome} cadastrado com sucesso! Valor: ${dados.valor_fechado_formatado}`);
+      resetCadastroCompleto();
+      
+      // Recarregar dados
+      await fetchPacientes();
+      await fetchAgendamentos();
+      await fetchFechamentos();
+      
+      // Forçar atualização nas outras telas
+      const timestamp = Date.now();
+      localStorage.setItem('data_sync_trigger', timestamp.toString());
+      window.dispatchEvent(new CustomEvent('data_updated', { detail: { timestamp } }));
+      
+    } catch (error) {
+      console.error('Erro ao cadastrar paciente completo:', error);
+      showErrorToast('Erro ao cadastrar paciente: ' + error.message);
+    } finally {
+      setSalvandoCadastroCompleto(false);
+    }
+  };
+
   const confirmarFechamento = async () => {
     if (!valorFechamento || valorFechamento <= 0) {
       showErrorToast('Por favor, informe um valor válido para o fechamento!');
@@ -1192,6 +1655,20 @@ const Pacientes = () => {
       formData.append('data_fechamento', dataFechamento);
       formData.append('tipo_tratamento', tipoTratamentoFechamento || '');
       formData.append('observacoes', observacoesFechamento || 'Fechamento criado pelo pipeline');
+      
+      // Novos campos de parcelamento
+      if (valorParcelaFechamento) {
+        formData.append('valor_parcela', parseFloat(valorParcelaFechamento));
+      }
+      if (numeroParcelasFechamento) {
+        formData.append('numero_parcelas', parseInt(numeroParcelasFechamento));
+      }
+      if (vencimentoFechamento) {
+        formData.append('vencimento', vencimentoFechamento);
+      }
+      if (antecipacaoFechamento) {
+        formData.append('antecipacao_meses', parseInt(antecipacaoFechamento));
+      }
       
       if (contratoFechamento) {
         formData.append('contrato', contratoFechamento);
@@ -1231,8 +1708,15 @@ const Pacientes = () => {
         localStorage.setItem('data_sync_trigger', timestamp.toString());
         window.dispatchEvent(new CustomEvent('data_updated', { detail: { timestamp } }));
       } else {
-        const errorData = await fechamentoResponse.json();
-        showErrorToast('Erro ao criar fechamento: ' + errorData.error);
+        let errorMessage = 'Erro ao criar fechamento';
+        try {
+          const errorData = await fechamentoResponse.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          // Se não conseguir fazer parse do JSON, usar o status text
+          errorMessage = `Erro ${fechamentoResponse.status}: ${fechamentoResponse.statusText}`;
+        }
+        showErrorToast(errorMessage);
       }
     } catch (error) {
       console.error('Erro ao confirmar fechamento:', error);
@@ -1482,7 +1966,7 @@ const Pacientes = () => {
                   textAlign: 'center'
                 }}>
                   <div style={{ color: '#dc2626', fontSize: '14px', marginBottom: '4px' }}>
-                    ⚠️ Links personalizados não encontrados
+                    Links personalizados não encontrados
                   </div>
                   <div style={{ color: '#6b7280', fontSize: '12px' }}>
                     Entre em contato com o administrador para gerar seus links.
@@ -1521,21 +2005,34 @@ const Pacientes = () => {
       {isClinica && (
         <div className="tabs">
           <button
-            className={`tab ${activeTab === 'leads-clinica' ? 'active' : ''}`}
-            onClick={() => setActiveTab('leads-clinica')}
-          >
-            Leads
-            <span style={{ marginLeft: '0.5rem', fontSize: '0.875rem', opacity: 0.8 }}>
-              ({pacientes.filter(p => p.status !== 'fechado' && p.status !== 'sem_interesse' && p.status !== 'nao_elegivel' && !p.cadastrado_por_clinica).length})
-            </span>
-          </button>
-          <button
             className={`tab ${activeTab === 'meus-pacientes' ? 'active' : ''}`}
             onClick={() => setActiveTab('meus-pacientes')}
           >
             Meus Pacientes
             <span style={{ marginLeft: '0.5rem', fontSize: '0.875rem', opacity: 0.8 }}>
-              ({pacientes.filter(p => p.cadastrado_por_clinica === true).length})
+              ({(() => {
+                const clinicaId = user?.clinica_id || user?.id;
+                // MOSTRAR TODOS OS FECHAMENTOS, não só aprovados
+                const fechamentosClinica = fechamentos.filter(f => f.clinica_id === clinicaId);
+                const pacientesIds = fechamentosClinica.map(f => f.paciente_id);
+                return pacientes.filter(p => pacientesIds.includes(p.id) && p.status === 'fechado').length;
+              })()})
+            </span>
+          </button>
+          <button
+            className={`tab ${activeTab === 'leads-clinica' ? 'active' : ''}`}
+            onClick={() => setActiveTab('leads-clinica')}
+          >
+            Leads
+            <span style={{ marginLeft: '0.5rem', fontSize: '0.875rem', opacity: 0.8 }}>
+              ({(() => {
+                const clinicaId = user?.clinica_id || user?.id;
+                return pacientes.filter(p => {
+                  // Verificar se tem agendamento nesta clínica
+                  const temAgendamento = agendamentos.some(a => a.paciente_id === p.id && a.clinica_id === clinicaId);
+                  return temAgendamento && p.status !== 'fechado';
+                }).length;
+              })()})
             </span>
           </button>
         </div>
@@ -1769,7 +2266,7 @@ const Pacientes = () => {
                         )}
                       </th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
-                      <th style={{ width: '140px' }}>Ações</th>
+                      <th style={{ width: isConsultor || isClinica ? '80px' : '140px' }}>Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1783,7 +2280,7 @@ const Pacientes = () => {
                               {paciente.observacoes && (
                                 <div style={{ marginTop: '0.25rem' }}>
                                   <button
-                                    onClick={() => handleViewObservacoes(paciente.observacoes)}
+                                    onClick={() => handleViewObservacoes(paciente.observacoes, paciente)}
                                     style={{
                                       background: 'none',
                                       border: 'none',
@@ -1960,7 +2457,7 @@ const Pacientes = () => {
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Tipo</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Status</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
-                      <th style={{ width: '200px', minWidth: '200px' }}>Ações</th>
+                      <th style={{ width: isConsultor || isClinica ? '80px' : '200px', minWidth: isConsultor || isClinica ? '80px' : '200px' }}>Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1974,7 +2471,7 @@ const Pacientes = () => {
                               {lead.observacoes && (
                                 <div style={{ marginTop: '0.25rem' }}>
                                   <button
-                                    onClick={() => handleViewObservacoes(lead.observacoes)}
+                                    onClick={() => handleViewObservacoes(lead.observacoes, lead)}
                                     style={{
                                       background: 'none',
                                       border: 'none',
@@ -2124,9 +2621,9 @@ const Pacientes = () => {
         <>
           <div className="card">
             <div className="card-header">
-              <h2 className="card-title">Leads Atribuídos à Clínica</h2>
+              <h2 className="card-title">Pacientes com Agendamento na Clínica</h2>
               <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                Leads com agendamentos marcados para sua clínica
+                Pacientes com agendamentos marcados para sua clínica que ainda não fecharam contrato
               </div>
             </div>
 
@@ -2136,7 +2633,15 @@ const Pacientes = () => {
               </div>
             ) : (
               <>
-                {pacientes.filter(p => p.status !== 'fechado' && p.status !== 'sem_interesse' && p.status !== 'nao_elegivel' && !p.cadastrado_por_clinica).length === 0 ? (
+                {(() => {
+                  const clinicaId = user?.clinica_id || user?.id;
+                  const leadsClinica = pacientes.filter(p => {
+                    const temAgendamento = agendamentos.some(a => a.paciente_id === p.id && a.clinica_id === clinicaId);
+                    return temAgendamento && p.status !== 'fechado';
+                  });
+                  
+                  return leadsClinica.length === 0;
+                })() ? (
                   <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
                     <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: '0 auto 1rem', opacity: 0.3 }}>
                       <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -2144,7 +2649,12 @@ const Pacientes = () => {
                       <line x1="9" y1="13" x2="15" y2="13"></line>
                       <line x1="9" y1="17" x2="11" y2="17"></line>
                     </svg>
-                    <p>Nenhum lead atribuído à sua clínica no momento.</p>
+                    <p style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                      Nenhum lead atribuído no momento
+                    </p>
+                    <p style={{ fontSize: '0.875rem', color: '#9ca3af' }}>
+                      Os leads aparecerão aqui quando houver agendamentos marcados para sua clínica.
+                    </p>
                   </div>
                 ) : (
                   <div className="table-container">
@@ -2152,23 +2662,53 @@ const Pacientes = () => {
                       <thead>
                         <tr>
                           <th>Nome</th>
-                          <th>Telefone</th>
-                          <th>Tipo</th>
+                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
+                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Tipo</th>
                           <th>Status</th>
-                          <th>Consultor</th>
-                          <th>Data</th>
+                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
+                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Data Agendamento</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {pacientes
-                          .filter(p => p.status !== 'fechado' && p.status !== 'sem_interesse' && p.status !== 'nao_elegivel' && !p.cadastrado_por_clinica)
-                          .map(paciente => {
+                        {(() => {
+                          const clinicaId = user?.clinica_id || user?.id;
+                          const leadsClinica = pacientes.filter(p => {
+                            const temAgendamento = agendamentos.some(a => a.paciente_id === p.id && a.clinica_id === clinicaId);
+                            return temAgendamento && p.status !== 'fechado';
+                          });
+                          
+                          return leadsClinica.map(paciente => {
                             const statusInfo = statusOptions.find(s => s.value === paciente.status) || statusOptions[0];
+                            const agendamentoPaciente = agendamentos.find(a => a.paciente_id === paciente.id && a.clinica_id === clinicaId);
+                            
                             return (
                               <tr key={paciente.id}>
-                                <td><strong>{paciente.nome}</strong></td>
-                                <td>{formatarTelefone(paciente.telefone)}</td>
                                 <td>
+                                  <strong>{paciente.nome}</strong>
+                                  {paciente.observacoes && (
+                                    <div style={{ marginTop: '0.25rem' }}>
+                                      <button
+                                        onClick={() => handleViewObservacoes(paciente.observacoes, paciente)}
+                                        style={{
+                                          background: 'none',
+                                          border: 'none',
+                                          color: '#6b7280',
+                                          cursor: 'pointer',
+                                          fontSize: '0.7rem',
+                                          padding: '0.2rem',
+                                          borderRadius: '4px'
+                                        }}
+                                        title="Ver observações"
+                                        onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                                        onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                                      >
+                                        •••
+                                      </button>
+                                    </div>
+                                  )}
+                                </td>
+                                <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarTelefone(paciente.telefone)}</td>
+                                <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                                   {paciente.tipo_tratamento && (
                                     <span className={`badge badge-${paciente.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
                                       {paciente.tipo_tratamento}
@@ -2176,15 +2716,27 @@ const Pacientes = () => {
                                   )}
                                 </td>
                                 <td>
-                                  <span className="badge" style={{ backgroundColor: statusInfo.color + '20', color: statusInfo.color }}>
+                                  <span className="badge" style={{ 
+                                    backgroundColor: statusInfo.color + '20', 
+                                    color: statusInfo.color,
+                                    fontWeight: '600',
+                                    border: `1px solid ${statusInfo.color}`
+                                  }}>
                                     {statusInfo.label}
                                   </span>
                                 </td>
-                                <td>{paciente.consultor_nome || '-'}</td>
-                                <td>{formatarData(paciente.created_at)}</td>
+                                <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                                  {paciente.consultor_nome || (
+                                    <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>-</span>
+                                  )}
+                                </td>
+                                <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                                  {agendamentoPaciente?.data_agendamento ? formatarData(agendamentoPaciente.data_agendamento) : formatarData(paciente.created_at)}
+                                </td>
                               </tr>
                             );
-                          })}
+                          });
+                        })()}
                       </tbody>
                     </table>
                   </div>
@@ -2198,31 +2750,100 @@ const Pacientes = () => {
       {/* Conteúdo da aba Meus Pacientes (apenas para clínicas) */}
       {activeTab === 'meus-pacientes' && isClinica && (
         <>
+          {/* Resumo de Estatísticas para Clínicas */}
+          <div className="stats-grid" style={{ marginBottom: '2rem', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+            <div className="stat-card">
+              <div className="stat-label">Total de Pacientes</div>
+              <div className="stat-value">
+                {(() => {
+                  const clinicaId = user?.clinica_id || user?.id;
+                  // TODOS os fechamentos, não só aprovados
+                  const fechamentosClinica = fechamentos.filter(f => f.clinica_id === clinicaId);
+                  const pacientesIds = fechamentosClinica.map(f => f.paciente_id);
+                  return pacientes.filter(p => pacientesIds.includes(p.id) && p.status === 'fechado').length;
+                })()}
+              </div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">Fechamentos Aprovados</div>
+              <div className="stat-value">
+                {(() => {
+                  const clinicaId = user?.clinica_id || user?.id;
+                  return fechamentos.filter(f => f.clinica_id === clinicaId && f.aprovado === 'aprovado').length;
+                })()}
+              </div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">Doc. Completa</div>
+              <div className="stat-value">
+                {(() => {
+                  const clinicaId = user?.clinica_id || user?.id;
+                  const fechamentosClinica = fechamentos.filter(f => f.clinica_id === clinicaId);
+                  const pacientesIds = fechamentosClinica.map(f => f.paciente_id);
+                  return pacientes.filter(p => {
+                    if (!pacientesIds.includes(p.id) || p.status !== 'fechado') return false;
+                    const docsEnviados = [
+                      p.selfie_doc_url,
+                      p.documento_url,
+                      p.comprovante_residencia_url,
+                      p.contrato_servico_url
+                    ].filter(Boolean).length;
+                    return docsEnviados === 4;
+                  }).length;
+                })()}
+              </div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">Doc. Pendente</div>
+              <div className="stat-value">
+                {(() => {
+                  const clinicaId = user?.clinica_id || user?.id;
+                  const fechamentosClinica = fechamentos.filter(f => f.clinica_id === clinicaId);
+                  const pacientesIds = fechamentosClinica.map(f => f.paciente_id);
+                  return pacientes.filter(p => {
+                    if (!pacientesIds.includes(p.id) || p.status !== 'fechado') return false;
+                    const docsEnviados = [
+                      p.selfie_doc_url,
+                      p.documento_url,
+                      p.comprovante_residencia_url,
+                      p.contrato_servico_url
+                    ].filter(Boolean).length;
+                    return docsEnviados < 4;
+                  }).length;
+                })()}
+              </div>
+            </div>
+          </div>
+
           <div className="card">
-            <div className="card-header">
-              <h2 className="card-title">Meus Pacientes</h2>
-              <button 
-                className="btn btn-primary" 
-                onClick={() => {
-                  setEditingPaciente(null);
-                  setFormData({
-                    nome: '',
-                    telefone: '',
-                    cpf: '',
-                    cidade: '',
-                    estado: '',
-                    tipo_tratamento: '',
-                    status: 'compareceu',
-                    observacoes: '',
-                    consultor_id: '',
-                    cadastrado_por_clinica: true,
-                    clinica_id: user?.clinica_id || user?.id
-                  });
-                  setShowModal(true);
-                }}
-              >
-                + Cadastrar Paciente
-              </button>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <h2 className="card-title" style={{ marginBottom: '0.5rem' }}>Lista de Pacientes com Fechamento</h2>
+                <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                  Upload de documentos é necessário para aprovação final.
+                </div>
+              </div>
+              <div>
+                <button 
+                  className="btn btn-primary" 
+                  onClick={() => setShowCadastroCompletoModal(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  Cadastrar Paciente
+                </button>
+              </div>
             </div>
 
             {loading ? (
@@ -2231,7 +2852,15 @@ const Pacientes = () => {
               </div>
             ) : (
               <>
-                {pacientes.filter(p => p.cadastrado_por_clinica === true).length === 0 ? (
+                {(() => {
+                  const clinicaId = user?.clinica_id || user?.id;
+                  // TODOS os fechamentos, não só aprovados
+                  const fechamentosClinica = fechamentos.filter(f => f.clinica_id === clinicaId);
+                  const pacientesIds = fechamentosClinica.map(f => f.paciente_id);
+                  const pacientesFechados = pacientes.filter(p => pacientesIds.includes(p.id) && p.status === 'fechado');
+                  
+                  return pacientesFechados.length === 0;
+                })() ? (
                   <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
                     <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: '0 auto 1rem', opacity: 0.3 }}>
                       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -2239,9 +2868,11 @@ const Pacientes = () => {
                       <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
                       <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                     </svg>
-                    <p>Você ainda não cadastrou nenhum paciente.</p>
-                    <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
-                      Clique em "Cadastrar Paciente" para adicionar pacientes próprios da clínica.
+                    <p style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                      Nenhum paciente com fechamento
+                    </p>
+                    <p style={{ fontSize: '0.875rem', color: '#9ca3af' }}>
+                      Os pacientes aparecerão aqui quando tiverem um fechamento registrado na sua clínica.
                     </p>
                   </div>
                 ) : (
@@ -2250,80 +2881,148 @@ const Pacientes = () => {
                       <thead>
                         <tr>
                           <th>Nome</th>
-                          <th>Telefone</th>
-                          <th>CPF</th>
-                          <th>Tipo</th>
-                          <th>Documentos</th>
-                          <th>Data Cadastro</th>
-                          <th>Ações</th>
+                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
+                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
+                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Valor</th>
+                          <th>Status</th>
+                          <th>Documentação</th>
+                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Data</th>
+                          <th style={{ width: '80px' }}>Ações</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {pacientes
-                          .filter(p => p.cadastrado_por_clinica === true)
-                          .map(paciente => (
+                        {(() => {
+                          const clinicaId = user?.clinica_id || user?.id;
+                          // TODOS os fechamentos, não só aprovados
+                          const fechamentosClinica = fechamentos.filter(f => f.clinica_id === clinicaId);
+                          const pacientesIds = fechamentosClinica.map(f => f.paciente_id);
+                          
+                          return pacientes
+                            .filter(p => pacientesIds.includes(p.id) && p.status === 'fechado')
+                            .map(paciente => {
+                              const totalDocs = 4;
+                              const docsEnviados = [
+                                paciente.selfie_doc_url,
+                                paciente.documento_url,
+                                paciente.comprovante_residencia_url,
+                                paciente.contrato_servico_url
+                              ].filter(Boolean).length;
+                              const fechamentoPaciente = fechamentosClinica.find(f => f.paciente_id === paciente.id);
+                              
+                              // Determinar status do fechamento
+                              let statusFechamento = fechamentoPaciente?.aprovado || 'documentacao_pendente';
+                              if (docsEnviados < totalDocs && statusFechamento !== 'reprovado') {
+                                statusFechamento = 'documentacao_pendente';
+                              }
+                              
+                              const statusColors = {
+                                'aprovado': { color: '#10b981', label: 'Aprovado' },
+                                'reprovado': { color: '#ef4444', label: 'Reprovado' },
+                                'documentacao_pendente': { color: '#f59e0b', label: 'Doc. Pendente' },
+                                'pendente': { color: '#f59e0b', label: 'Pendente' }
+                              };
+                              const statusInfo = statusColors[statusFechamento] || statusColors['pendente'];
+                              
+                              return (
                             <tr key={paciente.id}>
-                              <td><strong>{paciente.nome}</strong></td>
-                              <td>{formatarTelefone(paciente.telefone)}</td>
-                              <td>{formatarCPF(paciente.cpf)}</td>
-                              <td>
-                                {paciente.tipo_tratamento && (
-                                  <span className={`badge badge-${paciente.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
-                                    {paciente.tipo_tratamento}
+                                <td>
+                                  <strong>{paciente.nome}</strong>
+                                </td>
+                                <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarTelefone(paciente.telefone)}</td>
+                                <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                                  {paciente.consultor_nome || (
+                                    <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
+                                      Não atribuído
                                   </span>
                                 )}
                               </td>
+                                <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell'}}>
+                                  {fechamentoPaciente?.valor_fechado ? (
+                                    <div style={{ fontWeight: '700', color: '#059669', fontSize: '0.95rem' }}>
+                                      {formatarMoeda(fechamentoPaciente.valor_fechado)}
+                                    </div>
+                                  ) : (
+                                    <span style={{ color: '#9ca3af', fontSize: '0.875rem' }}>-</span>
+                                  )}
+                                </td>
+                                <td>
+                                  <span 
+                                    className="badge"
+                                    style={{
+                                      backgroundColor: statusInfo.color + '20',
+                                      color: statusInfo.color,
+                                      fontWeight: '600',
+                                      border: `1px solid ${statusInfo.color}`,
+                                      padding: '0.25rem 0.5rem',
+                                      borderRadius: '4px',
+                                      fontSize: '0.75rem'
+                                    }}
+                                    title="Status de aprovação do fechamento pelo admin"
+                                  >
+                                    {statusInfo.label}
+                                  </span>
+                                </td>
                               <td>
-                                <div style={{ display: 'flex', gap: '0.25rem' }}>
-                                  {paciente.selfie_doc_url && (
-                                    <span title="Selfie com documento" style={{ fontSize: '1.2rem' }}>📷</span>
-                                  )}
-                                  {paciente.documento_url && (
-                                    <span title="Documento" style={{ fontSize: '1.2rem' }}>📄</span>
-                                  )}
-                                  {paciente.comprovante_residencia_url && (
-                                    <span title="Comprovante de residência" style={{ fontSize: '1.2rem' }}>🏠</span>
-                                  )}
-                                  {paciente.contrato_servico_url && (
-                                    <span title="Contrato de serviço" style={{ fontSize: '1.2rem' }}>📑</span>
-                                  )}
-                                  {paciente.confirmacao_sacado_url && (
-                                    <span title="Confirmação do sacado" style={{ fontSize: '1.2rem' }}>✅</span>
-                                  )}
-                                  {!paciente.selfie_doc_url && !paciente.documento_url && !paciente.comprovante_residencia_url && 
-                                   !paciente.contrato_servico_url && !paciente.confirmacao_sacado_url && (
-                                    <span style={{ color: '#9ca3af', fontSize: '0.875rem' }}>Sem documentos</span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center' }}>
+                                  <div style={{ fontSize: '0.75rem', color: '#6b7280', whiteSpace: 'nowrap' }}>
+                                    {docsEnviados}/{totalDocs} enviados
+                                  </div>
+                                  <div style={{ 
+                                    width: window.innerWidth <= 768 ? '60px' : '100px', 
+                                    height: '6px', 
+                                    backgroundColor: '#e5e7eb',
+                                    borderRadius: '3px',
+                                    overflow: 'hidden'
+                                  }}>
+                                    <div style={{ 
+                                      width: `${(docsEnviados / totalDocs) * 100}%`,
+                                      height: '100%',
+                                      backgroundColor: docsEnviados === totalDocs ? '#10b981' : '#3b82f6',
+                                      transition: 'width 0.3s ease'
+                                    }} />
+                                  </div>
+                                  {docsEnviados === totalDocs && (
+                                    <span style={{ 
+                                      fontSize: '0.7rem', 
+                                      color: '#10b981', 
+                                      fontWeight: '600',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '0.25rem'
+                                    }}>
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                      </svg>
+                                      Completo
+                                    </span>
                                   )}
                                 </div>
                               </td>
-                              <td>{formatarData(paciente.created_at)}</td>
+                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                                {fechamentoPaciente?.data_fechamento ? formatarData(fechamentoPaciente.data_fechamento) : formatarData(paciente.created_at)}
+                              </td>
                               <td>
                                 <button
                                   className="btn-action"
-                                  onClick={() => {
-                                    setEditingPaciente(paciente);
-                                    setFormData({
-                                      nome: paciente.nome,
-                                      telefone: paciente.telefone,
-                                      cpf: paciente.cpf,
-                                      cidade: paciente.cidade || '',
-                                      estado: paciente.estado || '',
-                                      tipo_tratamento: paciente.tipo_tratamento || '',
-                                      status: paciente.status,
-                                      observacoes: paciente.observacoes || '',
-                                      consultor_id: paciente.consultor_id || '',
-                                      cadastrado_por_clinica: true,
-                                      clinica_id: user?.clinica_id || user?.id
-                                    });
-                                    setShowModal(true);
+                                  onClick={() => handleView(paciente)}
+                                  title="Visualizar informações do paciente"
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.25rem'
                                   }}
-                                  title="Editar/Upload documentos"
                                 >
-                                  ✏️
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                    <circle cx="12" cy="12" r="3" />
+                                  </svg>
                                 </button>
                               </td>
                             </tr>
-                          ))}
+                              );
+                            });
+                        })()}
                       </tbody>
                     </table>
                   </div>
@@ -3192,91 +3891,907 @@ const Pacientes = () => {
         </div>
       )}
 
-      {/* Modal de visualização: */}
+      {/* Modal de visualização com abas */}
       {showViewModal && viewPaciente && (
         <div className="modal-overlay">
-          <div className="modal">
+          <div className="modal" style={{ maxWidth: '1000px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="modal-header">
-              <h2 className="modal-title">Visualizar Paciente</h2>
-              <button className="close-btn" onClick={() => setShowViewModal(false)}>×</button>
+              <h2 className="modal-title">
+                {viewPaciente.nome}
+              </h2>
+              <button className="close-btn" onClick={closeViewModal}>×</button>
             </div>
+            
+            {/* Abas de Navegação */}
+            <div style={{ 
+              borderBottom: '1px solid #e5e7eb',
+              padding: '0 1.5rem',
+              overflowX: 'auto',
+              WebkitOverflowScrolling: 'touch'
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                gap: window.innerWidth <= 768 ? '0' : '2rem',
+                minWidth: 'max-content'
+              }}>
+                <button
+                  onClick={() => handleTabChange('informacoes')}
+                  style={{
+                    padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
+                    border: 'none',
+                    background: 'none',
+                    fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
+                    fontWeight: '500',
+                    color: activeViewTab === 'informacoes' ? '#3b82f6' : '#6b7280',
+                    borderBottom: activeViewTab === 'informacoes' ? '2px solid #3b82f6' : '2px solid transparent',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Informações do Paciente
+                </button>
+                
+                {isClinica && (
+                  <>
+                    <button
+                      onClick={() => handleTabChange('fechamento')}
+                      style={{
+                        padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
+                        border: 'none',
+                        background: 'none',
+                        fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
+                        fontWeight: '500',
+                        color: activeViewTab === 'fechamento' ? '#3b82f6' : '#6b7280',
+                        borderBottom: activeViewTab === 'fechamento' ? '2px solid #3b82f6' : '2px solid transparent',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Fechamento
+                    </button>
+
+                    <button
+                      onClick={() => handleTabChange('parcelamento')}
+                      style={{
+                        padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
+                        border: 'none',
+                        background: 'none',
+                        fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
+                        fontWeight: '500',
+                        color: activeViewTab === 'parcelamento' ? '#3b82f6' : '#6b7280',
+                        borderBottom: activeViewTab === 'parcelamento' ? '2px solid #3b82f6' : '2px solid transparent',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Parcelamento
+                    </button>
+                    
+                    <button
+                      onClick={() => handleTabChange('documentos')}
+                      style={{
+                        padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
+                        border: 'none',
+                        background: 'none',
+                        fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
+                        fontWeight: '500',
+                        color: activeViewTab === 'documentos' ? '#3b82f6' : '#6b7280',
+                        borderBottom: activeViewTab === 'documentos' ? '2px solid #3b82f6' : '2px solid transparent',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Documentos
+                    </button>
+                    
+                  </>
+                )}
+              </div>
+            </div>
+            
             <div style={{ padding: '1.5rem' }}>
-              <div className="form-group">
-                <label className="form-label">Nome Completo</label>
-                <input type="text" className="form-input" value={viewPaciente.nome || '-'} readOnly />
+              {/* Aba de Informações do Paciente */}
+              {activeViewTab === 'informacoes' && (
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Nome Completo</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewPaciente.nome}</p>
               </div>
+                  
               <div className="grid grid-2">
-                <div className="form-group">
-                  <label className="form-label">Telefone</label>
-                  <input type="text" className="form-input" value={viewPaciente.telefone || '-'} readOnly />
+                    <div>
+                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Telefone</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{formatarTelefone(viewPaciente.telefone) || '-'}</p>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">CPF</label>
-                  <input type="text" className="form-input" value={viewPaciente.cpf || '-'} readOnly />
+                    
+                    <div>
+                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>CPF</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937', fontFamily: 'monospace' }}>{formatarCPF(viewPaciente.cpf) || '-'}</p>
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Cidade</label>
-                <input type="text" className="form-input" value={viewPaciente.cidade || '-'} readOnly />
+                  <div className="grid grid-2">
+                    <div>
+                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Cidade</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewPaciente.cidade || '-'}</p>
+                    </div>
+                    
+                    <div>
+                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Estado</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewPaciente.estado || '-'}</p>
+                    </div>
               </div>
 
               <div className="grid grid-2">
-                <div className="form-group">
-                  <label className="form-label">Tipo de Tratamento</label>
-                  <input type="text" className="form-input" value={viewPaciente.tipo_tratamento || '-'} readOnly />
+                    <div>
+                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Tipo de Tratamento</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                        {viewPaciente.tipo_tratamento ? (
+                          <span className={`badge badge-${viewPaciente.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
+                            {viewPaciente.tipo_tratamento}
+                          </span>
+                        ) : '-'}
+                      </p>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Status</label>
-                  <input type="text" className="form-input" value={getStatusInfo(viewPaciente.status).label || '-'} readOnly />
+                    
+                    <div>
+                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Status do Paciente</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                        {viewPaciente.status && (
+                          <span 
+                            className="badge"
+                            style={{
+                              backgroundColor: getStatusInfo(viewPaciente.status).color + '20',
+                              color: getStatusInfo(viewPaciente.status).color,
+                              fontWeight: '600',
+                              borderRadius: '0.375rem'
+                            }}
+                          >
+                            {getStatusInfo(viewPaciente.status).label}
+                          </span>
+                        )}
+                      </p>
                 </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">Consultor Responsável</label>
-                <input type="text" className="form-input" value={consultores.find(c => String(c.id) === String(viewPaciente.consultor_id))?.nome || '-'} readOnly />
+                  
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Consultor Responsável</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                      {consultores.find(c => String(c.id) === String(viewPaciente.consultor_id))?.nome || (
+                        <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>Não atribuído</span>
+                      )}
+                    </p>
               </div>
-              <div className="form-group">
-                <label className="form-label">Observações</label>
-                <textarea className="form-textarea" value={viewPaciente.observacoes || '-'} readOnly rows="3" />
+                  
+                  {viewPaciente.observacoes && (
+                    <div>
+                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Observações</label>
+                      <div style={{ 
+                        margin: '0.5rem 0 0 0', 
+                        padding: '0.75rem',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '6px',
+                        border: '1px solid #e5e7eb',
+                        color: '#374151',
+                        whiteSpace: 'pre-wrap'
+                      }}>
+                        {viewPaciente.observacoes}
               </div>
-              <div className="form-group">
-                <label className="form-label">Cadastrado em</label>
-                <input type="text" className="form-input" value={viewPaciente.created_at ? formatarData(viewPaciente.created_at) : '-'} readOnly />
+              </div>
+                  )}
+                  
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Data de Cadastro</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>
+                      {viewPaciente.created_at ? formatarData(viewPaciente.created_at) : '-'}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Aba de Fechamento (apenas para clínicas) */}
+              {activeViewTab === 'fechamento' && isClinica && (
+                <div>
+                  <h3 style={{ 
+                    fontSize: '1.125rem', 
+                    fontWeight: '700', 
+                    color: '#1a1d23', 
+                    marginBottom: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    Dados do Fechamento
+                  </h3>
+                  
+                  {(() => {
+                    const clinicaId = user?.clinica_id || user?.id;
+                    const fechamentoPaciente = fechamentos.find(f => f.paciente_id === viewPaciente.id && f.clinica_id === clinicaId);
+                    
+                    if (!fechamentoPaciente) {
+                      return (
+                        <div style={{
+                          padding: '2rem',
+                          textAlign: 'center',
+                          backgroundColor: '#fef2f2',
+                          borderRadius: '8px',
+                          border: '1px solid #fecaca'
+                        }}>
+                          <div style={{ color: '#dc2626', fontSize: '0.875rem' }}>
+                            Nenhum fechamento encontrado para este paciente nesta clínica
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    const totalDocs = 4;
+                    const docsEnviados = [
+                      viewPaciente.selfie_doc_url,
+                      viewPaciente.documento_url,
+                      viewPaciente.comprovante_residencia_url,
+                      viewPaciente.contrato_servico_url
+                    ].filter(Boolean).length;
+                    
+                    let statusFechamento = fechamentoPaciente.aprovado || 'documentacao_pendente';
+                    if (docsEnviados < totalDocs && statusFechamento !== 'reprovado') {
+                      statusFechamento = 'documentacao_pendente';
+                    }
+                    
+                    const statusColors = {
+                      'aprovado': { color: '#10b981', label: 'Aprovado' },
+                      'reprovado': { color: '#ef4444', label: 'Reprovado' },
+                      'documentacao_pendente': { color: '#f59e0b', label: 'Doc. Pendente' },
+                      'pendente': { color: '#f59e0b', label: 'Pendente' }
+                    };
+                    const statusInfo = statusColors[statusFechamento] || statusColors['pendente'];
+                    
+                    return (
+                      <div style={{ display: 'grid', gap: '1rem' }}>
+                        <div>
+                          <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Valor do Fechamento</label>
+                          <p style={{ margin: '0.5rem 0 0 0', fontSize: '1.5rem', fontWeight: '700', color: '#059669' }}>
+                            {formatarMoeda(fechamentoPaciente.valor_fechado)}
+                          </p>
+                        </div>
+                        
+                        <div>
+                          <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Status de Aprovação</label>
+                          <p style={{ margin: '0.5rem 0 0 0' }}>
+                            <span 
+                              className="badge"
+                              style={{
+                                backgroundColor: statusInfo.color + '20',
+                                color: statusInfo.color,
+                                fontWeight: '600',
+                                border: `1px solid ${statusInfo.color}`,
+                                padding: '0.5rem 1rem',
+                                borderRadius: '6px',
+                                fontSize: '0.95rem'
+                              }}
+                            >
+                              {statusInfo.label}
+                            </span>
+                          </p>
+                        </div>
+                        
+                        <div className="grid grid-2">
+                          <div>
+                            <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Data do Fechamento</label>
+                            <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                              {formatarData(fechamentoPaciente.data_fechamento)}
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Tipo de Tratamento</label>
+                            <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                              {fechamentoPaciente.tipo_tratamento || 'Não informado'}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {fechamentoPaciente.observacoes && (
+                          <div>
+                            <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Observações do Fechamento</label>
+                            <div style={{ 
+                              margin: '0.5rem 0 0 0', 
+                              padding: '0.75rem',
+                              backgroundColor: '#f9fafb',
+                              borderRadius: '6px',
+                              border: '1px solid #e5e7eb',
+                              color: '#374151',
+                              whiteSpace: 'pre-wrap'
+                            }}>
+                              {fechamentoPaciente.observacoes}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Contrato do Fechamento */}
+                        <div style={{ 
+                          marginTop: '1rem',
+                          padding: '1rem',
+                          backgroundColor: fechamentoPaciente.contrato_arquivo ? '#f0fdf4' : '#fef2f2',
+                          borderRadius: '8px',
+                          border: fechamentoPaciente.contrato_arquivo ? '1px solid #86efac' : '1px solid #fecaca'
+                        }}>
+                          <label style={{ 
+                            fontWeight: '600', 
+                            color: fechamentoPaciente.contrato_arquivo ? '#065f46' : '#dc2626', 
+                            fontSize: '0.875rem', 
+                            marginBottom: '0.75rem', 
+                            display: 'block' 
+                          }}>
+                            Contrato do Fechamento
+                          </label>
+                          {fechamentoPaciente.contrato_arquivo ? (
+                            <>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#059669' }}>
+                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                  <polyline points="14,2 14,8 20,8"></polyline>
+                                </svg>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ fontWeight: '600', color: '#065f46', fontSize: '0.875rem' }}>
+                                    {fechamentoPaciente.contrato_nome_original || 'contrato.pdf'}
+                                  </div>
+                                  <div style={{ fontSize: '0.75rem', color: '#059669' }}>
+                                    ✓ Contrato disponível
+                                  </div>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => downloadContrato(fechamentoPaciente)}
+                                className="btn btn-primary"
+                                style={{ 
+                                  display: 'inline-flex', 
+                                  alignItems: 'center', 
+                                  gap: '0.5rem',
+                                  padding: '0.5rem 1rem'
+                                }}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                  <circle cx="12" cy="12" r="3" />
+                                </svg>
+                                Visualizar Contrato
+                              </button>
+                            </>
+                          ) : (
+                            <div style={{ textAlign: 'center', padding: '1rem' }}>
+                              <div style={{ color: '#dc2626', fontSize: '0.875rem' }}>
+                                Nenhum contrato anexado a este fechamento
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+              
+              {/* Aba de Documentos (apenas para clínicas) */}
+              {activeViewTab === 'documentos' && isClinica && (
+                <div>
+                  <h3 style={{ 
+                    fontSize: '1.125rem', 
+                    fontWeight: '700', 
+                    color: '#1a1d23', 
+                    marginBottom: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="16" y1="13" x2="8" y2="13"></line>
+                      <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                    Documentação do Paciente
+                  </h3>
+                  
+                  {(() => {
+                    const documentos = [
+                      { key: 'selfie_doc_url', label: '1. Selfie com Documento', required: true },
+                      { key: 'documento_url', label: '2. Documento (RG/CNH)', required: true },
+                      { key: 'comprovante_residencia_url', label: '3. Comprovante de Residência', required: true },
+                      { key: 'contrato_servico_url', label: '4. Contrato de Serviço', required: true }
+                    ];
+                    
+                    const totalDocs = 4;
+                    const docsEnviados = documentos.filter(doc => viewPaciente[doc.key]).length;
+                    
+                    return (
+                      <>
+                        {/* Barra de progresso */}
+                        <div style={{ 
+                          marginBottom: '1.5rem', 
+                          padding: '1rem', 
+                          backgroundColor: '#f0f9ff',
+                          borderRadius: '8px',
+                          border: '1px solid #3b82f6'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1e40af', margin: 0 }}>
+                                Progresso da Documentação
+                              </h4>
+                              <p style={{ fontSize: '0.75rem', color: '#3730a3', margin: '0.25rem 0 0 0' }}>
+                                {docsEnviados} de {totalDocs} documentos enviados
+                              </p>
+                            </div>
+                            <div style={{ 
+                              width: '120px', 
+                              height: '8px', 
+                              backgroundColor: '#e5e7eb',
+                              borderRadius: '4px',
+                              overflow: 'hidden'
+                            }}>
+                              <div style={{ 
+                                width: `${(docsEnviados / totalDocs) * 100}%`,
+                                height: '100%',
+                                backgroundColor: docsEnviados === totalDocs ? '#10b981' : '#3b82f6',
+                                transition: 'width 0.3s ease'
+                              }} />
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Lista de documentos */}
+                        <div style={{ 
+                          display: 'grid', 
+                          gridTemplateColumns: 'repeat(2, 1fr)',
+                          gap: '1rem'
+                        }}>
+                          {documentos.map(doc => {
+                            const docEnviado = viewPaciente[doc.key];
+                            const docKey = doc.key.replace('_url', '');
+                            const aprovadoStatus = viewPaciente[`${docKey}_aprovado`];
+                            
+                            return (
+                              <div key={doc.key} style={{
+                                padding: '1rem',
+                                backgroundColor: '#f9fafb',
+                                borderRadius: '8px',
+                                border: `2px solid ${
+                                  aprovadoStatus === true ? '#10b981' :
+                                  aprovadoStatus === false ? '#ef4444' :
+                                  docEnviado ? '#f59e0b' : '#e5e7eb'
+                                }`
+                              }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                  <div>
+                                    <label style={{ 
+                                      fontWeight: '600', 
+                                      color: '#374151', 
+                                      fontSize: '0.875rem'
+                                    }}>
+                                      {doc.label}
+                                      {doc.required && <span style={{ color: '#ef4444', marginLeft: '0.25rem' }}>*</span>}
+                                    </label>
+                                    <p style={{ 
+                                      margin: '0.25rem 0 0 0', 
+                                      fontSize: '0.75rem', 
+                                      fontWeight: '600',
+                                      color: aprovadoStatus === true ? '#059669' :
+                                             aprovadoStatus === false ? '#dc2626' :
+                                             docEnviado ? '#d97706' : '#6b7280'
+                                    }}>
+                                      {aprovadoStatus === true ? '✓ Aprovado' :
+                                       aprovadoStatus === false ? '✗ Reprovado' :
+                                       docEnviado ? 'Em Análise' : 'Pendente'}
+                                    </p>
+                                  </div>
+                                  {docEnviado && (
+                                    <button 
+                                      className="btn btn-sm btn-secondary" 
+                                      style={{ 
+                                        fontSize: '0.75rem', 
+                                        padding: '0.5rem',
+                                        justifyContent: 'center'
+                                      }}
+                                      onClick={() => window.open(viewPaciente[doc.key], '_blank')}
+                                    >
+                                      Visualizar
+                                    </button>
+                                  )}
+                                  
+                                  {/* Botão de upload (clínicas) */}
+                                  {isClinica && (
+                                    <label 
+                                      className="btn btn-sm btn-primary" 
+                                      style={{ 
+                                        fontSize: '0.75rem', 
+                                        padding: '0.5rem', 
+                                        cursor: uploadingDocs[docKey] ? 'not-allowed' : 'pointer',
+                                        opacity: uploadingDocs[docKey] ? 0.6 : 1,
+                                        textAlign: 'center',
+                                        margin: 0,
+                                        display: 'block'
+                                      }}
+                                    >
+                                      <input
+                                        type="file"
+                                        style={{ display: 'none' }}
+                                        accept={docKey === 'contrato_servico' ? '.pdf' : 'image/*,.pdf'}
+                                        onChange={(e) => handleUploadDocumentoPaciente(e, viewPaciente.id, docKey)}
+                                        disabled={uploadingDocs[docKey]}
+                                      />
+                                      {uploadingDocs[docKey] ? 'Enviando...' : (docEnviado ? 'Substituir' : 'Enviar Documento')}
+                                    </label>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+              
+              {/* Aba de Parcelamento (apenas para clínicas) */}
+              {activeViewTab === 'parcelamento' && isClinica && (
+                <div>
+                  <h3 style={{ 
+                    fontSize: '1.125rem', 
+                    fontWeight: '700', 
+                    color: '#1a1d23', 
+                    marginBottom: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                      <line x1="16" y1="2" x2="16" y2="6"></line>
+                      <line x1="8" y1="2" x2="8" y2="6"></line>
+                      <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    Informações de Parcelamento
+                  </h3>
+                  
+                  {(() => {
+                    const fechamentoPaciente = fechamentos.find(f => f.paciente_id === viewPaciente.id);
+                    
+                    if (!fechamentoPaciente) {
+                      return (
+                        <div style={{
+                          padding: '2rem',
+                          textAlign: 'center',
+                          backgroundColor: '#fef2f2',
+                          borderRadius: '8px',
+                          border: '1px solid #fecaca'
+                        }}>
+                          <div style={{ color: '#dc2626', fontSize: '0.875rem' }}>
+                            Nenhum fechamento encontrado para este paciente
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <div style={{ display: 'grid', gap: '1rem' }}>
+                        <div>
+                          <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Valor da Parcela</label>
+                          <div style={{ 
+                            padding: '0.75rem', 
+                            backgroundColor: '#f9fafb', 
+                            borderRadius: '6px',
+                            border: '1px solid #e5e7eb',
+                            fontWeight: '600',
+                            color: '#059669'
+                          }}>
+                            {fechamentoPaciente.valor_parcela ? 
+                              `R$ ${parseFloat(fechamentoPaciente.valor_parcela).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 
+                              'Não informado'
+                            }
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Número de Parcelas</label>
+                          <div style={{ 
+                            padding: '0.75rem', 
+                            backgroundColor: '#f9fafb', 
+                            borderRadius: '6px',
+                            border: '1px solid #e5e7eb'
+                          }}>
+                            {fechamentoPaciente.numero_parcelas || 'Não informado'}
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Vencimento</label>
+                          <div style={{ 
+                            padding: '0.75rem', 
+                            backgroundColor: '#f9fafb', 
+                            borderRadius: '6px',
+                            border: '1px solid #e5e7eb'
+                          }}>
+                            {fechamentoPaciente.vencimento ? 
+                              new Date(fechamentoPaciente.vencimento).toLocaleDateString('pt-BR') : 
+                              'Não informado'
+                            }
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Antecipação (em meses)</label>
+                          <div style={{ 
+                            padding: '0.75rem', 
+                            backgroundColor: '#f9fafb', 
+                            borderRadius: '6px',
+                            border: '1px solid #e5e7eb'
+                          }}>
+                            {fechamentoPaciente.antecipacao_meses ? 
+                              `${fechamentoPaciente.antecipacao_meses} meses` : 
+                              'Não informado'
+                            }
+                          </div>
+                        </div>
+                        
+                        {/* Resumo do parcelamento */}
+                        {fechamentoPaciente.valor_parcela && fechamentoPaciente.numero_parcelas && (
+                          <div style={{
+                            marginTop: '1rem',
+                            padding: '1rem',
+                            backgroundColor: '#f0f9ff',
+                            borderRadius: '8px',
+                            border: '1px solid #3b82f6'
+                          }}>
+                            <h4 style={{ 
+                              fontSize: '0.95rem', 
+                              fontWeight: '600', 
+                              color: '#1e40af', 
+                              margin: '0 0 0.5rem 0' 
+                            }}>
+                              Resumo do Parcelamento
+                            </h4>
+                            <div style={{ fontSize: '0.875rem', color: '#3730a3' }}>
+                              <div>Valor total: <strong>R$ {parseFloat(fechamentoPaciente.valor_fechado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></div>
+                              <div>Parcelas: <strong>{fechamentoPaciente.numero_parcelas}x de R$ {parseFloat(fechamentoPaciente.valor_parcela).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></div>
+                              {fechamentoPaciente.vencimento && (
+                                <div>Primeira parcela: <strong>{new Date(fechamentoPaciente.vencimento).toLocaleDateString('pt-BR')}</strong></div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+              
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem' }}>
+                <button 
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={closeViewModal}
+                >
+                  Fechar
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal de Observações */}
+      {/* Modal de Observações com Evidências */}
       {showObservacoesModal && (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: '500px' }}>
+          <div className="modal" style={{ maxWidth: '700px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <div className="modal-header">
-              <h2 className="modal-title">Observações sobre o paciente</h2> 
+              <h2 className="modal-title">
+                {pacienteObservacoes?.nome || 'Detalhes'}
+              </h2>
+              <button className="close-btn" onClick={() => setShowObservacoesModal(false)}>×</button>
             </div>
-            <div style={{ padding: '1.5rem' }}>
-              <div style={{
-                backgroundColor: '#f9fafb',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                padding: '1rem',
-                minHeight: '120px',
-                fontSize: '0.875rem',
-                lineHeight: '1.5',
-                color: '#374151',
-                whiteSpace: 'pre-wrap'
-              }}>
-                {observacoesAtual}
-              </div>
-              <div style={{ marginTop: '1rem', textAlign: 'right' }}>
-                <button 
-                  className="btn btn-secondary" 
-                  onClick={() => setShowObservacoesModal(false)}
+            
+            {/* Navegação por abas */}
+            <div style={{ 
+              display: 'flex', 
+              gap: '2rem',
+              padding: '1rem 1.5rem 0 1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              flexShrink: 0
+            }}>
+              <button
+                onClick={() => setActiveObservacoesTab('observacoes')}
+                style={{
+                  padding: '0.75rem 0',
+                  border: 'none',
+                  background: 'none',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: activeObservacoesTab === 'observacoes' ? '#3b82f6' : '#6b7280',
+                  borderBottom: activeObservacoesTab === 'observacoes' ? '2px solid #3b82f6' : '2px solid transparent',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Observações
+              </button>
+              
+                <button
+                  onClick={() => setActiveObservacoesTab('evidencias')}
+                  style={{
+                    padding: '0.75rem 0',
+                    border: 'none',
+                    background: 'none',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: activeObservacoesTab === 'evidencias' ? '#3b82f6' : '#6b7280',
+                    borderBottom: activeObservacoesTab === 'evidencias' ? '2px solid #3b82f6' : '2px solid transparent',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
                 >
-                  Fechar
-                </button>
-              </div>
+                  Evidências
+                {evidenciasPaciente.length > 0 && (
+                  <span style={{
+                    backgroundColor: '#3b82f6',
+                    color: 'white',
+                    fontSize: '0.7rem',
+                    fontWeight: '600',
+                    padding: '0.125rem 0.375rem',
+                    borderRadius: '9999px',
+                    minWidth: '20px',
+                    textAlign: 'center'
+                  }}>
+                    {evidenciasPaciente.length}
+                  </span>
+              )}
+              </button>
+            </div>
+            
+            <div style={{ padding: '1.5rem', flex: 1, overflowY: 'auto' }}>
+              {/* Aba de Observações */}
+              {activeObservacoesTab === 'observacoes' && (
+                <div style={{
+                  backgroundColor: '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  padding: '1rem',
+                  minHeight: '120px',
+                  fontSize: '0.875rem',
+                  lineHeight: '1.5',
+                  color: '#374151',
+                  whiteSpace: 'pre-wrap'
+                }}>
+                  {observacoesAtual}
+                </div>
+              )}
+              
+              {/* Aba de Evidências */}
+              {activeObservacoesTab === 'evidencias' && (
+                <div>
+                  <h3 style={{ 
+                    fontSize: '1rem', 
+                    fontWeight: '600', 
+                    color: '#374151', 
+                    marginBottom: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="16" y1="13" x2="8" y2="13"></line>
+                      <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                    Evidências de Mudanças de Status
+                  </h3>
+                  
+                  {evidenciasPaciente.length === 0 ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: '0 auto 1rem', opacity: 0.3 }}>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                      </svg>
+                      <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                        Nenhuma evidência registrada
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: '1rem' }}>
+                      {evidenciasPaciente.map((evidencia, index) => (
+                        <div key={evidencia.id} style={{
+                          backgroundColor: '#f9fafb',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          padding: '1rem'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.75rem' }}>
+                            <div>
+                              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                                {new Date(evidencia.created_at).toLocaleString('pt-BR')}
+                              </div>
+                              <div style={{ fontWeight: '600', color: '#374151' }}>
+                                {evidencia.status_anterior || 'N/A'} → {evidencia.status_novo || 'N/A'}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {evidencia.descricao && (
+                            <div style={{
+                              marginBottom: '0.75rem',
+                              padding: '0.75rem',
+                              backgroundColor: 'white',
+                              borderRadius: '6px',
+                              fontSize: '0.875rem',
+                              color: '#374151',
+                              whiteSpace: 'pre-wrap'
+                            }}>
+                              {evidencia.descricao}
+                            </div>
+                          )}
+                          
+                          {evidencia.arquivo_url && (
+                            <button
+                              onClick={() => window.open(evidencia.arquivo_url, '_blank')}
+                              className="btn btn-sm btn-primary"
+                              style={{
+                                fontSize: '0.75rem',
+                                padding: '0.5rem 0.75rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                              </svg>
+                              Visualizar Evidência
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div style={{ 
+              padding: '1rem 1.5rem', 
+              borderTop: '1px solid #e5e7eb',
+              flexShrink: 0,
+              textAlign: 'right'
+            }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => {
+                  setShowObservacoesModal(false);
+                  setActiveObservacoesTab('observacoes');
+                  setEvidenciasPaciente([]);
+                  setPacienteObservacoes(null);
+                }}
+              >
+                Fechar
+              </button>
             </div>
           </div>
         </div>
@@ -3451,30 +4966,167 @@ const Pacientes = () => {
                 </div>
               </div>
 
-              {/* Upload de Documentos - apenas se estiver editando */}
-              {editingPaciente && (
-                <>
-                  <h3 style={{ marginBottom: '1rem', color: '#1e293b', borderTop: '1px solid #e5e7eb', paddingTop: '2rem' }}>
-                    Upload de Documentos
+              {/* Upload de Documentos */}
+              <h3 style={{ 
+                marginBottom: '1rem', 
+                color: '#1e293b', 
+                borderTop: '1px solid #e5e7eb', 
+                paddingTop: '2rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                </svg>
+                Upload de Documentos do Paciente
                   </h3>
+              
+              {editingPaciente && (
+                <div style={{ 
+                  marginBottom: '1.5rem', 
+                  padding: '1rem', 
+                  backgroundColor: '#f0f9ff',
+                  borderRadius: '8px',
+                  border: '1px solid #3b82f6'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1e40af', margin: 0 }}>
+                        Status da Documentação
+                      </h4>
+                      <p style={{ fontSize: '0.75rem', color: '#3730a3', margin: '0.25rem 0 0 0' }}>
+                        {(() => {
+                          const totalDocs = 5;
+                          const docsEnviados = [
+                            editingPaciente.selfie_doc_url,
+                            editingPaciente.documento_url,
+                            editingPaciente.comprovante_residencia_url,
+                            editingPaciente.contrato_servico_url,
+                          ].filter(Boolean).length;
+                          
+                          return `${docsEnviados} de ${totalDocs} documentos enviados`;
+                        })()}
+                      </p>
+                    </div>
+                    <div style={{ 
+                      width: '120px', 
+                      height: '8px', 
+                      backgroundColor: '#e5e7eb',
+                      borderRadius: '4px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{ 
+                        width: `${(() => {
+                          const totalDocs = 5;
+                          const docsEnviados = [
+                            editingPaciente.selfie_doc_url,
+                            editingPaciente.documento_url,
+                            editingPaciente.comprovante_residencia_url,
+                            editingPaciente.contrato_servico_url,
+                          ].filter(Boolean).length;
+                          return (docsEnviados / totalDocs) * 100;
+                        })()}%`,
+                        height: '100%',
+                        backgroundColor: '#3b82f6',
+                        transition: 'width 0.3s ease'
+                      }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div className="alert alert-info" style={{ marginBottom: '1.5rem', backgroundColor: '#eff6ff', border: '1px solid #3b82f6', borderRadius: '8px', padding: '1rem' }}>
+                <strong style={{ color: '#1e40af' }}>Importante:</strong>
+                <p style={{ margin: '0.5rem 0 0 0', color: '#1e40af', fontSize: '0.875rem' }}>
+                  {editingPaciente 
+                    ? 'Faça upload dos documentos necessários. Formatos aceitos: Imagens (JPG, PNG) ou PDF.'
+                    : 'Você pode adicionar os documentos agora ou editá-los posteriormente. Formatos aceitos: Imagens (JPG, PNG) ou PDF.'
+                  }
+                </p>
+              </div>
+              
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(2, 1fr)',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
                     gap: '1.5rem',
                     marginBottom: '2rem'
                   }}>
                     {/* Campo de upload para cada tipo de documento */}
                     {[
-                      { key: 'selfie_doc', label: 'Selfie com Documento', icon: '📷' },
-                      { key: 'documento', label: 'Documento (RG/CNH)', icon: '📄' },
-                      { key: 'comprovante_residencia', label: 'Comprovante de Residência', icon: '🏠' },
-                      { key: 'contrato_servico', label: 'Contrato de Serviço', icon: '📑' },
-                      { key: 'confirmacao_sacado', label: 'Confirmação do Sacado', icon: '✅' }
+                  { key: 'selfie_doc', label: 'Selfie com Documento' },
+                  { key: 'documento', label: 'Documento (RG/CNH)' },
+                  { key: 'comprovante_residencia', label: 'Comprovante de Residência' },
+                  { key: 'contrato_servico', label: 'Contrato de Serviço' },
                     ].map(doc => (
-                      <div key={doc.key}>
-                        <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem' }}>
-                          {doc.icon} {doc.label}
+                  <div key={doc.key} style={{
+                    padding: '1rem',
+                    backgroundColor: '#f9fafb',
+                    borderRadius: '8px',
+                    border: editingPaciente?.[`${doc.key}_url`] ? '2px solid #10b981' : '2px solid #e2e8f0'
+                  }}>
+                    <label style={{ 
+                      display: 'block', 
+                      fontWeight: '600', 
+                      marginBottom: '0.75rem',
+                      color: '#1e293b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}>
+                      <span style={{ fontSize: '1.25rem' }}>{doc.icon}</span>
+                      {doc.label}
+                      {doc.required && <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>*</span>}
                         </label>
+                    
+                    {editingPaciente?.[`${doc.key}_url`] ? (
+                      <div>
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '0.5rem',
+                          marginBottom: '0.5rem',
+                          padding: '0.5rem',
+                          backgroundColor: '#ecfdf5',
+                          borderRadius: '6px'
+                        }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                          </svg>
+                          <span style={{ fontSize: '0.875rem', color: '#059669', fontWeight: '500' }}>
+                            Documento enviado
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => window.open(editingPaciente[`${doc.key}_url`], '_blank')}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem',
+                            backgroundColor: '#3b82f6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '0.875rem',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.5rem'
+                          }}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                          Visualizar
+                        </button>
+                      </div>
+                    ) : (
                         <input
                           type="file"
                           accept={doc.key === 'contrato_servico' ? '.pdf' : 'image/*,.pdf'}
@@ -3483,26 +5135,22 @@ const Pacientes = () => {
                             if (file) {
                               // Aqui você implementaria o upload
                               console.log(`Upload de ${doc.label}:`, file);
+                            showSuccessToast(`${doc.label} selecionado: ${file.name}`);
                             }
                           }}
                           style={{
                             width: '100%',
                             padding: '0.5rem',
                             border: '2px solid #e2e8f0',
-                            borderRadius: '10px',
-                            fontSize: '0.875rem'
+                          borderRadius: '6px',
+                          fontSize: '0.875rem',
+                          cursor: 'pointer'
                           }}
                         />
-                        {editingPaciente[`${doc.key}_url`] && (
-                          <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#059669' }}>
-                            ✓ Documento já enviado
-                          </div>
                         )}
                       </div>
                     ))}
                   </div>
-                </>
-              )}
 
               <div style={{ 
                 display: 'flex', 
@@ -3666,7 +5314,7 @@ const Pacientes = () => {
       {/* Modal de Fechamento */}
       {showFechamentoModal && (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: '600px' }}>
+          <div className="modal" style={{ maxWidth: '800px' }}>
             <div className="modal-header">
               <h2 className="modal-title">Criar Fechamento</h2>
               <button className="close-btn" onClick={fecharModalFechamento}>
@@ -3760,6 +5408,74 @@ const Pacientes = () => {
                   />
                 </div>
               </div>
+
+              {/* Seção de Parcelamento */}
+              <div style={{ 
+                border: '1px solid #e5e7eb', 
+                borderRadius: '8px', 
+                padding: '1rem', 
+                marginBottom: '1rem',
+                backgroundColor: '#f9fafb'
+              }}>
+                <h4 style={{ 
+                  margin: '0 0 1rem 0', 
+                  fontSize: '1rem', 
+                  fontWeight: '600', 
+                  color: '#374151' 
+                }}>
+                  Dados de Parcelamento
+                </h4>
+                
+                <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Valor da Parcela (R$)</label>
+                    <input 
+                      type="text"
+                      className="form-input"
+                      value={valorParcelaFormatado}
+                      onChange={handleValorParcelaChange}
+                      placeholder="R$ 0,00"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Nº de Parcelas</label>
+                    <input 
+                      type="number"
+                      className="form-input"
+                      value={numeroParcelasFechamento}
+                      onChange={(e) => setNumeroParcelasFechamento(e.target.value)}
+                      placeholder="Ex: 12"
+                      min="1"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-2" style={{ gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Vencimento</label>
+                    <input 
+                      type="date"
+                      className="form-input"
+                      value={vencimentoFechamento}
+                      onChange={(e) => setVencimentoFechamento(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Antecipação (em meses)</label>
+                    <input 
+                      type="number"
+                      className="form-input"
+                      value={antecipacaoFechamento}
+                      onChange={(e) => setAntecipacaoFechamento(e.target.value)}
+                      placeholder="Ex: 3"
+                      min="1"
+                    />
+                  </div>
+                </div>
+              </div>
+
 
               <div className="form-group" style={{ marginBottom: '1.5rem' }}>
                 <label className="form-label">Observações</label>
@@ -3953,6 +5669,622 @@ const Pacientes = () => {
         statusNovo={evidenciaData.statusNovo}
         nomeRegistro={evidenciaData.pacienteNome}
       />
+
+      {/* Modal de Cadastro Completo para Clínicas */}
+      {showCadastroCompletoModal && isClinica && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '1200px', maxHeight: '95vh', overflow: 'auto' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Cadastrar Paciente</h2>
+              <button className="close-btn" onClick={resetCadastroCompleto}>×</button>
+            </div>
+
+            <div style={{ padding: '2rem' }}>
+              {/* Seção 1: Informações do Paciente */}
+              <div style={{ 
+                marginBottom: '2rem', 
+                padding: '1.5rem', 
+                backgroundColor: '#f8fafc', 
+                borderRadius: '12px',
+                border: '1px solid #e2e8f0'
+              }}>
+                <h3 style={{ 
+                  fontSize: '1.25rem', 
+                  fontWeight: '700', 
+                  color: '#1e293b', 
+                  marginBottom: '1.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                  Dados do Paciente
+                </h3>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                      Nome Completo *
+                    </label>
+                    <input
+                      type="text"
+                      name="nome"
+                      value={dadosCompletosClinica.nome}
+                      onChange={handleInputChangeCadastroCompleto}
+                      onBlur={handleNomeBlurCompleto}
+                      placeholder="Digite o nome completo do paciente"
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                      Telefone/WhatsApp *
+                    </label>
+                    <input
+                      type="tel"
+                      name="telefone"
+                      value={dadosCompletosClinica.telefone}
+                      onChange={handleInputChangeCadastroCompleto}
+                      placeholder="(11) 99999-9999"
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                      CPF *
+                    </label>
+                    <input
+                      type="text"
+                      name="cpf"
+                      value={dadosCompletosClinica.cpf}
+                      onChange={handleInputChangeCadastroCompleto}
+                      placeholder="000.000.000-00"
+                      required
+                      maxLength="14"
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                      Estado *
+                    </label>
+                    <select
+                      name="estado"
+                      value={dadosCompletosClinica.estado}
+                      onChange={handleInputChangeCadastroCompleto}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="">Selecione o estado</option>
+                      {estadosBrasileiros.map(estado => (
+                        <option key={estado.sigla} value={estado.sigla}>
+                          {estado.sigla} - {estado.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                      Cidade *
+                    </label>
+                    {dadosCompletosClinica.estado && cidadesPorEstado[dadosCompletosClinica.estado] && !cidadeCustomizada ? (
+                      <select
+                        name="cidade"
+                        value={dadosCompletosClinica.cidade}
+                        onChange={(e) => {
+                          if (e.target.value === 'OUTRA') {
+                            setCidadeCustomizada(true);
+                            setDadosCompletosClinica(prev => ({ ...prev, cidade: '' }));
+                          } else {
+                            handleInputChangeCadastroCompleto(e);
+                          }
+                        }}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '0.875rem',
+                          border: '2px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '1rem',
+                          outline: 'none',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="">Selecione a cidade</option>
+                        {cidadesPorEstado[dadosCompletosClinica.estado].map(cidade => (
+                          <option key={cidade} value={cidade}>{cidade}</option>
+                        ))}
+                        <option value="OUTRA">Outra cidade</option>
+                      </select>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          name="cidade"
+                          value={dadosCompletosClinica.cidade}
+                          onChange={handleInputChangeCadastroCompleto}
+                          placeholder="Digite o nome da cidade"
+                          disabled={!dadosCompletosClinica.estado}
+                          required
+                          style={{
+                            flex: 1,
+                            padding: '0.875rem',
+                            border: '2px solid #e2e8f0',
+                            borderRadius: '8px',
+                            fontSize: '1rem',
+                            outline: 'none'
+                          }}
+                        />
+                        {dadosCompletosClinica.estado && cidadesPorEstado[dadosCompletosClinica.estado] && cidadeCustomizada && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCidadeCustomizada(false);
+                              setDadosCompletosClinica(prev => ({ ...prev, cidade: '' }));
+                            }}
+                            style={{
+                              padding: '0.875rem 1rem',
+                              background: '#e2e8f0',
+                              color: '#1e293b',
+                              border: 'none',
+                              borderRadius: '8px',
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            Voltar
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                      Tipo de Tratamento *
+                    </label>
+                    <select
+                      name="tipo_tratamento"
+                      value={dadosCompletosClinica.tipo_tratamento}
+                      onChange={handleInputChangeCadastroCompleto}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="">Selecione</option>
+                      <option value="Estético">Estético</option>
+                      <option value="Odontológico">Odontológico</option>
+                    </select>
+                  </div>
+
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                      Observações sobre o Paciente
+                    </label>
+                    <textarea
+                      name="observacoes"
+                      value={dadosCompletosClinica.observacoes}
+                      onChange={handleInputChangeCadastroCompleto}
+                      placeholder="Informações adicionais sobre o paciente..."
+                      rows="3"
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        resize: 'vertical',
+                        fontFamily: 'inherit'
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Seção 2: Dados do Fechamento */}
+              <div style={{ 
+                marginBottom: '2rem', 
+                padding: '1.5rem', 
+                backgroundColor: '#f0fdf4', 
+                borderRadius: '12px',
+                border: '1px solid #10b981'
+              }}>
+                <h3 style={{ 
+                  fontSize: '1.25rem', 
+                  fontWeight: '700', 
+                  color: '#065f46', 
+                  marginBottom: '1.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                  Dados do Fechamento
+                </h3>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                      Valor do Fechamento *
+                    </label>
+                    <input
+                      type="text"
+                      name="valor_fechado_formatado"
+                      value={dadosCompletosClinica.valor_fechado_formatado}
+                      onChange={handleValorFechadoCompleto}
+                      placeholder="R$ 0,00"
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                      Data do Fechamento *
+                    </label>
+                    <input
+                      type="date"
+                      name="data_fechamento"
+                      value={dadosCompletosClinica.data_fechamento}
+                      onChange={handleInputChangeCadastroCompleto}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                      Contrato (PDF) *
+                    </label>
+                    <input
+                      type="file"
+                      name="contrato_arquivo"
+                      onChange={handleInputChangeCadastroCompleto}
+                      accept=".pdf"
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    />
+                    {dadosCompletosClinica.contrato_arquivo && (
+                      <div style={{ 
+                        marginTop: '0.5rem', 
+                        fontSize: '0.875rem', 
+                        color: '#059669',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        {dadosCompletosClinica.contrato_arquivo.name}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                      Observações do Fechamento
+                    </label>
+                    <textarea
+                      name="observacoes_fechamento"
+                      value={dadosCompletosClinica.observacoes_fechamento}
+                      onChange={handleInputChangeCadastroCompleto}
+                      placeholder="Informações sobre o fechamento..."
+                      rows="3"
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        resize: 'vertical',
+                        fontFamily: 'inherit'
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Seção 3: Dados do Parcelamento */}
+              <div style={{ 
+                marginBottom: '2rem', 
+                padding: '1.5rem', 
+                backgroundColor: '#fefce8', 
+                borderRadius: '12px',
+                border: '1px solid #facc15'
+              }}>
+                <h3 style={{ 
+                  fontSize: '1.25rem', 
+                  fontWeight: '700', 
+                  color: '#a16207', 
+                  marginBottom: '1.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                  </svg>
+                  Informações de Parcelamento
+                </h3>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                      Valor da Parcela *
+                    </label>
+                    <input
+                      type="text"
+                      name="valor_parcela_formatado"
+                      value={dadosCompletosClinica.valor_parcela_formatado}
+                      onChange={handleValorParcelaCompleto}
+                      placeholder="R$ 0,00"
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                      Número de Parcelas *
+                    </label>
+                    <input
+                      type="number"
+                      name="numero_parcelas"
+                      value={dadosCompletosClinica.numero_parcelas}
+                      onChange={handleInputChangeCadastroCompleto}
+                      placeholder="Ex: 12"
+                      min="1"
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                      Vencimento *
+                    </label>
+                    <input
+                      type="date"
+                      name="vencimento"
+                      value={dadosCompletosClinica.vencimento}
+                      onChange={handleInputChangeCadastroCompleto}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                      Quantas parcelas quer antecipar? *
+                    </label>
+                    <input
+                      type="number"
+                      name="antecipacao_meses"
+                      value={dadosCompletosClinica.antecipacao_meses}
+                      onChange={handleInputChangeCadastroCompleto}
+                      placeholder="Ex: 3"
+                      min="1"
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Botões de Ação */}
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                gap: '1rem',
+                borderTop: '1px solid #e5e7eb',
+                paddingTop: '1.5rem'
+              }}>
+                <button
+                  type="button"
+                  onClick={resetCadastroCompleto}
+                  disabled={salvandoCadastroCompleto}
+                  style={{
+                    padding: '0.875rem 2rem',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '8px',
+                    backgroundColor: '#fff',
+                    color: '#64748b',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: salvandoCadastroCompleto ? 'not-allowed' : 'pointer',
+                    opacity: salvandoCadastroCompleto ? 0.6 : 1
+                  }}
+                >
+                  Cancelar
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={confirmarCadastroCompleto}
+                  disabled={salvandoCadastroCompleto}
+                  style={{
+                    padding: '0.875rem 2rem',
+                    border: 'none',
+                    borderRadius: '8px',
+                    background: salvandoCadastroCompleto 
+                      ? '#9ca3af' 
+                      : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: '#fff',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: salvandoCadastroCompleto ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  {salvandoCadastroCompleto ? (
+                    <>
+                      <div style={{
+                        width: '16px',
+                        height: '16px',
+                        border: '2px solid #ffffff',
+                        borderTopColor: 'transparent',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                      }}></div>
+                      Cadastrando...
+                    </>
+                  ) : (
+                    <>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                      Cadastrar Paciente
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Resumo dos dados preenchidos */}
+              {(dadosCompletosClinica.nome || dadosCompletosClinica.valor_fechado_formatado) && (
+                <div style={{
+                  marginTop: '1.5rem',
+                  padding: '1rem',
+                  backgroundColor: '#f0f9ff',
+                  borderRadius: '8px',
+                  border: '1px solid #3b82f6'
+                }}>
+                  <h4 style={{ 
+                    fontSize: '0.95rem', 
+                    fontWeight: '600', 
+                    color: '#1e40af', 
+                    margin: '0 0 0.5rem 0' 
+                  }}>
+                    Resumo do Cadastro
+                  </h4>
+                  <div style={{ fontSize: '0.875rem', color: '#3730a3', lineHeight: '1.5' }}>
+                    {dadosCompletosClinica.nome && (
+                      <div><strong>Paciente:</strong> {dadosCompletosClinica.nome}</div>
+                    )}
+                    {dadosCompletosClinica.valor_fechado_formatado && (
+                      <div><strong>Valor do Fechamento:</strong> {dadosCompletosClinica.valor_fechado_formatado}</div>
+                    )}
+                    {dadosCompletosClinica.valor_parcela_formatado && dadosCompletosClinica.numero_parcelas && (
+                      <div><strong>Parcelamento:</strong> {dadosCompletosClinica.numero_parcelas}x de {dadosCompletosClinica.valor_parcela_formatado}</div>
+                    )}
+                    {dadosCompletosClinica.vencimento && (
+                      <div><strong>Vencimento:</strong> {new Date(dadosCompletosClinica.vencimento).toLocaleDateString('pt-BR')}</div>
+                    )}
+                    {dadosCompletosClinica.antecipacao_meses && (
+                      <div><strong>Antecipação:</strong> {dadosCompletosClinica.antecipacao_meses} parcela(s)</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tutorial Overlay */}
       <TutorialPacientes

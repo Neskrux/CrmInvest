@@ -152,6 +152,14 @@ const Clinicas = () => {
     evidenciaId: null
   });
 
+  // Estados para modal de observações
+  const [showObservacoesModal, setShowObservacoesModal] = useState(false);
+  const [observacoesAtual, setObservacoesAtual] = useState('');
+  const [activeObservacoesTab, setActiveObservacoesTab] = useState('observacoes');
+  const [evidenciasClinica, setEvidenciasClinica] = useState([]);
+  const [clinicaObservacoes, setClinicaObservacoes] = useState(null);
+  const [tipoClinicaObservacoes, setTipoClinicaObservacoes] = useState(''); // 'clinica' ou 'nova_clinica'
+
   // Status disponíveis para clínicas gerais
   const statusClinicaOptions = [
     { value: 'ativa', label: 'Ativa', color: '#10b981' },
@@ -295,6 +303,19 @@ const Clinicas = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Controlar scroll do body quando modal estiver aberto
+  useEffect(() => {
+    if (showModal || showNovaClinicaModal || showAcessoModal || viewModalOpen || viewNovaClinicaModalOpen || showEvidenciaModal || showObservacoesModal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showModal, showNovaClinicaModal, showAcessoModal, viewModalOpen, viewNovaClinicaModalOpen, showEvidenciaModal, showObservacoesModal]);
 
   // Regeocodificar quando filtros/dados mudarem e a aba for mapa
   useEffect(() => {
@@ -1892,6 +1913,31 @@ const Clinicas = () => {
     }
   };
 
+  const handleViewObservacoes = async (observacoes, clinica, tipo = 'clinica') => {
+    setObservacoesAtual(observacoes || 'Nenhuma observação cadastrada.');
+    setClinicaObservacoes(clinica);
+    setTipoClinicaObservacoes(tipo);
+    setActiveObservacoesTab('observacoes');
+    
+    // Buscar evidências da clínica
+    if (clinica && clinica.id) {
+      try {
+        const response = await makeRequest(`/evidencias?tipo=${tipo}&registro_id=${clinica.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setEvidenciasClinica(Array.isArray(data) ? data : []);
+        } else {
+          setEvidenciasClinica([]);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar evidências:', error);
+        setEvidenciasClinica([]);
+      }
+    }
+    
+    setShowObservacoesModal(true);
+  };
+
   return (
     <div style={{ padding: '1.5rem' }}>
       <div className="page-header">
@@ -2030,7 +2076,7 @@ const Clinicas = () => {
                   textAlign: 'center'
                 }}>
                   <div style={{ color: '#dc2626', fontSize: '14px', marginBottom: '4px' }}>
-                    ⚠️ Links personalizados não encontrados
+                    Links personalizados não encontrados
                   </div>
                   <div style={{ color: '#6b7280', fontSize: '12px' }}>
                     Entre em contato com o administrador para gerar seus links.
@@ -5000,7 +5046,7 @@ const Clinicas = () => {
                                  }}>
                                    {aprovadoStatus === true ? '✓ Aprovado' :
                                     aprovadoStatus === false ? '✗ Reprovado' :
-                                    docStatus ? '⏳ Em Análise' : '⚠️ Pendente'}
+                                    docStatus ? 'Em Análise' : 'Pendente'}
                                  </p>
                                </div>
                                {docStatus && (
@@ -6314,6 +6360,216 @@ const Clinicas = () => {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Observações com Evidências */}
+      {showObservacoesModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '700px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">
+                {clinicaObservacoes?.nome || 'Detalhes da Clínica'}
+              </h2>
+              <button className="close-btn" onClick={() => setShowObservacoesModal(false)}>×</button>
+            </div>
+            
+            {/* Navegação por abas */}
+            <div style={{ 
+              display: 'flex', 
+              gap: '2rem',
+              padding: '1rem 1.5rem 0 1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              flexShrink: 0
+            }}>
+              <button
+                onClick={() => setActiveObservacoesTab('observacoes')}
+                style={{
+                  padding: '0.75rem 0',
+                  border: 'none',
+                  background: 'none',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: activeObservacoesTab === 'observacoes' ? '#3b82f6' : '#6b7280',
+                  borderBottom: activeObservacoesTab === 'observacoes' ? '2px solid #3b82f6' : '2px solid transparent',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Observações
+              </button>
+              
+              {evidenciasClinica.length > 0 && (
+                <button
+                  onClick={() => setActiveObservacoesTab('evidencias')}
+                  style={{
+                    padding: '0.75rem 0',
+                    border: 'none',
+                    background: 'none',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: activeObservacoesTab === 'evidencias' ? '#3b82f6' : '#6b7280',
+                    borderBottom: activeObservacoesTab === 'evidencias' ? '2px solid #3b82f6' : '2px solid transparent',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  Evidências
+                  <span style={{
+                    backgroundColor: '#3b82f6',
+                    color: 'white',
+                    fontSize: '0.7rem',
+                    fontWeight: '600',
+                    padding: '0.125rem 0.375rem',
+                    borderRadius: '9999px',
+                    minWidth: '20px',
+                    textAlign: 'center'
+                  }}>
+                    {evidenciasClinica.length}
+                  </span>
+                </button>
+              )}
+            </div>
+            
+            <div style={{ padding: '1.5rem', flex: 1, overflowY: 'auto' }}>
+              {/* Aba de Observações */}
+              {activeObservacoesTab === 'observacoes' && (
+                <div style={{
+                  backgroundColor: '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  padding: '1rem',
+                  minHeight: '120px',
+                  fontSize: '0.875rem',
+                  lineHeight: '1.5',
+                  color: '#374151',
+                  whiteSpace: 'pre-wrap'
+                }}>
+                  {observacoesAtual}
+                </div>
+              )}
+              
+              {/* Aba de Evidências */}
+              {activeObservacoesTab === 'evidencias' && (
+                <div>
+                  <h3 style={{ 
+                    fontSize: '1rem', 
+                    fontWeight: '600', 
+                    color: '#374151', 
+                    marginBottom: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="16" y1="13" x2="8" y2="13"></line>
+                      <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                    Evidências de Mudanças de Status
+                  </h3>
+                  
+                  {evidenciasClinica.length === 0 ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: '0 auto 1rem', opacity: 0.3 }}>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                      </svg>
+                      <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                        Nenhuma evidência registrada
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: '1rem' }}>
+                      {evidenciasClinica.map((evidencia, index) => (
+                        <div key={evidencia.id} style={{
+                          backgroundColor: '#f9fafb',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          padding: '1rem'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.75rem' }}>
+                            <div>
+                              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                                {new Date(evidencia.created_at).toLocaleString('pt-BR')}
+                              </div>
+                              <div style={{ fontWeight: '600', color: '#374151' }}>
+                                {evidencia.status_anterior || 'N/A'} → {evidencia.status_novo || 'N/A'}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {evidencia.descricao && (
+                            <div style={{
+                              marginBottom: '0.75rem',
+                              padding: '0.75rem',
+                              backgroundColor: 'white',
+                              borderRadius: '6px',
+                              fontSize: '0.875rem',
+                              color: '#374151',
+                              whiteSpace: 'pre-wrap'
+                            }}>
+                              {evidencia.descricao}
+                            </div>
+                          )}
+                          
+                          {evidencia.arquivo_url && (
+                            <button
+                              onClick={() => window.open(evidencia.arquivo_url, '_blank')}
+                              className="btn btn-sm btn-primary"
+                              style={{
+                                fontSize: '0.75rem',
+                                padding: '0.5rem 0.75rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                              </svg>
+                              Visualizar Evidência
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div style={{ 
+              padding: '1rem 1.5rem', 
+              borderTop: '1px solid #e5e7eb',
+              flexShrink: 0,
+              textAlign: 'right'
+            }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => {
+                  setShowObservacoesModal(false);
+                  setActiveObservacoesTab('observacoes');
+                  setEvidenciasClinica([]);
+                  setClinicaObservacoes(null);
+                  setTipoClinicaObservacoes('');
+                }}
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}

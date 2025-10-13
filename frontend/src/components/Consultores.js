@@ -722,7 +722,7 @@ const Consultores = () => {
       
       if (response.ok) {
         if (!data.estrutura_tabela.tem_coluna_codigo_referencia) {
-          showErrorToast('⚠️ Migração necessária! A coluna codigo_referencia não existe na tabela consultores.');
+          showErrorToast('Migração necessária! A coluna codigo_referencia não existe na tabela consultores.');
         } else if (data.consultores.sem_codigo > 0) {
           showSuccessToast(`✅ Estrutura OK. ${data.consultores.sem_codigo} consultores precisam de códigos de referência.`);
         } else {

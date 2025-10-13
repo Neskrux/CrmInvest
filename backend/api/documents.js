@@ -182,7 +182,7 @@ router.post('/upload-multiple/:clinicaId/:docType', upload.array('documents', 10
   }
 });
 
-// Upload de documento específico (único arquivo)
+// Upload de documento específico de clínica (único arquivo)
 router.post('/upload/:clinicaId/:docType', upload.single('document'), async (req, res) => {
   try {
     const { clinicaId, docType } = req.params;
@@ -443,6 +443,189 @@ router.delete('/delete/:clinicaId/:docType', async (req, res) => {
     res.status(500).json({ error: 'Erro ao deletar documento' });
   }
 });
+
+// ===== ENDPOINTS PARA PACIENTES =====
+
+// Upload de documento de paciente
+router.post('/upload-paciente/:pacienteId/:docType', upload.single('document'), async (req, res) => {
+  try {
+    const { pacienteId, docType } = req.params;
+    const file = req.file;
+    
+    if (!file) {
+      return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+    }
+    
+    // Mapear o tipo de documento para o campo do banco
+    const docFieldMap = {
+      'selfie_doc': 'selfie_doc',
+      'documento': 'documento',
+      'comprovante_residencia': 'comprovante_residencia',
+      'contrato_servico': 'contrato_servico',
+      'confirmacao_sacado': 'confirmacao_sacado'
+    };
+    
+    const docField = docFieldMap[docType];
+    const docUrlField = `${docField}_url`;
+    
+    if (!docField) {
+      return res.status(400).json({ error: 'Tipo de documento inválido' });
+    }
+    
+    // Gerar nome único para o arquivo
+    const timestamp = Date.now();
+    const randomId = Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    const fileName = `pacientes/${pacienteId}/${docType}_${timestamp}_${randomId}${ext}`;
+    
+    console.log(`📤 Fazendo upload de documento de paciente para Supabase Storage: ${fileName}`);
+    
+    // Fazer upload para Supabase Storage
+    const { data, error } = await supabaseAdmin.storage
+      .from(STORAGE_BUCKET)
+      .upload(fileName, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false
+      });
+    
+    if (error) {
+      console.error('❌ Erro no upload para Supabase:', error);
+      return res.status(500).json({ error: 'Erro ao fazer upload do arquivo' });
+    }
+    
+    console.log('✅ Upload realizado com sucesso:', data);
+    
+    // Obter URL pública do arquivo
+    const { data: urlData } = supabaseAdmin.storage
+      .from(STORAGE_BUCKET)
+      .getPublicUrl(fileName);
+    
+    // Atualizar banco de dados com a URL do Supabase
+    const updateData = {};
+    updateData[docUrlField] = urlData.publicUrl;
+    
+    // Resetar aprovação ao enviar novo documento
+    const aprovadoField = `${docField}_aprovado`;
+    updateData[aprovadoField] = null;
+    
+    const { error: updateError } = await supabaseAdmin
+      .from('pacientes')
+      .update(updateData)
+      .eq('id', pacienteId);
+    
+    if (updateError) {
+      console.error('Erro ao atualizar banco:', updateError);
+      return res.status(500).json({ error: 'Erro ao salvar informações do documento' });
+    }
+    
+    // Disparar evento de atualização
+    // (o frontend escuta eventos 'data_updated' para sincronização)
+    
+    res.json({
+      success: true,
+      message: 'Documento enviado com sucesso',
+      filename: fileName,
+      publicUrl: urlData.publicUrl,
+      docType: docType
+    });
+    
+  } catch (error) {
+    console.error('Erro no upload de documento de paciente:', error);
+    res.status(500).json({ error: 'Erro ao fazer upload do documento' });
+  }
+});
+
+// Aprovar documento de paciente (apenas admin)
+router.put('/approve-paciente/:pacienteId/:docType', async (req, res) => {
+  try {
+    const { pacienteId, docType } = req.params;
+    
+    // Mapear o tipo de documento para o campo de aprovação
+    const docFieldMap = {
+      'selfie_doc': 'selfie_doc_aprovado',
+      'documento': 'documento_aprovado',
+      'comprovante_residencia': 'comprovante_residencia_aprovado',
+      'contrato_servico': 'contrato_servico_aprovado',
+      'confirmacao_sacado': 'confirmacao_sacado_aprovado'
+    };
+    
+    const aprovadoField = docFieldMap[docType];
+    
+    if (!aprovadoField) {
+      return res.status(400).json({ error: 'Tipo de documento inválido' });
+    }
+    
+    // Atualizar status de aprovação
+    const updateData = {};
+    updateData[aprovadoField] = true;
+    
+    const { error: updateError } = await supabaseAdmin
+      .from('pacientes')
+      .update(updateData)
+      .eq('id', pacienteId);
+    
+    if (updateError) {
+      console.error('Erro ao aprovar documento:', updateError);
+      return res.status(500).json({ error: 'Erro ao aprovar documento' });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Documento aprovado com sucesso'
+    });
+    
+  } catch (error) {
+    console.error('Erro ao aprovar documento:', error);
+    res.status(500).json({ error: 'Erro ao aprovar documento' });
+  }
+});
+
+// Reprovar documento de paciente (apenas admin)
+router.put('/reject-paciente/:pacienteId/:docType', async (req, res) => {
+  try {
+    const { pacienteId, docType } = req.params;
+    
+    // Mapear o tipo de documento para o campo de aprovação
+    const docFieldMap = {
+      'selfie_doc': 'selfie_doc_aprovado',
+      'documento': 'documento_aprovado',
+      'comprovante_residencia': 'comprovante_residencia_aprovado',
+      'contrato_servico': 'contrato_servico_aprovado',
+      'confirmacao_sacado': 'confirmacao_sacado_aprovado'
+    };
+    
+    const aprovadoField = docFieldMap[docType];
+    
+    if (!aprovadoField) {
+      return res.status(400).json({ error: 'Tipo de documento inválido' });
+    }
+    
+    // Atualizar status de aprovação
+    const updateData = {};
+    updateData[aprovadoField] = false;
+    
+    const { error: updateError } = await supabaseAdmin
+      .from('pacientes')
+      .update(updateData)
+      .eq('id', pacienteId);
+    
+    if (updateError) {
+      console.error('Erro ao reprovar documento:', updateError);
+      return res.status(500).json({ error: 'Erro ao reprovar documento' });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Documento reprovado com sucesso'
+    });
+    
+  } catch (error) {
+    console.error('Erro ao reprovar documento:', error);
+    res.status(500).json({ error: 'Erro ao reprovar documento' });
+  }
+});
+
+// ===== ENDPOINTS PARA CLÍNICAS =====
 
 // Baixar documento
 router.get('/download/:clinicaId/:docType', async (req, res) => {
