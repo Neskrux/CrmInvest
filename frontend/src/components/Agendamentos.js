@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import TutorialAgendamentos from './TutorialAgendamentos';
+import ModalEvidencia from './ModalEvidencia';
 
 const Agendamentos = () => {
   const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isClinica } = useAuth();
@@ -33,6 +34,9 @@ const Agendamentos = () => {
   });
   const [showDetalhesModal, setShowDetalhesModal] = useState(false);
   const [detalhesAtual, setDetalhesAtual] = useState({ telefone: '', observacoes: '' });
+  const [activeDetalhesTab, setActiveDetalhesTab] = useState('observacoes');
+  const [evidenciasAgendamento, setEvidenciasAgendamento] = useState([]);
+  const [agendamentoDetalhes, setAgendamentoDetalhes] = useState(null);
 
   const isConsultor = user?.tipo === 'consultor';
 
@@ -46,6 +50,11 @@ const Agendamentos = () => {
   const [tipoTratamentoFechamento, setTipoTratamentoFechamento] = useState('');
   const [observacoesFechamento, setObservacoesFechamento] = useState('');
   const [dataFechamento, setDataFechamento] = useState(new Date().toISOString().split('T')[0]);
+  const [valorParcelaFechamento, setValorParcelaFechamento] = useState('');
+  const [valorParcelaFormatado, setValorParcelaFormatado] = useState('');
+  const [numeroParcelasFechamento, setNumeroParcelasFechamento] = useState('');
+  const [vencimentoFechamento, setVencimentoFechamento] = useState('');
+  const [antecipacaoFechamento, setAntecipacaoFechamento] = useState('');
 
   // Estados para controlar o tutorial
   const [showTutorial, setShowTutorial] = useState(false);
@@ -53,6 +62,16 @@ const Agendamentos = () => {
 
   // Estado para modal de explicação de permissões
   const [showPermissaoModal, setShowPermissaoModal] = useState(false);
+
+  // Estados para modal de evidência
+  const [showEvidenciaModal, setShowEvidenciaModal] = useState(false);
+  const [evidenciaData, setEvidenciaData] = useState({
+    agendamentoId: null,
+    agendamentoNome: '',
+    statusAnterior: '',
+    statusNovo: '',
+    evidenciaId: null
+  });
 
   // Status disponíveis para agendamentos
   const statusOptions = [
@@ -67,6 +86,15 @@ const Agendamentos = () => {
     { value: 'nao_passou_cpf', label: 'Não passou CPF', color: '#6366f1', description: 'Cliente não forneceu CPF' },
     { value: 'aguardando_fechamento', label: 'Aguardando Fechamento', color: '#fbbf24', description: 'Aguardando fechamento' },
     { value: 'nao_quer_reagendar', label: 'Não quer reagendar', color: '#9ca3af', description: 'Cliente recusou reagendamento' }
+  ];
+
+  // Status que requerem evidência obrigatória
+  const STATUS_COM_EVIDENCIA_AGENDAMENTOS = [
+    'nao_compareceu',
+    'nao_fechou',
+    'cancelado',
+    'nao_passou_cpf',
+    'nao_quer_reagendar'
   ];
 
   useEffect(() => {
@@ -110,7 +138,7 @@ const Agendamentos = () => {
 
   // Controlar scroll do body quando modal estiver aberto
   useEffect(() => {
-    if (showModal || showDetalhesModal || showValorModal || showPermissaoModal) {
+    if (showModal || showDetalhesModal || showValorModal || showPermissaoModal || showEvidenciaModal) {
       // Bloquear scroll da página
       document.body.style.overflow = 'hidden';
     } else {
@@ -122,7 +150,7 @@ const Agendamentos = () => {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [showModal, showDetalhesModal, showValorModal, showPermissaoModal]);
+  }, [showModal, showDetalhesModal, showValorModal, showPermissaoModal, showEvidenciaModal]);
 
   const fetchAgendamentos = async () => {
     try {
@@ -240,11 +268,30 @@ const Agendamentos = () => {
     setShowModal(true);
   };
 
-  const handleViewDetalhes = (telefone, observacoes) => {
+  const handleViewDetalhes = async (telefone, observacoes, agendamento = null) => {
     setDetalhesAtual({
       telefone: telefone || 'Nenhum telefone cadastrado.',
       observacoes: observacoes || 'Nenhuma observação cadastrada.'
     });
+    setAgendamentoDetalhes(agendamento);
+    setActiveDetalhesTab('observacoes');
+    
+    // Buscar evidências do agendamento
+    if (agendamento && agendamento.id) {
+      try {
+        const response = await makeRequest(`/evidencias?tipo=agendamento&registro_id=${agendamento.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setEvidenciasAgendamento(Array.isArray(data) ? data : []);
+        } else {
+          setEvidenciasAgendamento([]);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar evidências:', error);
+        setEvidenciasAgendamento([]);
+      }
+    }
+    
     setShowDetalhesModal(true);
   };
 
@@ -297,7 +344,16 @@ const Agendamentos = () => {
     setValorFechamento(valorNumerico);
   };
 
-  const updateStatus = async (agendamentoId, newStatus) => {
+  const handleValorParcelaChange = (e) => {
+    const valorDigitado = e.target.value;
+    const valorFormatado = formatarValorInput(valorDigitado);
+    const valorNumerico = desformatarValor(valorFormatado);
+    
+    setValorParcelaFormatado(valorFormatado);
+    setValorParcelaFechamento(valorNumerico);
+  };
+
+  const updateStatus = async (agendamentoId, newStatus, evidenciaId = null) => {
     // Verificar se o usuário tem permissão para alterar status
     if (!podeAlterarStatus) {
       showErrorToast('Você não tem permissão para alterar o status dos agendamentos');
@@ -310,14 +366,39 @@ const Agendamentos = () => {
       setAgendamentoParaFechar(agendamento);
       setValorFechamento('');
       setValorFormatado('');
+      setValorParcelaFechamento('');
+      setValorParcelaFormatado('');
+      setNumeroParcelasFechamento('');
+      setVencimentoFechamento('');
+      setAntecipacaoFechamento('');
       setShowValorModal(true);
+      return;
+    }
+
+    // VERIFICAR SE STATUS REQUER EVIDÊNCIA
+    if (STATUS_COM_EVIDENCIA_AGENDAMENTOS.includes(newStatus) && !evidenciaId) {
+      const agendamento = agendamentos.find(a => a.id === agendamentoId);
+      if (agendamento) {
+        // Abrir modal de evidência
+        setEvidenciaData({
+          agendamentoId: agendamentoId,
+          agendamentoNome: agendamento.paciente_nome,
+          statusAnterior: agendamento.status,
+          statusNovo: newStatus,
+          evidenciaId: null
+        });
+        setShowEvidenciaModal(true);
+      }
       return;
     }
 
     try {
       const response = await makeRequest(`/agendamentos/${agendamentoId}/status`, {
         method: 'PUT',
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({ 
+          status: newStatus,
+          evidencia_id: evidenciaId 
+        })
       });
 
       const data = await response.json();
@@ -420,6 +501,20 @@ const Agendamentos = () => {
         formData.append('tipo_tratamento', tipoTratamentoFechamento || '');
         formData.append('observacoes', observacoesFechamento || 'Fechamento criado automaticamente pelo pipeline');
         
+        // Novos campos de parcelamento
+        if (valorParcelaFechamento) {
+          formData.append('valor_parcela', parseFloat(valorParcelaFechamento));
+        }
+        if (numeroParcelasFechamento) {
+          formData.append('numero_parcelas', parseInt(numeroParcelasFechamento));
+        }
+        if (vencimentoFechamento) {
+          formData.append('vencimento', vencimentoFechamento);
+        }
+        if (antecipacaoFechamento) {
+          formData.append('antecipacao_meses', parseInt(antecipacaoFechamento));
+        }
+        
         if (contratoFechamento) {
           formData.append('contrato', contratoFechamento);
         }
@@ -444,8 +539,15 @@ const Agendamentos = () => {
             fetchPacientes()
           ]);
         } else {
-          const errorData = await fechamentoResponse.json();
-          showErrorToast('Erro ao criar fechamento: ' + errorData.error);
+          let errorMessage = 'Erro ao criar fechamento';
+          try {
+            const errorData = await fechamentoResponse.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch (parseError) {
+            // Se não conseguir fazer parse do JSON, usar o status text
+            errorMessage = `Erro ${fechamentoResponse.status}: ${fechamentoResponse.statusText}`;
+          }
+          showErrorToast(errorMessage);
         }
       } else {
         showErrorToast('Erro ao atualizar status: ' + data.error);
@@ -466,6 +568,11 @@ const Agendamentos = () => {
     setTipoTratamentoFechamento('');
     setObservacoesFechamento('');
     setDataFechamento(new Date().toISOString().split('T')[0]);
+    setValorParcelaFechamento('');
+    setValorParcelaFormatado('');
+    setNumeroParcelasFechamento('');
+    setVencimentoFechamento('');
+    setAntecipacaoFechamento('');
   };
 
   const formatarData = (data) => {
@@ -575,6 +682,24 @@ const Agendamentos = () => {
 
   const startTutorial = () => {
     setShowTutorial(true);
+  };
+
+  // Função chamada quando evidência é enviada com sucesso
+  const handleEvidenciaSuccess = async (evidenciaId) => {
+    // Atualizar status agora que temos a evidência
+    await updateStatus(evidenciaData.agendamentoId, evidenciaData.statusNovo, evidenciaId);
+  };
+
+  // Função chamada quando modal de evidência é fechado/cancelado
+  const handleEvidenciaClose = () => {
+    setShowEvidenciaModal(false);
+    setEvidenciaData({
+      agendamentoId: null,
+      agendamentoNome: '',
+      statusAnterior: '',
+      statusNovo: '',
+      evidenciaId: null
+    });
   };
 
   return (
@@ -823,7 +948,7 @@ const Agendamentos = () => {
                           {(agendamento.paciente_telefone || agendamento.observacoes) && (
                             <div style={{ marginTop: '0.25rem' }}>
                               <button
-                                onClick={() => handleViewDetalhes(agendamento.paciente_telefone, agendamento.observacoes)}
+                                onClick={() => handleViewDetalhes(agendamento.paciente_telefone, agendamento.observacoes, agendamento)}
                                 style={{
                                   background: 'none',
                                   border: 'none',
@@ -1102,14 +1227,77 @@ const Agendamentos = () => {
       {/* Modal de Detalhes */}
       {showDetalhesModal && (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: '600px' }}>
+          <div className="modal" style={{ maxWidth: '700px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <div className="modal-header">
               <h2 className="modal-title">
-                {detalhesAtual.nome ? 'Informações do Paciente' : 'Detalhes do agendamento'}
+                {detalhesAtual.nome || agendamentoDetalhes?.paciente_nome || 'Detalhes'}
               </h2>
+              <button className="close-btn" onClick={() => setShowDetalhesModal(false)}>×</button>
             </div>
-            <div style={{ padding: '1.5rem' }}>
-              {detalhesAtual.nome ? (
+            
+            {/* Navegação por abas */}
+            <div style={{ 
+              display: 'flex', 
+              gap: '2rem',
+              padding: '1rem 1.5rem 0 1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              flexShrink: 0
+            }}>
+              <button
+                onClick={() => setActiveDetalhesTab('observacoes')}
+                style={{
+                  padding: '0.75rem 0',
+                  border: 'none',
+                  background: 'none',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: activeDetalhesTab === 'observacoes' ? '#3b82f6' : '#6b7280',
+                  borderBottom: activeDetalhesTab === 'observacoes' ? '2px solid #3b82f6' : '2px solid transparent',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {detalhesAtual.nome ? 'Informações' : 'Detalhes'}
+              </button>
+              
+              {evidenciasAgendamento.length > 0 && (
+                <button
+                  onClick={() => setActiveDetalhesTab('evidencias')}
+                  style={{
+                    padding: '0.75rem 0',
+                    border: 'none',
+                    background: 'none',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: activeDetalhesTab === 'evidencias' ? '#3b82f6' : '#6b7280',
+                    borderBottom: activeDetalhesTab === 'evidencias' ? '2px solid #3b82f6' : '2px solid transparent',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  Evidências
+                  <span style={{
+                    backgroundColor: '#3b82f6',
+                    color: 'white',
+                    fontSize: '0.7rem',
+                    fontWeight: '600',
+                    padding: '0.125rem 0.375rem',
+                    borderRadius: '9999px',
+                    minWidth: '20px',
+                    textAlign: 'center'
+                  }}>
+                    {evidenciasAgendamento.length}
+                  </span>
+                </button>
+              )}
+            </div>
+            
+            <div style={{ padding: '1.5rem', flex: 1, overflowY: 'auto' }}>
+              {/* Aba de Informações/Detalhes */}
+              {activeDetalhesTab === 'observacoes' && detalhesAtual.nome && (
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                     <div className="form-group">
@@ -1188,7 +1376,10 @@ const Agendamentos = () => {
                     </div>
                   </div>
                 </>
-              ) : (
+              )}
+              
+              {/* Aba de Detalhes Simples (telefone e observações) */}
+              {activeDetalhesTab === 'observacoes' && !detalhesAtual.nome && (
                 <>
                   <div className="form-group" style={{ marginBottom: '1.5rem' }}>
                     <label className="form-label">Telefone do paciente</label>
@@ -1209,14 +1400,121 @@ const Agendamentos = () => {
                 </>
               )}
               
-              <div style={{ textAlign: 'right' }}>
-                <button 
-                  className="btn btn-secondary" 
-                  onClick={() => setShowDetalhesModal(false)}
-                >
-                  Fechar
-                </button>
-              </div>
+              {/* Aba de Evidências */}
+              {activeDetalhesTab === 'evidencias' && (
+                <div>
+                  <h3 style={{ 
+                    fontSize: '1rem', 
+                    fontWeight: '600', 
+                    color: '#374151', 
+                    marginBottom: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="16" y1="13" x2="8" y2="13"></line>
+                      <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                    Evidências de Mudanças de Status
+                  </h3>
+                  
+                  {evidenciasAgendamento.length === 0 ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: '0 auto 1rem', opacity: 0.3 }}>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                      </svg>
+                      <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                        Nenhuma evidência registrada
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: '1rem' }}>
+                      {evidenciasAgendamento.map((evidencia, index) => (
+                        <div key={evidencia.id} style={{
+                          backgroundColor: '#f9fafb',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          padding: '1rem'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.75rem' }}>
+                            <div>
+                              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                                {new Date(evidencia.created_at).toLocaleString('pt-BR')}
+                              </div>
+                              <div style={{ fontWeight: '600', color: '#374151' }}>
+                                {evidencia.status_anterior || 'N/A'} → {evidencia.status_novo || 'N/A'}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {evidencia.descricao && (
+                            <div style={{
+                              marginBottom: '0.75rem',
+                              padding: '0.75rem',
+                              backgroundColor: 'white',
+                              borderRadius: '6px',
+                              fontSize: '0.875rem',
+                              color: '#374151',
+                              whiteSpace: 'pre-wrap'
+                            }}>
+                              {evidencia.descricao}
+                            </div>
+                          )}
+                          
+                          {evidencia.arquivo_url && (
+                            <button
+                              onClick={() => window.open(evidencia.arquivo_url, '_blank')}
+                              className="btn btn-sm btn-primary"
+                              style={{
+                                fontSize: '0.75rem',
+                                padding: '0.5rem 0.75rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                              </svg>
+                              Visualizar Evidência
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div style={{ 
+              padding: '1rem 1.5rem', 
+              borderTop: '1px solid #e5e7eb',
+              flexShrink: 0,
+              textAlign: 'right'
+            }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => {
+                  setShowDetalhesModal(false);
+                  setActiveDetalhesTab('observacoes');
+                  setEvidenciasAgendamento([]);
+                  setAgendamentoDetalhes(null);
+                }}
+              >
+                Fechar
+              </button>
             </div>
           </div>
         </div>
@@ -1225,7 +1523,7 @@ const Agendamentos = () => {
       {/* Modal de Valor de Fechamento */}
       {showValorModal && (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: '600px' }}>
+          <div className="modal" style={{ maxWidth: '800px' }}>
             <div className="modal-header">
               <h2 className="modal-title">Dados do Fechamento</h2>
               <button className="close-btn" onClick={cancelarFechamento}>
@@ -1301,6 +1599,74 @@ const Agendamentos = () => {
                   Arquivo deve ser PDF com no máximo 10MB
                 </p>
               </div>
+
+              {/* Seção de Parcelamento */}
+              <div style={{ 
+                border: '1px solid #e5e7eb', 
+                borderRadius: '8px', 
+                padding: '1rem', 
+                marginBottom: '1rem',
+                backgroundColor: '#f9fafb'
+              }}>
+                <h4 style={{ 
+                  margin: '0 0 1rem 0', 
+                  fontSize: '1rem', 
+                  fontWeight: '600', 
+                  color: '#374151' 
+                }}>
+                  Dados de Parcelamento
+                </h4>
+                
+                <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Valor da Parcela (R$)</label>
+                    <input 
+                      type="text"
+                      className="form-input"
+                      value={valorParcelaFormatado}
+                      onChange={handleValorParcelaChange}
+                      placeholder="R$ 0,00"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Nº de Parcelas</label>
+                    <input 
+                      type="number"
+                      className="form-input"
+                      value={numeroParcelasFechamento}
+                      onChange={(e) => setNumeroParcelasFechamento(e.target.value)}
+                      placeholder="Ex: 12"
+                      min="1"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-2" style={{ gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Vencimento</label>
+                    <input 
+                      type="date"
+                      className="form-input"
+                      value={vencimentoFechamento}
+                      onChange={(e) => setVencimentoFechamento(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Antecipação (em meses)</label>
+                    <input 
+                      type="number"
+                      className="form-input"
+                      value={antecipacaoFechamento}
+                      onChange={(e) => setAntecipacaoFechamento(e.target.value)}
+                      placeholder="Ex: 3"
+                      min="1"
+                    />
+                  </div>
+                </div>
+              </div>
+
 
               <div className="form-group" style={{ marginBottom: '1.5rem' }}>
                 <label className="form-label">Observações</label>
@@ -1400,6 +1766,18 @@ const Agendamentos = () => {
         </div>
       )}
       
+      {/* Modal de Evidência de Status */}
+      <ModalEvidencia
+        isOpen={showEvidenciaModal}
+        onClose={handleEvidenciaClose}
+        onSuccess={handleEvidenciaSuccess}
+        tipo="agendamento"
+        registroId={evidenciaData.agendamentoId}
+        statusAnterior={evidenciaData.statusAnterior}
+        statusNovo={evidenciaData.statusNovo}
+        nomeRegistro={evidenciaData.agendamentoNome}
+      />
+
       {/* Tutorial Overlay */}
       <TutorialAgendamentos
         isOpen={showTutorial}

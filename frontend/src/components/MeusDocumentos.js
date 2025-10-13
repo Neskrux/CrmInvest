@@ -683,7 +683,7 @@ const MeusDocumentos = () => {
                             </h4>
                             {doc.nota && (
                               <p style={{ fontSize: '0.7rem', color: '#f59e0b', margin: '0.25rem 0', fontWeight: '500' }}>
-                                ⚠️ {doc.nota}
+                                {doc.nota}
                               </p>
                             )}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>

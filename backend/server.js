@@ -67,11 +67,18 @@ const storage = multer.memoryStorage();
 
 // Filtros para upload
 const fileFilter = (req, file, cb) => {
-  // Permitir apenas arquivos PDF
-  if (file.mimetype === 'application/pdf') {
+  // Permitir PDFs e imagens
+  const allowedMimeTypes = [
+    'application/pdf',
+    'image/jpeg',
+    'image/jpg', 
+    'image/png'
+  ];
+  
+  if (allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Apenas arquivos PDF são permitidos!'), false);
+    cb(new Error('Apenas arquivos PDF, JPG e PNG são permitidos!'), false);
   }
 };
 
@@ -3420,6 +3427,12 @@ app.put('/api/pacientes/:id/status', authenticateToken, async (req, res) => {
 
     // Automação do pipeline
     if (status === 'fechado') {
+      // Atualizar status do agendamento para "fechado"
+      await supabaseAdmin
+        .from('agendamentos')
+        .update({ status: 'fechado' })
+        .eq('paciente_id', id);
+
       // Verificar se já existe fechamento
       const { data: fechamentoExistente } = await supabaseAdmin
         .from('fechamentos')
@@ -4799,7 +4812,11 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
       valor_fechado, 
       data_fechamento, 
       tipo_tratamento,
-      observacoes 
+      observacoes,
+      valor_parcela,
+      numero_parcelas,
+      vencimento,
+      antecipacao_meses
     } = req.body;
 
     // Verificar se é fechamento automático (baseado nas observações)
@@ -4827,12 +4844,18 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
       return res.status(400).json({ error: 'Valor de fechamento deve ser um número válido maior ou igual a zero' });
     }
 
+    // Validar e processar campos de parcelamento
+    const valorParcela = valor_parcela ? parseFloat(valor_parcela) : null;
+    const numeroParcelas = numero_parcelas ? parseInt(numero_parcelas) : null;
+    const vencimentoData = vencimento || null;
+    const antecipacaoMeses = antecipacao_meses ? parseInt(antecipacao_meses) : null;
+
     // Dados do contrato (se houver arquivo)
     let contratoArquivo = null;
     let contratoNomeOriginal = null;
     let contratoTamanho = null;
     
-    // Se houver arquivo, fazer upload para Supabase Storage
+    // Se houver arquivo de contrato, fazer upload para Supabase Storage
     if (req.file) {
       try {
         const uploadResult = await uploadToSupabase(req.file);
@@ -4840,7 +4863,7 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
         contratoNomeOriginal = uploadResult.originalName;
         contratoTamanho = uploadResult.size;
       } catch (uploadError) {
-        console.error('Erro detalhado no upload:', uploadError);
+        console.error('Erro detalhado no upload do contrato:', uploadError);
         return res.status(500).json({ 
           error: 'Erro ao fazer upload do contrato: ' + uploadError.message,
           details: process.env.NODE_ENV === 'development' ? uploadError : undefined
@@ -4861,6 +4884,10 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
         contrato_arquivo: contratoArquivo,
         contrato_nome_original: contratoNomeOriginal,
         contrato_tamanho: contratoTamanho,
+        valor_parcela: valorParcela,
+        numero_parcelas: numeroParcelas,
+        vencimento: vencimentoData,
+        antecipacao_meses: antecipacaoMeses,
         aprovado: 'pendente'
       }])
       .select();
@@ -4883,7 +4910,7 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
         .eq('id', paciente_id);
     }
 
-    // Criar agendamento automaticamente com status "compareceu"
+    // Criar agendamento automaticamente com status "fechado"
     if (paciente_id && clinicaId) {
       try {
         await supabaseAdmin
@@ -4894,7 +4921,7 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
             clinica_id: clinicaId,
             data_agendamento: data_fechamento, // Usar a mesma data do fechamento
             horario: '00:00', // Horário padrão
-            status: 'compareceu', // Status automático "compareceu"
+            status: 'fechado', // Status automático "fechado"
             observacoes: 'Agendamento criado automaticamente a partir do fechamento'
           }]);
       } catch (agendamentoError) {
@@ -5029,10 +5056,10 @@ app.get('/api/fechamentos/:id/contrato-url', authenticateToken, async (req, res)
       return res.status(404).json({ error: 'Contrato não encontrado!' });
     }
 
-    // Gerar URL assinada com validade de 5 minutos (300 segundos)
+    // Gerar URL assinada com validade de 24 horas (86400 segundos)
     const { data: urlData, error: urlError } = await supabaseAdmin.storage
       .from(STORAGE_BUCKET)
-      .createSignedUrl(fechamento.contrato_arquivo, 300);
+      .createSignedUrl(fechamento.contrato_arquivo, 86400);
 
     if (urlError) {
       console.error('Erro ao gerar URL assinada:', urlError);
@@ -5043,7 +5070,7 @@ app.get('/api/fechamentos/:id/contrato-url', authenticateToken, async (req, res)
     res.json({ 
       url: urlData.signedUrl,
       nome: fechamento.contrato_nome_original || 'contrato.pdf',
-      expiraEm: '5 minutos'
+      expiraEm: '24 horas'
     });
   } catch (error) {
     console.error('Erro ao gerar URL do contrato:', error);
