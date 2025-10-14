@@ -479,7 +479,7 @@ const PacientesFinanceiro = () => {
                     <th>Contato</th>
                     <th>Valor Parcela</th>
                     <th>Nº Parcelas</th>
-                    <th>Vencimento</th>
+                    <th>Dia do Vencimento</th>
                     <th>Valor Tratamento</th>
                     <th>Antecipação</th>
                     <th>Data Operação</th>
@@ -718,7 +718,7 @@ const PacientesFinanceiro = () => {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Vencimento</label>
+                  <label className="form-label">Dia do Vencimento</label>
                   <input
                     type="date"
                     className="form-input"

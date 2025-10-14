@@ -1223,19 +1223,20 @@ app.get('/api/clinicas/estados', authenticateToken, async (req, res) => {
   }
 });
 
-// Endpoint para buscar clínicas em análise (admin e consultor interno)
+// Endpoint para buscar clínicas em análise (admin, consultor interno, e freelancers)
 // IMPORTANTE: Esta rota DEVE vir ANTES de /api/clinicas/:id para não ser capturada como ID
 app.get('/api/clinicas/em-analise', authenticateToken, async (req, res) => {
   try {
-    // Verificar se é admin ou consultor interno
+    // Verificar permissões
     const isConsultorInterno = req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true;
     const isAdmin = req.user.tipo === 'admin' || req.user.tipo === 'root';
+    const isFreelancer = req.user.tipo === 'consultor' && !isConsultorInterno && req.user.is_freelancer === true;
     
-    if (!isAdmin && !isConsultorInterno) {
+    if (!isAdmin && !isConsultorInterno && !isFreelancer) {
       return res.status(403).json({ error: 'Acesso negado' });
     }
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('clinicas')
       .select(`
         *,
@@ -1247,6 +1248,14 @@ app.get('/api/clinicas/em-analise', authenticateToken, async (req, res) => {
       `)
       .eq('em_analise', true)
       .order('created_at', { ascending: false });
+
+    // Se for freelancer, filtrar apenas suas clínicas
+    if (isFreelancer) {
+      console.log('👥 Freelancer buscando clínicas em análise - ID:', req.user.id);
+      query = query.eq('consultor_id', req.user.id);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     
@@ -1303,6 +1312,7 @@ app.get('/api/clinicas', authenticateToken, async (req, res) => {
           empresas(nome)
         )
       `)
+      .eq('em_analise', false) // Excluir clínicas em análise (elas aparecem na aba específica)
       .order('nome');
 
     // Filtrar por estado se especificado
@@ -1333,33 +1343,12 @@ app.get('/api/clinicas', authenticateToken, async (req, res) => {
     
     if (isFreelancer) {
       console.log('👥 Buscando clínicas do freelancer ID:', req.user.id);
-      // Freelancer: buscar clínicas através da tabela de relacionamento
-      const { data: relacoes, error: relError } = await supabaseAdmin
-        .from('consultor_clinica')
-        .select('clinica_id')
-        .eq('consultor_id', req.user.id);
-      
-      if (relError) {
-        console.error('❌ Erro ao buscar relações:', relError);
-        throw relError;
-      }
-      
-      console.log('🔗 Relações encontradas:', relacoes?.length || 0);
-      
-      if (relacoes && relacoes.length > 0) {
-        const clinicaIds = relacoes.map(r => r.clinica_id);
-        console.log('   IDs das clínicas:', clinicaIds);
-        query = query.in('id', clinicaIds);
-        const result = await query;
-        data = result.data;
-        error = result.error;
-        console.log('   Clínicas encontradas:', data?.length || 0);
-      } else {
-        // Freelancer sem clínicas ainda
-        console.log('   ⚠️ Freelancer ainda não tem clínicas indicadas');
-        data = [];
-        error = null;
-      }
+      // Freelancer: buscar clínicas usando consultor_id diretamente
+      query = query.eq('consultor_id', req.user.id);
+      const result = await query;
+      data = result.data;
+      error = result.error;
+      console.log('   Clínicas encontradas:', data?.length || 0);
     } else {
       const result = await query;
       data = result.data;
@@ -3559,14 +3548,33 @@ app.delete('/api/pacientes/:id', authenticateToken, async (req, res) => {
 // === NOVOS LEADS === (Funcionalidade para pegar leads)
 app.get('/api/novos-leads', authenticateToken, async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin
+    // Buscar pacientes sem consultor_id
+    const { data: pacientesSemConsultor, error } = await supabaseAdmin
       .from('pacientes')
       .select('*')
       .is('consultor_id', null)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    res.json(data);
+    
+    // Buscar todos os fechamentos para identificar pacientes de clínicas
+    const { data: fechamentos, error: fechError } = await supabaseAdmin
+      .from('fechamentos')
+      .select('paciente_id');
+      
+    if (fechError) throw fechError;
+    
+    // Criar Set de IDs de pacientes que têm fechamento
+    const pacientesComFechamento = new Set(fechamentos?.map(f => f.paciente_id) || []);
+    
+    // Filtrar apenas pacientes que NÃO têm fechamento (são leads verdadeiros)
+    const novosLeads = pacientesSemConsultor.filter(p => !pacientesComFechamento.has(p.id));
+    
+    console.log('🔍 Pacientes sem consultor:', pacientesSemConsultor?.length || 0);
+    console.log('🔍 Pacientes com fechamento (excluídos):', pacientesComFechamento.size);
+    console.log('🔍 Novos leads verdadeiros:', novosLeads?.length || 0);
+    
+    res.json(novosLeads);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -4081,6 +4089,9 @@ app.put('/api/novas-clinicas/:id/pegar', authenticateToken, async (req, res) => 
       .select();
 
     if (insertError) throw insertError;
+
+    console.log('✅ Clínica movida para análise com sucesso! ID:', clinicaInserida[0]?.id);
+    console.log('   - Consultor responsável:', clinicaAtual.criado_por_consultor_id);
 
     // Remover da tabela novas_clinicas
     const { error: deleteError } = await supabaseAdmin
