@@ -279,7 +279,8 @@ const Agendamentos = () => {
     // Buscar evidências do agendamento
     if (agendamento && agendamento.id) {
       try {
-        const response = await makeRequest(`/evidencias?tipo=agendamento&registro_id=${agendamento.id}`);
+        // Corrigido: usar formato de URL correto /:tipo/:registroId
+        const response = await makeRequest(`/evidencias/agendamento/${agendamento.id}`);
         if (response.ok) {
           const data = await response.json();
           setEvidenciasAgendamento(Array.isArray(data) ? data : []);
@@ -295,7 +296,7 @@ const Agendamentos = () => {
     setShowDetalhesModal(true);
   };
 
-  const handleViewPaciente = (agendamento) => {
+  const handleViewPaciente = async (agendamento) => {
     const paciente = pacientes.find(p => p.id === agendamento.paciente_id);
     setDetalhesAtual({
       nome: agendamento.paciente_nome || 'Nome não informado',
@@ -309,6 +310,25 @@ const Agendamentos = () => {
       data_agendamento: agendamento.data_agendamento || 'Data não informada',
       horario: agendamento.horario || 'Horário não informado'
     });
+    setAgendamentoDetalhes(agendamento);
+    setActiveDetalhesTab('observacoes');
+    
+    // Buscar evidências do agendamento
+    if (agendamento && agendamento.id) {
+      try {
+        const response = await makeRequest(`/evidencias/agendamento/${agendamento.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setEvidenciasAgendamento(Array.isArray(data) ? data : []);
+        } else {
+          setEvidenciasAgendamento([]);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar evidências:', error);
+        setEvidenciasAgendamento([]);
+      }
+    }
+    
     setShowDetalhesModal(true);
   };
 
@@ -1260,25 +1280,25 @@ const Agendamentos = () => {
                 {detalhesAtual.nome ? 'Informações' : 'Detalhes'}
               </button>
               
-              {evidenciasAgendamento.length > 0 && (
-                <button
-                  onClick={() => setActiveDetalhesTab('evidencias')}
-                  style={{
-                    padding: '0.75rem 0',
-                    border: 'none',
-                    background: 'none',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    color: activeDetalhesTab === 'evidencias' ? '#3b82f6' : '#6b7280',
-                    borderBottom: activeDetalhesTab === 'evidencias' ? '2px solid #3b82f6' : '2px solid transparent',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}
-                >
-                  Evidências
+              <button
+                onClick={() => setActiveDetalhesTab('evidencias')}
+                style={{
+                  padding: '0.75rem 0',
+                  border: 'none',
+                  background: 'none',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: activeDetalhesTab === 'evidencias' ? '#3b82f6' : '#6b7280',
+                  borderBottom: activeDetalhesTab === 'evidencias' ? '2px solid #3b82f6' : '2px solid transparent',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                Evidências
+                {evidenciasAgendamento.length > 0 && (
                   <span style={{
                     backgroundColor: '#3b82f6',
                     color: 'white',
@@ -1291,8 +1311,8 @@ const Agendamentos = () => {
                   }}>
                     {evidenciasAgendamento.length}
                   </span>
-                </button>
-              )}
+                )}
+              </button>
             </div>
             
             <div style={{ padding: '1.5rem', flex: 1, overflowY: 'auto' }}>

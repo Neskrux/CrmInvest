@@ -295,33 +295,7 @@ const Evidencias = () => {
           </button>
         )}
       </div>
-
-      {/* Resumo */}
-      <div style={{ 
-        display: 'flex', 
-        gap: '1rem', 
-        marginBottom: '2rem',
-        flexWrap: 'wrap'
-      }}>
-        <div className="card" style={{ flex: '1', minWidth: '200px', padding: '1rem', textAlign: 'center' }}>
-          <div style={{ fontSize: '2rem', fontWeight: '700', color: '#3b82f6' }}>
-            {evidenciasFiltradas.length}
-          </div>
-          <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
-            Evidências Encontradas
-          </div>
-        </div>
-
-        <div className="card" style={{ flex: '1', minWidth: '200px', padding: '1rem', textAlign: 'center' }}>
-          <div style={{ fontSize: '2rem', fontWeight: '700', color: '#10b981' }}>
-            {Object.keys(evidenciasPorUsuario).length}
-          </div>
-          <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
-            Usuários com Evidências
-          </div>
-        </div>
-      </div>
-
+      
       {/* Loading */}
       {loading && (
         <div style={{ textAlign: 'center', padding: '3rem' }}>
