@@ -277,7 +277,7 @@ A Empresa vê **PACIENTES DOS CONSULTORES DA EMPRESA**:
   - CPF, Nome, Contato
   - **Valor da Parcela** (R$)
   - **Número de Parcelas**
-  - **Data de Vencimento**
+  - **Dia do Vencimento**
   - **Valor Total do Tratamento**
   - **Antecipação** (em meses)
   - **Data da Operação**

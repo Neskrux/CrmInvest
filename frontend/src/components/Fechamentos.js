@@ -1561,7 +1561,7 @@ const Fechamentos = () => {
 
                 <div className="grid grid-2" style={{ gap: '1rem' }}>
                   <div className="form-group">
-                    <label className="form-label">Vencimento</label>
+                    <label className="form-label">Dia do Vencimento</label>
                     <input 
                       type="date"
                       className="form-input"
@@ -2300,7 +2300,7 @@ const Fechamentos = () => {
                     </div>
                     
                     <div>
-                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Vencimento</label>
+                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Dia do Vencimento</label>
                       <div style={{ 
                         padding: '0.75rem', 
                         backgroundColor: '#f9fafb', 

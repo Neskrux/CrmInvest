@@ -1664,7 +1664,7 @@ const Agendamentos = () => {
 
                 <div className="grid grid-2" style={{ gap: '1rem' }}>
                   <div className="form-group">
-                    <label className="form-label">Vencimento</label>
+                    <label className="form-label">Dia do Vencimento</label>
                     <input 
                       type="date"
                       className="form-input"
