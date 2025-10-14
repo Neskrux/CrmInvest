@@ -21,6 +21,95 @@
     padding: 0;
     box-sizing: border-box;
   }
+
+/* Simulador Styles */
+.simulador-container {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.simulador-container .card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e5e7eb;
+}
+
+.simulador-container .card-header {
+  padding: 1.5rem 1.5rem 0 1.5rem;
+  border-bottom: 1px solid #f3f4f6;
+  margin-bottom: 1.5rem;
+}
+
+.simulador-container .card-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.simulador-container .card-content {
+  padding: 0 1.5rem 1.5rem 1.5rem;
+}
+
+.simulador-container input:focus,
+.simulador-container select:focus {
+  outline: none;
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.simulador-container .table-container {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.simulador-container .table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.simulador-container .table th {
+  background: #f8fafc;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.875rem;
+}
+
+.simulador-container .table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f3f4f6;
+  color: #4b5563;
+  font-size: 0.875rem;
+}
+
+.simulador-container .table tr:hover {
+  background: #f9fafb;
+}
+
+@media (max-width: 768px) {
+  .simulador-container {
+    padding: 1rem;
+  }
+  
+  .simulador-container .card-header,
+  .simulador-container .card-content {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  .simulador-container .table th,
+  .simulador-container .table td {
+    padding: 0.5rem;
+    font-size: 0.75rem;
+  }
+}
   
   :root {
     /* Cores Profissionais - Paleta Corporativa */

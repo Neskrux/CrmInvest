@@ -3037,7 +3037,7 @@ const Pacientes = () => {
                                     width: '100%'
                                   }}>
                                     <div style={{ fontSize: '0.75rem', color: '#6b7280', whiteSpace: 'nowrap' }}>
-                                      {docsEnviados}/{totalDocs} enviados
+                                      {docsEnviados}/{totalDocs}
                                     </div>
                                     <div style={{ 
                                       width: window.innerWidth <= 768 ? '80px' : '120px', 
@@ -3072,31 +3072,35 @@ const Pacientes = () => {
                                       <button
                                         onClick={() => handleView(paciente, 'documentos')}
                                         style={{
-                                          background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                                          background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
                                           border: 'none',
                                           color: 'white',
                                           cursor: 'pointer',
-                                          padding: '0.375rem 0.75rem',
+                                          padding: '0.5rem 1rem',
                                           display: 'flex',
                                           alignItems: 'center',
-                                          gap: '0.375rem',
-                                          borderRadius: '6px',
-                                          fontSize: '0.75rem',
+                                          gap: '0.5rem',
+                                          borderRadius: '8px',
+                                          fontSize: '0.8rem',
                                           fontWeight: '600',
-                                          boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)',
-                                          transition: 'all 0.2s',
-                                          whiteSpace: 'nowrap'
+                                          boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)',
+                                          transition: 'all 0.3s ease',
+                                          whiteSpace: 'nowrap',
+                                          minWidth: '90px',
+                                          justifyContent: 'center'
                                         }}
                                         onMouseEnter={(e) => {
-                                          e.currentTarget.style.transform = 'translateY(-1px)';
-                                          e.currentTarget.style.boxShadow = '0 4px 6px rgba(59, 130, 246, 0.3)';
+                                          e.currentTarget.style.transform = 'translateY(-2px)';
+                                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(5, 150, 105, 0.35)';
+                                          e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
                                         }}
                                         onMouseLeave={(e) => {
                                           e.currentTarget.style.transform = 'translateY(0)';
-                                          e.currentTarget.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.2)';
+                                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(5, 150, 105, 0.25)';
+                                          e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
                                         }}
                                       >
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                           <polyline points="17 8 12 3 7 8"></polyline>
                                           <line x1="12" y1="3" x2="12" y2="15"></line>

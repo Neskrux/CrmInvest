@@ -30,6 +30,7 @@ import Indicacoes from './components/Indicacoes';
 import ComoFazer from './components/ComoFazer';
 import MeusDocumentos from './components/MeusDocumentos';
 import Evidencias from './components/Evidencias';
+import Simulador from './components/Simulador';
 import logoBrasao from './images/logobrasao.png';
 import logoHorizontal from './images/logohorizontal.png';
 import logoHorizontalPreto from './images/logohorizontalpreto.png';
@@ -98,6 +99,7 @@ const AppContentWithNotifications = () => {
     if (path.includes('/fechamentos')) return 'fechamentos';
     if (path.includes('/meta-ads')) return 'meta-ads';
     if (path.includes('/whatsapp')) return 'whatsapp';
+    if (path.includes('/simulador')) return 'simulador';
     if (path.includes('/meus-documentos')) return 'meus-documentos';
     if (path.includes('/materiais')) return 'materiais';
     if (path.includes('/perfil')) return 'perfil';
@@ -206,6 +208,7 @@ const AppContentWithNotifications = () => {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/pacientes" element={<Pacientes />} />
           <Route path="/agendamentos" element={<Agendamentos />} />
+          <Route path="/simulador" element={<Simulador />} />
           <Route path="/meus-documentos" element={<MeusDocumentos />} />
           <Route path="/materiais" element={<Materiais />} />
           <Route path="/perfil" element={<Perfil />} />
@@ -654,6 +657,31 @@ const AppContentWithNotifications = () => {
                   <polyline points="9 22 9 12 15 12 15 22" />
                 </svg>
                 Clínicas
+              </Link>
+            </div>
+          )}
+
+          {/* Simulador - Apenas para clínicas */}
+          {user.tipo === 'clinica' && (
+            <div className="nav-item">
+              <Link
+                to="/simulador"
+                className={`nav-link ${activeTab === 'simulador' ? 'active' : ''}`}
+                onClick={handleMobileNavigation}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <path d="M9 9h6v6H9z"/>
+                  <path d="M9 1v6"/>
+                  <path d="M15 1v6"/>
+                  <path d="M9 17v6"/>
+                  <path d="M15 17v6"/>
+                  <path d="M1 9h6"/>
+                  <path d="M1 15h6"/>
+                  <path d="M17 9h6"/>
+                  <path d="M17 15h6"/>
+                </svg>
+                Simulador
               </Link>
             </div>
           )}
