@@ -41,6 +41,7 @@ const Clinicas = () => {
   const [viewNovaClinicaModalOpen, setViewNovaClinicaModalOpen] = useState(false);
   const [viewingNovaClinica, setViewingNovaClinica] = useState(null);
   const [activeViewTab, setActiveViewTab] = useState('informacoes');
+  const [activeNovaClinicaTab, setActiveNovaClinicaTab] = useState('informacoes');
   const [pacientesClinica, setPacientesClinica] = useState([]);
   const [loadingPacientes, setLoadingPacientes] = useState(false);
   const [clinicasGeo, setClinicasGeo] = useState([]);
@@ -1316,8 +1317,25 @@ const Clinicas = () => {
     setShowModal(true);
   };
 
-  const handleView = (clinica) => {
+  const handleView = async (clinica) => {
     setViewingClinica(clinica);
+    
+    // Buscar evidências da clínica
+    if (clinica && clinica.id) {
+      try {
+        const response = await makeRequest(`/evidencias/clinica/${clinica.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setEvidenciasClinica(Array.isArray(data) ? data : []);
+        } else {
+          setEvidenciasClinica([]);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar evidências:', error);
+        setEvidenciasClinica([]);
+      }
+    }
+    
     setViewModalOpen(true);
     // Buscar pacientes quando abrir o modal (será carregado quando clicar na aba)
   };
@@ -1371,14 +1389,33 @@ const Clinicas = () => {
     }
   };
 
-  const handleViewNovaClinica = (clinica) => {
+  const handleViewNovaClinica = async (clinica) => {
     setViewingNovaClinica(clinica);
+    
+    // Buscar evidências da nova clínica
+    if (clinica && clinica.id) {
+      try {
+        const response = await makeRequest(`/evidencias/nova_clinica/${clinica.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setEvidenciasClinica(Array.isArray(data) ? data : []);
+        } else {
+          setEvidenciasClinica([]);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar evidências:', error);
+        setEvidenciasClinica([]);
+      }
+    }
+    
     setViewNovaClinicaModalOpen(true);
   };
 
   const closeViewNovaClinicaModal = () => {
     setViewNovaClinicaModalOpen(false);
     setViewingNovaClinica(null);
+    setActiveNovaClinicaTab('informacoes');
+    setEvidenciasClinica([]);
   };
 
   const formatarData = (data) => {
@@ -1922,7 +1959,8 @@ const Clinicas = () => {
     // Buscar evidências da clínica
     if (clinica && clinica.id) {
       try {
-        const response = await makeRequest(`/evidencias?tipo=${tipo}&registro_id=${clinica.id}`);
+        // Corrigido: usar formato de URL correto /:tipo/:registroId
+        const response = await makeRequest(`/evidencias/${tipo}/${clinica.id}`);
         if (response.ok) {
           const data = await response.json();
           setEvidenciasClinica(Array.isArray(data) ? data : []);
@@ -2767,10 +2805,10 @@ const Clinicas = () => {
                       {clinica.telefone && (
                         <div>{formatarTelefone(clinica.telefone)}</div>
                       )}
-                      {clinica.email && (
-                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>{clinica.email?.toLowerCase()}</div>
+                      {clinica.responsavel && (
+                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>{clinica.responsavel}</div>
                       )}
-                      {!clinica.telefone && !clinica.email && '-'}
+                      {!clinica.telefone && !clinica.responsavel && '-'}
                     </td>
                     <td>
                       {(isAdmin || podeAlterarStatus) ? (
@@ -4721,6 +4759,49 @@ const Clinicas = () => {
                    )}
                    Histórico
                  </button>
+                 
+                 <button
+                   onClick={() => handleTabChange('evidencias')}
+                   style={{
+                     padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
+                     border: 'none',
+                     background: 'none',
+                     fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
+                     fontWeight: '500',
+                     color: activeViewTab === 'evidencias' ? '#3b82f6' : '#6b7280',
+                     borderBottom: activeViewTab === 'evidencias' ? '2px solid #3b82f6' : '2px solid transparent',
+                     cursor: 'pointer',
+                     transition: 'all 0.2s',
+                     whiteSpace: 'nowrap',
+                     display: 'flex',
+                     alignItems: 'center',
+                     gap: '0.5rem'
+                   }}
+                 >
+                   {window.innerWidth > 768 && (
+                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
+                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                       <polyline points="14 2 14 8 20 8"></polyline>
+                       <line x1="16" y1="13" x2="8" y2="13"></line>
+                       <line x1="16" y1="17" x2="8" y2="17"></line>
+                     </svg>
+                   )}
+                   Evidências
+                   {evidenciasClinica.length > 0 && (
+                     <span style={{
+                       backgroundColor: '#3b82f6',
+                       color: 'white',
+                       fontSize: '0.7rem',
+                       fontWeight: '600',
+                       padding: '0.125rem 0.375rem',
+                       borderRadius: '9999px',
+                       minWidth: '20px',
+                       textAlign: 'center'
+                     }}>
+                       {evidenciasClinica.length}
+                     </span>
+                   )}
+                 </button>
                </div>
              </div>
  
@@ -5333,6 +5414,103 @@ const Clinicas = () => {
                  </div>
                )}
                
+               {/* Aba de Evidências */}
+               {activeViewTab === 'evidencias' && (
+                 <div>
+                   <h3 style={{ 
+                     fontSize: '1.125rem', 
+                     fontWeight: '700', 
+                     color: '#1a1d23', 
+                     marginBottom: '1.5rem',
+                     display: 'flex',
+                     alignItems: 'center',
+                     gap: '0.5rem'
+                   }}>
+                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                       <polyline points="14 2 14 8 20 8"></polyline>
+                       <line x1="16" y1="13" x2="8" y2="13"></line>
+                       <line x1="16" y1="17" x2="8" y2="17"></line>
+                     </svg>
+                     Evidências de Mudanças de Status
+                   </h3>
+                   
+                   {evidenciasClinica.length === 0 ? (
+                     <div style={{
+                       padding: '2rem',
+                       textAlign: 'center',
+                       backgroundColor: '#f9fafb',
+                       borderRadius: '8px',
+                       border: '1px solid #e5e7eb'
+                     }}>
+                       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: '0 auto 1rem', opacity: 0.3 }}>
+                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                         <polyline points="14 2 14 8 20 8"></polyline>
+                       </svg>
+                       <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                         Nenhuma evidência registrada
+                       </div>
+                     </div>
+                   ) : (
+                     <div style={{ display: 'grid', gap: '1rem' }}>
+                       {evidenciasClinica.map((evidencia) => (
+                         <div key={evidencia.id} style={{
+                           backgroundColor: '#f9fafb',
+                           border: '1px solid #e5e7eb',
+                           borderRadius: '8px',
+                           padding: '1rem'
+                         }}>
+                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.75rem' }}>
+                             <div>
+                               <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                                 {new Date(evidencia.created_at).toLocaleString('pt-BR')}
+                               </div>
+                               <div style={{ fontWeight: '600', color: '#374151' }}>
+                                 {evidencia.status_anterior || 'N/A'} → {evidencia.status_novo || 'N/A'}
+                               </div>
+                             </div>
+                           </div>
+                           
+                           {evidencia.observacao && (
+                             <div style={{
+                               marginBottom: '0.75rem',
+                               padding: '0.75rem',
+                               backgroundColor: 'white',
+                               borderRadius: '6px',
+                               fontSize: '0.875rem',
+                               color: '#374151',
+                               whiteSpace: 'pre-wrap'
+                             }}>
+                               {evidencia.observacao}
+                             </div>
+                           )}
+                           
+                           {evidencia.evidencia_url && (
+                             <button
+                               onClick={() => window.open(evidencia.evidencia_url, '_blank')}
+                               className="btn btn-sm btn-primary"
+                               style={{
+                                 fontSize: '0.75rem',
+                                 padding: '0.5rem 0.75rem',
+                                 display: 'inline-flex',
+                                 alignItems: 'center',
+                                 gap: '0.5rem'
+                               }}
+                             >
+                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                 <circle cx="12" cy="12" r="3" />
+                               </svg>
+                               Visualizar Evidência
+                             </button>
+                           )}
+                         </div>
+                       ))}
+                     </div>
+                   )}
+                 </div>
+               )}
+               
                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem' }}>
                  <button 
                    type="button"
@@ -5350,10 +5528,10 @@ const Clinicas = () => {
       {/* Modal de Visualização de Nova Clínica */}
       {viewNovaClinicaModalOpen && viewingNovaClinica && (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: '600px' }}>
+          <div className="modal" style={{ maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="modal-header">
               <h2 className="modal-title">
-                Detalhes da Nova Clínica
+                {viewingNovaClinica.nome}
               </h2>
               <button 
                 className="close-btn"
@@ -5363,7 +5541,76 @@ const Clinicas = () => {
               </button>
             </div>
 
+            {/* Abas de Navegação */}
+            <div style={{ 
+              borderBottom: '1px solid #e5e7eb',
+              padding: '0 1.5rem',
+              overflowX: 'auto',
+              WebkitOverflowScrolling: 'touch'
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                gap: window.innerWidth <= 768 ? '0' : '2rem',
+                minWidth: 'max-content'
+              }}>
+                <button
+                  onClick={() => setActiveNovaClinicaTab('informacoes')}
+                  style={{
+                    padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
+                    border: 'none',
+                    background: 'none',
+                    fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
+                    fontWeight: '500',
+                    color: activeNovaClinicaTab === 'informacoes' ? '#3b82f6' : '#6b7280',
+                    borderBottom: activeNovaClinicaTab === 'informacoes' ? '2px solid #3b82f6' : '2px solid transparent',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Informações
+                </button>
+                
+                <button
+                  onClick={() => setActiveNovaClinicaTab('evidencias')}
+                  style={{
+                    padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
+                    border: 'none',
+                    background: 'none',
+                    fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
+                    fontWeight: '500',
+                    color: activeNovaClinicaTab === 'evidencias' ? '#3b82f6' : '#6b7280',
+                    borderBottom: activeNovaClinicaTab === 'evidencias' ? '2px solid #3b82f6' : '2px solid transparent',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  Evidências
+                  {evidenciasClinica.length > 0 && (
+                    <span style={{
+                      backgroundColor: '#3b82f6',
+                      color: 'white',
+                      fontSize: '0.7rem',
+                      fontWeight: '600',
+                      padding: '0.125rem 0.375rem',
+                      borderRadius: '9999px',
+                      minWidth: '20px',
+                      textAlign: 'center'
+                    }}>
+                      {evidenciasClinica.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
+
             <div style={{ padding: '1.5rem' }}>
+              {/* Aba de Informações */}
+              {activeNovaClinicaTab === 'informacoes' && (
               <div style={{ display: 'grid', gap: '1rem' }}>
                 <div>
                   <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Nome da Clínica</label>
@@ -5488,6 +5735,104 @@ const Clinicas = () => {
                   </div>
                 )}
               </div>
+              )}
+              
+              {/* Aba de Evidências */}
+              {activeNovaClinicaTab === 'evidencias' && (
+                <div>
+                  <h3 style={{ 
+                    fontSize: '1.125rem', 
+                    fontWeight: '700', 
+                    color: '#1a1d23', 
+                    marginBottom: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="16" y1="13" x2="8" y2="13"></line>
+                      <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                    Evidências de Mudanças de Status
+                  </h3>
+                  
+                  {evidenciasClinica.length === 0 ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: '0 auto 1rem', opacity: 0.3 }}>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                      </svg>
+                      <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                        Nenhuma evidência registrada
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: '1rem' }}>
+                      {evidenciasClinica.map((evidencia) => (
+                        <div key={evidencia.id} style={{
+                          backgroundColor: '#f9fafb',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          padding: '1rem'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.75rem' }}>
+                            <div>
+                              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                                {new Date(evidencia.created_at).toLocaleString('pt-BR')}
+                              </div>
+                              <div style={{ fontWeight: '600', color: '#374151' }}>
+                                {evidencia.status_anterior || 'N/A'} → {evidencia.status_novo || 'N/A'}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {evidencia.observacao && (
+                            <div style={{
+                              marginBottom: '0.75rem',
+                              padding: '0.75rem',
+                              backgroundColor: 'white',
+                              borderRadius: '6px',
+                              fontSize: '0.875rem',
+                              color: '#374151',
+                              whiteSpace: 'pre-wrap'
+                            }}>
+                              {evidencia.observacao}
+                            </div>
+                          )}
+                          
+                          {evidencia.evidencia_url && (
+                            <button
+                              onClick={() => window.open(evidencia.evidencia_url, '_blank')}
+                              className="btn btn-sm btn-primary"
+                              style={{
+                                fontSize: '0.75rem',
+                                padding: '0.5rem 0.75rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                              </svg>
+                              Visualizar Evidência
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem' }}>
                 <button 

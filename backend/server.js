@@ -4296,8 +4296,8 @@ app.post('/api/evidencias/upload', authenticateUpload, uploadEvidencia.single('e
       return res.status(400).json({ error: 'Tipo, registro_id e status_novo são obrigatórios!' });
     }
     
-    if (!['paciente', 'clinica', 'nova_clinica'].includes(tipo)) {
-      return res.status(400).json({ error: 'Tipo inválido! Use: paciente, clinica ou nova_clinica' });
+    if (!['paciente', 'clinica', 'nova_clinica', 'agendamento', 'fechamento'].includes(tipo)) {
+      return res.status(400).json({ error: 'Tipo inválido! Use: paciente, clinica, nova_clinica, agendamento ou fechamento' });
     }
     
     if (!req.file) {
@@ -4345,6 +4345,12 @@ app.post('/api/evidencias/upload', authenticateUpload, uploadEvidencia.single('e
     
     console.log('✅ Upload concluído. URL:', evidenciaUrl);
     
+    // Obter timestamp atual em horário de Brasília (UTC-3)
+    const agora = new Date();
+    const brasiliaOffset = -3 * 60; // UTC-3 em minutos
+    const localOffset = agora.getTimezoneOffset(); // offset do servidor em minutos
+    const brasiliaTime = new Date(agora.getTime() + (localOffset - brasiliaOffset) * 60000);
+    
     // Salvar registro na tabela de histórico
     const { data: historicoData, error: historicoError } = await supabaseAdmin
       .from('historico_status_evidencias')
@@ -4357,7 +4363,8 @@ app.post('/api/evidencias/upload', authenticateUpload, uploadEvidencia.single('e
         evidencia_filename: req.file.originalname,
         observacao: observacao || null,
         alterado_por_id: req.user?.id || null,
-        alterado_por_nome: req.user?.nome || req.user?.username || null
+        alterado_por_nome: req.user?.nome || req.user?.username || null,
+        created_at: brasiliaTime.toISOString()
       }])
       .select();
     
@@ -4382,13 +4389,13 @@ app.post('/api/evidencias/upload', authenticateUpload, uploadEvidencia.single('e
   }
 });
 
-// Buscar evidências de um registro (apenas admin)
-app.get('/api/evidencias/:tipo/:registroId', authenticateToken, requireAdmin, async (req, res) => {
+// Buscar evidências de um registro (usuários autenticados)
+app.get('/api/evidencias/:tipo/:registroId', authenticateToken, async (req, res) => {
   try {
     const { tipo, registroId } = req.params;
     
     // Validar tipo
-    if (!['paciente', 'clinica', 'nova_clinica'].includes(tipo)) {
+    if (!['paciente', 'clinica', 'nova_clinica', 'agendamento', 'fechamento'].includes(tipo)) {
       return res.status(400).json({ error: 'Tipo inválido!' });
     }
     
@@ -4425,7 +4432,7 @@ app.get('/api/evidencias/todas', authenticateToken, requireAdmin, async (req, re
       throw error;
     }
     
-    // Enriquecer evidências com nomes dos pacientes/clínicas
+    // Enriquecer evidências com nomes dos pacientes/clínicas/agendamentos/fechamentos
     const evidenciasEnriquecidas = await Promise.all(evidencias.map(async (ev) => {
       let nomeRegistro = null;
       
@@ -4451,6 +4458,20 @@ app.get('/api/evidencias/todas', authenticateToken, requireAdmin, async (req, re
             .eq('id', ev.registro_id)
             .single();
           nomeRegistro = clinica?.nome;
+        } else if (ev.tipo === 'agendamento') {
+          const { data: agendamento } = await supabaseAdmin
+            .from('agendamentos')
+            .select('paciente_id, pacientes(nome)')
+            .eq('id', ev.registro_id)
+            .single();
+          nomeRegistro = agendamento?.pacientes?.nome ? `Agendamento - ${agendamento.pacientes.nome}` : null;
+        } else if (ev.tipo === 'fechamento') {
+          const { data: fechamento } = await supabaseAdmin
+            .from('fechamentos')
+            .select('paciente_id, pacientes(nome)')
+            .eq('id', ev.registro_id)
+            .single();
+          nomeRegistro = fechamento?.pacientes?.nome ? `Fechamento - ${fechamento.pacientes.nome}` : null;
         }
       } catch (err) {
         console.warn(`⚠️ Não foi possível buscar nome para ${ev.tipo} ID ${ev.registro_id}`);
