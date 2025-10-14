@@ -1402,6 +1402,7 @@ const Fechamentos = () => {
                   value={novoFechamento.paciente_id || ''}
                   onChange={(e) => handlePacienteChange(e.target.value)}
                   required
+                  disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                 >
                   <option value="">Selecione um paciente</option>
                   {pacientes.filter(p => 
@@ -1413,6 +1414,11 @@ const Fechamentos = () => {
                     </option>
                   ))}
                 </select>
+                {isConsultorInterno && !isAdmin && fechamentoEditando && (
+                  <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                    Consultor pode editar apenas dados de operação
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-2">
@@ -1425,6 +1431,7 @@ const Fechamentos = () => {
                     onChange={handleValorChange}
                     placeholder="0,00"
                     required
+                    disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                   />
                 </div>
 
@@ -1434,6 +1441,7 @@ const Fechamentos = () => {
                     className="form-select"
                     value={novoFechamento.consultor_id || ''}
                     onChange={(e) => setNovoFechamento({...novoFechamento, consultor_id: e.target.value})}
+                    disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                   >
                     <option value="">Selecione um consultor</option>
                     {consultores.map(c => (
@@ -1449,6 +1457,7 @@ const Fechamentos = () => {
                   className="form-select"
                   value={novoFechamento.clinica_id || ''}
                   onChange={(e) => setNovoFechamento({...novoFechamento, clinica_id: e.target.value})}
+                  disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                 >
                   <option value="">Selecione uma clínica</option>
                   {clinicas.map(c => (
@@ -1465,6 +1474,7 @@ const Fechamentos = () => {
                     className="form-input"
                     value={novoFechamento.data_fechamento}
                     onChange={(e) => setNovoFechamento({...novoFechamento, data_fechamento: e.target.value})}
+                    disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                   />
                 </div>
 
@@ -1474,6 +1484,7 @@ const Fechamentos = () => {
                     className="form-select"
                     value={novoFechamento.tipo_tratamento || ''}
                     onChange={(e) => setNovoFechamento({...novoFechamento, tipo_tratamento: e.target.value})}
+                    disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                   >
                     <option value="">Selecione</option>
                     <option value="Estético">Estético</option>
@@ -1489,6 +1500,7 @@ const Fechamentos = () => {
                   className="form-input"
                   accept=".pdf"
                   onChange={(e) => setContratoSelecionado(e.target.files[0])}
+                  disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                 />
                 {fechamentoEditando && fechamentoEditando.contrato_arquivo && (
                   <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
@@ -1505,6 +1517,7 @@ const Fechamentos = () => {
                   value={novoFechamento.observacoes}
                   onChange={(e) => setNovoFechamento({...novoFechamento, observacoes: e.target.value})}
                   placeholder="Informações adicionais..."
+                  disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                 />
               </div>
 
@@ -1514,7 +1527,8 @@ const Fechamentos = () => {
                 borderRadius: '8px', 
                 padding: '1rem', 
                 marginTop: '1.5rem',
-                backgroundColor: '#f0fdf4'
+                backgroundColor: '#f0fdf4',
+                opacity: isConsultorInterno && !isAdmin && fechamentoEditando ? 0.6 : 1
               }}>
                 <h4 style={{ 
                   margin: '0 0 1rem 0', 
@@ -1532,6 +1546,11 @@ const Fechamentos = () => {
                     <line x1="3" y1="10" x2="21" y2="10"></line>
                   </svg>
                   Dados de Parcelamento
+                  {isConsultorInterno && !isAdmin && fechamentoEditando && (
+                    <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 'normal' }}>
+                      (Bloqueado para consultor)
+                    </span>
+                  )}
                 </h4>
                 
                 <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
@@ -1543,6 +1562,7 @@ const Fechamentos = () => {
                       value={novoFechamento.valor_parcela_formatado || ''}
                       onChange={handleValorParcelaChange}
                       placeholder="0,00"
+                      disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                     />
                   </div>
 
@@ -1555,6 +1575,7 @@ const Fechamentos = () => {
                       onChange={(e) => setNovoFechamento({...novoFechamento, numero_parcelas: e.target.value})}
                       placeholder="Ex: 12"
                       min="1"
+                      disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                     />
                   </div>
                 </div>
@@ -1567,6 +1588,7 @@ const Fechamentos = () => {
                       className="form-input"
                       value={novoFechamento.vencimento || ''}
                       onChange={(e) => setNovoFechamento({...novoFechamento, vencimento: e.target.value})}
+                      disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                     />
                   </div>
 
@@ -1579,6 +1601,7 @@ const Fechamentos = () => {
                       onChange={(e) => setNovoFechamento({...novoFechamento, antecipacao_meses: e.target.value})}
                       placeholder="Ex: 3"
                       min="1"
+                      disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                     />
                   </div>
                 </div>
@@ -1603,6 +1626,11 @@ const Fechamentos = () => {
                     gap: '0.5rem'
                   }}>
                     Dados da Operação
+                    {isConsultorInterno && !isAdmin && fechamentoEditando && (
+                      <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 'normal' }}>
+                        (Editável para consultor)
+                      </span>
+                    )}
                   </h4>
                   
                   <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
