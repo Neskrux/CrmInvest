@@ -4104,40 +4104,42 @@ const Pacientes = () => {
                   </>
                 )}
                 
-                <button
-                  onClick={() => handleTabChange('evidencias')}
-                  style={{
-                    padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
-                    border: 'none',
-                    background: 'none',
-                    fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
-                    fontWeight: '500',
-                    color: activeViewTab === 'evidencias' ? '#3b82f6' : '#6b7280',
-                    borderBottom: activeViewTab === 'evidencias' ? '2px solid #3b82f6' : '2px solid transparent',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    whiteSpace: 'nowrap',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}
-                >
-                  Evidências
-                  {evidenciasPaciente.length > 0 && (
-                    <span style={{
-                      backgroundColor: '#3b82f6',
-                      color: 'white',
-                      fontSize: '0.7rem',
-                      fontWeight: '600',
-                      padding: '0.125rem 0.375rem',
-                      borderRadius: '9999px',
-                      minWidth: '20px',
-                      textAlign: 'center'
-                    }}>
-                      {evidenciasPaciente.length}
-                    </span>
-                  )}
-                </button>
+                {!isClinica && (
+                  <button
+                    onClick={() => handleTabChange('evidencias')}
+                    style={{
+                      padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
+                      border: 'none',
+                      background: 'none',
+                      fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
+                      fontWeight: '500',
+                      color: activeViewTab === 'evidencias' ? '#3b82f6' : '#6b7280',
+                      borderBottom: activeViewTab === 'evidencias' ? '2px solid #3b82f6' : '2px solid transparent',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    Evidências
+                    {evidenciasPaciente.length > 0 && (
+                      <span style={{
+                        backgroundColor: '#3b82f6',
+                        color: 'white',
+                        fontSize: '0.7rem',
+                        fontWeight: '600',
+                        padding: '0.125rem 0.375rem',
+                        borderRadius: '9999px',
+                        minWidth: '20px',
+                        textAlign: 'center'
+                      }}>
+                        {evidenciasPaciente.length}
+                      </span>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
             
@@ -4723,7 +4725,7 @@ const Pacientes = () => {
               )}
               
               {/* Aba de Evidências */}
-              {activeViewTab === 'evidencias' && (
+              {activeViewTab === 'evidencias' && !isClinica && (
                 <div>
                   <h3 style={{ 
                     fontSize: '1.125rem', 
@@ -4869,39 +4871,41 @@ const Pacientes = () => {
                 Observações
               </button>
               
-                <button
-                  onClick={() => setActiveObservacoesTab('evidencias')}
-                  style={{
-                    padding: '0.75rem 0',
-                    border: 'none',
-                    background: 'none',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    color: activeObservacoesTab === 'evidencias' ? '#3b82f6' : '#6b7280',
-                    borderBottom: activeObservacoesTab === 'evidencias' ? '2px solid #3b82f6' : '2px solid transparent',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}
-                >
-                  Evidências
-                {evidenciasPaciente.length > 0 && (
-                  <span style={{
-                    backgroundColor: '#3b82f6',
-                    color: 'white',
-                    fontSize: '0.7rem',
-                    fontWeight: '600',
-                    padding: '0.125rem 0.375rem',
-                    borderRadius: '9999px',
-                    minWidth: '20px',
-                    textAlign: 'center'
-                  }}>
-                    {evidenciasPaciente.length}
-                  </span>
-              )}
-              </button>
+                {!isClinica && (
+                  <button
+                    onClick={() => setActiveObservacoesTab('evidencias')}
+                    style={{
+                      padding: '0.75rem 0',
+                      border: 'none',
+                      background: 'none',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: activeObservacoesTab === 'evidencias' ? '#3b82f6' : '#6b7280',
+                      borderBottom: activeObservacoesTab === 'evidencias' ? '2px solid #3b82f6' : '2px solid transparent',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    Evidências
+                  {evidenciasPaciente.length > 0 && (
+                    <span style={{
+                      backgroundColor: '#3b82f6',
+                      color: 'white',
+                      fontSize: '0.7rem',
+                      fontWeight: '600',
+                      padding: '0.125rem 0.375rem',
+                      borderRadius: '9999px',
+                      minWidth: '20px',
+                      textAlign: 'center'
+                    }}>
+                      {evidenciasPaciente.length}
+                    </span>
+                  )}
+                  </button>
+                )}
             </div>
             
             <div style={{ padding: '1.5rem', flex: 1, overflowY: 'auto' }}>
@@ -4923,7 +4927,7 @@ const Pacientes = () => {
               )}
               
               {/* Aba de Evidências */}
-              {activeObservacoesTab === 'evidencias' && (
+              {activeObservacoesTab === 'evidencias' && !isClinica && (
                 <div>
                   <h3 style={{ 
                     fontSize: '1rem', 

@@ -265,9 +265,6 @@ const Simulador = () => {
                   <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#166534' }}>
                     {formatarMoeda(resultado.valorAntecipacao)}
                   </div>
-                  <div style={{ fontSize: '0.875rem', color: '#16a34a' }}>
-                    {resultado.taxaAntecipacao}% do valor total
-                  </div>
                 </div>
 
                 {/* Detalhes */}
