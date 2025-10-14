@@ -4661,7 +4661,7 @@ const Pacientes = () => {
                         </div>
                         
                         <div>
-                          <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Vencimento</label>
+                          <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Dia do Vencimento</label>
                           <div style={{ 
                             padding: '0.75rem', 
                             backgroundColor: '#f9fafb', 
@@ -5698,7 +5698,7 @@ const Pacientes = () => {
 
                 <div className="grid grid-2" style={{ gap: '1rem' }}>
                   <div className="form-group">
-                    <label className="form-label">Vencimento</label>
+                    <label className="form-label">Dia do Vencimento</label>
                     <input 
                       type="date"
                       className="form-input"
@@ -6459,7 +6459,7 @@ const Pacientes = () => {
 
                   <div>
                     <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
-                      Vencimento *
+                      Dia do Vencimento *
                     </label>
                     <input
                       type="date"
@@ -6601,7 +6601,7 @@ const Pacientes = () => {
                       <div><strong>Parcelamento:</strong> {dadosCompletosClinica.numero_parcelas}x de {dadosCompletosClinica.valor_parcela_formatado}</div>
                     )}
                     {dadosCompletosClinica.vencimento && (
-                      <div><strong>Vencimento:</strong> {new Date(dadosCompletosClinica.vencimento).toLocaleDateString('pt-BR')}</div>
+                      <div><strong>Dia do Vencimento:</strong> {new Date(dadosCompletosClinica.vencimento).toLocaleDateString('pt-BR')}</div>
                     )}
                     {dadosCompletosClinica.antecipacao_meses && (
                       <div><strong>Antecipação:</strong> {dadosCompletosClinica.antecipacao_meses} parcela(s)</div>
