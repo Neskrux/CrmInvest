@@ -32,9 +32,21 @@ const Fechamentos = () => {
     valor_formatado: '',
     data_fechamento: new Date().toISOString().split('T')[0],
     tipo_tratamento: '',
-    observacoes: ''
+    observacoes: '',
+    // Campos de parcelamento
+    valor_parcela: '',
+    valor_parcela_formatado: '',
+    numero_parcelas: '',
+    vencimento: '',
+    antecipacao_meses: '',
+    // Campos administrativos
+    data_operacao: '',
+    valor_entregue: '',
+    valor_entregue_formatado: '',
+    tipo_operacao: ''
   });
   const [contratoSelecionado, setContratoSelecionado] = useState(null);
+  const [printConfirmacaoSelecionado, setPrintConfirmacaoSelecionado] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [showObservacoesModal, setShowObservacoesModal] = useState(false);
   const [observacoesAtual, setObservacoesAtual] = useState('');
@@ -302,13 +314,62 @@ const Fechamentos = () => {
         }
       }
       
+      // Processar valor_entregue
+      const valorEntregueOriginal = fechamento.valor_entregue;
+      let valorEntregueNumerico = '';
+      let valorEntregueFormatado = '';
+      
+      if (valorEntregueOriginal !== null && valorEntregueOriginal !== undefined && valorEntregueOriginal !== '') {
+        const numeroLimpo = typeof valorEntregueOriginal === 'string' 
+          ? parseFloat(valorEntregueOriginal.replace(/[^\d.,-]/g, '').replace(',', '.'))
+          : parseFloat(valorEntregueOriginal);
+        
+        if (!isNaN(numeroLimpo)) {
+          valorEntregueNumerico = numeroLimpo.toString();
+          valorEntregueFormatado = numeroLimpo.toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          });
+        }
+      }
+      
+      // Processar valor_parcela
+      const valorParcelaOriginal = fechamento.valor_parcela;
+      let valorParcelaNumerico = '';
+      let valorParcelaFormatado = '';
+      
+      if (valorParcelaOriginal !== null && valorParcelaOriginal !== undefined && valorParcelaOriginal !== '') {
+        const numeroLimpo = typeof valorParcelaOriginal === 'string' 
+          ? parseFloat(valorParcelaOriginal.replace(/[^\d.,-]/g, '').replace(',', '.'))
+          : parseFloat(valorParcelaOriginal);
+        
+        if (!isNaN(numeroLimpo)) {
+          valorParcelaNumerico = numeroLimpo.toString();
+          valorParcelaFormatado = numeroLimpo.toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          });
+        }
+      }
+      
       setNovoFechamento({ 
         ...fechamento, 
         consultor_id: fechamento.consultor_id || '',
         clinica_id: fechamento.clinica_id || '',
         tipo_tratamento: fechamento.tipo_tratamento || '',
         valor_fechado: valorNumerico,
-        valor_formatado: valorFormatado 
+        valor_formatado: valorFormatado,
+        // Campos de parcelamento
+        valor_parcela: valorParcelaNumerico,
+        valor_parcela_formatado: valorParcelaFormatado,
+        numero_parcelas: fechamento.numero_parcelas || '',
+        vencimento: fechamento.vencimento || '',
+        antecipacao_meses: fechamento.antecipacao_meses || '',
+        // Campos administrativos
+        data_operacao: fechamento.data_operacao || '',
+        valor_entregue: valorEntregueNumerico,
+        valor_entregue_formatado: valorEntregueFormatado,
+        tipo_operacao: fechamento.tipo_operacao || ''
       });
     } else {
       setFechamentoEditando(null);
@@ -320,9 +381,21 @@ const Fechamentos = () => {
         valor_formatado: '',
         data_fechamento: new Date().toISOString().split('T')[0],
         tipo_tratamento: '',
-        observacoes: ''
+        observacoes: '',
+        // Campos de parcelamento
+        valor_parcela: '',
+        valor_parcela_formatado: '',
+        numero_parcelas: '',
+        vencimento: '',
+        antecipacao_meses: '',
+        // Campos administrativos
+        data_operacao: '',
+        valor_entregue: '',
+        valor_entregue_formatado: '',
+        tipo_operacao: ''
       });
     }
+    setPrintConfirmacaoSelecionado(null);
     setModalAberto(true);
   };
 
@@ -330,6 +403,7 @@ const Fechamentos = () => {
     setModalAberto(false);
     setFechamentoEditando(null);
     setContratoSelecionado(null);
+    setPrintConfirmacaoSelecionado(null);
     setNovoFechamento({
       paciente_id: '',
       consultor_id: '',
@@ -338,7 +412,18 @@ const Fechamentos = () => {
       valor_formatado: '',
       data_fechamento: new Date().toISOString().split('T')[0],
       tipo_tratamento: '',
-      observacoes: ''
+      observacoes: '',
+      // Campos de parcelamento
+      valor_parcela: '',
+      valor_parcela_formatado: '',
+      numero_parcelas: '',
+      vencimento: '',
+      antecipacao_meses: '',
+      // Campos administrativos
+      data_operacao: '',
+      valor_entregue: '',
+      valor_entregue_formatado: '',
+      tipo_operacao: ''
     });
   };
 
@@ -440,6 +525,34 @@ const Fechamentos = () => {
       formData.append('data_fechamento', novoFechamento.data_fechamento);
       formData.append('tipo_tratamento', novoFechamento.tipo_tratamento || '');
       formData.append('observacoes', novoFechamento.observacoes || '');
+      
+      // Campos de parcelamento
+      if (novoFechamento.valor_parcela) {
+        formData.append('valor_parcela', parseFloat(novoFechamento.valor_parcela));
+      }
+      if (novoFechamento.numero_parcelas) {
+        formData.append('numero_parcelas', parseInt(novoFechamento.numero_parcelas));
+      }
+      if (novoFechamento.vencimento) {
+        formData.append('vencimento', novoFechamento.vencimento);
+      }
+      if (novoFechamento.antecipacao_meses) {
+        formData.append('antecipacao_meses', parseInt(novoFechamento.antecipacao_meses));
+      }
+      
+      // Campos administrativos (admin/consultor interno)
+      if (novoFechamento.data_operacao) {
+        formData.append('data_operacao', novoFechamento.data_operacao);
+      }
+      if (novoFechamento.valor_entregue) {
+        formData.append('valor_entregue', parseFloat(novoFechamento.valor_entregue));
+      }
+      if (novoFechamento.tipo_operacao) {
+        formData.append('tipo_operacao', novoFechamento.tipo_operacao);
+      }
+      if (printConfirmacaoSelecionado) {
+        formData.append('print_confirmacao', printConfirmacaoSelecionado);
+      }
       
       if (contratoSelecionado) {
         formData.append('contrato', contratoSelecionado);
@@ -606,6 +719,30 @@ const Fechamentos = () => {
       valor_formatado: valorFormatado
     });
   };
+  
+  const handleValorEntregueChange = (e) => {
+    const valorDigitado = e.target.value;
+    const valorFormatado = formatarValorInput(valorDigitado);
+    const valorNumerico = desformatarValor(valorFormatado);
+    
+    setNovoFechamento({
+      ...novoFechamento, 
+      valor_entregue: valorNumerico,
+      valor_entregue_formatado: valorFormatado
+    });
+  };
+  
+  const handleValorParcelaChange = (e) => {
+    const valorDigitado = e.target.value;
+    const valorFormatado = formatarValorInput(valorDigitado);
+    const valorNumerico = desformatarValor(valorFormatado);
+    
+    setNovoFechamento({
+      ...novoFechamento, 
+      valor_parcela: valorNumerico,
+      valor_parcela_formatado: valorFormatado
+    });
+  };
 
   const handlePacienteChange = async (pacienteId) => {
     setNovoFechamento({...novoFechamento, paciente_id: pacienteId});
@@ -676,8 +813,6 @@ const Fechamentos = () => {
 
       // Abrir URL assinada em nova aba
       window.open(url, '_blank');
-      
-      showSuccessToast(`Contrato "${nome}" aberto. Link válido por 5 minutos.`);
     } catch (error) {
       console.error('Erro ao abrir contrato:', error);
       showErrorToast('Erro ao abrir contrato: ' + error.message);
@@ -876,7 +1011,7 @@ const Fechamentos = () => {
               </svg>
               Filtros {filtrosAtivos > 0 && `(${filtrosAtivos})`}
             </button>
-            {isAdmin && (
+            {(isAdmin || isConsultorInterno) && (
               <button className="btn btn-primary" onClick={() => abrirModal()}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -977,6 +1112,9 @@ const Fechamentos = () => {
                     <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Clínica</th>
                     <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Tipo</th>
                     <th style={{ textAlign: 'right', display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Valor</th>
+                    {(isAdmin || isConsultorInterno) && (
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Dados Op.</th>
+                    )}
                     <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                       Status
                       {!isAdmin && (
@@ -1067,6 +1205,47 @@ const Fechamentos = () => {
                         <td style={{ textAlign: 'right', fontWeight: '600', display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                           {formatarMoeda(fechamento.valor_fechado)}
                         </td>
+                        {(isAdmin || isConsultorInterno) && (
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                            {(() => {
+                              // Verificar se dados administrativos estão completos
+                              const temDataOperacao = !!fechamento.data_operacao;
+                              const temValorEntregue = fechamento.valor_entregue !== null && fechamento.valor_entregue !== undefined;
+                              const temTipo = !!fechamento.tipo_operacao;
+                              const temPrint = !!fechamento.print_confirmacao_arquivo;
+                              
+                              const totalCampos = 4;
+                              const camposPreenchidos = [temDataOperacao, temValorEntregue, temTipo, temPrint].filter(Boolean).length;
+                              const completo = camposPreenchidos === totalCampos;
+                              
+                              return (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
+                                  <span style={{
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600',
+                                    color: completo ? '#059669' : '#dc2626',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem'
+                                  }}>
+                                    {completo ? (
+                                      <>
+                                        Completo
+                                      </>
+                                    ) : (
+                                      <>
+                                        Incompleto
+                                      </>
+                                    )}
+                                  </span>
+                                  <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>
+                                    {camposPreenchidos}/{totalCampos}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </td>
+                        )}
                         <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                           {/* Calcular progresso de documentação */}
                           {(() => {
@@ -1162,7 +1341,7 @@ const Fechamentos = () => {
                                 <circle cx="12" cy="12" r="3"></circle>
                               </svg>
                             </button>
-                            {isAdmin && (
+                            {(isAdmin || (isConsultorInterno && fechamento.consultor_id === user?.id)) && (
                               <button 
                                 className="btn-action"
                                 onClick={() => abrirModal(fechamento)}
@@ -1329,6 +1508,171 @@ const Fechamentos = () => {
                 />
               </div>
 
+              {/* Seção de Parcelamento */}
+              <div style={{ 
+                border: '1px solid #10b981', 
+                borderRadius: '8px', 
+                padding: '1rem', 
+                marginTop: '1.5rem',
+                backgroundColor: '#f0fdf4'
+              }}>
+                <h4 style={{ 
+                  margin: '0 0 1rem 0', 
+                  fontSize: '1rem', 
+                  fontWeight: '600', 
+                  color: '#065f46',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                  </svg>
+                  Dados de Parcelamento
+                </h4>
+                
+                <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Valor da Parcela (R$)</label>
+                    <input 
+                      type="text"
+                      className="form-input"
+                      value={novoFechamento.valor_parcela_formatado || ''}
+                      onChange={handleValorParcelaChange}
+                      placeholder="0,00"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Nº de Parcelas</label>
+                    <input 
+                      type="number"
+                      className="form-input"
+                      value={novoFechamento.numero_parcelas || ''}
+                      onChange={(e) => setNovoFechamento({...novoFechamento, numero_parcelas: e.target.value})}
+                      placeholder="Ex: 12"
+                      min="1"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-2" style={{ gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Vencimento</label>
+                    <input 
+                      type="date"
+                      className="form-input"
+                      value={novoFechamento.vencimento || ''}
+                      onChange={(e) => setNovoFechamento({...novoFechamento, vencimento: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Antecipação (em meses)</label>
+                    <input 
+                      type="number"
+                      className="form-input"
+                      value={novoFechamento.antecipacao_meses || ''}
+                      onChange={(e) => setNovoFechamento({...novoFechamento, antecipacao_meses: e.target.value})}
+                      placeholder="Ex: 3"
+                      min="1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Seção de Dados Administrativos - Apenas Admin/Consultor Interno */}
+              {(isAdmin || isConsultorInterno) && (
+                <div style={{ 
+                  border: '1px solid #3b82f6', 
+                  borderRadius: '8px', 
+                  padding: '1rem', 
+                  marginTop: '1.5rem',
+                  backgroundColor: '#eff6ff'
+                }}>
+                  <h4 style={{ 
+                    margin: '0 0 1rem 0', 
+                    fontSize: '1rem', 
+                    fontWeight: '600', 
+                    color: '#1e40af',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    Dados da Operação
+                  </h4>
+                  
+                  <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
+                    <div className="form-group">
+                      <label className="form-label">Data da Operação</label>
+                      <input 
+                        type="date"
+                        className="form-input"
+                        value={novoFechamento.data_operacao || ''}
+                        onChange={(e) => setNovoFechamento({...novoFechamento, data_operacao: e.target.value})}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Tipo</label>
+                      <select 
+                        className="form-select"
+                        value={novoFechamento.tipo_operacao || ''}
+                        onChange={(e) => setNovoFechamento({...novoFechamento, tipo_operacao: e.target.value})}
+                      >
+                        <option value="">Selecione</option>
+                        <option value="operacao">Operação</option>
+                        <option value="colateral">Colateral</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: '1rem' }}>
+                    <label className="form-label">Valor Entregue (R$)</label>
+                    <input 
+                      type="text"
+                      className="form-input"
+                      value={novoFechamento.valor_entregue_formatado || ''}
+                      onChange={handleValorEntregueChange}
+                      placeholder="0,00"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Print de Confirmação com Sacado</label>
+                    <input 
+                      type="file"
+                      className="form-input"
+                      accept="image/*,.pdf"
+                      onChange={(e) => setPrintConfirmacaoSelecionado(e.target.files[0])}
+                    />
+                    {printConfirmacaoSelecionado && (
+                      <div style={{ 
+                        marginTop: '0.5rem', 
+                        fontSize: '0.875rem', 
+                        color: '#059669',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        {printConfirmacaoSelecionado.name}
+                      </div>
+                    )}
+                    {fechamentoEditando && fechamentoEditando.print_confirmacao_arquivo && !printConfirmacaoSelecionado && (
+                      <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                        Print atual: {fechamentoEditando.print_confirmacao_nome || 'anexado'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
                 <button 
                   type="button"
@@ -1477,6 +1821,51 @@ const Fechamentos = () => {
                   </span>
                 )}
               </button>
+              
+              {(isAdmin || isConsultorInterno) && (
+                <button
+                  onClick={() => handleTabChange('operacao')}
+                  style={{
+                    padding: '1rem 0',
+                    border: 'none',
+                    background: 'none',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: activeViewTab === 'operacao' ? '#3b82f6' : '#6b7280',
+                    borderBottom: activeViewTab === 'operacao' ? '2px solid #3b82f6' : '2px solid transparent',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  Dados da Operação
+                  {(() => {
+                    const temDataOperacao = !!viewingFechamento.data_operacao;
+                    const temValorEntregue = viewingFechamento.valor_entregue !== null && viewingFechamento.valor_entregue !== undefined;
+                    const temTipo = !!viewingFechamento.tipo_operacao;
+                    const temPrint = !!viewingFechamento.print_confirmacao_arquivo;
+                    const camposPreenchidos = [temDataOperacao, temValorEntregue, temTipo, temPrint].filter(Boolean).length;
+                    const incompleto = camposPreenchidos < 4;
+                    
+                    return incompleto ? (
+                      <span style={{
+                        backgroundColor: '#dc2626',
+                        color: 'white',
+                        fontSize: '0.7rem',
+                        fontWeight: '600',
+                        padding: '0.125rem 0.375rem',
+                        borderRadius: '9999px',
+                        minWidth: '20px',
+                        textAlign: 'center'
+                      }}>
+                        !
+                      </span>
+                    ) : null;
+                  })()}
+                </button>
+              )}
             </div>
 
             <div style={{ padding: '0 1.5rem 1.5rem 1.5rem', flex: 1, overflowY: 'auto' }}>
@@ -2027,6 +2416,192 @@ const Fechamentos = () => {
                 </div>
               )}
               
+              {/* Aba de Dados da Operação - Admin/Consultor Interno */}
+              {(isAdmin || isConsultorInterno) && activeViewTab === 'operacao' && (
+                <div>
+                  <h3 style={{ 
+                    fontSize: '1.125rem', 
+                    fontWeight: '700', 
+                    color: '#1a1d23', 
+                    marginBottom: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                    </svg>
+                    Dados Administrativos da Operação
+                  </h3>
+                  
+                  {(() => {
+                    const temDataOperacao = !!viewingFechamento.data_operacao;
+                    const temValorEntregue = viewingFechamento.valor_entregue !== null && viewingFechamento.valor_entregue !== undefined;
+                    const temTipo = !!viewingFechamento.tipo_operacao;
+                    const temPrint = !!viewingFechamento.print_confirmacao_arquivo;
+                    const camposPreenchidos = [temDataOperacao, temValorEntregue, temTipo, temPrint].filter(Boolean).length;
+                    const completo = camposPreenchidos === 4;
+                    
+                    return (
+                      <>
+                        {/* Alerta de dados incompletos */}
+                        {!completo && (
+                          <div style={{
+                            backgroundColor: '#fef2f2',
+                            border: '1px solid #fecaca',
+                            borderRadius: '8px',
+                            padding: '1rem',
+                            marginBottom: '1.5rem',
+                            display: 'flex',
+                            alignItems: 'start',
+                            gap: '0.75rem'
+                          }}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#dc2626', flexShrink: 0 }}>
+                              <circle cx="12" cy="12" r="10"></circle>
+                              <line x1="12" y1="8" x2="12" y2="12"></line>
+                              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            </svg>
+                            <div>
+                              <div style={{ fontWeight: '600', color: '#991b1b', marginBottom: '0.25rem' }}>
+                                Dados Administrativos Incompletos
+                              </div>
+                              <div style={{ fontSize: '0.875rem', color: '#dc2626' }}>
+                                {camposPreenchidos} de 4 campos preenchidos. Clique em "Editar Fechamento" para completar os dados da operação.
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div style={{ display: 'grid', gap: '1rem' }}>
+                          <div>
+                            <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Data da Operação</label>
+                            <div style={{ 
+                              padding: '0.75rem', 
+                              backgroundColor: temDataOperacao ? '#f0fdf4' : '#fef2f2', 
+                              borderRadius: '6px',
+                              border: `1px solid ${temDataOperacao ? '#86efac' : '#fecaca'}`
+                            }}>
+                              {viewingFechamento.data_operacao ? 
+                                new Date(viewingFechamento.data_operacao).toLocaleDateString('pt-BR') : 
+                                <span style={{ color: '#dc2626', fontStyle: 'italic' }}>Não informado</span>
+                              }
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Tipo de Operação</label>
+                            <div style={{ 
+                              padding: '0.75rem', 
+                              backgroundColor: temTipo ? '#f0fdf4' : '#fef2f2', 
+                              borderRadius: '6px',
+                              border: `1px solid ${temTipo ? '#86efac' : '#fecaca'}`
+                            }}>
+                              {viewingFechamento.tipo_operacao ? (
+                                <span className="badge" style={{
+                                  backgroundColor: viewingFechamento.tipo_operacao === 'operacao' ? '#3b82f6' : '#8b5cf6',
+                                  color: 'white',
+                                  padding: '0.25rem 0.75rem'
+                                }}>
+                                  {viewingFechamento.tipo_operacao === 'operacao' ? 'Operação' : 'Colateral'}
+                                </span>
+                              ) : (
+                                <span style={{ color: '#dc2626', fontStyle: 'italic' }}>Não informado</span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Valor Entregue</label>
+                            <div style={{ 
+                              padding: '0.75rem', 
+                              backgroundColor: temValorEntregue ? '#f0fdf4' : '#fef2f2', 
+                              borderRadius: '6px',
+                              border: `1px solid ${temValorEntregue ? '#86efac' : '#fecaca'}`,
+                              fontWeight: '600',
+                              color: temValorEntregue ? '#059669' : '#dc2626'
+                            }}>
+                              {temValorEntregue ? 
+                                `R$ ${parseFloat(viewingFechamento.valor_entregue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 
+                                <span style={{ fontStyle: 'italic' }}>Não informado</span>
+                              }
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Print de Confirmação com Sacado</label>
+                            {temPrint ? (
+                              <div style={{
+                                padding: '1rem',
+                                backgroundColor: '#f0fdf4',
+                                borderRadius: '8px',
+                                border: '1px solid #86efac'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+                                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#059669' }}>
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                    <polyline points="21 15 16 10 5 21"></polyline>
+                                  </svg>
+                                  <div>
+                                    <div style={{ fontWeight: '600', color: '#065f46' }}>
+                                      {viewingFechamento.print_confirmacao_nome || 'print_confirmacao'}
+                                    </div>
+                                    <div style={{ fontSize: '0.875rem', color: '#059669' }}>
+                                      ✓ Arquivo anexado
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      const response = await makeRequest(`/fechamentos/${viewingFechamento.id}/print-confirmacao-url`);
+                                      
+                                      if (!response.ok) {
+                                        const data = await response.json();
+                                        showErrorToast('Erro ao gerar link: ' + (data.error || 'Erro desconhecido'));
+                                        return;
+                                      }
+
+                                      const { url, nome } = await response.json();
+                                      window.open(url, '_blank');
+                                      showSuccessToast(`Print "${nome}" aberto. Link válido por 24 horas.`);
+                                    } catch (error) {
+                                      console.error('Erro ao abrir print:', error);
+                                      showErrorToast('Erro ao abrir print: ' + error.message);
+                                    }
+                                  }}
+                                  className="btn btn-primary"
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                                >
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                  </svg>
+                                  Visualizar Print
+                                </button>
+                              </div>
+                            ) : (
+                              <div style={{
+                                padding: '1rem',
+                                textAlign: 'center',
+                                backgroundColor: '#fef2f2',
+                                borderRadius: '8px',
+                                border: '1px solid #fecaca'
+                              }}>
+                                <div style={{ color: '#dc2626', fontSize: '0.875rem', fontStyle: 'italic' }}>
+                                  Nenhum print foi anexado
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+              
               {/* Aba de Evidências */}
               {activeViewTab === 'evidencias' && (
                 <div>
@@ -2181,7 +2756,7 @@ const Fechamentos = () => {
                   >
                     Fechar
                   </button>
-                  {isAdmin && (
+                  {(isAdmin || (isConsultorInterno && viewingFechamento.consultor_id === user?.id)) && (
                     <button 
                       className="btn btn-primary" 
                       onClick={() => {

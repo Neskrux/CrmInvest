@@ -649,9 +649,9 @@ const Pacientes = () => {
     setShowModal(true);
   };
 
-  const handleView = async (paciente) => {
+  const handleView = async (paciente, initialTab = 'informacoes') => {
     setViewPaciente(paciente);
-    setActiveViewTab('informacoes');
+    setActiveViewTab(initialTab);
     
     // Buscar evidências do paciente
     if (paciente && paciente.id) {
@@ -1260,6 +1260,13 @@ const Pacientes = () => {
   const [numeroParcelasFechamento, setNumeroParcelasFechamento] = useState('');
   const [vencimentoFechamento, setVencimentoFechamento] = useState('');
   const [antecipacaoFechamento, setAntecipacaoFechamento] = useState('');
+  
+  // Novos campos para admin/consultor interno
+  const [dataOperacaoFechamento, setDataOperacaoFechamento] = useState('');
+  const [valorEntregue, setValorEntregue] = useState('');
+  const [valorEntregueFormatado, setValorEntregueFormatado] = useState('');
+  const [printConfirmacao, setPrintConfirmacao] = useState(null);
+  const [tipoOperacao, setTipoOperacao] = useState('');
 
   // Funções do modal de fechamento
   const abrirModalFechamento = (paciente, novoStatus = null) => {
@@ -1303,6 +1310,12 @@ const Pacientes = () => {
     setNumeroParcelasFechamento('');
     setVencimentoFechamento('');
     setAntecipacaoFechamento('');
+    // Limpar novos campos
+    setDataOperacaoFechamento('');
+    setValorEntregue('');
+    setValorEntregueFormatado('');
+    setPrintConfirmacao(null);
+    setTipoOperacao('');
   };
 
   // Funções do modal de atribuir consultor
@@ -1372,6 +1385,15 @@ const Pacientes = () => {
     
     setValorParcelaFormatado(valorFormatado);
     setValorParcelaFechamento(valorNumerico);
+  };
+  
+  const handleValorEntregueChange = (e) => {
+    const valorDigitado = e.target.value;
+    const valorFormatado = formatarValorInput(valorDigitado);
+    const valorNumerico = desformatarValor(valorFormatado);
+    
+    setValorEntregueFormatado(valorFormatado);
+    setValorEntregue(valorNumerico);
   };
 
   // Funções para cadastro completo da clínica
@@ -1686,6 +1708,20 @@ const Pacientes = () => {
       }
       if (antecipacaoFechamento) {
         formData.append('antecipacao_meses', parseInt(antecipacaoFechamento));
+      }
+      
+      // Campos administrativos (admin/consultor interno)
+      if (dataOperacaoFechamento) {
+        formData.append('data_operacao', dataOperacaoFechamento);
+      }
+      if (valorEntregue) {
+        formData.append('valor_entregue', parseFloat(valorEntregue));
+      }
+      if (tipoOperacao) {
+        formData.append('tipo_operacao', tipoOperacao);
+      }
+      if (printConfirmacao) {
+        formData.append('print_confirmacao', printConfirmacao);
       }
       
       if (contratoFechamento) {
@@ -2992,39 +3028,83 @@ const Pacientes = () => {
                                   </span>
                                 </td>
                               <td>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center' }}>
-                                  <div style={{ fontSize: '0.75rem', color: '#6b7280', whiteSpace: 'nowrap' }}>
-                                    {docsEnviados}/{totalDocs} enviados
-                                  </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center' }}>
                                   <div style={{ 
-                                    width: window.innerWidth <= 768 ? '60px' : '100px', 
-                                    height: '6px', 
-                                    backgroundColor: '#e5e7eb',
-                                    borderRadius: '3px',
-                                    overflow: 'hidden'
+                                    display: 'flex', 
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    width: '100%'
                                   }}>
+                                    <div style={{ fontSize: '0.75rem', color: '#6b7280', whiteSpace: 'nowrap' }}>
+                                      {docsEnviados}/{totalDocs} enviados
+                                    </div>
                                     <div style={{ 
-                                      width: `${(docsEnviados / totalDocs) * 100}%`,
-                                      height: '100%',
-                                      backgroundColor: docsEnviados === totalDocs ? '#10b981' : '#3b82f6',
-                                      transition: 'width 0.3s ease'
-                                    }} />
-                                  </div>
-                                  {docsEnviados === totalDocs && (
-                                    <span style={{ 
-                                      fontSize: '0.7rem', 
-                                      color: '#10b981', 
-                                      fontWeight: '600',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '0.25rem'
+                                      width: window.innerWidth <= 768 ? '80px' : '120px', 
+                                      height: '6px', 
+                                      backgroundColor: '#e5e7eb',
+                                      borderRadius: '3px',
+                                      overflow: 'hidden'
                                     }}>
-                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <polyline points="20 6 9 17 4 12"></polyline>
-                                      </svg>
-                                      Completo
-                                    </span>
-                                  )}
+                                      <div style={{ 
+                                        width: `${(docsEnviados / totalDocs) * 100}%`,
+                                        height: '100%',
+                                        backgroundColor: docsEnviados === totalDocs ? '#10b981' : '#3b82f6',
+                                        transition: 'width 0.3s ease'
+                                      }} />
+                                    </div>
+                                    
+                                    {docsEnviados === totalDocs ? (
+                                      <span style={{ 
+                                        fontSize: '0.7rem', 
+                                        color: '#10b981', 
+                                        fontWeight: '600',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.25rem'
+                                      }}>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                          <polyline points="20 6 9 17 4 12"></polyline>
+                                        </svg>
+                                        Completo
+                                      </span>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleView(paciente, 'documentos')}
+                                        style={{
+                                          background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                                          border: 'none',
+                                          color: 'white',
+                                          cursor: 'pointer',
+                                          padding: '0.375rem 0.75rem',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '0.375rem',
+                                          borderRadius: '6px',
+                                          fontSize: '0.75rem',
+                                          fontWeight: '600',
+                                          boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)',
+                                          transition: 'all 0.2s',
+                                          whiteSpace: 'nowrap'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.transform = 'translateY(-1px)';
+                                          e.currentTarget.style.boxShadow = '0 4px 6px rgba(59, 130, 246, 0.3)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.transform = 'translateY(0)';
+                                          e.currentTarget.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.2)';
+                                        }}
+                                      >
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                          <polyline points="17 8 12 3 7 8"></polyline>
+                                          <line x1="12" y1="3" x2="12" y2="15"></line>
+                                        </svg>
+                                        Enviar
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                               <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
@@ -5637,6 +5717,89 @@ const Pacientes = () => {
                 </div>
               </div>
 
+              {/* Seção de Dados Administrativos - Apenas Admin/Consultor Interno */}
+              {(isAdmin || isConsultorInterno) && (
+                <div style={{ 
+                  border: '1px solid #3b82f6', 
+                  borderRadius: '8px', 
+                  padding: '1rem', 
+                  marginBottom: '1rem',
+                  backgroundColor: '#eff6ff'
+                }}>
+                  <h4 style={{ 
+                    margin: '0 0 1rem 0', 
+                    fontSize: '1rem', 
+                    fontWeight: '600', 
+                    color: '#1e40af',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    Dados da Operação
+                  </h4>
+                  
+                  <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
+                    <div className="form-group">
+                      <label className="form-label">Data da Operação</label>
+                      <input 
+                        type="date"
+                        className="form-input"
+                        value={dataOperacaoFechamento}
+                        onChange={(e) => setDataOperacaoFechamento(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Tipo</label>
+                      <select 
+                        className="form-select"
+                        value={tipoOperacao}
+                        onChange={(e) => setTipoOperacao(e.target.value)}
+                      >
+                        <option value="">Selecione</option>
+                        <option value="operacao">Operação</option>
+                        <option value="colateral">Colateral</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: '1rem' }}>
+                    <label className="form-label">Valor Entregue (R$)</label>
+                    <input 
+                      type="text"
+                      className="form-input"
+                      value={valorEntregueFormatado}
+                      onChange={handleValorEntregueChange}
+                      placeholder="R$ 0,00"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Print de Confirmação com Sacado</label>
+                    <input 
+                      type="file"
+                      className="form-input"
+                      accept="image/*,.pdf"
+                      onChange={(e) => setPrintConfirmacao(e.target.files[0])}
+                    />
+                    {printConfirmacao && (
+                      <div style={{ 
+                        marginTop: '0.5rem', 
+                        fontSize: '0.875rem', 
+                        color: '#059669',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        {printConfirmacao.name}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="form-group" style={{ marginBottom: '1.5rem' }}>
                 <label className="form-label">Observações</label>

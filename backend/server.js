@@ -173,7 +173,7 @@ console.log(`📧 Email from: ${process.env.EMAIL_FROM || 'noreply@crm.com'}`);
 const STORAGE_BUCKET = 'contratos';
 
 // Função para fazer upload para Supabase Storage com retry
-const uploadToSupabase = async (file, retryCount = 0) => {
+const uploadToSupabase = async (file, fileType = 'contrato', retryCount = 0) => {
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 1000; // 1 segundo
   
@@ -183,21 +183,59 @@ const uploadToSupabase = async (file, retryCount = 0) => {
       hasSupabaseAdmin: !!supabaseAdmin,
       bucket: STORAGE_BUCKET,
       fileSize: file.size,
+      fileType: fileType,
+      originalName: file.originalname,
+      mimeType: file.mimetype,
       supabaseUrl: supabaseUrl ? 'OK' : 'MISSING',
       supabaseKey: supabaseServiceKey ? 'OK' : 'MISSING'
     });
 
-    // Gerar nome único para o arquivo
+    // Gerar nome único para o arquivo baseado no tipo
     const timestamp = Date.now();
     const randomId = Math.round(Math.random() * 1E9);
-    const fileName = `contrato-${timestamp}-${randomId}.pdf`;
     
+    // Detectar extensão do arquivo original
+    const originalExt = file.originalname ? file.originalname.split('.').pop().toLowerCase() : null;
+    
+    // Determinar extensão e contentType baseado no tipo de arquivo e mimetype
+    let extension = 'pdf';
+    let contentType = 'application/pdf';
+    
+    if (fileType === 'print_confirmacao') {
+      // Para prints, usar a extensão original ou detectar pelo mimetype
+      if (file.mimetype.startsWith('image/')) {
+        const mimeToExt = {
+          'image/jpeg': 'jpg',
+          'image/jpg': 'jpg',
+          'image/png': 'png',
+          'image/gif': 'gif',
+          'image/webp': 'webp'
+        };
+        extension = mimeToExt[file.mimetype] || originalExt || 'jpg';
+        contentType = file.mimetype;
+      } else if (file.mimetype === 'application/pdf') {
+        extension = 'pdf';
+        contentType = 'application/pdf';
+      } else {
+        // Fallback: tentar usar extensão original
+        extension = originalExt || 'jpg';
+        contentType = file.mimetype;
+      }
+    }
+    
+    const fileName = `${fileType}-${timestamp}-${randomId}.${extension}`;
+    
+    console.log('📤 Upload iniciado:', {
+      fileName,
+      contentType,
+      size: file.size
+    });
     
     // Fazer upload para o Supabase Storage usando cliente admin com timeout
     const uploadPromise = supabaseAdmin.storage
       .from(STORAGE_BUCKET)
       .upload(fileName, file.buffer, {
-        contentType: 'application/pdf',
+        contentType: contentType,
         cacheControl: '3600',
         upsert: false
       });
@@ -225,7 +263,7 @@ const uploadToSupabase = async (file, retryCount = 0) => {
     // Se não atingiu o máximo de tentativas e é um erro de conexão, tenta novamente
     if (retryCount < MAX_RETRIES && isRetryableError(error)) {
       await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-      return uploadToSupabase(file, retryCount + 1);
+      return uploadToSupabase(file, fileType, retryCount + 1);
     }
     
     throw error;
@@ -4824,7 +4862,10 @@ app.get('/api/dashboard/fechamentos', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), async (req, res) => {
+app.post('/api/fechamentos', authenticateUpload, upload.fields([
+  { name: 'contrato', maxCount: 1 },
+  { name: 'print_confirmacao', maxCount: 1 }
+]), async (req, res) => {
   try {
     const { 
       paciente_id, 
@@ -4837,14 +4878,18 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
       valor_parcela,
       numero_parcelas,
       vencimento,
-      antecipacao_meses
+      antecipacao_meses,
+      // Novos campos administrativos
+      data_operacao,
+      valor_entregue,
+      tipo_operacao
     } = req.body;
 
     // Verificar se é fechamento automático (baseado nas observações)
     const isAutomaticFechamento = observacoes && observacoes.includes('automaticamente pelo pipeline');
     
     // Verificar se o arquivo foi enviado (obrigatório apenas para fechamentos manuais)
-    if (!req.file && !isAutomaticFechamento) {
+    if (!req.files?.contrato && !isAutomaticFechamento) {
       return res.status(400).json({ error: 'Contrato em PDF é obrigatório!' });
     }
 
@@ -4870,16 +4915,26 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
     const numeroParcelas = numero_parcelas ? parseInt(numero_parcelas) : null;
     const vencimentoData = vencimento || null;
     const antecipacaoMeses = antecipacao_meses ? parseInt(antecipacao_meses) : null;
+    
+    // Validar e processar novos campos administrativos
+    const dataOperacao = data_operacao || null;
+    const valorEntregueVal = valor_entregue ? parseFloat(valor_entregue) : null;
+    const tipoOperacaoVal = tipo_operacao || null;
 
     // Dados do contrato (se houver arquivo)
     let contratoArquivo = null;
     let contratoNomeOriginal = null;
     let contratoTamanho = null;
     
+    // Dados do print de confirmação
+    let printConfirmacaoArquivo = null;
+    let printConfirmacaoNome = null;
+    let printConfirmacaoTamanho = null;
+    
     // Se houver arquivo de contrato, fazer upload para Supabase Storage
-    if (req.file) {
+    if (req.files?.contrato && req.files.contrato[0]) {
       try {
-        const uploadResult = await uploadToSupabase(req.file);
+        const uploadResult = await uploadToSupabase(req.files.contrato[0], 'contrato');
         contratoArquivo = uploadResult.fileName;
         contratoNomeOriginal = uploadResult.originalName;
         contratoTamanho = uploadResult.size;
@@ -4889,6 +4944,20 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
           error: 'Erro ao fazer upload do contrato: ' + uploadError.message,
           details: process.env.NODE_ENV === 'development' ? uploadError : undefined
         });
+      }
+    }
+    
+    // Se houver arquivo de print de confirmação, fazer upload
+    if (req.files?.print_confirmacao && req.files.print_confirmacao[0]) {
+      try {
+        const uploadResult = await uploadToSupabase(req.files.print_confirmacao[0], 'print_confirmacao');
+        printConfirmacaoArquivo = uploadResult.fileName;
+        printConfirmacaoNome = uploadResult.originalName;
+        printConfirmacaoTamanho = uploadResult.size;
+      } catch (uploadError) {
+        console.error('Erro detalhado no upload do print de confirmação:', uploadError);
+        // Não bloquear o fechamento se houver erro no upload do print
+        console.warn('Print de confirmação não foi salvo devido a erro no upload');
       }
     }
     
@@ -4909,16 +4978,27 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
         numero_parcelas: numeroParcelas,
         vencimento: vencimentoData,
         antecipacao_meses: antecipacaoMeses,
+        // Novos campos administrativos
+        data_operacao: dataOperacao,
+        valor_entregue: valorEntregueVal,
+        tipo_operacao: tipoOperacaoVal,
+        print_confirmacao_arquivo: printConfirmacaoArquivo,
+        print_confirmacao_nome: printConfirmacaoNome,
+        print_confirmacao_tamanho: printConfirmacaoTamanho,
         aprovado: 'pendente'
       }])
       .select();
 
     if (error) {
-      // Se houve erro, remover o arquivo do Supabase Storage
-      if (contratoArquivo) {
+      // Se houve erro, remover os arquivos do Supabase Storage
+      const filesToRemove = [];
+      if (contratoArquivo) filesToRemove.push(contratoArquivo);
+      if (printConfirmacaoArquivo) filesToRemove.push(printConfirmacaoArquivo);
+      
+      if (filesToRemove.length > 0) {
         await supabaseAdmin.storage
           .from(STORAGE_BUCKET)
-          .remove([contratoArquivo]);
+          .remove(filesToRemove);
       }
       throw error;
     }
@@ -4962,9 +5042,36 @@ app.post('/api/fechamentos', authenticateUpload, upload.single('contrato'), asyn
   }
 });
 
-app.put('/api/fechamentos/:id', authenticateUpload, upload.single('contrato'), async (req, res) => {
+app.put('/api/fechamentos/:id', authenticateUpload, upload.fields([
+  { name: 'contrato', maxCount: 1 },
+  { name: 'print_confirmacao', maxCount: 1 }
+]), async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Verificar permissões: Admin pode editar tudo, Consultor Interno apenas seus próprios
+    if (req.user.tipo === 'consultor') {
+      const isConsultorInterno = req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true;
+      
+      if (!isConsultorInterno) {
+        return res.status(403).json({ error: 'Você não tem permissão para editar fechamentos' });
+      }
+      
+      // Verificar se o fechamento pertence ao consultor
+      const { data: fechamento, error: checkError } = await supabaseAdmin
+        .from('fechamentos')
+        .select('consultor_id')
+        .eq('id', id)
+        .single();
+      
+      if (checkError) {
+        return res.status(404).json({ error: 'Fechamento não encontrado' });
+      }
+      
+      if (fechamento.consultor_id !== req.user.id) {
+        return res.status(403).json({ error: 'Você só pode editar fechamentos atribuídos a você' });
+      }
+    }
     
     // Debug: Log completo do que está chegando
     
@@ -4975,7 +5082,16 @@ app.put('/api/fechamentos/:id', authenticateUpload, upload.single('contrato'), a
       valor_fechado, 
       data_fechamento, 
       tipo_tratamento,
-      observacoes 
+      observacoes,
+      // Campos de parcelamento
+      valor_parcela,
+      numero_parcelas,
+      vencimento,
+      antecipacao_meses,
+      // Campos administrativos
+      data_operacao,
+      valor_entregue,
+      tipo_operacao
     } = req.body;
 
     // Converter campos opcionais para null se não enviados ou vazios
@@ -5000,17 +5116,64 @@ app.put('/api/fechamentos/:id', authenticateUpload, upload.single('contrato'), a
       });
     }
     
+    // Processar campos de parcelamento
+    const valorParcelaVal = valor_parcela ? parseFloat(valor_parcela) : null;
+    const numeroParcelasVal = numero_parcelas ? parseInt(numero_parcelas) : null;
+    const vencimentoVal = vencimento || null;
+    const antecipacaoMesesVal = antecipacao_meses ? parseInt(antecipacao_meses) : null;
+    
+    // Processar campos administrativos
+    const dataOperacao = data_operacao || null;
+    const valorEntregueVal = valor_entregue ? parseFloat(valor_entregue) : null;
+    const tipoOperacaoVal = tipo_operacao || null;
+    
+    // Upload de print de confirmação se fornecido
+    let printConfirmacaoArquivo = null;
+    let printConfirmacaoNome = null;
+    let printConfirmacaoTamanho = null;
+    
+    if (req.files?.print_confirmacao && req.files.print_confirmacao[0]) {
+      try {
+        const uploadResult = await uploadToSupabase(req.files.print_confirmacao[0], 'print_confirmacao');
+        printConfirmacaoArquivo = uploadResult.fileName;
+        printConfirmacaoNome = uploadResult.originalName;
+        printConfirmacaoTamanho = uploadResult.size;
+      } catch (uploadError) {
+        console.error('Erro no upload do print de confirmação:', uploadError);
+        // Não bloquear a atualização se houver erro no upload do print
+      }
+    }
+    
+    // Preparar objeto de atualização
+    const updateData = { 
+      paciente_id: parseInt(paciente_id), 
+      consultor_id: consultorId, 
+      clinica_id: clinicaId, 
+      valor_fechado: valorFechado, 
+      data_fechamento, 
+      tipo_tratamento: tipo_tratamento || null,
+      observacoes: observacoes || null,
+      // Campos de parcelamento
+      valor_parcela: valorParcelaVal,
+      numero_parcelas: numeroParcelasVal,
+      vencimento: vencimentoVal,
+      antecipacao_meses: antecipacaoMesesVal,
+      // Campos administrativos
+      data_operacao: dataOperacao,
+      valor_entregue: valorEntregueVal,
+      tipo_operacao: tipoOperacaoVal
+    };
+    
+    // Adicionar campos do print apenas se houver novo upload
+    if (printConfirmacaoArquivo) {
+      updateData.print_confirmacao_arquivo = printConfirmacaoArquivo;
+      updateData.print_confirmacao_nome = printConfirmacaoNome;
+      updateData.print_confirmacao_tamanho = printConfirmacaoTamanho;
+    }
+    
     const { data, error } = await supabaseAdmin
       .from('fechamentos')
-      .update({ 
-        paciente_id: parseInt(paciente_id), 
-        consultor_id: consultorId, 
-        clinica_id: clinicaId, 
-        valor_fechado: valorFechado, 
-        data_fechamento, 
-        tipo_tratamento: tipo_tratamento || null,
-        observacoes: observacoes || null 
-      })
+      .update(updateData)
       .eq('id', id)
       .select();
 
@@ -5135,6 +5298,46 @@ app.get('/api/fechamentos/:id/contrato', authenticateToken, async (req, res) => 
     res.send(data);
   } catch (error) {
     console.error('Erro ao baixar contrato:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Rota para gerar URL assinada do print de confirmação (sob demanda)
+app.get('/api/fechamentos/:id/print-confirmacao-url', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Buscar dados do fechamento
+    const { data: fechamento, error } = await supabaseAdmin
+      .from('fechamentos')
+      .select('print_confirmacao_arquivo, print_confirmacao_nome')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+
+    if (!fechamento?.print_confirmacao_arquivo) {
+      return res.status(404).json({ error: 'Print de confirmação não encontrado!' });
+    }
+
+    // Gerar URL assinada com validade de 24 horas (86400 segundos)
+    const { data: urlData, error: urlError } = await supabaseAdmin.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrl(fechamento.print_confirmacao_arquivo, 86400);
+
+    if (urlError) {
+      console.error('Erro ao gerar URL assinada:', urlError);
+      return res.status(500).json({ error: 'Erro ao gerar URL de download' });
+    }
+
+    // Retornar apenas a URL assinada
+    res.json({ 
+      url: urlData.signedUrl,
+      nome: fechamento.print_confirmacao_nome || 'print_confirmacao',
+      expiraEm: '24 horas'
+    });
+  } catch (error) {
+    console.error('Erro ao gerar URL do print de confirmação:', error);
     res.status(500).json({ error: error.message });
   }
 });
