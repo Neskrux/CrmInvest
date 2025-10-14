@@ -6462,10 +6462,13 @@ const Pacientes = () => {
                       Dia do Vencimento *
                     </label>
                     <input
-                      type="date"
+                      type="number"
                       name="vencimento"
                       value={dadosCompletosClinica.vencimento}
                       onChange={handleInputChangeCadastroCompleto}
+                      placeholder="Ex: 15"
+                      min="1"
+                      max="31"
                       required
                       style={{
                         width: '100%',
@@ -6476,6 +6479,9 @@ const Pacientes = () => {
                         outline: 'none'
                       }}
                     />
+                    <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem', marginBottom: 0 }}>
+                      Digite o dia do mês (1 a 31)
+                    </p>
                   </div>
 
                   <div>

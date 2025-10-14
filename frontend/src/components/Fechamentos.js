@@ -19,6 +19,7 @@ const Fechamentos = () => {
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
   const [fechamentoEditando, setFechamentoEditando] = useState(null);
+  const [activeTab, setActiveTab] = useState('fechamentos'); // 'fechamentos' ou 'em_analise'
   
   // Estados para modal de visualização com abas
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -1096,12 +1097,159 @@ const Fechamentos = () => {
           </div>
         )}
 
+        {/* Abas */}
+        <div style={{ 
+          borderBottom: '1px solid #e5e7eb',
+          display: 'flex',
+          backgroundColor: '#f9fafb'
+        }}>
+          <button
+            className={`tab ${activeTab === 'fechamentos' ? 'active' : ''}`}
+            onClick={() => setActiveTab('fechamentos')}
+            title="Apenas fechamentos aprovados"
+            style={{
+              padding: '1rem 1.5rem',
+              border: 'none',
+              backgroundColor: 'transparent',
+              cursor: 'pointer',
+              borderBottom: activeTab === 'fechamentos' ? '2px solid #3b82f6' : '2px solid transparent',
+              color: activeTab === 'fechamentos' ? '#3b82f6' : '#6b7280',
+              fontWeight: activeTab === 'fechamentos' ? '600' : '500',
+              fontSize: '0.875rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Fechamentos
+            <span style={{ 
+              fontSize: '0.75rem', 
+              backgroundColor: activeTab === 'fechamentos' ? '#3b82f6' : '#e5e7eb',
+              color: activeTab === 'fechamentos' ? 'white' : '#6b7280',
+              padding: '0.125rem 0.5rem',
+              borderRadius: '12px',
+              fontWeight: '600'
+            }}>
+              {fechamentosFiltrados.filter(f => {
+                const paciente = pacientes.find(p => p.id === f.paciente_id);
+                if (!paciente) return false;
+                
+                const totalDocs = 4;
+                const docsEnviados = [
+                  paciente.selfie_doc_url,
+                  paciente.documento_url,
+                  paciente.comprovante_residencia_url,
+                  paciente.contrato_servico_url
+                ].filter(Boolean).length;
+                
+                let statusReal = f.aprovado || 'documentacao_pendente';
+                if (docsEnviados < totalDocs && statusReal !== 'reprovado') {
+                  statusReal = 'documentacao_pendente';
+                }
+                
+                return statusReal === 'aprovado';
+              }).length}
+            </span>
+          </button>
+          
+          <button
+            className={`tab ${activeTab === 'em_analise' ? 'active' : ''}`}
+            onClick={() => setActiveTab('em_analise')}
+            title="Documentação pendente, reprovados e outros status não aprovados"
+            style={{
+              padding: '1rem 1.5rem',
+              border: 'none',
+              backgroundColor: 'transparent',
+              cursor: 'pointer',
+              borderBottom: activeTab === 'em_analise' ? '2px solid #3b82f6' : '2px solid transparent',
+              color: activeTab === 'em_analise' ? '#3b82f6' : '#6b7280',
+              fontWeight: activeTab === 'em_analise' ? '600' : '500',
+              fontSize: '0.875rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"></path>
+            </svg>
+            Em Análise
+            <span style={{ 
+              fontSize: '0.75rem', 
+              backgroundColor: activeTab === 'em_analise' ? '#3b82f6' : '#e5e7eb',
+              color: activeTab === 'em_analise' ? 'white' : '#6b7280',
+              padding: '0.125rem 0.5rem',
+              borderRadius: '12px',
+              fontWeight: '600'
+            }}>
+              {fechamentosFiltrados.filter(f => {
+                const paciente = pacientes.find(p => p.id === f.paciente_id);
+                if (!paciente) return false;
+                
+                const totalDocs = 4;
+                const docsEnviados = [
+                  paciente.selfie_doc_url,
+                  paciente.documento_url,
+                  paciente.comprovante_residencia_url,
+                  paciente.contrato_servico_url
+                ].filter(Boolean).length;
+                
+                let statusReal = f.aprovado || 'documentacao_pendente';
+                if (docsEnviados < totalDocs && statusReal !== 'reprovado') {
+                  statusReal = 'documentacao_pendente';
+                }
+                
+                return statusReal !== 'aprovado';
+              }).length}
+            </span>
+          </button>
+        </div>
+
         <div className="card-body">
-          {fechamentosFiltrados.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-              Nenhum fechamento encontrado
-            </div>
-          ) : (
+          {(() => {
+            // Filtrar fechamentos baseado na aba ativa
+            const fechamentosPorAba = fechamentosFiltrados.filter(fechamento => {
+              // Encontrar o paciente correspondente para verificar documentação
+              const paciente = pacientes.find(p => p.id === fechamento.paciente_id);
+              
+              if (!paciente) return false;
+              
+              // Verificar se documentação está completa
+              const totalDocs = 4;
+              const docsEnviados = [
+                paciente.selfie_doc_url,
+                paciente.documento_url,
+                paciente.comprovante_residencia_url,
+                paciente.contrato_servico_url
+              ].filter(Boolean).length;
+              
+              // Determinar status real do fechamento
+              let statusReal = fechamento.aprovado || 'documentacao_pendente';
+              if (docsEnviados < totalDocs && statusReal !== 'reprovado') {
+                statusReal = 'documentacao_pendente';
+              }
+              
+              if (activeTab === 'fechamentos') {
+                // Aba "Fechamentos": apenas pacientes aprovados E com documentação completa
+                return statusReal === 'aprovado';
+              } else {
+                // Aba "Em Análise": todos os demais (pendente, reprovado, documentação pendente, etc.)
+                return statusReal !== 'aprovado';
+              }
+            });
+
+            return fechamentosPorAba.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+                {activeTab === 'fechamentos' 
+                  ? 'Nenhum fechamento aprovado encontrado'
+                  : 'Nenhum fechamento em análise encontrado (documentação pendente, reprovados, etc.)'
+                }
+              </div>
+            ) : (
             <div className="table-container">
               <table className="table">
                 <thead>
@@ -1156,7 +1304,7 @@ const Fechamentos = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {fechamentosFiltrados.map(fechamento => {
+                  {fechamentosPorAba.map(fechamento => {
                     const paciente = pacientes.find(p => p.id === fechamento.paciente_id);
                     const consultor = consultores.find(c => c.id === fechamento.consultor_id);
                     const clinica = clinicas.find(c => c.id === fechamento.clinica_id);
@@ -1377,7 +1525,8 @@ const Fechamentos = () => {
                 </tbody>
               </table>
             </div>
-          )}
+            );
+          })()}
         </div>
       </div>
 
@@ -1584,12 +1733,18 @@ const Fechamentos = () => {
                   <div className="form-group">
                     <label className="form-label">Dia do Vencimento</label>
                     <input 
-                      type="date"
+                      type="number"
                       className="form-input"
                       value={novoFechamento.vencimento || ''}
                       onChange={(e) => setNovoFechamento({...novoFechamento, vencimento: e.target.value})}
+                      placeholder="Ex: 15"
+                      min="1"
+                      max="31"
                       disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                     />
+                    <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem', marginBottom: 0 }}>
+                      Digite o dia do mês (1 a 31)
+                    </p>
                   </div>
 
                   <div className="form-group">

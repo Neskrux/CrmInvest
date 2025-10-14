@@ -949,11 +949,17 @@ const Pacientes = () => {
                 <div className="form-group">
                   <label className="form-label">Dia do Vencimento</label>
                   <input
-                    type="date"
+                    type="number"
                     className="form-input"
                     value={pacienteFormData.vencimento}
                     onChange={e => setPacienteFormData({...pacienteFormData, vencimento: e.target.value})}
+                    placeholder="Ex: 15"
+                    min="1"
+                    max="31"
                   />
+                  <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem', marginBottom: 0 }}>
+                    Digite o dia do mês (1 a 31)
+                  </p>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Valor do Tratamento</label>
