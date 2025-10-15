@@ -1083,88 +1083,64 @@ const Indicacoes = () => {
                     <button 
                       className="action-button secondary"
                       onClick={() => {
-                        // Detectar o navegador e sistema operacional
+                        // Detectar iOS/Safari
                         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                        const isAndroid = /Android/.test(navigator.userAgent);
                         const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
-                        const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+                        const isAndroid = /Android/.test(navigator.userAgent);
                         
-                        // Função para abrir Google Maps com localização
-                        const openMapsWithLocation = (lat, lng) => {
-                          if (isIOS || isSafari) {
-                            // iOS/Safari: usar URL scheme do Apple Maps ou Google Maps app
-                            const appleMapsUrl = `http://maps.apple.com/?q=clínicas+estéticas+odontológicas&ll=${lat},${lng}&z=15`;
-                            const googleMapsUrl = `comgooglemaps://?q=clínicas+estéticas+odontológicas&center=${lat},${lng}&zoom=15`;
-                            
-                            // Tentar Google Maps app primeiro, depois Apple Maps
-                            const iframe = document.createElement('iframe');
-                            iframe.style.display = 'none';
-                            iframe.src = googleMapsUrl;
-                            document.body.appendChild(iframe);
-                            
-                            setTimeout(() => {
-                              document.body.removeChild(iframe);
-                              // Fallback para Apple Maps
-                              window.open(appleMapsUrl, '_blank');
-                            }, 500);
-                          } else if (isAndroid) {
-                            // Android: usar intent do Google Maps
-                            const mapsUrl = `geo:${lat},${lng}?q=clínicas+estéticas+odontológicas&z=15`;
-                            window.open(mapsUrl, '_blank');
-                          } else {
-                            // Desktop/outros: usar Google Maps web
-                            const mapsUrl = `https://www.google.com/maps/search/clínicas+estéticas+odontológicas/@${lat},${lng},15z`;
-                            window.open(mapsUrl, '_blank');
-                          }
+                        // Função simples para iOS/Safari
+                        const openForIOS = () => {
+                          // URL do Apple Maps que funciona no Safari
+                          const appleMapsUrl = `https://maps.apple.com/?q=clínicas+estéticas+odontológicas+near+me`;
+                          window.open(appleMapsUrl, '_blank');
                         };
                         
-                        // Função para abrir sem localização específica
-                        const openMapsWithoutLocation = () => {
-                          if (isIOS || isSafari) {
-                            const appleMapsUrl = `http://maps.apple.com/?q=clínicas+estéticas+odontológicas+near+me`;
-                            const googleMapsUrl = `comgooglemaps://?q=clínicas+estéticas+odontológicas+near+me`;
-                            
-                            const iframe = document.createElement('iframe');
-                            iframe.style.display = 'none';
-                            iframe.src = googleMapsUrl;
-                            document.body.appendChild(iframe);
-                            
-                            setTimeout(() => {
-                              document.body.removeChild(iframe);
-                              window.open(appleMapsUrl, '_blank');
-                            }, 500);
-                          } else if (isAndroid) {
-                            const mapsUrl = `geo:0,0?q=clínicas+estéticas+odontológicas+near+me`;
-                            window.open(mapsUrl, '_blank');
-                          } else {
-                            const mapsUrl = 'https://www.google.com/maps/search/clínicas+estéticas+odontológicas+near+me';
-                            window.open(mapsUrl, '_blank');
-                          }
+                        // Função para Android
+                        const openForAndroid = (lat, lng) => {
+                          const mapsUrl = `geo:${lat},${lng}?q=clínicas+estéticas+odontológicas`;
+                          window.open(mapsUrl, '_blank');
                         };
                         
-                        // Tentar obter localização com timeout
-                        if (navigator.geolocation) {
-                          const options = {
-                            enableHighAccuracy: true,
-                            timeout: 5000, // 5 segundos de timeout
-                            maximumAge: 300000 // 5 minutos de cache
-                          };
-                          
+                        // Função para outros navegadores
+                        const openForOthers = (lat, lng) => {
+                          const mapsUrl = `https://www.google.com/maps/search/clínicas+estéticas+odontológicas/@${lat},${lng},15z`;
+                          window.open(mapsUrl, '_blank');
+                        };
+                        
+                        // Para iOS/Safari, abrir diretamente sem geolocalização
+                        if (isIOS || isSafari) {
+                          openForIOS();
+                          return;
+                        }
+                        
+                        // Para outros dispositivos, tentar geolocalização
+                        if (navigator.geolocation && !isIOS && !isSafari) {
                           navigator.geolocation.getCurrentPosition(
                             (position) => {
                               const { latitude, longitude } = position.coords;
-                              openMapsWithLocation(latitude, longitude);
+                              if (isAndroid) {
+                                openForAndroid(latitude, longitude);
+                              } else {
+                                openForOthers(latitude, longitude);
+                              }
                             },
-                            (error) => {
-                              console.log('Erro ao obter localização:', error);
-                              // Fallback: abrir sem localização específica
-                              openMapsWithoutLocation();
+                            () => {
+                              // Se falhar, abrir sem localização
+                              if (isAndroid) {
+                                openForAndroid(0, 0);
+                              } else {
+                                openForOthers(0, 0);
+                              }
                             },
-                            options
+                            { timeout: 3000 }
                           );
                         } else {
-                          // Geolocalização não disponível
-                          openMapsWithoutLocation();
+                          // Fallback para todos
+                          if (isAndroid) {
+                            openForAndroid(0, 0);
+                          } else {
+                            openForOthers(0, 0);
+                          }
                         }
                       }}
                       style={{
