@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import TutorialPacientes from './TutorialPacientes';
 import ModalEvidencia from './ModalEvidencia';
 
 const Pacientes = () => {
+  const location = useLocation();
   const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isFreelancer, isClinica, deveFiltrarPorClinica } = useAuth();
   // Verificar se usuário é consultor
   const isConsultor = user?.tipo === 'consultor';
@@ -16,8 +18,16 @@ const Pacientes = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingPaciente, setEditingPaciente] = useState(null);
   const [loading, setLoading] = useState(true);
-  // Define aba inicial baseada no tipo de usuário
-  const [activeTab, setActiveTab] = useState(isClinica ? 'meus-pacientes' : 'pacientes');
+  
+  // Verificar se está na rota de cálculo de carteira
+  const isCalculoCarteira = location.pathname === '/calculo-carteira';
+  
+  // Define aba inicial baseada no tipo de usuário e rota
+  const [activeTab, setActiveTab] = useState(() => {
+    if (isCalculoCarteira) return 'carteira-existente';
+    if (isClinica) return 'meus-pacientes';
+    return 'pacientes';
+  });
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [filtroNome, setFiltroNome] = useState('');
   const [filtroTelefone, setFiltroTelefone] = useState('');
@@ -63,6 +73,7 @@ const Pacientes = () => {
   });
   const [pacientesCarteira, setPacientesCarteira] = useState([]);
   const [carteiraCalculos, setCarteiraCalculos] = useState(null);
+  const [percentualAlvoCarteira, setPercentualAlvoCarteira] = useState(130);
 
   // Função para preencher automaticamente dados de teste
   const preencherDadosTeste = () => {
@@ -934,7 +945,7 @@ const Pacientes = () => {
     setCarteiraCalculos(null); // Limpar cálculos quando remover paciente
   };
 
-  const calcularCarteiraExistente = () => {
+  const calcularCarteiraExistente = (percentualAlvo = 130) => {
     if (pacientesCarteira.length === 0) {
       showErrorToast('Adicione pelo menos um paciente antes de calcular');
       return;
@@ -944,12 +955,7 @@ const Pacientes = () => {
     const fatorAMNum = 0.33; // Fator fixo de 0.33%
     const dataAceite = '2025-10-15'; // Data fixa conforme testecarteira
 
-    let valorEntregueTotal = 0;
-    let desagioTotal = 0;
-    let valorFaceTotal = 0;
-    const parcelasDetalhadas = [];
-
-    // Primeiro, calcular todas as parcelas sem tipo
+    // Primeiro, calcular todas as parcelas
     const todasParcelas = [];
     (pacientesCarteira || []).forEach(paciente => {
       const valorParcelaNum = paciente.valorParcela;
@@ -975,124 +981,127 @@ const Pacientes = () => {
           dias: dias,
           desagio: desagio,
           liquidez: liquidez,
-          pacienteId: paciente.id
+          pacienteId: paciente.id,
+          score: desagio / valorParcelaNum // Perda relativa para heurística
         });
-
-        valorFaceTotal += valorParcelaNum;
       }
     });
 
-    // Calcular valor total de FACE da carteira
-    const valorTotalFace = todasParcelas.reduce((sum, p) => sum + p.valor, 0);
+    // HEURÍSTICA GULOSA para atingir o percentual alvo
+    // 1. Inicializar todos como OP
+    todasParcelas.forEach(p => p.aloc = 'OP');
     
-    // Distribuição conforme regra: Colateral deve ser pelo menos 130% da Operação
-    // Se Total = X, então: Operação = X / (1 + 1.30) = X / 2.30
-    // Colateral = X - Operação
-    const valorOperacaoFace = valorTotalFace / 2.30;
-    const valorColateralFace = valorTotalFace - valorOperacaoFace;
+    // 2. Ordenar por score (perda relativa) decrescente
+    const parcelasOrdenadas = [...todasParcelas].sort((a, b) => b.score - a.score);
     
-    // Verificar se colateral atende ao mínimo de 130% na base de FACE
-    const percentualFace = valorColateralFace / valorOperacaoFace;
+    // 3. Mover parcelas de OP → COL até atingir o percentual alvo
+    const percentualAlvoDecimal = percentualAlvo / 100; // Ex: 130% = 1.30
     
-    // Agrupar parcelas por paciente
-    const parcelasPorPaciente = {};
-    todasParcelas.forEach(parcela => {
-      if (!parcelasPorPaciente[parcela.pacienteId]) {
-        parcelasPorPaciente[parcela.pacienteId] = [];
+    let oFace = todasParcelas.reduce((sum, p) => sum + p.valor, 0);
+    let cFace = 0;
+    
+    for (const parcela of parcelasOrdenadas) {
+      if (cFace / oFace >= percentualAlvoDecimal) {
+        break; // Já atingimos o percentual alvo
       }
-      parcelasPorPaciente[parcela.pacienteId].push(parcela);
-    });
-
-    // Ordenar pacientes por valor de FACE (maior primeiro)
-    const pacientesOrdenados = Object.keys(parcelasPorPaciente).map(pacienteId => {
-      const parcelas = parcelasPorPaciente[pacienteId];
-      const valorFace = parcelas.reduce((sum, p) => sum + p.valor, 0);
-      return {
-        pacienteId,
-        parcelas,
-        valorFace,
-        nome: parcelas[0].paciente
-      };
-    }).sort((a, b) => b.valorFace - a.valorFace);
-
-    // Atribuir pacientes para atingir os valores calculados
-    let valorColateralFaceAtual = 0;
-    const pacientesColateral = [];
-    const pacientesOperacao = [];
-
-    // Atribuir pacientes maiores como colateral até atingir o valor alvo
-    for (const paciente of pacientesOrdenados) {
-      if (valorColateralFaceAtual < valorColateralFace) {
-        pacientesColateral.push(paciente);
-        valorColateralFaceAtual += paciente.valorFace;
-      } else {
-        pacientesOperacao.push(paciente);
+      
+      // Mover de OP para COL
+      parcela.aloc = 'COL';
+      oFace -= parcela.valor;
+      cFace += parcela.valor;
+    }
+    
+    // 4. AJUSTE FINO: tentar reduzir o slack sem ficar abaixo do alvo
+    let melhorSlack = cFace / oFace - percentualAlvoDecimal;
+    let houveMelhoria = true;
+    
+    while (houveMelhoria) {
+      houveMelhoria = false;
+      
+      // Tentar trocar um título de COL por um de OP
+      const parcelasCOL = todasParcelas.filter(p => p.aloc === 'COL');
+      const parcelasOP = todasParcelas.filter(p => p.aloc === 'OP');
+      
+      for (const pCol of parcelasCOL) {
+        for (const pOp of parcelasOP) {
+          // Simular a troca
+          const novoOFace = oFace + pCol.valor - pOp.valor;
+          const novoCFace = cFace - pCol.valor + pOp.valor;
+          
+          if (novoOFace > 0) {
+            const novoRatio = novoCFace / novoOFace;
+            const novoSlack = novoRatio - percentualAlvoDecimal;
+            
+            // Se melhorou o slack e ainda está acima do alvo
+            if (novoSlack >= 0 && novoSlack < melhorSlack) {
+              // Fazer a troca
+              pCol.aloc = 'OP';
+              pOp.aloc = 'COL';
+              oFace = novoOFace;
+              cFace = novoCFace;
+              melhorSlack = novoSlack;
+              houveMelhoria = true;
+              break;
+            }
+          }
+        }
+        if (houveMelhoria) break;
       }
     }
-
-    // Adicionar parcelas com tipo correto
-    pacientesColateral.forEach(paciente => {
-      paciente.parcelas.forEach(parcela => {
-        parcelasDetalhadas.push({
-          ...parcela,
-          tipo: 'colateral'
-        });
-      });
-    });
-
-    pacientesOperacao.forEach(paciente => {
-      paciente.parcelas.forEach(parcela => {
-        parcelasDetalhadas.push({
-          ...parcela,
-          tipo: 'operacao'
-        });
-      });
-    });
+    
+    // Calcular valores finais usando a alocação da heurística
+    const parcelasDetalhadas = todasParcelas.map(p => ({
+      ...p,
+      tipo: p.aloc === 'COL' ? 'colateral' : 'operacao'
+    }));
 
     // Calcular valores separados por tipo na base de FACE
-    const valorColateralFaceCalculado = parcelasDetalhadas
-      .filter(p => p.tipo === 'colateral')
+    const valorColateralFaceCalculado = todasParcelas
+      .filter(p => p.aloc === 'COL')
       .reduce((sum, p) => sum + p.valor, 0);
 
-    const valorOperacaoFaceCalculado = parcelasDetalhadas
-      .filter(p => p.tipo === 'operacao')
+    const valorOperacaoFaceCalculado = todasParcelas
+      .filter(p => p.aloc === 'OP')
       .reduce((sum, p) => sum + p.valor, 0);
 
     // Calcular valores ENTREGUES
     // IMPORTANTE: Deságio aplicado APENAS na operação, colateral não tem deságio
-    const valorColateralEntregue = parcelasDetalhadas
-      .filter(p => p.tipo === 'colateral')
-      .reduce((sum, p) => sum + p.valor, 0); // Sem deságio
+    const valorColateralEntregue = valorColateralFaceCalculado; // Colateral = sem deságio
 
-    const valorOperacaoEntregue = parcelasDetalhadas
-      .filter(p => p.tipo === 'operacao')
+    const valorOperacaoEntregue = todasParcelas
+      .filter(p => p.aloc === 'OP')
       .reduce((sum, p) => sum + p.liquidez, 0); // Com deságio
 
     // Deságio total = apenas da operação
     const desagioColateral = 0; // Colateral não tem deságio
-    const desagioOperacao = parcelasDetalhadas
-      .filter(p => p.tipo === 'operacao')
+    const desagioOperacao = todasParcelas
+      .filter(p => p.aloc === 'OP')
       .reduce((sum, p) => sum + p.desagio, 0);
 
-    desagioTotal = desagioOperacao; // Apenas deságio da operação
-    valorEntregueTotal = valorColateralEntregue + valorOperacaoEntregue;
+    const desagioTotal = desagioOperacao;
+    const valorEntregueTotal = valorColateralEntregue + valorOperacaoEntregue;
+    const valorFaceTotal = valorColateralFaceCalculado + valorOperacaoFaceCalculado;
 
-    // Calcular percentual final na base de FACE
-    const percentualFinal = valorOperacaoFaceCalculado > 0 ? 
+    // Calcular percentual final e slack
+    const percentualFinalCalculado = valorOperacaoFaceCalculado > 0 ? 
       (valorColateralFaceCalculado / valorOperacaoFaceCalculado) * 100 : 0;
+    
+    const slack = (valorColateralFaceCalculado / valorOperacaoFaceCalculado) - percentualAlvoDecimal;
 
     setCarteiraCalculos({
       parcelasDetalhadas,
       valorEntregueTotal,
       desagioTotal,
-      valorFaceTotal: valorColateralFaceCalculado + valorOperacaoFaceCalculado,
+      valorFaceTotal,
       valorTotalOperacao: valorOperacaoFaceCalculado,
       valorColateral: valorColateralFaceCalculado,
       valorColateralEntregue,
       valorOperacaoEntregue,
       desagioColateral,
       desagioOperacao,
-      percentualFinal,
+      percentualFinal: percentualFinalCalculado,
+      percentualAlvo: percentualAlvo,
+      slack: slack * 100, // Convertendo para porcentagem
       pacientesCarteira
     });
   };
@@ -2528,21 +2537,34 @@ const Pacientes = () => {
       {/* Para Admin e Consultor Interno */}
       {(isAdmin || isConsultorInterno) && !isClinica && (
         <div className="tabs">
+          {!isCalculoCarteira && (
+            <>
+              <button
+                className={`tab ${activeTab === 'pacientes' ? 'active' : ''}`}
+                onClick={() => setActiveTab('pacientes')}
+              >
+                Pacientes
+              </button>
+              <button
+                className={`tab ${activeTab === 'novos-leads' ? 'active' : ''}`}
+                onClick={() => setActiveTab('novos-leads')}
+                style={{ position: 'relative' }}
+              >
+                Novos Leads
+                {novosLeads.length > 0 && (
+                  <span className="tab-badge">{novosLeads.length}</span>
+                )}
+              </button>
+            </>
+          )}
           <button
-            className={`tab ${activeTab === 'pacientes' ? 'active' : ''}`}
-            onClick={() => setActiveTab('pacientes')}
+            className={`tab ${activeTab === 'carteira-existente' ? 'active' : ''}`}
+            onClick={() => setActiveTab('carteira-existente')}
           >
-            Pacientes
-          </button>
-          <button
-            className={`tab ${activeTab === 'novos-leads' ? 'active' : ''}`}
-            onClick={() => setActiveTab('novos-leads')}
-            style={{ position: 'relative' }}
-          >
-            Novos Leads
-            {novosLeads.length > 0 && (
-              <span className="tab-badge">{novosLeads.length}</span>
-            )}
+            Carteira Existente
+            <span style={{ marginLeft: '0.5rem', fontSize: '0.875rem', opacity: 0.8 }}>
+              ({pacientes.filter(p => p.carteira_existente === true).length})
+            </span>
           </button>
         </div>
       )}
@@ -7456,22 +7478,51 @@ const Pacientes = () => {
                         🧪 Dados Teste
                       </button>
                       {pacientesCarteira.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={calcularCarteiraExistente}
-                          style={{
-                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                            border: 'none',
-                            color: 'white',
-                            cursor: 'pointer',
-                            padding: '0.5rem 1rem',
-                            borderRadius: '6px',
-                            fontSize: '0.875rem',
-                            fontWeight: '600'
-                          }}
-                        >
-                          Calcular Carteira
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <label style={{ fontSize: '0.875rem', color: '#374151', fontWeight: '500' }}>
+                              Percentual Alvo:
+                            </label>
+                            <input
+                              type="number"
+                              value={percentualAlvoCarteira}
+                              onChange={(e) => {
+                                const valor = parseFloat(e.target.value);
+                                if (!isNaN(valor) && valor >= 100 && valor <= 200) {
+                                  setPercentualAlvoCarteira(valor);
+                                }
+                              }}
+                              style={{
+                                width: '80px',
+                                padding: '0.5rem',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '6px',
+                                fontSize: '0.875rem',
+                                textAlign: 'center'
+                              }}
+                              min="100"
+                              max="200"
+                              step="1"
+                            />
+                            <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>%</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => calcularCarteiraExistente(percentualAlvoCarteira)}
+                            style={{
+                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              border: 'none',
+                              color: 'white',
+                              cursor: 'pointer',
+                              padding: '0.5rem 1rem',
+                              borderRadius: '6px',
+                              fontSize: '0.875rem',
+                              fontWeight: '600'
+                            }}
+                          >
+                            Calcular Carteira
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -7765,40 +7816,98 @@ const Pacientes = () => {
                         </div>
 
                         {/* Status do Colateral */}
+                        {(() => {
+                          const percentual = carteiraCalculos?.percentualFinal || 0;
+                          const alvo = carteiraCalculos?.percentualAlvo || 130;
+                          const diferenca = Math.abs(percentual - alvo);
+                          
+                          // Determinar cor baseada na proximidade do alvo
+                          let backgroundColor, borderColor, textColor, icon;
+                          
+                          if (diferenca <= 0.5) {
+                            // Muito próximo do alvo (≤ 0.5% de diferença)
+                            backgroundColor = '#f0fdf4';
+                            borderColor = '#bbf7d0';
+                            textColor = '#166534';
+                            icon = '🎯';
+                          } else if (diferenca <= 1.0) {
+                            // Próximo do alvo (≤ 1% de diferença)
+                            backgroundColor = '#fef3c7';
+                            borderColor = '#fde68a';
+                            textColor = '#92400e';
+                            icon = '✅';
+                          } else if (percentual >= alvo) {
+                            // Atende ao mínimo mas não está próximo
+                            backgroundColor = '#f0fdf4';
+                            borderColor = '#bbf7d0';
+                            textColor = '#166534';
+                            icon = '✓';
+                          } else {
+                            // Abaixo do alvo
+                            backgroundColor = '#fffbeb';
+                            borderColor = '#fed7aa';
+                            textColor = '#d97706';
+                            icon = '⚠️';
+                          }
+                          
+                          return (
+                            <div style={{ 
+                              backgroundColor, 
+                              border: `1px solid ${borderColor}`,
+                              borderRadius: '12px',
+                              padding: '1.5rem',
+                              textAlign: 'center'
+                            }}>
+                              <div style={{ 
+                                fontSize: '2rem', 
+                                fontWeight: '800', 
+                                color: textColor,
+                                marginBottom: '0.5rem'
+                              }}>
+                                {percentual.toFixed(2)}% {icon}
+                              </div>
+                              <div style={{ 
+                                fontSize: '0.875rem', 
+                                color: textColor,
+                                fontWeight: '500'
+                              }}>
+                                {diferenca <= 0.5 
+                                  ? `Perfeito! Colateral muito próximo de ${alvo}%`
+                                  : diferenca <= 1.0
+                                  ? `Ótimo! Colateral próximo de ${alvo}%`
+                                  : percentual >= alvo
+                                  ? `Colateral atende ao mínimo de ${alvo}%`
+                                  : `Colateral abaixo do alvo de ${alvo}%`
+                                }
+                              </div>
+                              <div style={{ 
+                                fontSize: '0.75rem', 
+                                color: textColor,
+                                opacity: 0.7,
+                                marginTop: '0.25rem'
+                              }}>
+                                Diferença de {diferenca.toFixed(2)}% do alvo
+                              </div>
+                              {carteiraCalculos?.slack !== undefined && (
+                                <div style={{ 
+                                  fontSize: '0.75rem', 
+                                  color: textColor,
+                                  opacity: 0.7,
+                                  marginTop: '0.1rem'
+                                }}>
+                                  Slack: {carteiraCalculos.slack.toFixed(2)}%
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                         <div style={{ 
-                          backgroundColor: (carteiraCalculos?.percentualFinal || 0) >= 130 ? '#f0fdf4' : '#fffbeb', 
-                          border: `1px solid ${(carteiraCalculos?.percentualFinal || 0) >= 130 ? '#bbf7d0' : '#fed7aa'}`,
-                          borderRadius: '12px',
-                          padding: '1.5rem',
-                          textAlign: 'center'
+                          fontSize: '0.75rem', 
+                          color: '#6b7280',
+                          marginTop: '0.25rem',
+                          fontStyle: 'italic'
                         }}>
-                          <div style={{ 
-                            fontSize: '2rem', 
-                            fontWeight: '800', 
-                            color: (carteiraCalculos?.percentualFinal || 0) >= 130 ? '#166534' : '#d97706',
-                            marginBottom: '0.5rem'
-                          }}>
-                            {(carteiraCalculos?.percentualFinal || 0).toFixed(2)}%
-                            {(carteiraCalculos?.percentualFinal || 0) >= 130 ? ' ✓' : ' ⚠️'}
-                          </div>
-                          <div style={{ 
-                            fontSize: '0.875rem', 
-                            color: (carteiraCalculos?.percentualFinal || 0) >= 130 ? '#166534' : '#d97706',
-                            fontWeight: '500'
-                          }}>
-                            {(carteiraCalculos?.percentualFinal || 0) >= 130 
-                              ? 'Colateral atende ao mínimo de 130% (garantia)' 
-                              : 'Colateral abaixo do mínimo de 130% (garantia)'
-                            }
-                          </div>
-                          <div style={{ 
-                            fontSize: '0.75rem', 
-                            color: '#6b7280',
-                            marginTop: '0.25rem',
-                            fontStyle: 'italic'
-                          }}>
-                            Operação = antecipação principal | Colateral = garantia mínima
-                          </div>
+                          Operação = antecipação principal | Colateral = garantia mínima
                         </div>
                       </div>
 
