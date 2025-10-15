@@ -143,18 +143,18 @@ const Indicacoes = () => {
   const mensagensClinicas = [
     {
       id: 1,
-      titulo: 'Receba à Vista - Paciente Paga Parcelado',
-      texto: `Prezado(a) proprietário(a) de clínica,\n\nApresentamos uma proposta comercial que pode aumentar significativamente seu faturamento.\n\nComo funciona:\n• Paciente faz tratamento de R$ 5.000\n• Ele parcela em 10x no boleto\n• Você recebe os R$ 5.000 à vista\n• Nós cuidamos da cobrança\n\nVantagens para sua clínica:\n• Eliminação do risco de inadimplência\n• Fluxo de caixa garantido\n• Aumento no número de pacientes\n• Pacientes pré-aprovados para tratamento\n• Sem taxas de cartão de crédito\n\nNossos números:\n• 85% de aprovação dos pacientes\n• Ticket médio: R$ 3.500\n• 15-20 novos pacientes por mês\n• Pagamento em D+1 útil\n\nTrabalhamos com mais de 200 clínicas parceiras em todo o Brasil.\n\nEntre em contato para conhecer nossa proposta:`
+      titulo: 'Gestão de Boletos - Sem Taxas',
+      texto: `Prezado(a) proprietário(a),\n\nOferecemos gestão completa de boletos bancários para clínicas estéticas e odontológicas.\n\nNossa proposta:\n• Gestão total de boletos bancários\n• Cobrança automatizada e eficiente\n• Zero taxa de mensalidade\n• Zero taxa de adesão\n• Zero taxa de setup\n\nComo funciona:\n• Pacientes parcelam no boleto (até 36x)\n• Nós gerenciamos toda emissão\n• Nós executamos toda cobrança\n• Nós acompanhamos os pagamentos\n• Nós trazemos mais pacientes para sua clínica\n\nSem burocracias, sem custos ocultos.\n\nInteressado em nossa parceria?`
     },
     {
       id: 2,
-      titulo: 'Solução para Agenda e Inadimplência',
-      texto: `Prezada clínica,\n\nIdentificamos que muitas clínicas enfrentam os seguintes desafios:\n• Agenda com baixa ocupação\n• Alto índice de inadimplência\n• Pacientes que desistem por falta de crédito\n• Fluxo de caixa irregular\n\nNossa solução:\n\n1. Enviamos pacientes pré-aprovados\n2. Você atende e fecha o tratamento\n3. Recebe o valor à vista em 24h\n4. Nós gerenciamos a cobrança\n\nBenefícios comprovados:\n• Aumento médio de 35% no faturamento\n• Zero inadimplência para a clínica\n• Pacientes que realmente realizam o tratamento\n• Gestão completa da cobrança\n• Sistema legal e transparente\n\nExemplo de resultado:\nClínica parceira - Odontologia\nAntes: 40 pacientes/mês\nDepois: 95 pacientes/mês\nAumento no faturamento: R$ 65.000/mês\n\nVagas limitadas por região. Entre em contato:`
+      titulo: 'Aumente seu Faturamento',
+      texto: `Clínica parceira,\n\nVocê está perdendo vendas por falta de opções de pagamento?\n\nNossa solução:\n• Pacientes pagam no boleto (sem cartão)\n• Cobrança bancária automatizada\n• Controle total dos pagamentos\n• Relatórios financeiros detalhados\n• Suporte técnico dedicado\n\nSem custos:\n• Sem taxa mensal\n• Sem taxa de adesão\n• Sem taxa de setup\n• Sem taxa de manutenção\n\nResultados comprovados:\n• +40% no faturamento médio\n• +25 novos pacientes/mês\n• 0% inadimplência para você\n• Mais pacientes para sua clínica\n\nQuer aumentar suas vendas sem risco?`
     },
     {
       id: 3,
-      titulo: 'Antecipação de Boletos - Aumento de Faturamento',
-      texto: `Prezado(a) proprietário(a),\n\nPara clínicas que desejam:\n• Aumentar o número de pacientes\n• Receber sempre à vista\n• Eliminar inadimplência\n• Melhorar a ocupação da agenda\n\nO problema: 60% dos pacientes não possuem cartão com limite suficiente.\nNossa solução: Antecipamos o pagamento via boleto.\n\nComo funciona:\n• Paciente sem cartão/dinheiro\n• Quer fazer tratamento de R$ 8.000\n• Parcela em 12x no boleto\n• Você recebe R$ 8.000 à vista\n• Nós gerenciamos a cobrança\n\nDiferenciais:\n• Aprovação em até 24h\n• Pagamento em D+1\n• Taxa menor que cartão de crédito\n• Atendimento a todas as classes sociais\n• Suporte completo\n\nMédia das nossas clínicas parceiras:\n• 20 novos pacientes por mês\n• Ticket médio: R$ 3.800\n• Taxa de conversão: 88%\n\nEntre em contato para mais informações:`
+      titulo: 'Gestão Financeira Completa',
+      texto: `Prezado(a) proprietário(a),\n\nTrabalhamos exclusivamente com clínicas estéticas e odontológicas há mais de 3 anos.\n\nNossa especialidade:\n• Gestão completa de boletos bancários\n• Emissão e controle automatizado\n• Cobrança bancária eficiente\n• Aprovação em 24 horas\n• Pagamento D+1\n\nNossa proposta:\n• Zero taxa de mensalidade\n• Zero taxa de adesão\n• Zero custos ocultos\n• Zero burocracias\n\nComo funciona:\n1. Paciente faz tratamento\n2. Parcela no boleto\n3. Nós cuidamos da cobrança\n4. Você recebe sem inadimplência\n5. Nós trazemos mais pacientes para sua clínica\n\nInteressado em uma parceria de sucesso?`
     }
   ];
 
