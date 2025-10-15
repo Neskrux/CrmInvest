@@ -53,28 +53,28 @@ const ComoFazer = () => {
       resposta: "Sim. Dentro da plataforma Solumn, vá em 'Meu Perfil' e atualize suas informações sempre que precisar — como telefone, e-mail ou chave PIX."
     },
     {
-      pergunta: "O que é a Investmoney e o que ela faz?",
-      resposta: "A Investmoney é uma empresa que ajuda clínicas a receberem à vista o que os pacientes pagam parcelado. Ela antecipa o dinheiro pra clínica e depois recebe os boletos aos poucos. Assim, a clínica tem dinheiro agora e o paciente pode pagar tranquilo."
+      pergunta: "O que é a IM e o que ela faz?",
+      resposta: "A IM é uma empresa que ajuda clínicas a receberem à vista o que os pacientes pagam parcelado. Ela antecipa o dinheiro pra clínica e depois recebe os boletos aos poucos. Assim, a clínica tem dinheiro agora e o paciente pode pagar tranquilo."
     },
     {
-      pergunta: "O que significa ser um Freelancer Investmoney?",
+      pergunta: "O que significa ser um Freelancer IM?",
       resposta: "É fazer parte da rede que indica clínicas e pacientes pra esse sistema. Você ajuda a conectar quem precisa parcelar com quem oferece o tratamento — e ganha por cada indicação que dá certo."
     },
     {
       pergunta: "Como funciona o sistema de parcelamento no boleto?",
-      resposta: "O paciente escolhe pagar em boletos, a clínica faz o tratamento e recebe tudo antes. Depois, a Investmoney cuida de receber os boletos mês a mês. É simples, sem cartão e sem taxas altas."
+      resposta: "O paciente escolhe pagar em boletos, a clínica faz o tratamento e recebe tudo antes. Depois, a IM cuida de receber os boletos mês a mês. É simples, sem cartão e sem taxas altas."
     },
     {
       pergunta: "É seguro participar?",
-      resposta: "Sim! A Investmoney é uma empresa real, com contratos e processos 100% digitais e rastreáveis. Todo pagamento e comissão acontece de forma segura e registrada."
+      resposta: "Sim! A IM é uma empresa real, com contratos e processos 100% digitais e rastreáveis. Todo pagamento e comissão acontece de forma segura e registrada."
     },
     {
       pergunta: "Meus dados e indicações ficam protegidos?",
       resposta: "Sim. Seus dados são usados só pra validar e pagar suas indicações. Tudo segue as regras da LGPD, a lei que protege informações pessoais no Brasil."
     },
     {
-      pergunta: "A Investmoney é uma empresa registrada?",
-      resposta: "Sim. A Investmoney Securitizadora S.A. é uma empresa registrada com CNPJ e sede oficial no Brasil, e atua dentro das normas do mercado financeiro."
+      pergunta: "A IM é uma empresa registrada?",
+      resposta: "Sim. A IM é uma empresa registrada com CNPJ e sede oficial no Brasil, e atua dentro das normas do mercado financeiro."
     }
   ];
 
@@ -124,10 +124,10 @@ const ComoFazer = () => {
                 <h3>Identifique Clínicas e as indique</h3>
                 <p>
                   Procure por clínicas odontológicas ou estéticas que possam ter interesse 
-                  em receber o valor à vista dos tratamentos. Crie ela diretamente pelo formulário ou compartilhe a mensagem completa com o link para que ela possa se cadastrar.
+                  em ter uma gestão completa de boletos e cobranças e sem taxa de adesão ou mensalidade. Compartilhe a mensagem completa com o link para que ela possa se cadastrar.
                 </p>
                 <div className="instruction-tip">
-                  <span>Dica: Clínicas que aceitam parcelamento ou querem melhorar o fluxo de caixa são ótimas candidatas. Apresente os benefícios: receber à vista sem burocracia!</span>
+                  <span>Dica: Clínicas que trabalham com o sistema de boleto são ótimas candidatas. Apresente os benefícios: gestão completa de boletos e cobranças e sem taxa de adesão ou mensalidade!</span>
                 </div>
               </div>
             </div>
@@ -151,7 +151,7 @@ const ComoFazer = () => {
               <div className="instruction-content">
                 <h3>Ganhe R$ 100,00 por Clínica</h3>
                 <p>
-                  Assim que a clínica for aprovada e começar a operar com a Investmoney, 
+                  Assim que a clínica for aprovada e começar a operar com a IM, 
                   você receberá <strong>R$ 100,00</strong> via PIX. Simples assim!
                 </p>
                 <div className="instruction-tip success">
@@ -258,7 +258,7 @@ const ComoFazer = () => {
               <div className="pos-venda-number">1</div>
               <h3>Você indica</h3>
               <p>
-                Coloque os dados da clínica ou do paciente no formulário e envie.
+                Envie sua mensagem completa com o link para que a clínica ou paciente possam se cadastrar.
               </p>
               <div className="pos-venda-destaque">
                 Pronto. Sua parte termina aqui.
@@ -269,7 +269,7 @@ const ComoFazer = () => {
               <div className="pos-venda-number">2</div>
               <h3>Nossa equipe entra em ação</h3>
               <p>
-                A equipe da Investmoney recebe sua indicação e entra em contato direto com a clínica ou o paciente.
+                A equipe da IM recebe sua indicação e entra em contato direto com a clínica ou o paciente.
               </p>
               <div className="pos-venda-destaque">
                 Você não precisa fazer ligações nem negociar.

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import TutorialPacientes from './TutorialPacientes';
@@ -6,6 +7,7 @@ import ModalEvidencia from './ModalEvidencia';
 
 const Pacientes = () => {
   const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isFreelancer, isClinica, deveFiltrarPorClinica } = useAuth();
+  const navigate = useNavigate();
   // Verificar se usuário é consultor
   const isConsultor = user?.tipo === 'consultor';
   const [pacientes, setPacientes] = useState([]);
@@ -1580,30 +1582,7 @@ const Pacientes = () => {
       const pacienteCriado = await pacienteResponse.json();
       console.log('Paciente criado:', pacienteCriado);
       
-      // 2. Criar o agendamento com valores padrão
-      const hoje = new Date().toISOString().split('T')[0];
-      const agendamentoData = {
-        paciente_id: pacienteCriado.id,
-        consultor_id: pacienteCriado.consultor_id || null,
-        clinica_id: parseInt(clinicaId),
-        data_agendamento: hoje, // Data de hoje
-        horario: '09:00', // Horário padrão
-        status: 'compareceu',
-        observacoes: 'Agendamento criado automaticamente pelo cadastro da clínica'
-      };
-      
-      const agendamentoResponse = await makeRequest('/agendamentos', {
-        method: 'POST',
-        body: JSON.stringify(agendamentoData)
-      });
-      
-      if (!agendamentoResponse.ok) {
-        const errorData = await agendamentoResponse.json();
-        console.error('Erro ao criar agendamento:', errorData);
-        // Não parar o processo por causa do agendamento
-      }
-      
-      // 3. Criar o fechamento com contrato
+      // 2. Criar o fechamento com contrato (sem agendamento automático)
       const fechamentoFormData = new FormData();
       fechamentoFormData.append('paciente_id', pacienteCriado.id);
       fechamentoFormData.append('consultor_id', pacienteCriado.consultor_id || '');
@@ -2251,9 +2230,17 @@ const Pacientes = () => {
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 className="card-title">Lista de Pacientes</h2>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button 
+              <button
                 className="btn btn-primary" 
                 onClick={() => {
+                  if (isFreelancer) {
+                    navigate('/indicacoes');
+                    // Scroll para o topo da página após navegação
+                    setTimeout(() => {
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }, 100);
+                    return;
+                  }
                   setShowModal(true);
                   // Se for consultor, pré-preenche o consultor_id automaticamente
                   if (isConsultor) {
@@ -2463,9 +2450,9 @@ const Pacientes = () => {
                   </tbody>
                   </table>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', padding: '0.5rem' }}>
                   <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
-                    Página {currentPage} de {totalPages} — exibindo {pacientesPaginados.length} de {pacientesFiltrados.length}
+                    Página {currentPage} de {totalPages}
                   </div>
                   <div style={{ display: window.innerWidth <= 768 ? 'flex' : 'block' }}>
                     <button
@@ -2950,7 +2937,7 @@ const Pacientes = () => {
                           <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
                           <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Valor</th>
                           <th>Status</th>
-                          <th>Documentação</th>
+                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Documentação</th>
                           <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Data</th>
                           <th style={{ width: '80px' }}>Ações</th>
                         </tr>
@@ -3027,7 +3014,7 @@ const Pacientes = () => {
                                     {statusInfo.label}
                                   </span>
                                 </td>
-                              <td>
+                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center' }}>
                                   <div style={{ 
                                     display: 'flex', 
@@ -3115,22 +3102,25 @@ const Pacientes = () => {
                                 {fechamentoPaciente?.data_fechamento ? formatarData(fechamentoPaciente.data_fechamento) : formatarData(paciente.created_at)}
                               </td>
                               <td>
-                                <button
-                                  className="btn-action"
-                                  onClick={() => handleView(paciente)}
-                                  title="Visualizar informações do paciente"
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '0.25rem'
-                                  }}
-                                >
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                                    <circle cx="12" cy="12" r="3" />
-                                  </svg>
-                                </button>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center' }}>
+                                  {/* Botão de visualizar - sempre visível */}
+                                  <button
+                                    className="btn-action"
+                                    onClick={() => handleView(paciente)}
+                                    title="Visualizar informações do paciente"
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: '0.25rem'
+                                    }}
+                                  >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                      <circle cx="12" cy="12" r="3" />
+                                    </svg>
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                               );
@@ -6001,7 +5991,13 @@ const Pacientes = () => {
       {/* Modal de Cadastro Completo para Clínicas */}
       {showCadastroCompletoModal && isClinica && (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: '1200px', maxHeight: '95vh', overflow: 'auto' }}>
+          <div className="modal" style={{ 
+            maxWidth: window.innerWidth <= 768 ? '95vw' : '1000px', 
+            width: window.innerWidth <= 768 ? '95vw' : 'auto',
+            maxHeight: '95vh', 
+            overflow: 'auto',
+            margin: window.innerWidth <= 768 ? '10px' : 'auto'
+          }}>
             <div className="modal-header">
               <h2 className="modal-title">Cadastrar Paciente</h2>
               <button className="close-btn" onClick={resetCadastroCompleto}>×</button>
@@ -6032,8 +6028,14 @@ const Pacientes = () => {
                   Dados do Paciente
                 </h3>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
-                  <div style={{ gridColumn: 'span 2' }}>
+                <div style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '1.5rem',
+                  maxWidth: '600px',
+                  margin: '0 auto'
+                }}>
+                  <div>
                     <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
                       Nome Completo *
                     </label>
@@ -6232,7 +6234,7 @@ const Pacientes = () => {
                     </select>
                   </div>
 
-                  <div style={{ gridColumn: 'span 2' }}>
+                  <div>
                     <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
                       Observações sobre o Paciente
                     </label>
@@ -6280,7 +6282,13 @@ const Pacientes = () => {
                   Dados do Fechamento
                 </h3>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
+                <div style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '1.5rem',
+                  maxWidth: '600px',
+                  margin: '0 auto'
+                }}>
                   <div>
                     <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
                       Valor do Fechamento *
@@ -6324,7 +6332,7 @@ const Pacientes = () => {
                     />
                   </div>
 
-                  <div style={{ gridColumn: 'span 2' }}>
+                  <div>
                     <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
                       Contrato (PDF) *
                     </label>
@@ -6361,7 +6369,7 @@ const Pacientes = () => {
                     )}
                   </div>
 
-                  <div style={{ gridColumn: 'span 2' }}>
+                  <div>
                     <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
                       Observações do Fechamento
                     </label>
@@ -6411,7 +6419,13 @@ const Pacientes = () => {
                   Informações de Parcelamento
                 </h3>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
+                <div style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '1.5rem',
+                  maxWidth: '600px',
+                  margin: '0 auto'
+                }}>
                   <div>
                     <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
                       Valor da Parcela *
@@ -6506,10 +6520,14 @@ const Pacientes = () => {
               {/* Botões de Ação */}
               <div style={{ 
                 display: 'flex', 
-                justifyContent: 'space-between', 
+                flexDirection: window.innerWidth <= 768 ? 'column' : 'row',
+                justifyContent: 'center',
+                alignItems: 'center',
                 gap: '1rem',
                 borderTop: '1px solid #e5e7eb',
-                paddingTop: '1.5rem'
+                paddingTop: '1.5rem',
+                maxWidth: '600px',
+                margin: '0 auto'
               }}>
                 <button
                   type="button"
@@ -6524,7 +6542,8 @@ const Pacientes = () => {
                     fontSize: '1rem',
                     fontWeight: '600',
                     cursor: salvandoCadastroCompleto ? 'not-allowed' : 'pointer',
-                    opacity: salvandoCadastroCompleto ? 0.6 : 1
+                    opacity: salvandoCadastroCompleto ? 0.6 : 1,
+                    minWidth: window.innerWidth <= 768 ? '100%' : '120px'
                   }}
                 >
                   Cancelar
@@ -6547,7 +6566,9 @@ const Pacientes = () => {
                     cursor: salvandoCadastroCompleto ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.5rem'
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    minWidth: window.innerWidth <= 768 ? '100%' : '180px'
                   }}
                 >
                   {salvandoCadastroCompleto ? (

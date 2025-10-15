@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import TutorialClinicas from './TutorialClinicas';
@@ -10,6 +11,7 @@ import config from '../config';
 const Clinicas = () => {
   const { makeRequest, user, isAdmin, podeAlterarStatus, isFreelancer, isConsultorInterno, isClinica } = useAuth();
   const { showSuccessToast, showErrorToast, showWarningToast } = useToast();
+  const navigate = useNavigate();
   const [clinicas, setClinicas] = useState([]);
   const [novasClinicas, setNovasClinicas] = useState([]);
   const [clinicasEmAnalise, setClinicasEmAnalise] = useState([]);
@@ -2589,7 +2591,17 @@ const Clinicas = () => {
                 {isConsultor && !isConsultorInterno && (
                   <button 
                     className="btn btn-primary"
-                    onClick={() => setShowNovaClinicaModal(true)}
+                    onClick={() => {
+                      if (isFreelancer) {
+                        navigate('/indicacoes');
+                        // Scroll para o topo da página após navegação
+                        setTimeout(() => {
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }, 100);
+                        return;
+                      }
+                      setShowNovaClinicaModal(true);
+                    }}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                   >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -2974,15 +2986,18 @@ const Clinicas = () => {
               <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                 {novasClinicas.length} clínica(s) disponível(eis)
               </div>
-              <button 
-                className="btn btn-primary"
-                onClick={() => setShowNovaClinicaModal(true)}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-                {user?.tipo === 'empresa' ? 'Indicar Nova Clínica' : 'Cadastrar Nova Clínica'}
-              </button>
+              {/* Botão oculto para freelancers na aba minhas indicações */}
+              {!isFreelancer && (
+                <button 
+                  className="btn btn-primary"
+                  onClick={() => setShowNovaClinicaModal(true)}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  {user?.tipo === 'empresa' ? 'Indicar Nova Clínica' : 'Cadastrar Nova Clínica'}
+                </button>
+              )}
             </div>
           </div>
 
@@ -3041,7 +3056,7 @@ const Clinicas = () => {
                       )}
                     </th>
                     <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Cadastrado</th>
-                    <th style={{ width: '220px' }}>Ações</th>
+                    <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3186,25 +3201,174 @@ const Clinicas = () => {
               Nenhuma clínica em análise no momento.
             </div>
           ) : (
-            <div className="table-container">
-              <table className="table">
+            <div className="table-container" style={{ 
+              overflowX: 'auto',
+              borderRadius: '12px',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+              border: '1px solid #e5e7eb'
+            }}>
+              <table className="table" style={{ 
+                width: '100%',
+                borderCollapse: 'separate',
+                borderSpacing: 0,
+                backgroundColor: 'white'
+              }}>
                 <thead>
-                  <tr>
-                    <th style={{ textAlign: isFreelancer ? 'left' : 'left', width: isFreelancer ? '25%' : 'auto' }}>Nome</th>
-                    <th style={{ display: isMobile ? 'none' : 'table-cell', textAlign: 'center', width: isFreelancer ? '12%' : '100px', maxWidth: '100px' }}>Nicho</th>
-                    {!isMobile && <th style={{ textAlign: 'center', width: isFreelancer ? '15%' : 'auto' }}>Cidade/Estado</th>}
-                    {isFreelancer && !isMobile && <th style={{ textAlign: 'center', width: '15%' }}>Telefone</th>}
-                    {!isFreelancer && <th>Status</th>}
-                    {(isAdmin || isConsultorInterno) && (
-                      <>
-                        <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Documentação</th>
-                        <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Vídeo Validação</th>
-                      </>
-                    )}
-                    <th style={{ display: isMobile ? 'none' : 'table-cell', textAlign: 'center', width: isFreelancer ? '13%' : 'auto' }}>Cadastrado</th>
-                    {!isFreelancer && <th style={{ width: '280px' }}>Ações</th>}
-                    {isFreelancer && <th style={{ textAlign: 'center', width: '20%' }}>Status</th>}
-                  </tr>
+                  {(isFreelancer && !isAdmin && !isConsultorInterno) ? (
+                    // Layout específico para freelancers (compacto)
+                    <tr style={{ backgroundColor: '#f8fafc' }}>
+                      <th style={{ 
+                        textAlign: 'left', 
+                        width: '25%',
+                        padding: '1rem 1.5rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        borderBottom: '2px solid #e5e7eb',
+                        fontSize: '0.875rem',
+                        letterSpacing: '0.025em'
+                      }}>Nome</th>
+                      <th style={{ 
+                        display: isMobile ? 'none' : 'table-cell', 
+                        textAlign: 'center', 
+                        width: '12%',
+                        padding: '1rem 1.5rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        borderBottom: '2px solid #e5e7eb',
+                        fontSize: '0.875rem',
+                        letterSpacing: '0.025em'
+                      }}>Nicho</th>
+                      {!isMobile && <th style={{ 
+                        textAlign: 'center', 
+                        width: '15%',
+                        padding: '1rem 1.5rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        borderBottom: '2px solid #e5e7eb',
+                        fontSize: '0.875rem',
+                        letterSpacing: '0.025em'
+                      }}>Cidade/Estado</th>}
+                      {!isMobile && <th style={{ 
+                        textAlign: 'center', 
+                        width: '15%',
+                        padding: '1rem 1.5rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        borderBottom: '2px solid #e5e7eb',
+                        fontSize: '0.875rem',
+                        letterSpacing: '0.025em'
+                      }}>Telefone</th>}
+                      <th style={{ 
+                        display: isMobile ? 'none' : 'table-cell', 
+                        textAlign: 'center', 
+                        width: '13%',
+                        padding: '1rem 1.5rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        borderBottom: '2px solid #e5e7eb',
+                        fontSize: '0.875rem',
+                        letterSpacing: '0.025em'
+                      }}>Cadastrado</th>
+                      <th style={{ 
+                        textAlign: 'center', 
+                        width: '20%',
+                        padding: '1rem 1.5rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        borderBottom: '2px solid #e5e7eb',
+                        fontSize: '0.875rem',
+                        letterSpacing: '0.025em'
+                      }}>Status</th>
+                    </tr>
+                  ) : (
+                    // Layout específico para admins e consultores internos (completo)
+                    <tr style={{ backgroundColor: '#f8fafc' }}>
+                      <th style={{
+                        padding: '1rem 1.5rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        borderBottom: '2px solid #e5e7eb',
+                        fontSize: '0.875rem',
+                        letterSpacing: '0.025em',
+                        textAlign: 'left',
+                        minWidth: '180px'
+                      }}>Nome</th>
+                      <th style={{ 
+                        display: isMobile ? 'none' : 'table-cell', 
+                        textAlign: 'center',
+                        padding: '1rem 1.5rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        borderBottom: '2px solid #e5e7eb',
+                        fontSize: '0.875rem',
+                        letterSpacing: '0.025em',
+                        minWidth: '120px'
+                      }}>Nicho</th>
+                      {!isMobile && <th style={{ 
+                        textAlign: 'center',
+                        padding: '1rem 1.5rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        borderBottom: '2px solid #e5e7eb',
+                        fontSize: '0.875rem',
+                        letterSpacing: '0.025em',
+                        minWidth: '150px'
+                      }}>Localização</th>}
+                      <th style={{
+                        padding: '1rem 1.5rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        borderBottom: '2px solid #e5e7eb',
+                        fontSize: '0.875rem',
+                        letterSpacing: '0.025em',
+                        textAlign: 'center',
+                        minWidth: '140px'
+                      }}>Status</th>
+                      <th style={{ 
+                        display: isMobile ? 'none' : 'table-cell',
+                        padding: '1rem 1.5rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        borderBottom: '2px solid #e5e7eb',
+                        fontSize: '0.875rem',
+                        letterSpacing: '0.025em',
+                        textAlign: 'center',
+                        minWidth: '160px'
+                      }}>Documentação</th>
+                      <th style={{ 
+                        display: isMobile ? 'none' : 'table-cell',
+                        padding: '1rem 1.5rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        borderBottom: '2px solid #e5e7eb',
+                        fontSize: '0.875rem',
+                        letterSpacing: '0.025em',
+                        textAlign: 'center',
+                        minWidth: '140px'
+                      }}>Vídeo</th>
+                      <th style={{ 
+                        display: isMobile ? 'none' : 'table-cell', 
+                        textAlign: 'center',
+                        padding: '1rem 1.5rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        borderBottom: '2px solid #e5e7eb',
+                        fontSize: '0.875rem',
+                        letterSpacing: '0.025em',
+                        minWidth: '120px'
+                      }}>Cadastrado</th>
+                      <th style={{
+                        padding: '1rem 1.5rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        borderBottom: '2px solid #e5e7eb',
+                        fontSize: '0.875rem',
+                        letterSpacing: '0.025em',
+                        textAlign: 'center',
+                        minWidth: '200px'
+                      }}>Ações</th>
+                    </tr>
+                  )}
                 </thead>
                 <tbody>
                   {clinicasEmAnalise.map(clinica => {
@@ -3240,294 +3404,572 @@ const Clinicas = () => {
                       clinica.doc_carteirinha_cro_aprovado
                     ].filter(v => v === true).length;
                     
-                    return (
-                      <tr key={clinica.id}>
-                        <td style={{ padding: isFreelancer ? '0.75rem' : '0.75rem' }}>
-                          <strong style={{ fontSize: '0.9rem' }}>{clinica.nome}</strong>
+                    return (isFreelancer && !isAdmin && !isConsultorInterno) ? (
+                      // Layout compacto para freelancers
+                      <tr key={clinica.id} style={{
+                        borderBottom: '1px solid #f1f5f9',
+                        transition: 'all 0.2s ease',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                        <td style={{
+                          padding: '1rem 1.5rem',
+                          verticalAlign: 'middle'
+                        }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                            <strong style={{ fontSize: '0.95rem', color: '#1f2937', fontWeight: '600' }}>
+                              {clinica.nome}
+                            </strong>
+                            {clinica.responsavel && (
+                              <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                                {clinica.responsavel}
+                              </span>
+                            )}
+                          </div>
                         </td>
-                        <td style={{ display: isMobile ? 'none' : 'table-cell', textAlign: 'center', padding: '0.75rem' }}>
+                        <td style={{ 
+                          display: isMobile ? 'none' : 'table-cell', 
+                          textAlign: 'center',
+                          padding: '1rem 1.5rem',
+                          verticalAlign: 'middle'
+                        }}>
                           {clinica.nicho ? (
                             <span className="badge" style={{ 
-                              backgroundColor: '#e5e7eb', 
-                              color: '#374151',
+                              backgroundColor: '#dbeafe', 
+                              color: '#1e40af',
                               fontSize: '0.75rem',
-                              padding: '0.25rem 0.5rem',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              display: 'inline-block',
-                              maxWidth: '100%'
+                              padding: '0.375rem 0.75rem',
+                              borderRadius: '6px',
+                              fontWeight: '500'
                             }}>
                               {clinica.nicho}
                             </span>
-                          ) : '-'}
+                          ) : (
+                            <span style={{ color: '#9ca3af', fontSize: '0.875rem' }}>-</span>
+                          )}
                         </td>
                         {!isMobile && (
-                          <td style={{ textAlign: 'center', padding: '0.75rem' }}>
+                          <td style={{ 
+                            textAlign: 'center',
+                            padding: '1rem 1.5rem',
+                            verticalAlign: 'middle'
+                          }}>
                             {clinica.cidade && clinica.estado ? (
-                              <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                              <span style={{ fontSize: '0.875rem', color: '#4b5563', fontWeight: '500' }}>
                                 {clinica.cidade}/{clinica.estado}
                               </span>
-                            ) : '-'}
+                            ) : (
+                              <span style={{ color: '#9ca3af', fontSize: '0.875rem' }}>-</span>
+                            )}
                           </td>
                         )}
-                        {isFreelancer && !isMobile && (
-                          <td style={{ textAlign: 'center', padding: '0.75rem' }}>
+                        {!isMobile && (
+                          <td style={{ 
+                            textAlign: 'center',
+                            padding: '1rem 1.5rem',
+                            verticalAlign: 'middle'
+                          }}>
                             {clinica.telefone ? (
-                              <span style={{ fontSize: '0.8rem', color: '#374151', fontWeight: '500' }}>
-                                {clinica.telefone}
+                              <span style={{ fontSize: '0.875rem', color: '#374151', fontWeight: '500' }}>
+                                {formatarTelefone(clinica.telefone)}
                               </span>
-                            ) : '-'}
-                          </td>
-                        )}
-                        {!isFreelancer && (
-                          <td>
-                            {isAdmin ? (
-                              <select
-                                value={clinica.status}
-                                onChange={async (e) => {
-                                  const novoStatus = e.target.value;
-                                  
-                                  try {
-                                    const response = await makeRequest(`/clinicas/${clinica.id}`, {
-                                      method: 'PUT',
-                                      body: JSON.stringify({
-                                        ...clinica,
-                                        status: novoStatus,
-                                        em_analise: novoStatus !== 'ativa' // Remove de análise se status = ativa
-                                      })
-                                    });
-                                    
-                                    if (response.ok) {
-                                      showSuccessToast('Status atualizado com sucesso!');
-                                      fetchClinicasEmAnalise();
-                                      fetchClinicas(); // Atualizar clínicas gerais também
-                                    } else {
-                                      const data = await response.json();
-                                      showErrorToast('Erro ao alterar status: ' + data.error);
-                                    }
-                                  } catch (error) {
-                                    console.error('Erro ao alterar status:', error);
-                                    showErrorToast('Erro ao alterar status da clínica');
-                                  }
-                                }}
-                                className="form-select"
-                                style={{
-                                  fontSize: '0.75rem',
-                                  padding: '0.25rem 0.5rem',
-                                  border: 'none',
-                                  backgroundColor: statusInfo.color + '20',
-                                  color: statusInfo.color,
-                                  fontWeight: '600',
-                                  borderRadius: '0.375rem'
-                                }}
-                              >
-                                {statusAnaliseOptions.map(option => (
-                                  <option key={option.value} value={option.value}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
                             ) : (
-                              <span 
-                                className="badge"
-                                style={{
-                                  backgroundColor: statusInfo.color + '20',
-                                  color: statusInfo.color,
-                                  fontWeight: '600',
-                                  borderRadius: '0.375rem'
-                                }}
-                              >
-                                {statusInfo.label}
-                              </span>
+                              <span style={{ color: '#9ca3af', fontSize: '0.875rem' }}>-</span>
                             )}
                           </td>
                         )}
-                        {(isAdmin || isConsultorInterno) && (
-                          <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                              <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                                {docsEnviados}/{totalDocs} enviados
-                              </div>
-                              <div style={{ 
-                                width: '100px', 
-                                height: '6px', 
-                                backgroundColor: '#e5e7eb',
-                                borderRadius: '3px',
-                                overflow: 'hidden'
-                              }}>
-                                <div style={{ 
-                                  width: `${(docsEnviados / totalDocs) * 100}%`,
-                                  height: '100%',
-                                  backgroundColor: docsAprovados === totalDocs ? '#10b981' : '#3b82f6',
-                                  transition: 'width 0.3s ease'
-                                }} />
-                              </div>
-                              {docsAprovados > 0 && (
-                                <div style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: '600' }}>
-                                  {docsAprovados} aprovados
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        )}
-                        {(isAdmin || isConsultorInterno) && (
-                          <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
-                            {clinica.video_validacao_url ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center' }}>
-                                <span style={{ 
-                                  fontSize: '0.75rem', 
-                                  color: '#10b981', 
-                                  fontWeight: '600',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.25rem'
-                                }}>
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <circle cx="12" cy="12" r="10"/>
-                                    <polyline points="10 8 16 12 10 16"/>
-                                  </svg>
-                                  Enviado
-                                </span>
-                                <button
-                                  onClick={() => window.open(`http://localhost:5000/api/documents/download/${clinica.id}/video_validacao`, '_blank')}
-                                  className="btn btn-sm btn-secondary"
-                                  style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
-                                >
-                                  Assistir
-                                </button>
-                              </div>
-                            ) : (
-                              <label 
-                                className="btn btn-sm btn-primary" 
-                                style={{ fontSize: '0.7rem', padding: '0.3rem 0.5rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                              >
-                                <input
-                                  type="file"
-                                  style={{ display: 'none' }}
-                                  accept="video/mp4,video/avi,video/mov,video/wmv,video/webm,video/mkv"
-                                  onChange={async (e) => {
-                                    const file = e.target.files[0];
-                                    if (!file) return;
-                                    
-                                    if (file.size > 250 * 1024 * 1024) {
-                                      showErrorToast('Vídeo muito grande! Máximo 250MB');
-                                      return;
-                                    }
-                                    
-                                    setUploadingDocs(prev => ({ ...prev, [`video_validacao_${clinica.id}`]: true }));
-                                    
-                                    const formData = new FormData();
-                                    formData.append('document', file);
-                                    
-                                    try {
-                                      const response = await fetch(`http://localhost:5000/api/documents/upload/${clinica.id}/video_validacao`, {
-                                        method: 'POST',
-                                        headers: {
-                                          'Authorization': `Bearer ${localStorage.getItem('token')}`
-                                        },
-                                        body: formData
-                                      });
-                                      
-                                      if (response.ok) {
-                                        showSuccessToast('Vídeo enviado com sucesso!');
-                                        fetchClinicasEmAnalise();
-                                      } else {
-                                        const error = await response.json();
-                                        showErrorToast(error.error || 'Erro ao enviar vídeo');
-                                      }
-                                    } catch (error) {
-                                      console.error('Erro ao fazer upload:', error);
-                                      showErrorToast('Erro ao enviar vídeo');
-                                    } finally {
-                                      setUploadingDocs(prev => ({ ...prev, [`video_validacao_${clinica.id}`]: false }));
-                                    }
-                                  }}
-                                />
-                                {uploadingDocs[`video_validacao_${clinica.id}`] ? 'Enviando...' : 'Enviar Vídeo'}
-                              </label>
-                            )}
-                          </td>
-                        )}
-                        <td style={{ display: isMobile ? 'none' : 'table-cell', textAlign: 'center', padding: '0.75rem' }}>
+                        <td style={{ 
+                          display: isMobile ? 'none' : 'table-cell', 
+                          textAlign: 'center',
+                          padding: '1rem 1.5rem',
+                          verticalAlign: 'middle'
+                        }}>
                           <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
                             {formatarData(clinica.created_at)}
                           </span>
                         </td>
-                        {!isFreelancer && (
-                          <td>
+                        <td style={{ 
+                          textAlign: 'center',
+                          padding: '1rem 1.5rem',
+                          verticalAlign: 'middle'
+                        }}>
+                          <span 
+                            className="badge"
+                            style={{
+                              backgroundColor: statusInfo.color + '15',
+                              color: statusInfo.color,
+                              fontWeight: '600', 
+                              borderRadius: '8px',
+                              padding: '0.5rem 1rem',
+                              fontSize: '0.8rem',
+                              display: 'inline-block',
+                              border: `1px solid ${statusInfo.color}30`
+                            }}
+                          >
+                            {statusInfo.label}
+                          </span>
+                        </td>
+                      </tr>
+                    ) : (
+                      // Layout completo para admins e consultores internos
+                      <tr key={clinica.id} style={{
+                        borderBottom: '1px solid #f1f5f9',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                        <td style={{
+                          padding: '1rem 1.5rem',
+                          verticalAlign: 'middle'
+                        }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                            <strong style={{ fontSize: '0.95rem', color: '#1f2937', fontWeight: '600' }}>
+                              {clinica.nome}
+                            </strong>
+                            {clinica.responsavel && (
+                              <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                                {clinica.responsavel}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ 
+                          display: isMobile ? 'none' : 'table-cell', 
+                          textAlign: 'center',
+                          padding: '1rem 1.5rem',
+                          verticalAlign: 'middle'
+                        }}>
+                          {clinica.nicho ? (
+                            <span className="badge" style={{ 
+                              backgroundColor: '#dbeafe', 
+                              color: '#1e40af',
+                              fontSize: '0.75rem',
+                              padding: '0.375rem 0.75rem',
+                              borderRadius: '6px',
+                              fontWeight: '500'
+                            }}>
+                              {clinica.nicho}
+                            </span>
+                          ) : (
+                            <span style={{ color: '#9ca3af', fontSize: '0.875rem' }}>-</span>
+                          )}
+                        </td>
+                        {!isMobile && (
+                          <td style={{ 
+                            textAlign: 'center',
+                            padding: '1rem 1.5rem',
+                            verticalAlign: 'middle'
+                          }}>
+                            {clinica.cidade && clinica.estado ? (
+                              <span style={{ fontSize: '0.875rem', color: '#4b5563', fontWeight: '500' }}>
+                                {clinica.cidade}/{clinica.estado}
+                              </span>
+                            ) : (
+                              <span style={{ color: '#9ca3af', fontSize: '0.875rem' }}>-</span>
+                            )}
+                          </td>
+                        )}
+                        <td style={{
+                          padding: '1rem 1.5rem',
+                          verticalAlign: 'middle',
+                          textAlign: 'center'
+                        }}>
+                          {(isAdmin || isConsultorInterno) ? (
+                            <select
+                              value={clinica.status}
+                              onChange={async (e) => {
+                                const novoStatus = e.target.value;
+                                
+                                try {
+                                  const response = await makeRequest(`/clinicas/${clinica.id}`, {
+                                    method: 'PUT',
+                                    body: JSON.stringify({
+                                      ...clinica,
+                                      status: novoStatus,
+                                      em_analise: novoStatus !== 'ativa'
+                                    })
+                                  });
+                                  
+                                  if (response.ok) {
+                                    showSuccessToast('Status atualizado com sucesso!');
+                                    fetchClinicasEmAnalise();
+                                    fetchClinicas();
+                                  } else {
+                                    const data = await response.json();
+                                    showErrorToast('Erro ao alterar status: ' + data.error);
+                                  }
+                                } catch (error) {
+                                  console.error('Erro ao alterar status:', error);
+                                  showErrorToast('Erro ao alterar status da clínica');
+                                }
+                              }}
+                              className="form-select"
+                              style={{
+                                fontSize: '0.8rem',
+                                padding: '0.5rem 0.75rem',
+                                border: `2px solid ${statusInfo.color}30`,
+                                backgroundColor: statusInfo.color + '10',
+                                color: statusInfo.color,
+                                fontWeight: '600',
+                                borderRadius: '8px',
+                                minWidth: '120px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              {statusAnaliseOptions.map(option => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span 
+                              className="badge"
+                              style={{
+                                backgroundColor: statusInfo.color + '15',
+                                color: statusInfo.color,
+                                fontWeight: '600',
+                                borderRadius: '8px',
+                                padding: '0.5rem 1rem',
+                                fontSize: '0.8rem',
+                                border: `1px solid ${statusInfo.color}30`
+                              }}
+                            >
+                              {statusInfo.label}
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ 
+                          display: isMobile ? 'none' : 'table-cell',
+                          padding: '1rem 1.5rem',
+                          verticalAlign: 'middle',
+                          textAlign: 'center'
+                        }}>
+                          <div style={{ 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            gap: '0.5rem',
+                            alignItems: 'center' 
+                          }}>
+                            <div style={{ 
+                              fontSize: '0.8rem', 
+                              color: '#4b5563',
+                              fontWeight: '500'
+                            }}>
+                              {docsEnviados}/{totalDocs} docs
+                            </div>
+                            <div style={{ 
+                              width: '80px', 
+                              height: '8px', 
+                              backgroundColor: '#e5e7eb',
+                              borderRadius: '4px',
+                              overflow: 'hidden',
+                              boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.1)'
+                            }}>
+                              <div style={{ 
+                                width: `${(docsEnviados / totalDocs) * 100}%`,
+                                height: '100%',
+                                backgroundColor: docsAprovados === totalDocs ? '#10b981' : '#3b82f6',
+                                transition: 'width 0.3s ease',
+                                borderRadius: '4px'
+                              }} />
+                            </div>
+                            {docsAprovados > 0 && (
+                              <div style={{ 
+                                fontSize: '0.7rem', 
+                                color: '#10b981', 
+                                fontWeight: '600',
+                                backgroundColor: '#dcfce7',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px'
+                              }}>
+                                {docsAprovados} aprovados
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ 
+                          display: isMobile ? 'none' : 'table-cell',
+                          padding: '1rem 1.5rem',
+                          verticalAlign: 'middle',
+                          textAlign: 'center'
+                        }}>
+                          {clinica.video_validacao_url ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center' }}>
+                              <div style={{ 
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                padding: '0.375rem 0.75rem',
+                                backgroundColor: '#dcfce7',
+                                borderRadius: '6px',
+                                fontSize: '0.75rem',
+                                color: '#059669',
+                                fontWeight: '600'
+                              }}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <circle cx="12" cy="12" r="10"/>
+                                  <polyline points="10 8 16 12 10 16"/>
+                                </svg>
+                                Enviado
+                              </div>
+                              <button
+                                onClick={() => window.open(`http://localhost:5000/api/documents/download/${clinica.id}/video_validacao`, '_blank')}
+                                className="btn btn-sm btn-secondary"
+                                style={{ 
+                                  fontSize: '0.7rem', 
+                                  padding: '0.375rem 0.75rem',
+                                  borderRadius: '6px',
+                                  border: '1px solid #d1d5db',
+                                  backgroundColor: 'white',
+                                  color: '#374151',
+                                  fontWeight: '500',
+                                  transition: 'all 0.2s ease'
+                                }}
+                              >
+                                Assistir
+                              </button>
+                            </div>
+                          ) : (
+                            <label 
+                              className="btn btn-sm btn-primary" 
+                              style={{ 
+                                fontSize: '0.75rem', 
+                                padding: '0.5rem 0.75rem', 
+                                cursor: 'pointer', 
+                                whiteSpace: 'nowrap',
+                                borderRadius: '6px',
+                                backgroundColor: '#3b82f6',
+                                border: 'none',
+                                color: 'white',
+                                fontWeight: '500',
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                accept="video/mp4,video/avi,video/mov,video/wmv,video/webm,video/mkv"
+                                onChange={async (e) => {
+                                  const file = e.target.files[0];
+                                  if (!file) return;
+                                  
+                                  if (file.size > 250 * 1024 * 1024) {
+                                    showErrorToast('Vídeo muito grande! Máximo 250MB');
+                                    return;
+                                  }
+                                  
+                                  setUploadingDocs(prev => ({ ...prev, [`video_validacao_${clinica.id}`]: true }));
+                                  
+                                  const formData = new FormData();
+                                  formData.append('document', file);
+                                  
+                                  try {
+                                    const response = await fetch(`http://localhost:5000/api/documents/upload/${clinica.id}/video_validacao`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                                      },
+                                      body: formData
+                                    });
+                                    
+                                    if (response.ok) {
+                                      showSuccessToast('Vídeo enviado com sucesso!');
+                                      fetchClinicasEmAnalise();
+                                    } else {
+                                      const error = await response.json();
+                                      showErrorToast(error.error || 'Erro ao enviar vídeo');
+                                    }
+                                  } catch (error) {
+                                    console.error('Erro ao fazer upload:', error);
+                                    showErrorToast('Erro ao enviar vídeo');
+                                  } finally {
+                                    setUploadingDocs(prev => ({ ...prev, [`video_validacao_${clinica.id}`]: false }));
+                                  }
+                                }}
+                              />
+                              {uploadingDocs[`video_validacao_${clinica.id}`] ? (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <div style={{
+                                    width: '12px',
+                                    height: '12px',
+                                    border: '2px solid rgba(255,255,255,0.3)',
+                                    borderTop: '2px solid white',
+                                    borderRadius: '50%',
+                                    animation: 'spin 1s linear infinite'
+                                  }} />
+                                  Enviando...
+                                </span>
+                              ) : 'Enviar Vídeo'}
+                            </label>
+                          )}
+                        </td>
+                        <td style={{ 
+                          display: isMobile ? 'none' : 'table-cell', 
+                          textAlign: 'center',
+                          padding: '1rem 1.5rem',
+                          verticalAlign: 'middle'
+                        }}>
+                          <span style={{ 
+                            fontSize: '0.8rem', 
+                            color: '#6b7280',
+                            fontWeight: '500'
+                          }}>
+                            {formatarData(clinica.created_at)}
+                          </span>
+                        </td>
+                        <td style={{
+                          padding: '1rem 1.5rem',
+                          verticalAlign: 'middle',
+                          textAlign: 'center'
+                        }}>
+                          <div style={{ 
+                            display: 'flex', 
+                            gap: '0.5rem',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            flexWrap: 'wrap'
+                          }}>
                             <button
                               onClick={() => handleView(clinica)}
                               className="btn-action"
                               title="Visualizar"
+                              style={{
+                                padding: '0.5rem',
+                                borderRadius: '8px',
+                                border: '1px solid #e5e7eb',
+                                backgroundColor: 'white',
+                                color: '#4b5563',
+                                transition: 'all 0.2s ease',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.backgroundColor = '#f3f4f6';
+                                e.target.style.borderColor = '#9ca3af';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = 'white';
+                                e.target.style.borderColor = '#e5e7eb';
+                              }}
                             >
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                                 <circle cx="12" cy="12" r="3" />
                               </svg>
                             </button>
-                            {isAdmin && (
+                            {(isAdmin || isConsultorInterno) && (
                               <>
                                 <button
                                   onClick={() => handleEditClinicaAnalise(clinica)}
                                   className="btn-action"
                                   title="Editar"
-                                  style={{ marginLeft: '0.5rem' }}
+                                  style={{
+                                    padding: '0.5rem',
+                                    borderRadius: '8px',
+                                    border: '1px solid #dbeafe',
+                                    backgroundColor: '#eff6ff',
+                                    color: '#3b82f6',
+                                    transition: 'all 0.2s ease',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.target.style.backgroundColor = '#dbeafe';
+                                    e.target.style.borderColor = '#93c5fd';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.target.style.backgroundColor = '#eff6ff';
+                                    e.target.style.borderColor = '#dbeafe';
+                                  }}
                                 >
                                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                                   </svg>
                                 </button>
-                                <button
-                                  onClick={() => handleGerenciarAcesso(clinica)}
-                                  className="btn-action"
-                                  title={clinica.ativo_no_sistema ? "Editar Acesso" : "Criar Acesso"}
-                                  style={{ 
-                                    marginLeft: '0.5rem', 
-                                    color: clinica.ativo_no_sistema ? '#10b981' : '#3b82f6' 
-                                  }}
-                                >
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                                  </svg>
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteClinica(clinica.id)}
-                                  className="btn-action"
-                                  title="Excluir"
-                                  style={{ marginLeft: '0.5rem', color: '#dc2626' }}
-                                >
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <polyline points="3 6 5 6 21 6" />
-                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                    <line x1="10" y1="11" x2="10" y2="17" />
-                                    <line x1="14" y1="11" x2="14" y2="17" />
-                                  </svg>
-                                </button>
+                                {isAdmin && (
+                                  <button
+                                    onClick={() => handleGerenciarAcesso(clinica)}
+                                    className="btn-action"
+                                    title={clinica.ativo_no_sistema ? "Editar Acesso" : "Criar Acesso"}
+                                    style={{
+                                      padding: '0.5rem',
+                                      borderRadius: '8px',
+                                      border: clinica.ativo_no_sistema ? '1px solid #d1fae5' : '1px solid #dbeafe',
+                                      backgroundColor: clinica.ativo_no_sistema ? '#ecfdf5' : '#eff6ff',
+                                      color: clinica.ativo_no_sistema ? '#10b981' : '#3b82f6',
+                                      transition: 'all 0.2s ease',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      if (clinica.ativo_no_sistema) {
+                                        e.target.style.backgroundColor = '#d1fae5';
+                                        e.target.style.borderColor = '#a7f3d0';
+                                      } else {
+                                        e.target.style.backgroundColor = '#dbeafe';
+                                        e.target.style.borderColor = '#93c5fd';
+                                      }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      if (clinica.ativo_no_sistema) {
+                                        e.target.style.backgroundColor = '#ecfdf5';
+                                        e.target.style.borderColor = '#d1fae5';
+                                      } else {
+                                        e.target.style.backgroundColor = '#eff6ff';
+                                        e.target.style.borderColor = '#dbeafe';
+                                      }
+                                    }}
+                                  >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                    </svg>
+                                  </button>
+                                )}
+                                {isAdmin && (
+                                  <button
+                                    onClick={() => handleDeleteClinica(clinica.id)}
+                                    className="btn-action"
+                                    title="Excluir"
+                                    style={{
+                                      padding: '0.5rem',
+                                      borderRadius: '8px',
+                                      border: '1px solid #fecaca',
+                                      backgroundColor: '#fef2f2',
+                                      color: '#dc2626',
+                                      transition: 'all 0.2s ease',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.target.style.backgroundColor = '#fecaca';
+                                      e.target.style.borderColor = '#f87171';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.target.style.backgroundColor = '#fef2f2';
+                                      e.target.style.borderColor = '#fecaca';
+                                    }}
+                                  >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <polyline points="3 6 5 6 21 6" />
+                                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                      <line x1="10" y1="11" x2="10" y2="17" />
+                                      <line x1="14" y1="11" x2="14" y2="17" />
+                                    </svg>
+                                  </button>
+                                )}
                               </>
                             )}
-                          </td>
-                        )}
-                        {isFreelancer && (
-                          <td style={{ textAlign: 'center', padding: '0.75rem' }}>
-                            <span 
-                              className="badge"
-                              style={{
-                                backgroundColor: statusInfo.color + '20',
-                                color: statusInfo.color,
-                                fontWeight: '600', 
-                                borderRadius: '0.5rem',
-                                padding: '0.4rem 0.9rem',
-                                fontSize: '0.8rem',
-                                display: 'inline-block'
-                              }}
-                            >
-                              {statusInfo.label}
-                            </span>
-                          </td>
-                        )}
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}

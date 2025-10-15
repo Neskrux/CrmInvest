@@ -614,7 +614,7 @@ const PacientesFinanceiro = () => {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
               <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
-                Página {currentPage} de {totalPages} — exibindo {dadosPaginados.length} de {dadosFiltrados.length}
+                Página {currentPage} de {totalPages}
               </div>
               <div>
                 <button
