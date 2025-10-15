@@ -830,6 +830,89 @@ const Indicacoes = () => {
             </div>
           </div>
 
+      {/* Seção explicativa - O que vou indicar? */}
+      <div className="explicacao-container" style={{ padding: window.innerWidth <= 768 ? '0 1.5rem' : '0', marginTop: '3rem' }}>
+        <div style={{
+          borderRadius: '16px',
+          padding: '2.5rem',
+          textAlign: 'center',
+          maxWidth: '900px',
+          margin: '0 auto'
+        }}>
+          <h2 style={{
+            fontSize: window.innerWidth <= 768 ? '1.5rem' : '2rem',
+            fontWeight: '700',
+            color: '#1e293b',
+            marginBottom: '1.5rem'
+          }}>
+            O que vou indicar?
+          </h2>
+          
+          {activeTab === 'clinicas' ? (
+            <div>
+              <p style={{
+                fontSize: window.innerWidth <= 768 ? '1rem' : '1.1rem',
+                color: '#475569',
+                lineHeight: '1.6',
+                marginBottom: '1.5rem',
+                maxWidth: '800px',
+                margin: '0 auto 1.5rem'
+              }}>
+                <strong>Você indicará nosso produto para clínicas estéticas e odontológicas.</strong> <br /> <br />
+                <strong>O que é nosso produto?</strong> <br />
+                <p>Nosso produto é uma parceria, onde realizamos a gestão de boletos e cobranças dessas clínicas sem taxas de adesão ou mensalidade.</p>
+              </p>
+              <div style={{
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: 'white',
+                padding: '1rem 1.5rem',
+                borderRadius: '12px',
+                fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem',
+                fontWeight: '600',
+                display: 'inline-block'
+              }}>
+                Indique para clínicas que querem fazer a gestão de boletos e cobranças sem taxas de adesão ou mensalidade.
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p style={{
+                fontSize: window.innerWidth <= 768 ? '1rem' : '1.1rem',
+                color: '#475569',
+                lineHeight: '1.6',
+                marginBottom: '1.5rem',
+                maxWidth: '800px',
+                margin: '0 auto 1.5rem'
+              }}>
+                <strong>Você indicará nossa solução para os pacientes.</strong><br /> <br />
+                <strong>O que é nossa solução?</strong> <br />
+                <p>Nossa solução é a possibilidade de fazer tratamentos estéticos ou odontológicos parcelados no boleto, conectamos qualquer pessoa, à uma clinica parceira.</p>
+              </p>
+              <div style={{
+                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                color: 'white',
+                padding: '1rem 1.5rem',
+                borderRadius: '12px',
+                fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem',
+                fontWeight: '600',
+                display: 'inline-block'
+              }}>
+                Indique um parente, um amigo, um conhecido, ou até mesmo você..
+              </div>
+            </div>
+          )}
+
+          <h2 style={{
+            fontSize: window.innerWidth <= 768 ? '1.5rem' : '2rem',
+            fontWeight: '700',
+            color: '#1e293b',
+            marginTop: '3rem'
+          }}>
+            E agora, o que eu faço?
+          </h2>
+        </div>
+      </div>
+
       {/* Processo executivo */}
       <div className="process-container" style={{ padding: window.innerWidth <= 768 ? '0 1.5rem' : '0' }}>
         <div className="process-step" data-tutorial="mensagens">
@@ -840,7 +923,7 @@ const Indicacoes = () => {
         textAlign: 'center',
         marginBottom: window.innerWidth <= 768 ? '2rem' : '4rem',
         padding: window.innerWidth <= 768 ? '1rem 0.5rem' : '1rem'}}>
-        Faça o primeiro contato com {activeTab === 'pacientes' ? 'os pacientes' : 'as clínicas'}!
+        Agora faça o primeiro contato com {activeTab === 'pacientes' ? 'os pacientes' : 'as clínicas'}!
         </h2>
           <div className="step-header"> 
             <div className="step-number">1</div>
@@ -1091,19 +1174,19 @@ const Indicacoes = () => {
                         // Função simples para iOS/Safari
                         const openForIOS = () => {
                           // URL do Google Maps que funciona no Safari
-                          const googleMapsUrl = `https://www.google.com/maps/search/clínicas+estéticas+odontológicas+near+me`;
+                          const googleMapsUrl = `https://www.google.com/maps/search/clínicas+estéticas+ou+odontológicas+near+me`;
                           window.open(googleMapsUrl, '_blank');
                         };
                         
                         // Função para Android
                         const openForAndroid = (lat, lng) => {
-                          const mapsUrl = `geo:${lat},${lng}?q=clínicas+estéticas+odontológicas`;
+                          const mapsUrl = `geo:${lat},${lng}?q=clínicas+estéticas+ou+odontológicas`;
                           window.open(mapsUrl, '_blank');
                         };
                         
                         // Função para outros navegadores
                         const openForOthers = (lat, lng) => {
-                          const mapsUrl = `https://www.google.com/maps/search/clínicas+estéticas+odontológicas/@${lat},${lng},15z`;
+                          const mapsUrl = `https://www.google.com/maps/search/clínicas+estéticas+ou+odontológicas/@${lat},${lng},15z`;
                           window.open(mapsUrl, '_blank');
                         };
                         
