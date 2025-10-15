@@ -83,6 +83,7 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 1rem 3rem;
+  margin-top: 2rem;
 }
 
 .process-step {
@@ -523,7 +524,7 @@
 .final-actions {
   text-align: center;
   padding: 3rem 2rem;
-  max-width: 800px;
+  max-width: 1200px;
   margin: 2rem auto;
 }
 

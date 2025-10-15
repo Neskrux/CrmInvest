@@ -363,7 +363,8 @@ const Materiais = () => {
                     minHeight: '280px',
                     height: '100%',
                     display: 'flex',
-                    flexDirection: 'column'
+                    flexDirection: 'column',
+                    padding: '1.5rem'
                   }}
                 >
                   <div 

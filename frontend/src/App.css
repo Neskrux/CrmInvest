@@ -339,13 +339,10 @@
   
   /* Cards Profissionais */
   .card {
-    background: white;
     border-radius: 8px;
     box-shadow: var(--shadow);
     border: 1px solid var(--gray-200);
-    margin-bottom: 1.5rem;
     overflow: hidden;
-    padding: 1rem;
   }
   
   .card-header {
@@ -362,10 +359,7 @@
     letter-spacing: -0.025em;
     margin-bottom: 0.875rem;
   }
-  
-  .card-body {
-    padding: 1.5rem;
-  }
+
   
   /* Container de tabela - sem scroll horizontal */
   .table-container {

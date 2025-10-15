@@ -24,14 +24,6 @@ const tutorialSteps = [
     scrollTo: true
   },
   {
-    id: 'formulario-cadastro',
-    title: 'Cadastro Direto',
-    content: 'Você pode cadastrar clínicas e pacientes diretamente aqui! Preencha os dados e eles serão automaticamente atribuídos a você.',
-    targetSelector: '[data-tutorial="formulario-cadastro"]',
-    position: 'bottom',
-    scrollTo: true
-  },
-  {
     id: 'mensagens',
     title: 'Mensagens Prontas',
     content: 'Em seguida, escolha uma mensagem pronta, elas são opcionais, você pode mudar para o seu jeito!',
@@ -44,14 +36,6 @@ const tutorialSteps = [
     title: 'Imagens Profissionais',
     content: 'Escolha uma imagem atrativa para acompanhar sua mensagem. Você pode baixar a imagem selecionada e enviá-la junto com o texto. Imagens aumentam muito a conversão!',
     targetSelector: '[data-tutorial="imagens"]',
-    position: 'bottom',
-    scrollTo: true
-  },
-  {
-    id: 'link-personalizado',
-    title: 'Seu Link Personalizado',
-    content: 'Este é seu link único! Todos que se cadastrarem através dele serão automaticamente atribuídos a você. Copie e compartilhe onde quiser!',
-    targetSelector: '[data-tutorial="link-personalizado"]',
     position: 'bottom',
     scrollTo: true
   },
@@ -80,11 +64,18 @@ const TutorialIndicacoes = ({ isOpen, onClose, onComplete }) => {
   const scrollToElement = (selector) => {
     const element = document.querySelector(selector);
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      // Ajuste adicional para subir um pouco e evitar corte na parte inferior
-      setTimeout(() => {
-        window.scrollBy(0, -120);
-      }, 500);
+      // Para o passo de escolha do tipo, usar posicionamento mais preciso
+      if (selector === '[data-tutorial="escolha-tipo"]') {
+        // Scroll apenas para o topo da página
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        console.log('Scroll executado para escolha-tipo - apenas topo');
+      } else {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Ajuste adicional para subir um pouco e evitar corte na parte inferior
+        setTimeout(() => {
+          window.scrollBy(0, -120);
+        }, 500);
+      }
     }
   };
 
@@ -107,6 +98,12 @@ const TutorialIndicacoes = ({ isOpen, onClose, onComplete }) => {
       return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
     }
 
+    // Debug para o passo escolha-tipo
+    if (selector === '[data-tutorial="escolha-tipo"]') {
+      console.log('Elemento encontrado:', element);
+      console.log('Rect:', rect);
+    }
+
     let top, left;
 
     switch (position) {
@@ -117,6 +114,21 @@ const TutorialIndicacoes = ({ isOpen, onClose, onComplete }) => {
       case 'bottom':
         top = rect.bottom + margin;
         left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+        // Para a seção de escolha do tipo, ajustar posicionamento
+        if (selector === '[data-tutorial="escolha-tipo"]') {
+          // Se o elemento estiver fora da viewport (y negativo), usar posição fixa
+          if (rect.top < 0) {
+            top = 350; // Posição fixa ainda mais acima, abaixo do header
+            left = '50%';
+            console.log('Elemento fora da viewport, usando posição fixa');
+          } else {
+            // Posicionar o tooltip bem abaixo das tabs
+            top = rect.bottom + 30;
+            // Centralizar horizontalmente no container das tabs
+            left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+            console.log('Posição calculada - top:', top, 'left:', left);
+          }
+        }
         break;
       case 'left':
         top = rect.top + (rect.height / 2) - (tooltipHeight / 2);
@@ -140,6 +152,15 @@ const TutorialIndicacoes = ({ isOpen, onClose, onComplete }) => {
     // Usar margem maior na parte inferior para evitar corte
     if (top + tooltipHeight > window.innerHeight - bottomMargin) {
       top = window.innerHeight - tooltipHeight - bottomMargin;
+    }
+
+    // Para posição fixa (escolha-tipo fora da viewport)
+    if (selector === '[data-tutorial="escolha-tipo"]' && left === '50%') {
+      return {
+        top: `${top}px`,
+        left: '50%',
+        transform: 'translateX(-50%)'
+      };
     }
 
     return {
@@ -212,7 +233,8 @@ const TutorialIndicacoes = ({ isOpen, onClose, onComplete }) => {
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
           border: '1px solid #e5e7eb',
           maxWidth: '400px',
-          minWidth: window.innerWidth <= 768 ? '320px' : 'auto',
+          minWidth: window.innerWidth <= 768 ? '300px' : 'auto',
+          width: window.innerWidth <= 768 ? '90%' : 'auto',
           zIndex: 10001
         }}
       >

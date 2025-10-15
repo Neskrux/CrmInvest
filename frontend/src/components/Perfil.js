@@ -455,7 +455,7 @@ const Perfil = () => {
           <h2 className="card-title">Informações Pessoais</h2>
         </div>
         
-        <form onSubmit={handleSubmit} className="card-body">
+        <form onSubmit={handleSubmit} className="card-body" style={{ padding: '1.5rem' }}>
           {/* Seção de Foto de Perfil 
             <div 
               className="profile-avatar"
