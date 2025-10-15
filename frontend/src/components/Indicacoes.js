@@ -1090,9 +1090,9 @@ const Indicacoes = () => {
                         
                         // Função simples para iOS/Safari
                         const openForIOS = () => {
-                          // URL do Apple Maps que funciona no Safari
-                          const appleMapsUrl = `https://maps.apple.com/?q=clínicas+estéticas+odontológicas+near+me`;
-                          window.open(appleMapsUrl, '_blank');
+                          // URL do Google Maps que funciona no Safari
+                          const googleMapsUrl = `https://www.google.com/maps/search/clínicas+estéticas+odontológicas+near+me`;
+                          window.open(googleMapsUrl, '_blank');
                         };
                         
                         // Função para Android
