@@ -3017,7 +3017,7 @@ const Clinicas = () => {
                     <th>Nome</th>
                     <th style={{ display: 'none' }}>Nicho</th>
                     <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Telefone</th>
-                    <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Email</th>
+                    <th style={{ display: 'none' }}>Email</th>
                     <th style={{ display: isMobile ? 'none' : 'table-cell' }}>
                       Status
                       {!podeAlterarStatus && (
@@ -3076,7 +3076,7 @@ const Clinicas = () => {
                         </td>
                         <td style={{ display: 'none' }}>{clinica.nicho || '-'}</td>
                         <td style={{ display: isMobile ? 'none' : 'table-cell' }}>{formatarTelefone(clinica.telefone) || '-'}</td>
-                        <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                        <td style={{ display: 'none' }}>
                           {clinica.email ? (
                             <span style={{ fontSize: '0.875rem' }}>{clinica.email?.toLowerCase()}</span>
                           ) : '-'}
