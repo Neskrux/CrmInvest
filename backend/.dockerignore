@@ -4,11 +4,11 @@
 # Include only essential files
 !package.json
 !package-lock.json
-!server.js
+!server.ts
 !Dockerfile
 !fly.toml
-!api/
-!utils/
+!src/
+!tsconfig.json
 !database.sqlite
 
 # Exclude all node_modules

@@ -1091,19 +1091,19 @@ const Indicacoes = () => {
                         // Função simples para iOS/Safari
                         const openForIOS = () => {
                           // URL do Google Maps que funciona no Safari
-                          const googleMapsUrl = `https://www.google.com/maps/search/clínicas+estéticas+odontológicas+near+me`;
+                          const googleMapsUrl = `https://www.google.com/maps/search/clínicas+estéticas+ou+odontológicas+near+me`;
                           window.open(googleMapsUrl, '_blank');
                         };
                         
                         // Função para Android
                         const openForAndroid = (lat, lng) => {
-                          const mapsUrl = `geo:${lat},${lng}?q=clínicas+estéticas+odontológicas`;
+                          const mapsUrl = `geo:${lat},${lng}?q=clínicas+estéticas+ou+odontológicas`;
                           window.open(mapsUrl, '_blank');
                         };
                         
                         // Função para outros navegadores
                         const openForOthers = (lat, lng) => {
-                          const mapsUrl = `https://www.google.com/maps/search/clínicas+estéticas+odontológicas/@${lat},${lng},15z`;
+                          const mapsUrl = `https://www.google.com/maps/search/clínicas+estéticas+ou+odontológicas/@${lat},${lng},15z`;
                           window.open(mapsUrl, '_blank');
                         };
                         

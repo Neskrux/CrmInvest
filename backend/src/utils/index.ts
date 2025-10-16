@@ -1,0 +1,103 @@
+// Exportar todas as funções utilitárias
+
+// Constantes
+export * from './constants';
+
+// Helpers básicos (sem conflitos)
+export {
+  normalizarEmail,
+  normalizarTelefone,
+  normalizarNome,
+  normalizarCNPJ,
+  normalizarCPF,
+  formatarTelefone,
+  formatarCNPJ,
+  formatarCPF,
+  formatarMoeda,
+  formatarData,
+  formatarDataHora,
+  gerarCodigoReferencia,
+  gerarCodigoConsultor,
+  gerarUrlPersonalizada,
+  extrairDominioEmail,
+  isEmailCorporativo,
+  calcularIdade,
+  gerarHash,
+  isValidUrl,
+  removerAcentos,
+  gerarSlug,
+  mascararDados,
+  parsearMoeda,
+  calcularDiferencaDias,
+  isDataNoIntervalo,
+  gerarArrayDatas,
+  stringToBoolean,
+  capitalizar,
+  removerTagsHTML,
+  truncarTexto,
+  isEmpty,
+  deepClone,
+  deepMerge
+} from './helpers';
+
+// Validadores (sem conflitos)
+export {
+  isValidStatusPaciente,
+  isValidStatusClinica,
+  isValidStatusAgendamento,
+  isValidStatusFechamento,
+  isValidTipoUsuario,
+  isValidTipoArquivo,
+  isValidCPF,
+  isValidCNPJ,
+  isValidPassword,
+  isValidDataNascimento,
+  isValidHorario,
+  isHorarioComercial,
+  isDataFutura,
+  isDataRazoavel,
+  isValidFileSize,
+  isValidFileName,
+  isValidMoneyValue,
+  isValidCodigoReferencia,
+  isValidEstadoBrasil,
+  isValidDiaSemana,
+  isValidMes,
+  isValidAno,
+  isValidId,
+  isValidUUID,
+  isValidJWTFormat,
+  isValidIP,
+  isValidLatitude,
+  isValidLongitude,
+  isValidCoordinates,
+  isValidEAN13,
+  isValidUPC,
+  validateFields
+} from './validators';
+
+// Formatadores (sem conflitos)
+export {
+  formatarUsuario,
+  formatarPaciente,
+  formatarClinica,
+  formatarAgendamento,
+  formatarFechamento,
+  formatarLead,
+  formatarConsultor,
+  formatarStatus,
+  formatarTipoUsuario,
+  formatarArquivo,
+  formatarDuracao,
+  formatarIdade,
+  formatarPercentual,
+  formatarNumero,
+  formatarDataRelativa,
+  formatarRespostaAPI,
+  formatarErroAPI,
+  formatarPaginacao,
+  formatarEstatisticas,
+  formatarHorario,
+  formatarEndereco,
+  formatarLista
+} from './formatters';

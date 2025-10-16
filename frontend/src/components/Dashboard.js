@@ -546,10 +546,12 @@ const Dashboard = () => {
           makeRequest('/dashboard/fechamentos'),
           makeRequest(`/clinicas?${clinicasParams.toString()}`)
         ]);
-        let pacientes = await pacientesRes.json();
-        let agendamentos = await agendamentosRes.json();
-        let fechamentos = await fechamentosRes.json();
-        const clinicasFiltradas = await clinicasRes.json();
+        
+        // Extrair dados da nova estrutura de resposta
+        let pacientes = pacientesRes.ok ? (await pacientesRes.json()).data || await pacientesRes.json() : [];
+        let agendamentos = agendamentosRes.ok ? (await agendamentosRes.json()).data || await agendamentosRes.json() : [];
+        let fechamentos = fechamentosRes.ok ? (await fechamentosRes.json()).data || await fechamentosRes.json() : [];
+        const clinicasFiltradas = clinicasRes.ok ? (await clinicasRes.json()).data || await clinicasRes.json() : [];
         
         // Se for clínica, filtrar apenas dados relacionados a ela
         if (isClinica && user?.clinica_id) {
@@ -783,14 +785,16 @@ const Dashboard = () => {
           const cidadesClinicasRes = await makeRequest(`/clinicas/cidades?estado=${filtroRegiao.estado}`);
           let cidadesClinicas = [];
           if (cidadesClinicasRes.ok) {
-            cidadesClinicas = await cidadesClinicasRes.json();
+            const response = await cidadesClinicasRes.json();
+            cidadesClinicas = response.data || response;
           }
           
           // Buscar cidades dos pacientes desse estado
           const pacientesRes = await makeRequest('/dashboard/gerais/pacientes');
           let cidadesPacientes = [];
           if (pacientesRes.ok) {
-            const pacientes = await pacientesRes.json();
+            const response = await pacientesRes.json();
+            const pacientes = response.data || response; // Suporte para nova e antiga estrutura
             cidadesPacientes = [...new Set(
               pacientes
                 .filter(p => p.estado === filtroRegiao.estado && p.cidade)
@@ -806,14 +810,16 @@ const Dashboard = () => {
           const cidadesClinicasRes = await makeRequest('/clinicas/cidades');
           let cidadesClinicas = [];
           if (cidadesClinicasRes.ok) {
-            cidadesClinicas = await cidadesClinicasRes.json();
+            const response = await cidadesClinicasRes.json();
+            cidadesClinicas = response.data || response;
           }
           
           // Buscar todas as cidades dos pacientes
           const pacientesRes = await makeRequest('/dashboard/gerais/pacientes');
           let cidadesPacientes = [];
           if (pacientesRes.ok) {
-            const pacientes = await pacientesRes.json();
+            const response = await pacientesRes.json();
+            const pacientes = response.data || response;
             cidadesPacientes = [...new Set(pacientes.filter(p => p.cidade).map(p => p.cidade))];
           }
           
@@ -859,16 +865,17 @@ const Dashboard = () => {
         makeRequest('/dashboard/gerais/fechamentos')
       ]);
 
-      let pacientes = await pacientesRes.json();
-      let agendamentos = await agendamentosRes.json();
-      let fechamentos = await fechamentosRes.json();
-      const consultores = await consultoresRes.json();
-      const clinicasFiltradas = await clinicasRes.json();
+      // Extrair dados da nova estrutura de resposta
+      let pacientes = pacientesRes.ok ? (await pacientesRes.json()).data || await pacientesRes.json() : [];
+      let agendamentos = agendamentosRes.ok ? (await agendamentosRes.json()).data || await agendamentosRes.json() : [];
+      let fechamentos = fechamentosRes.ok ? (await fechamentosRes.json()).data || await fechamentosRes.json() : [];
+      const consultores = consultoresRes.ok ? (await consultoresRes.json()).data || await consultoresRes.json() : [];
+      const clinicasFiltradas = clinicasRes.ok ? (await clinicasRes.json()).data || await clinicasRes.json() : [];
 
       // Dados gerais para gráfico de cidades e ranking
-      let pacientesGerais = await pacientesGeraisRes.json();
-      let agendamentosGerais = await agendamentosGeraisRes.json();
-      let fechamentosGerais = await fechamentosGeraisRes.json();
+      let pacientesGerais = pacientesGeraisRes.ok ? (await pacientesGeraisRes.json()).data || await pacientesGeraisRes.json() : [];
+      let agendamentosGerais = agendamentosGeraisRes.ok ? (await agendamentosGeraisRes.json()).data || await agendamentosGeraisRes.json() : [];
+      let fechamentosGerais = fechamentosGeraisRes.ok ? (await fechamentosGeraisRes.json()).data || await fechamentosGeraisRes.json() : [];
       
       // Se for clínica, filtrar também os dados gerais
       if (isClinica && user?.clinica_id) {
@@ -1135,7 +1142,8 @@ const Dashboard = () => {
         // Usar endpoint específico que retorna todas as clínicas sem filtro de consultor
         const todasClinicasRes = await makeRequest('/dashboard/gerais/clinicas');
           if (todasClinicasRes.ok) {
-            todasClinicas = await todasClinicasRes.json();
+            const response = await todasClinicasRes.json();
+            todasClinicas = response.data || response;
           }
         } catch (error) {
         // Fallback para clínicas filtradas se houver erro
@@ -1471,14 +1479,16 @@ const Dashboard = () => {
       const estadosClinicasRes = await makeRequest('/clinicas/estados');
       let estadosClinicas = [];
       if (estadosClinicasRes.ok) {
-        estadosClinicas = await estadosClinicasRes.json();
+        const response = await estadosClinicasRes.json();
+        estadosClinicas = response.data || response;
       }
       
       // Buscar estados dos pacientes
       const pacientesRes = await makeRequest('/dashboard/gerais/pacientes');
       let estadosPacientes = [];
       if (pacientesRes.ok) {
-        const pacientes = await pacientesRes.json();
+        const response = await pacientesRes.json();
+        const pacientes = response.data || response; // Suporte para nova e antiga estrutura
         estadosPacientes = [...new Set(pacientes.filter(p => p.estado).map(p => p.estado))];
       }
       

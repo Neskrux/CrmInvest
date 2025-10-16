@@ -19,10 +19,16 @@ RUN chown -R node:node /app
 COPY package*.json ./
 
 # Instalar dependências
-RUN npm ci --omit=dev
+RUN npm ci
 
 # Copiar código da aplicação
 COPY --chown=node:node . .
+
+# Compilar TypeScript
+RUN npm run build
+
+# Remover dependências de desenvolvimento após build
+RUN npm ci --omit=dev
 
 # Criar diretório para uploads
 RUN mkdir -p uploads && chown -R node:node uploads

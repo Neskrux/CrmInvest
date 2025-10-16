@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Link, us
 import './App.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './components/Toast';
-import { LeadNotificationProvider, useLeadNotification } from './components/LeadNotificationProvider';
+import { LeadNotificationProvider } from './components/LeadNotificationProvider';
 import { AudioProvider } from './contexts/AudioContext';
 import { HelpCircle } from 'lucide-react';
 import LandingPage from './components/LandingPage';
@@ -34,9 +34,14 @@ import Simulador from './components/Simulador';
 import logoBrasao from './images/logobrasao.png';
 import logoHorizontal from './images/logohorizontal.png';
 import logoHorizontalPreto from './images/logohorizontalpreto.png';
+import { User } from './types/auth';
 
 // Componente para proteger rotas
-const ProtectedRoute = ({ children }) => {
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+}
+
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, loading } = useAuth();
   
   if (loading) {
@@ -51,23 +56,23 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
   
-  return children;
+  return <>{children}</>;
 };
 
 // Componente interno que usa o hook de notificação
-const AppContentWithNotifications = () => {
+const AppContentWithNotifications: React.FC = () => {
   const { user, logout, loading, isAdmin, isEmpresa } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
-  const navRef = React.useRef(null);
-  const [showLeftArrow, setShowLeftArrow] = useState(false);
-  const [showRightArrow, setShowRightArrow] = useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth <= 768);
+  const [showMobileSidebar, setShowMobileSidebar] = useState<boolean>(false);
+  const navRef = React.useRef<HTMLElement>(null);
+  const [showLeftArrow, setShowLeftArrow] = useState<boolean>(false);
+  const [showRightArrow, setShowRightArrow] = useState<boolean>(false);
 
   // Função para fechar sidebar ao navegar no mobile
-  const handleMobileNavigation = () => {
+  const handleMobileNavigation = (): void => {
     if (isMobile) {
       setShowMobileSidebar(false);
     }
@@ -75,7 +80,7 @@ const AppContentWithNotifications = () => {
   
   // Hook para detectar mudanças no tamanho da tela
   useEffect(() => {
-    const handleResize = () => {
+    const handleResize = (): void => {
       setIsMobile(window.innerWidth <= 768);
       // Fechar sidebar mobile quando mudança para desktop
       if (window.innerWidth > 768) {
@@ -88,7 +93,7 @@ const AppContentWithNotifications = () => {
   }, []);
   
   // Determinar aba ativa baseada na rota atual
-  const getActiveTab = () => {
+  const getActiveTab = (): string => {
     const path = location.pathname;
     if (path.includes('/indicacoes')) return 'indicacoes';
     if (path.includes('/como-fazer')) return 'como-fazer';
@@ -109,7 +114,7 @@ const AppContentWithNotifications = () => {
   const activeTab = getActiveTab();
 
   // Função para verificar se precisa mostrar as setas
-  const checkScrollArrows = () => {
+  const checkScrollArrows = (): void => {
     if (navRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = navRef.current;
       setShowLeftArrow(scrollLeft > 0);
@@ -118,7 +123,7 @@ const AppContentWithNotifications = () => {
   };
 
   // Função para scroll da navegação
-  const scrollNav = (direction) => {
+  const scrollNav = (direction: 'left' | 'right'): void => {
     if (navRef.current) {
       const scrollAmount = 350;
       navRef.current.scrollBy({
@@ -137,8 +142,8 @@ const AppContentWithNotifications = () => {
 
   // Fechar dropdown quando clicar fora
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showUserDropdown && !event.target.closest('[data-user-dropdown]')) {
+    const handleClickOutside = (event: MouseEvent): void => {
+      if (showUserDropdown && !(event.target as Element).closest('[data-user-dropdown]')) {
         setShowUserDropdown(false);
       }
     };
@@ -172,7 +177,7 @@ const AppContentWithNotifications = () => {
   }
 
   // Se o usuário está autenticado, mostrar a aplicação principal
-  const RenderContent = () => {
+  const RenderContent: React.FC = () => {
     const { isEmpresa, isFreelancer } = useAuth();
     
     // Interface simplificada para Freelancers Consultores
@@ -271,9 +276,9 @@ const AppContentWithNotifications = () => {
     );
   };
 
-  const getUserInitials = () => {
+  const getUserInitials = (): string => {
     if (user?.nome) {
-      const names = user.nome.trim().split(' ').filter(n => n.length > 0);
+      const names = user.nome.trim().split(' ').filter((n: string) => n.length > 0);
       if (names.length >= 2) {
         return (names[0][0] + names[names.length - 1][0]).toUpperCase();
       }
@@ -436,7 +441,7 @@ const AppContentWithNotifications = () => {
         
         {/* Conteúdo principal */}
         <main className="freelancer-main">
-          {RenderContent()}
+          <RenderContent />
         </main>
 
         {/* Botão Flutuante WhatsApp - Para Freelancers */}
@@ -464,13 +469,13 @@ const AppContentWithNotifications = () => {
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'scale(1.1)';
             e.currentTarget.style.backgroundColor = '#128C7E';
-            const tooltip = e.currentTarget.querySelector('.whatsapp-tooltip');
+            const tooltip = e.currentTarget.querySelector('.whatsapp-tooltip') as HTMLElement;
             if (tooltip) tooltip.style.opacity = '1';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = 'scale(1)';
             e.currentTarget.style.backgroundColor = '#25D366';
-            const tooltip = e.currentTarget.querySelector('.whatsapp-tooltip');
+            const tooltip = e.currentTarget.querySelector('.whatsapp-tooltip') as HTMLElement;
             if (tooltip) tooltip.style.opacity = '0';
           }}
           aria-label="Fale conosco no WhatsApp"
@@ -890,13 +895,10 @@ const AppContentWithNotifications = () => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderRadius: '0.5rem',
-                  transition: 'background-color 0.2s',
-                  ':hover': {
-                    backgroundColor: '#f3f4f6'
-                  }
+                  transition: 'background-color 0.2s'
                 }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#f3f4f6'}
+                onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = 'transparent'}
               >
                 <svg 
                   width="24" 
@@ -1016,8 +1018,8 @@ const AppContentWithNotifications = () => {
                         color: '#374151',
                         transition: 'background-color 0.2s'
                       }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                      onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#f3f4f6'}
+                      onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = 'transparent'}
                       onClick={(e) => {
                         e.stopPropagation();
                         setShowUserDropdown(false);
@@ -1048,8 +1050,8 @@ const AppContentWithNotifications = () => {
                         color: '#ef4444',
                         transition: 'background-color 0.2s'
                       }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#fef2f2'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                      onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#fef2f2'}
+                      onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = 'transparent'}
                       onClick={(e) => {
                         e.stopPropagation();
                         setShowUserDropdown(false);
@@ -1072,7 +1074,7 @@ const AppContentWithNotifications = () => {
         </header>
 
         <div className="page-content">
-          {RenderContent()}
+          <RenderContent />
         </div>
       </main>
 
@@ -1102,13 +1104,13 @@ const AppContentWithNotifications = () => {
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'scale(1.1)';
             e.currentTarget.style.backgroundColor = '#128C7E';
-            const tooltip = e.currentTarget.querySelector('.whatsapp-tooltip');
+            const tooltip = e.currentTarget.querySelector('.whatsapp-tooltip') as HTMLElement;
             if (tooltip) tooltip.style.opacity = '1';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = 'scale(1)';
             e.currentTarget.style.backgroundColor = '#25D366';
-            const tooltip = e.currentTarget.querySelector('.whatsapp-tooltip');
+            const tooltip = e.currentTarget.querySelector('.whatsapp-tooltip') as HTMLElement;
             if (tooltip) tooltip.style.opacity = '0';
           }}
           aria-label="Fale conosco no WhatsApp"
@@ -1144,9 +1146,9 @@ const AppContentWithNotifications = () => {
       )}
     </div>
   );
-}
+};
 
-function App() {
+const App: React.FC = () => {
   return (
     <ToastProvider>
       <AuthProvider>
@@ -1171,6 +1173,6 @@ function App() {
       </AuthProvider>
     </ToastProvider>
   );
-}
+};
 
-export default App; 
+export default App;

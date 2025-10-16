@@ -90,7 +90,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setToken(null);
       
-      const response = await fetch(`${API_BASE_URL}/login`, {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -104,7 +104,17 @@ export const AuthProvider = ({ children }) => {
         throw new Error(data.error || 'Erro no login');
       }
 
-      const { token: newToken, usuario } = data;
+      // Extrair token e usuário da resposta
+      let newToken, usuario;
+      if (data.success && data.data) {
+        // Nova estrutura do backend TypeScript
+        newToken = data.data.token;
+        usuario = data.data.user;
+      } else {
+        // Estrutura antiga (fallback)
+        newToken = data.token;
+        usuario = data.usuario;
+      }
       
       // Limpar flags de tutoriais e modais (importante para evitar confusion entre tipos de usuário)
       localStorage.removeItem('welcome-completed');
