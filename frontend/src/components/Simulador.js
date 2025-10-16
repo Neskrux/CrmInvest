@@ -123,7 +123,12 @@ const Simulador = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'start' }}>
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: window.innerWidth <= 768 ? '1fr' : '1fr 1fr', 
+        gap: '2rem', 
+        alignItems: 'start' 
+      }}>
         {/* Formulário de Entrada */}
         <div className="card">
           <div className="card-header">
@@ -343,14 +348,14 @@ const Simulador = () => {
             </p>
           </div>
           <div className="card-content">
-            <div className="table-container">
+            <div className="table-container" style={{ overflowX: 'auto' }}>
               <table className="table">
                 <thead>
                   <tr>
                     <th>Antecipação</th>
                     <th>Você Recebe</th>
-                    <th>Parcela do Cliente</th>
-                    <th>Total Cliente</th>
+                    <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Parcela do Cliente</th>
+                    <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Total Cliente</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -387,8 +392,8 @@ const Simulador = () => {
                           {meses} meses
                         </td>
                         <td>{formatarMoeda(valorAntecipacao)}</td>
-                        <td>{formatarMoeda(valorParcela)}</td>
-                        <td>{formatarMoeda(totalCliente)}</td>
+                        <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarMoeda(valorParcela)}</td>
+                        <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarMoeda(totalCliente)}</td>
                       </tr>
                     );
                   })}

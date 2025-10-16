@@ -143,18 +143,18 @@ const Indicacoes = () => {
   const mensagensClinicas = [
     {
       id: 1,
-      titulo: 'Receba à Vista - Paciente Paga Parcelado',
-      texto: `Prezado(a) proprietário(a) de clínica,\n\nApresentamos uma proposta comercial que pode aumentar significativamente seu faturamento.\n\nComo funciona:\n• Paciente faz tratamento de R$ 5.000\n• Ele parcela em 10x no boleto\n• Você recebe os R$ 5.000 à vista\n• Nós cuidamos da cobrança\n\nVantagens para sua clínica:\n• Eliminação do risco de inadimplência\n• Fluxo de caixa garantido\n• Aumento no número de pacientes\n• Pacientes pré-aprovados para tratamento\n• Sem taxas de cartão de crédito\n\nNossos números:\n• 85% de aprovação dos pacientes\n• Ticket médio: R$ 3.500\n• 15-20 novos pacientes por mês\n• Pagamento em D+1 útil\n\nTrabalhamos com mais de 200 clínicas parceiras em todo o Brasil.\n\nEntre em contato para conhecer nossa proposta:`
+      titulo: 'Gestão de Boletos - Sem Taxas',
+      texto: `Prezado(a) proprietário(a),\n\nOferecemos gestão completa de boletos bancários para clínicas estéticas e odontológicas.\n\nNossa proposta:\n• Gestão total de boletos bancários\n• Cobrança automatizada e eficiente\n• Zero taxa de mensalidade\n• Zero taxa de adesão\n• Zero taxa de setup\n\nComo funciona:\n• Pacientes parcelam no boleto (até 36x)\n• Nós gerenciamos toda emissão\n• Nós executamos toda cobrança\n• Nós acompanhamos os pagamentos\n• Nós trazemos mais pacientes para sua clínica\n\nSem burocracias, sem custos ocultos.\n\nInteressado em nossa parceria?`
     },
     {
       id: 2,
-      titulo: 'Solução para Agenda e Inadimplência',
-      texto: `Prezada clínica,\n\nIdentificamos que muitas clínicas enfrentam os seguintes desafios:\n• Agenda com baixa ocupação\n• Alto índice de inadimplência\n• Pacientes que desistem por falta de crédito\n• Fluxo de caixa irregular\n\nNossa solução:\n\n1. Enviamos pacientes pré-aprovados\n2. Você atende e fecha o tratamento\n3. Recebe o valor à vista em 24h\n4. Nós gerenciamos a cobrança\n\nBenefícios comprovados:\n• Aumento médio de 35% no faturamento\n• Zero inadimplência para a clínica\n• Pacientes que realmente realizam o tratamento\n• Gestão completa da cobrança\n• Sistema legal e transparente\n\nExemplo de resultado:\nClínica parceira - Odontologia\nAntes: 40 pacientes/mês\nDepois: 95 pacientes/mês\nAumento no faturamento: R$ 65.000/mês\n\nVagas limitadas por região. Entre em contato:`
+      titulo: 'Aumente seu Faturamento',
+      texto: `Clínica parceira,\n\nVocê está perdendo vendas por falta de opções de pagamento?\n\nNossa solução:\n• Pacientes pagam no boleto (sem cartão)\n• Cobrança bancária automatizada\n• Controle total dos pagamentos\n• Relatórios financeiros detalhados\n• Suporte técnico dedicado\n\nSem custos:\n• Sem taxa mensal\n• Sem taxa de adesão\n• Sem taxa de setup\n• Sem taxa de manutenção\n\nResultados comprovados:\n• +40% no faturamento médio\n• +25 novos pacientes/mês\n• 0% inadimplência para você\n• Mais pacientes para sua clínica\n\nQuer aumentar suas vendas sem risco?`
     },
     {
       id: 3,
-      titulo: 'Antecipação de Boletos - Aumento de Faturamento',
-      texto: `Prezado(a) proprietário(a),\n\nPara clínicas que desejam:\n• Aumentar o número de pacientes\n• Receber sempre à vista\n• Eliminar inadimplência\n• Melhorar a ocupação da agenda\n\nO problema: 60% dos pacientes não possuem cartão com limite suficiente.\nNossa solução: Antecipamos o pagamento via boleto.\n\nComo funciona:\n• Paciente sem cartão/dinheiro\n• Quer fazer tratamento de R$ 8.000\n• Parcela em 12x no boleto\n• Você recebe R$ 8.000 à vista\n• Nós gerenciamos a cobrança\n\nDiferenciais:\n• Aprovação em até 24h\n• Pagamento em D+1\n• Taxa menor que cartão de crédito\n• Atendimento a todas as classes sociais\n• Suporte completo\n\nMédia das nossas clínicas parceiras:\n• 20 novos pacientes por mês\n• Ticket médio: R$ 3.800\n• Taxa de conversão: 88%\n\nEntre em contato para mais informações:`
+      titulo: 'Gestão Financeira Completa',
+      texto: `Prezado(a) proprietário(a),\n\nTrabalhamos exclusivamente com clínicas estéticas e odontológicas há mais de 3 anos.\n\nNossa especialidade:\n• Gestão completa de boletos bancários\n• Emissão e controle automatizado\n• Cobrança bancária eficiente\n• Aprovação em 24 horas\n• Pagamento D+1\n\nNossa proposta:\n• Zero taxa de mensalidade\n• Zero taxa de adesão\n• Zero custos ocultos\n• Zero burocracias\n\nComo funciona:\n1. Paciente faz tratamento\n2. Parcela no boleto\n3. Nós cuidamos da cobrança\n4. Você recebe sem inadimplência\n5. Nós trazemos mais pacientes para sua clínica\n\nInteressado em uma parceria de sucesso?`
     }
   ];
 
@@ -680,7 +680,7 @@ const Indicacoes = () => {
             Comece a Indicar
           </h1>
           <p className="header-subtitle">
-            Siga os passos abaixo para começar a indicar e ganhar dinheiro
+            Siga os passos abaixo para começar a ganhar dinheiro apenas enviando mensagens
           </p>
           
           {/* Botão Ver Tutorial - Mobile: abaixo do texto */}
@@ -755,242 +755,17 @@ const Indicacoes = () => {
         </button>
       </div>
 
-      {/* Seção de Comissões em Destaque */}
-      <div 
-        data-tutorial="comissoes"
-        style={{
-          padding: '2rem',
-          borderRadius: '16px',
-          margin: '2rem auto',
-          maxWidth: '1200px',
-          boxShadow: '0 20px 60px rgba(102, 126, 234, 0.3)'
-        }}>
-        <div style={{
-          textAlign: 'center',
-          color: '#1e293b ',
-          marginBottom: '2rem'
-        }}>
-          <h2 style={{
-            fontSize: '2rem',
-            fontWeight: '700',
-            marginBottom: '0.5rem',
-            color: '#1e293b '
-          }}>
-            Quanto você ganha com suas indicações?
-          </h2>
-          <p style={{
-            fontSize: '1.1rem',
-            opacity: 0.95,
-            maxWidth: '800px',
-            margin: '0 auto'
-          }}>
-            Receba comissões atrativas por cada indicação que fechar conosco
-          </p>
-        </div>
-
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: window.innerWidth <= 768 ? '1fr' : 'repeat(2, 1fr)',
-          gap: '1.5rem',
-          maxWidth: '900px',
-          margin: '0 auto'
-        }}>
-          {/* Card Clínicas */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.95)',
-            borderRadius: '12px',
-            padding: '2rem',
-            textAlign: 'center',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
-            border: '3px solid rgba(255, 255, 255, 0.3)',
-            transition: 'transform 0.3s ease',
-            position: 'relative'
-          }}>
-            <div style={{
-              width: '60px',
-              height: '60px',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 1rem'
-            }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                <polyline points="9 22 9 12 15 12 15 22"/>
-              </svg>
-            </div>
-            <h3 style={{
-              fontSize: '1.3rem',
-              fontWeight: '700',
-              color: '#1f2937',
-              marginBottom: '1rem'
-            }}>
-              Indicação de Clínicas Estéticas ou Odontológicas
-            </h3>
-            <div style={{
-              fontSize: '3rem',
-              fontWeight: '800',
-              color: '#10b981',
-              marginBottom: '0.5rem',
-              lineHeight: '1'
-            }}>
-              R$ 100
-            </div>
-            <p style={{
-              fontSize: '1rem',
-              color: '#6b7280',
-              fontWeight: '500',
-              marginBottom: '1rem'
-            }}>
-              por clínica indicada
-            </p>
-            
-            {/* Destaque do Bônus ES */}
-            <div style={{
-              background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
-              padding: '1rem',
-              borderRadius: '8px',
-              border: '2px solid #f59e0b',
-              marginBottom: '1rem',
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
-              <div style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: '3px',
-                background: 'linear-gradient(90deg, #f59e0b 0%, #d97706 50%, #f59e0b 100%)',
-                backgroundSize: '200% 100%',
-                animation: 'shimmer 2s linear infinite'
-              }}></div>
-              <div style={{
-                fontSize: '0.75rem',
-                color: '#92400e',
-                fontWeight: '600',
-                textTransform: 'uppercase',
-                marginBottom: '0.25rem',
-                letterSpacing: '0.5px'
-              }}>
-                Bônus Especial
-              </div>
-              <div style={{
-                fontSize: '1.5rem',
-                fontWeight: '800',
-                color: '#f59e0b',
-                marginBottom: '0.25rem'
-              }}>
-                R$ 200
-              </div>
-              <div style={{
-                fontSize: '0.85rem',
-                color: '#92400e',
-                fontWeight: '600'
-              }}>
-                Para clínicas no Espírito Santo ou Curitiba
-              </div>
-            </div>
-            
-            <div style={{
-              background: '#f0fdf4',
-              padding: '0.75rem',
-              borderRadius: '8px',
-              border: '1px solid #bbf7d0'
-            }}>
-              <p style={{
-                fontSize: '0.9rem',
-                color: '#065f46',
-                fontWeight: '600',
-                margin: 0
-              }}>
-                ✓ Pagamento quando a clínica fechar parceria conosco
-              </p>
-            </div>
-          </div>
-
-          {/* Card Pacientes */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.95)',
-            borderRadius: '12px',
-            padding: '2rem',
-            textAlign: 'center',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
-            border: '3px solid rgba(255, 255, 255, 0.3)',
-            transition: 'transform 0.3s ease'
-          }}>
-            <div style={{
-              width: '60px',
-              height: '60px',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 1rem'
-            }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" style={{ marginLeft: '0.5rem' }}>
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-              </svg>
-            </div>
-            <h3 style={{
-              fontSize: '1.3rem',
-              fontWeight: '700',
-              color: '#1f2937',
-              marginBottom: '1rem'
-            }}>
-              Indicação de Pacientes
-            </h3>
-            <div style={{
-              fontSize: '3rem',
-              fontWeight: '800',
-              color: '#3b82f6',
-              marginBottom: '0.5rem',
-              lineHeight: '1'
-            }}>
-              R$ 50
-            </div>
-            <p style={{
-              fontSize: '1rem',
-              color: '#6b7280',
-              fontWeight: '500',
-              marginBottom: '1rem'
-            }}>
-              a cada R$ 5.000 do tratamento
-            </p>
-            <div style={{
-              background: '#eff6ff',
-              padding: '0.75rem',
-              borderRadius: '8px',
-              border: '1px solid #bfdbfe'
-            }}>
-              <p style={{
-                fontSize: '0.9rem',
-                color: '#1e40af',
-                fontWeight: '600',
-                margin: 0
-              }}>
-                  Ex: Tratamento de R$ 3.000 = R$ 30 de comissão<br /><br />
-                 ✓ Comissão após primeiro pagamento do tratamento
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
         {/* Tabs executivas */}
       <h2 style={{
-        fontSize: '2rem',
+        fontSize: window.innerWidth <= 768 ? '1.5rem' : '2rem',
         fontWeight: '700',
         marginBottom: '1rem',
         color: '#1e293b ',
         textAlign: 'center',
-        marginTop: '2rem'
-      }}>Escolha o que você quer indicar</h2>
-      <div className="tabs-container" data-tutorial="escolha-tipo">
+        marginTop: '2rem',
+        padding: window.innerWidth <= 768 ? '0 1.5rem' : '0'
+      }}>Clique no que você quer indicar</h2>
+      <div className="tabs-container" data-tutorial="escolha-tipo" style={{ padding: window.innerWidth <= 768 ? '0 1.5rem' : '0' }}>
         <div className="tabs-wrapper">
           <button
             className={`tab-button ${activeTab === 'clinicas' ? 'active' : ''}`}
@@ -1005,18 +780,19 @@ const Indicacoes = () => {
               </div>
                      <div className="tab-info">
                        <span className="tab-text">Clínicas</span>
-                       <span className="tab-subtitle">Indicar clínicas estéticas ou odontológicas</span>
+                       <span className="tab-subtitle">Indicar clínicas estéticas <br/> ou odontológicas</span>
                        <span style={{
                          display: 'inline-block',
                          marginTop: '0.25rem',
                          padding: '0.25rem 0.5rem',
                          background: '#10b981',
                          color: 'white',
-                         fontSize: '0.75rem',
+                         fontSize: window.innerWidth <= 768 ? '0.6rem' : '0.75rem',
                          fontWeight: '700',
                          borderRadius: '6px'
                        }}>
-                         R$ 100 por clínica indicada
+                         R$ 100 por clínica indicada <br />
+                         que fechar parceria conosco
                        </span>
                      </div>
             </div>
@@ -1041,514 +817,119 @@ const Indicacoes = () => {
                          padding: '0.25rem 0.5rem',
                          background: '#3b82f6',
                          color: 'white',
-                         fontSize: '0.75rem',
+                         fontSize: window.innerWidth <= 768 ? '0.6rem' : '0.75rem',
                          fontWeight: '700',
                          borderRadius: '6px'
                        }}>
-                         R$ 50 a cada R$ 5.000 <br />
-                         Após primeiro pagamento do tratamento
+                         1% do valor do tratamento <br />
+                         que fizer conosco
                        </span>
                      </div>
                     </div>
               </button>
             </div>
           </div>
-      {/* Formulário de Cadastro Direto */}
-      <div style={{
-        maxWidth: '900px',
-        margin: '3rem auto 2rem',
-        padding: '0 1rem'
-      }}>
-        <div 
-          data-tutorial="formulario-cadastro"
-          style={{
-            borderRadius: '16px',
-            padding: '2.5rem',
-            border: '2px solid #1e293b',
-            boxShadow: '0 8px 32px rgba(59, 130, 246, 0.15)'
+
+      {/* Seção explicativa - O que vou indicar? */}
+      <div className="explicacao-container" style={{ padding: window.innerWidth <= 768 ? '0 1.5rem' : '0', marginTop: '3rem' }}>
+        <div style={{
+          borderRadius: '16px',
+          padding: '2.5rem',
+          textAlign: 'center',
+          maxWidth: '900px',
+          margin: '0 auto'
+        }}>
+          <h2 style={{
+            fontSize: window.innerWidth <= 768 ? '1.5rem' : '2rem',
+            fontWeight: '700',
+            color: '#1e293b',
+            marginBottom: '1.5rem'
           }}>
-          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-      <h2 style={{
-              fontSize: '1.75rem',
-        fontWeight: '700',
-              color: '#1e293b',
-              marginBottom: '0.5rem'
-            }}>
-              Cadastro de {activeTab === 'clinicas' ? 'Clínica' : 'Paciente'}
-            </h2>
-            <p style={{
-              fontSize: '1rem',
-              color: '#1e293b',
-              marginBottom: 0
-            }}>
-              Preencha os dados abaixo para cadastrar {activeTab === 'clinicas' ? 'uma clínica' : 'um paciente'} diretamente no sistema
-            </p>
-          </div>
-
-          <form onSubmit={handleCadastroSubmit}>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: window.innerWidth <= 768 ? '1fr' : 'repeat(2, 1fr)',
-              gap: '1.5rem',
-              marginBottom: '1.5rem'
-            }}>
-              {/* Nome */}
-              <div style={{ gridColumn: window.innerWidth <= 768 ? '1' : 'span 2' }}>
-                <label style={{
-                  display: 'block',
-                  fontWeight: '600',
-                  color: '#1e293b',
-                  marginBottom: '0.5rem',
-                  fontSize: '0.95rem'
-                }}>
-                  Nome {activeTab === 'clinicas' ? 'da Clínica' : 'do Paciente'} *
-                </label>
-                <input
-                  type="text"
-                  name="nome"
-                  value={formCadastro.nome}
-                  onChange={handleCadastroInputChange}
-                  placeholder={`Digite o nome ${activeTab === 'clinicas' ? 'da clínica' : 'do paciente'}`}
-                  disabled={submittingCadastro}
-                  style={{
-                    width: '100%',
-                    padding: '0.875rem',
-                    border: formErrors.nome ? '2px solid #ef4444' : '2px solid #1e293b',
-                    borderRadius: '10px',
-                    fontSize: '1rem',
-                    transition: 'all 0.3s ease',
-                    backgroundColor: 'white',
-                    outline: 'none'
-                  }}
-                  onFocus={(e) => {
-                    if (!formErrors.nome) e.target.style.borderColor = '#1e293b';
-                  }}
-                  onBlur={(e) => {
-                    if (!formErrors.nome) e.target.style.borderColor = '#1e293b';
-                  }}
-                />
-                {formErrors.nome && (
-                  <span style={{
-                    color: '#ef4444',
-                    fontSize: '0.875rem',
-                    marginTop: '0.25rem',
-                    display: 'block'
-                  }}>
-                    {formErrors.nome}
-                  </span>
-                )}
-              </div>
-
-              {/* Responsável - apenas para clínicas */}
-              {activeTab === 'clinicas' && (
-                <div style={{ gridColumn: window.innerWidth <= 768 ? '1' : 'span 2' }}>
-                  <label style={{
-                    display: 'block',
-                    fontWeight: '600',
-                    color: '#1e293b',
-                    marginBottom: '0.5rem',
-                    fontSize: '0.95rem'
-                  }}>
-                    Responsável pela Clínica *
-                  </label>
-                  <input
-                    type="text"
-                    name="responsavel"
-                    value={formCadastro.responsavel}
-                    onChange={handleCadastroInputChange}
-                    placeholder="Digite o nome do responsável"
-                    disabled={submittingCadastro}
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem',
-                      border: formErrors.responsavel ? '2px solid #ef4444' : '2px solid #1e293b',
-                      borderRadius: '10px',
-                      fontSize: '1rem',
-                      transition: 'all 0.3s ease',
-                      backgroundColor: 'white',
-                      outline: 'none'
-                    }}
-                    onFocus={(e) => {
-                      if (!formErrors.responsavel) e.target.style.borderColor = '#1e293b';
-                    }}
-                    onBlur={(e) => {
-                      if (!formErrors.responsavel) e.target.style.borderColor = '#1e293b';
-                    }}
-                  />
-                  {formErrors.responsavel && (
-                    <span style={{
-                      color: '#ef4444',
-                      fontSize: '0.875rem',
-                      marginTop: '0.25rem',
-                      display: 'block'
-                    }}>
-                      {formErrors.responsavel}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* WhatsApp */}
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontWeight: '600',
-                  color: '#1e293b',
-                  marginBottom: '0.5rem',
-                  fontSize: '0.95rem'
-                }}>
-                  WhatsApp (Celular) *
-                </label>
-                <input
-                  type="tel"
-                  name="telefone"
-                  value={formCadastro.telefone}
-                  onChange={handleCadastroInputChange}
-                  placeholder="(11) 99999-9999"
-                  disabled={submittingCadastro}
-                  style={{
-                    width: '100%',
-                    padding: '0.875rem',
-                    border: formErrors.telefone ? '2px solid #ef4444' : '2px solid #1e293b',
-                    borderRadius: '10px',
-                    fontSize: '1rem',
-                    transition: 'all 0.3s ease',
-                    backgroundColor: 'white',
-                    outline: 'none'
-                  }}
-                  onFocus={(e) => {
-                    if (!formErrors.telefone) e.target.style.borderColor = '#1e293b';
-                  }}
-                  onBlur={(e) => {
-                    if (!formErrors.telefone) e.target.style.borderColor = '#1e293b';
-                  }}
-                />
-                <div style={{
-                  fontSize: '0.75rem',
-                  color: '#6b7280',
-                  marginTop: '0.25rem',
-                  fontStyle: 'italic'
-                }}>
-                  Apenas número de celular (não aceita telefone fixo)
-                </div>
-                {formErrors.telefone && (
-                  <span style={{
-                    color: '#ef4444',
-                    fontSize: '0.875rem',
-                    marginTop: '0.25rem',
-                    display: 'block'
-                  }}>
-                    {formErrors.telefone}
-                  </span>
-                )}
-              </div>
-
-              {/* Estado */}
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontWeight: '600',
-                  color: '#1e293b ',
-                  marginBottom: '0.5rem',
-                  fontSize: '0.95rem'
-                }}>
-                  Estado *
-                </label>
-                <select
-                  name="estado"
-                  value={formCadastro.estado}
-                  onChange={handleCadastroInputChange}
-                  disabled={submittingCadastro}
-                  style={{
-                    width: '100%',
-                    padding: '0.875rem',
-                    border: formErrors.estado ? '2px solid #ef4444' : '2px solid #1e293b ',
-                    borderRadius: '10px',
-                    fontSize: '1rem',
-                    transition: 'all 0.3s ease',
-                    backgroundColor: 'white',
-                    outline: 'none',
-                    cursor: 'pointer'
-                  }}
-                  onFocus={(e) => {
-                    if (!formErrors.estado) e.target.style.borderColor = '#1e293b ';
-                  }}
-                  onBlur={(e) => {
-                    if (!formErrors.estado) e.target.style.borderColor = '#1e293b ';
-                  }}
-                >
-                  <option value="">Selecione o estado</option>
-                  {estadosBrasileiros.map(estado => (
-                    <option key={estado.sigla} value={estado.sigla}>
-                      {estado.sigla} - {estado.nome}
-                    </option>
-                  ))}
-                </select>
-                {formErrors.estado && (
-                  <span style={{
-                    color: '#1e293b ',
-                    fontSize: '0.875rem',
-                    marginTop: '0.25rem',
-                    display: 'block'
-                  }}>
-                    {formErrors.estado}
-                  </span>
-                )}
-              </div>
-
-              {/* Cidade */}
-              <div style={{ gridColumn: window.innerWidth <= 768 ? '1' : 'span 2' }}>
-                <label style={{
-                  display: 'block',
-                  fontWeight: '600',
-                  color: '#1e293b ',
-                  marginBottom: '0.5rem',
-                  fontSize: '0.95rem'
-                }}>
-                  Cidade *
-                </label>
-                {formCadastro.estado && cidadesPorEstado[formCadastro.estado] && !cidadeCustomizadaCadastro ? (
-                  <select
-                    name="cidade"
-                    value={formCadastro.cidade}
-                    onChange={(e) => {
-                      if (e.target.value === 'OUTRA') {
-                        setCidadeCustomizadaCadastro(true);
-                        setFormCadastro(prev => ({ ...prev, cidade: '' }));
-                      } else {
-                        handleCadastroInputChange(e);
-                      }
-                    }}
-                    disabled={submittingCadastro}
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem',
-                      border: formErrors.cidade ? '2px solid #ef4444' : '2px solid #1e293b ',
-                      borderRadius: '10px',
-                      fontSize: '1rem',
-                      transition: 'all 0.3s ease',
-                      backgroundColor: 'white',
-                      outline: 'none',
-                      cursor: 'pointer'
-                    }}
-                    onFocus={(e) => {
-                      if (!formErrors.cidade) e.target.style.borderColor = '#1e293b ';
-                    }}
-                    onBlur={(e) => {
-                      if (!formErrors.cidade) e.target.style.borderColor = '#1e293b ';
-                    }}
-                  >
-                    <option value="">Selecione a cidade</option>
-                    {cidadesPorEstado[formCadastro.estado].map(cidade => (
-                      <option key={cidade} value={cidade}>{cidade}</option>
-                    ))}
-                    <option value="OUTRA">Outra cidade</option>
-                  </select>
-                ) : (
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1 }}>
-                      <input
-                        type="text"
-                        name="cidade"
-                        value={formCadastro.cidade}
-                        onChange={handleCadastroInputChange}
-                        placeholder="Digite o nome da cidade"
-                        disabled={submittingCadastro || !formCadastro.estado}
-                        style={{
-                          width: '100%',
-                          padding: '0.875rem',
-                          border: formErrors.cidade ? '2px solid #ef4444' : '2px solid #1e293b ',
-                          borderRadius: '10px',
-                          fontSize: '1rem',
-                          transition: 'all 0.3s ease',
-                          backgroundColor: 'white',
-                          outline: 'none'
-                        }}
-                        onFocus={(e) => {
-                          if (!formErrors.cidade) e.target.style.borderColor = '#1e293b ';
-                        }}
-                        onBlur={(e) => {
-                          if (!formErrors.cidade) e.target.style.borderColor = '#1e293b ';
-                        }}
-                      />
-                    </div>
-                    {formCadastro.estado && cidadesPorEstado[formCadastro.estado] && cidadeCustomizadaCadastro && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCidadeCustomizadaCadastro(false);
-                          setFormCadastro(prev => ({ ...prev, cidade: '' }));
-                        }}
-                        disabled={submittingCadastro}
-                        style={{
-                          padding: '0.875rem 1rem',
-                          background: '#1e293b ',
-                          color: '#1e293b ',
-                          border: '2px solid #1e293b ',
-                          borderRadius: '10px',
-                          fontSize: '0.875rem',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          whiteSpace: 'nowrap',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.target.style.background = '#1e293b ';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.background = '#1e293b ';
-                        }}
-                      >
-                        Voltar
-                      </button>
-                    )}
-                  </div>
-                )}
-                {formErrors.cidade && (
-                  <span style={{
-                    color: '#1e293b ',
-                    fontSize: '0.875rem',
-                    marginTop: '0.25rem',
-                    display: 'block'
-                  }}>
-                    {formErrors.cidade}
-                  </span>
-                )}
-              </div>
-
-              {/* Observações */}
-              <div style={{ gridColumn: window.innerWidth <= 768 ? '1' : 'span 2' }}>
-                <label style={{
-                  display: 'block',
-                  fontWeight: '600',
-                  color: '#1e293b ',
-                  marginBottom: '0.5rem',
-                  fontSize: '0.95rem'
-                }}>
-                  Observações
-                </label>
-                <textarea
-                  name="observacoes"
-                  value={formCadastro.observacoes}
-                  onChange={handleCadastroInputChange}
-                  placeholder={`Adicione observações sobre ${activeTab === 'clinicas' ? 'a clínica' : 'o paciente'} (opcional)`}
-                  disabled={submittingCadastro}
-                  rows="3"
-                  style={{
-                    width: '100%',
-                    padding: '0.875rem',
-                    border: '2px solid #1e293b ',
-                    borderRadius: '10px',
-                    fontSize: '1rem',
-                    transition: 'all 0.3s ease',
-                    backgroundColor: 'white',
-                    outline: 'none',
-                    resize: 'vertical',
-                    fontFamily: 'inherit'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#1e293b ';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#1e293b ';
-                  }}
-                />
+            O que vou indicar?
+          </h2>
+          
+          {activeTab === 'clinicas' ? (
+            <div>
+              <p style={{
+                fontSize: window.innerWidth <= 768 ? '1rem' : '1.1rem',
+                color: '#475569',
+                lineHeight: '1.6',
+                marginBottom: '1.5rem',
+                maxWidth: '800px',
+                margin: '0 auto 1.5rem'
+              }}>
+                <strong>Você indicará nosso produto para clínicas estéticas e odontológicas.</strong> <br /> <br />
+                <strong>O que é nosso produto?</strong> <br />
+                <p>Nosso produto é uma parceria, onde realizamos a gestão de boletos e cobranças dessas clínicas sem taxas de adesão ou mensalidade.</p>
+              </p>
+              <div style={{
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: 'white',
+                padding: '1rem 1.5rem',
+                borderRadius: '12px',
+                fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem',
+                fontWeight: '600',
+                display: 'inline-block'
+              }}>
+                Indique para clínicas que querem fazer a gestão de boletos e cobranças sem taxas de adesão ou mensalidade.
               </div>
             </div>
-
-            {/* Botão de Submit */}
-            <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
-              <button
-                type="submit"
-                disabled={submittingCadastro}
-                style={{
-                  padding: '1rem 3rem',
-                  background: submittingCadastro 
-                    ? '#1e293b ' 
-                    : 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontSize: '1.1rem',
-                  fontWeight: '700',
-                  cursor: submittingCadastro ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s ease',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}
-                onMouseEnter={(e) => {
-                  if (!submittingCadastro) {
-                    e.target.style.transform = 'translateY(-2px)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.transform = 'translateY(0)';
-                }}
-              >
-                {submittingCadastro ? (
-                  <>
-                    <div style={{
-                      width: '20px',
-                      height: '20px',
-                      border: '3px solid rgba(255, 255, 255, 0.3)',
-                      borderTop: '3px solid white',
-                      borderRadius: '50%',
-                      animation: 'spin 1s linear infinite'
-                    }} />
-                    Cadastrando...
-                  </>
-                ) : (
-                  <>
-                    Cadastrar {activeTab === 'clinicas' ? 'Clínica' : 'Paciente'}
-                  </>
-                )}
-              </button>
+          ) : (
+            <div>
+              <p style={{
+                fontSize: window.innerWidth <= 768 ? '1rem' : '1.1rem',
+                color: '#475569',
+                lineHeight: '1.6',
+                marginBottom: '1.5rem',
+                maxWidth: '800px',
+                margin: '0 auto 1.5rem'
+              }}>
+                <strong>Você indicará nossa solução para os pacientes.</strong><br /> <br />
+                <strong>O que é nossa solução?</strong> <br />
+                <p>Nossa solução é a possibilidade de fazer tratamentos estéticos ou odontológicos parcelados no boleto, conectamos qualquer pessoa, à uma clinica parceira.</p>
+              </p>
+              <div style={{
+                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                color: 'white',
+                padding: '1rem 1.5rem',
+                borderRadius: '12px',
+                fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem',
+                fontWeight: '600',
+                display: 'inline-block'
+              }}>
+                Indique um parente, um amigo, um conhecido, ou até mesmo você..
+              </div>
             </div>
-          </form>
+          )}
 
-          {/* Mensagem informativa */}
-          <div style={{
-            marginTop: '1.5rem',
-            padding: '1rem',
-            background: 'rgba(59, 130, 246, 0.1)',
-            borderLeft: '4px solid #3b82f6',
-            borderRadius: '8px'
+          <h2 style={{
+            fontSize: window.innerWidth <= 768 ? '1.5rem' : '2rem',
+            fontWeight: '700',
+            color: '#1e293b',
+            marginTop: '3rem'
           }}>
-            <p style={{
-              margin: 0,
-              fontSize: '0.9rem',
-              color: '#1e40af',
-              lineHeight: '1.6'
-            }}>
-              <strong>Dica:</strong> {activeTab === 'clinicas' 
-                ? 'Ao cadastrar uma clínica, ela será automaticamente atribuída a você e aparecerá na sua página de clínicas.'
-                : 'Ao cadastrar um paciente, ele será automaticamente atribuído a você e aparecerá na sua página de pacientes.'}
-            </p>
-          </div>
+            E agora, o que eu faço?
+          </h2>
         </div>
       </div>
 
       {/* Processo executivo */}
-      <div className="process-container">
-        
-
-        {/* Passo 2: Mensagens Corporativas */}
+      <div className="process-container" style={{ padding: window.innerWidth <= 768 ? '0 1.5rem' : '0' }}>
         <div className="process-step" data-tutorial="mensagens">
         <h2 style={{
-        fontSize: '2rem',
+        fontSize: window.innerWidth <= 768 ? '1.4rem' : '2rem',
         fontWeight: '700',
         color: '#1e293b ',
         textAlign: 'center',
-        marginBottom: '4rem',
-        padding: '1rem'}}>
-        Ou faça você mesmo o primeiro contato
+        marginBottom: window.innerWidth <= 768 ? '2rem' : '4rem',
+        padding: window.innerWidth <= 768 ? '1rem 0.5rem' : '1rem'}}>
+        Agora faça o primeiro contato com {activeTab === 'pacientes' ? 'os pacientes' : 'as clínicas'}!
         </h2>
-          <div className="step-header">
+          <div className="step-header"> 
             <div className="step-number">1</div>
             <div className="step-content">
-                   <h2>Escolha uma Mensagem (Opcional)</h2>
-                   <p>Use um dos modelos prontos ou personalize do seu jeito</p>
+                   <h2 style={{ fontSize: window.innerWidth <= 768 ? '1.1rem' : '1.25rem' }}>Clique em uma Mensagem</h2>
+                   <p style={{ fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem' }}>Use uma das nossas mensagens pré-prontas para entrar em contato e explicar nossa proposta</p>
             </div>
           </div>
           <div className="messages-grid">
@@ -1598,8 +979,8 @@ const Indicacoes = () => {
           <div className="step-header">
             <div className="step-number">2</div>
             <div className="step-content">
-                   <h2>Escolha uma Imagem (Opcional)</h2>
-                   <p>Selecione a imagem que mais combina com seu público, ou envie apenas a mensagem de texto</p>
+                   <h2 style={{ fontSize: window.innerWidth <= 768 ? '1.1rem' : '1.25rem' }}>Clique em uma Imagem (Opcional)</h2>
+                   <p style={{ fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem' }}>Selecione a imagem que mais combina com sua mensagem, ou envie apenas a mensagem de texto sem imagem</p>
             </div>
           </div>
           <div className="carousel-container">
@@ -1683,10 +1064,10 @@ const Indicacoes = () => {
           {selectedMessage && (
             <div className="complete-message-card">
               <div className="message-header">
-                  <h4>Envie essa mensagem para seus possíveis clientes!</h4>
+                  <h4>Envie essa mensagem para {activeTab === 'pacientes' ? 'os pacientes' : 'as clínicas'}!</h4>
                 <button className="copy-all-button" onClick={copyFullMessage}>
                   <Copy size={16} />
-                  Copiar Mensagem
+                  Clique para copiar a mensagem
                 </button>
               </div>
               <div className="message-full-content">
@@ -1751,108 +1132,368 @@ const Indicacoes = () => {
                   </div>
                 </div>
                 
-                {/* Botão de copiar no final */}
+                {/* Botões de ação no final */}
                 <div style={{ 
                   display: 'flex', 
-                  justifyContent: 'center', 
+                  justifyContent: 'center',
+                  gap: '1rem',
                   marginTop: '1.5rem',
                   paddingTop: '1rem',
-                  borderTop: '1px solid #e5e7eb'
+                  borderTop: '1px solid #e5e7eb',
+                  flexWrap: 'wrap'
                 }}>
                   <button 
                     className="action-button primary" 
                     onClick={copyFullMessage}
                     style={{
-                      padding: '0.75rem 2rem',
-                      fontSize: '0.9rem',
+                      padding: window.innerWidth <= 768 ? '0.6rem 1.5rem' : '0.75rem 2rem',
+                      fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.5rem'
+                      gap: '0.5rem',
+                      minWidth: window.innerWidth <= 768 ? '150px' : '200px'
                     }}
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                     </svg>
-                    Copiar Mensagem Completa
+                    Clique para copiar a mensagem completa
                   </button>
-                </div>
-              </div>
-            </div>
-          )}
 
-          {/* Passo 1: Links Executivos */}
-        <div className="process-step" data-tutorial="link-personalizado">
-          <div className="step-header">
-            <div className="step-content">
-                   <h2>Esse é <strong>SEU</strong> link personalizado</h2>
-                   <p>Se não deseja utilizar nossos textos e imagens pré-definidos, você pode personalizar do seu jeito, mas não esqueça de enviar junto com o link!</p>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="loading-section">
-              <div className="loading-spinner"></div>
-                   <p>Carregando seus links...</p>
-            </div>
-          ) : (
-            <div className="links-section">
-              <div className="links-container">
-                <div className="link-card">
-                  <div className="link-header">
-                    <div className={`link-icon ${activeTab === 'pacientes' ? 'link-icon-pacientes' : ''}`}>
-                      {activeTab === 'clinicas' ?
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                          <polyline points="9 22 9 12 15 12 15 22"/>
-                        </svg> :
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                          <circle cx="9" cy="7" r="4"/>
-                        </svg>
-                      }
-                    </div>
-                    <div className="link-info">
-                           <h4>Link para {activeTab === 'clinicas' ? 'Clínicas' : 'Pacientes'}</h4>
-                           <p>Use este link para suas indicações</p>
-                    </div>
-                  </div>
-                  <div className="link-input-container">
-                    <input
-                      type="text"
-                      value={loadingLink ? 'Carregando...' : (activeTab === 'clinicas' ? linkClinicas : linkPacientes) || 'Link não disponível'}
-                      readOnly
-                      className="link-input"
-                      placeholder="Seu link personalizado será gerado aqui..."
-                    />
-                    <button
-                      className="copy-link-button"
-                      onClick={() => copyToClipboard(activeTab === 'clinicas' ? linkClinicas : linkPacientes)}
-                      disabled={loadingLink || !(activeTab === 'clinicas' ? linkClinicas : linkPacientes)}
+                  {/* Botão para encontrar clínicas próximas - apenas para tab clínicas */}
+                  {activeTab === 'clinicas' && (
+                    <button 
+                      className="action-button secondary"
+                      onClick={() => {
+                        // Detectar iOS/Safari
+                        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                        const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+                        const isAndroid = /Android/.test(navigator.userAgent);
+                        
+                        // Função simples para iOS/Safari
+                        const openForIOS = () => {
+                          // URL do Google Maps que funciona no Safari
+                          const googleMapsUrl = `https://www.google.com/maps/search/clínicas+estéticas+ou+odontológicas+near+me`;
+                          window.open(googleMapsUrl, '_blank');
+                        };
+                        
+                        // Função para Android
+                        const openForAndroid = (lat, lng) => {
+                          const mapsUrl = `geo:${lat},${lng}?q=clínicas+estéticas+ou+odontológicas`;
+                          window.open(mapsUrl, '_blank');
+                        };
+                        
+                        // Função para outros navegadores
+                        const openForOthers = (lat, lng) => {
+                          const mapsUrl = `https://www.google.com/maps/search/clínicas+estéticas+ou+odontológicas/@${lat},${lng},15z`;
+                          window.open(mapsUrl, '_blank');
+                        };
+                        
+                        // Para iOS/Safari, abrir diretamente sem geolocalização
+                        if (isIOS || isSafari) {
+                          openForIOS();
+                          return;
+                        }
+                        
+                        // Para outros dispositivos, tentar geolocalização
+                        if (navigator.geolocation && !isIOS && !isSafari) {
+                          navigator.geolocation.getCurrentPosition(
+                            (position) => {
+                              const { latitude, longitude } = position.coords;
+                              if (isAndroid) {
+                                openForAndroid(latitude, longitude);
+                              } else {
+                                openForOthers(latitude, longitude);
+                              }
+                            },
+                            () => {
+                              // Se falhar, abrir sem localização
+                              if (isAndroid) {
+                                openForAndroid(0, 0);
+                              } else {
+                                openForOthers(0, 0);
+                              }
+                            },
+                            { timeout: 3000 }
+                          );
+                        } else {
+                          // Fallback para todos
+                          if (isAndroid) {
+                            openForAndroid(0, 0);
+                          } else {
+                            openForOthers(0, 0);
+                          }
+                        }
+                      }}
+                      style={{
+                        padding: window.innerWidth <= 768 ? '0.6rem 1.5rem' : '0.75rem 2rem',
+                        fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
+                        border: '2px solid #d1d5db',
+                        color: '#374151',
+                        fontWeight: '600',
+                        minWidth: window.innerWidth <= 768 ? '150px' : '200px'
+                      }}
                     >
-                      {copiedLink ?
-                        <><Check size={16} /> Copiado!</> :
-                        <><Copy size={16} /> Copiar</>
-                      }
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                        <circle cx="12" cy="10" r="3"/>
+                      </svg>
+                      Ver clínicas próximas a mim
                     </button>
-                  </div>
+                  )}
                 </div>
               </div>
+
+              
             </div>
           )}
-        </div>
         </div>
 
         {/* Ações Finais */}
-        <div className="final-actions">
-          <h3>Tudo pronto!</h3>
-          <p>Agora é só compartilhar e acompanhar o status das suas indicações na página Clínicas ou Pacientes. <strong>Todos que se cadastrarem pelo seu link serão atribuídos a você no sistema
+        <div className="final-actions" style={{ padding: window.innerWidth <= 768 ? '0 1.5rem' : '0' }}>
+          {/* Seção de Comissões em Destaque */}
+          <div 
+            data-tutorial="comissoes"
+            style={{
+              borderRadius: '16px',
+              margin: '2rem auto'
+            }}>
+            <div style={{
+              textAlign: 'center',
+              color: '#1e293b ',
+              marginBottom: '2rem'
+            }}>
+              <h2 style={{
+                fontSize: '2rem',
+                fontWeight: '700',
+                marginBottom: '0.5rem',
+                color: '#1e293b '
+              }}>
+                Quanto você ganha com suas indicações?
+              </h2>
+              <p style={{
+                fontSize: '1.1rem',
+                opacity: 0.95,
+                maxWidth: '800px',
+                margin: '0 auto'
+              }}>
+                Receba comissões atrativas por cada indicação que fechar conosco
+              </p>
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: window.innerWidth <= 768 ? '1fr' : 'repeat(2, 1fr)',
+              gap: '1.5rem',
+              maxWidth: '900px',
+              margin: '0 auto'
+            }}>
+              {/* Card Clínicas */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.95)',
+                borderRadius: '12px',
+                padding: '2rem',
+                textAlign: 'center',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+                border: '3px solid rgba(255, 255, 255, 0.3)',
+                transition: 'transform 0.3s ease',
+                position: 'relative'
+              }}>
+                <div style={{
+                  width: '60px',
+                  height: '60px',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 1rem'
+                }}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                </div>
+                <h3 style={{
+                  fontSize: '1.3rem',
+                  fontWeight: '700',
+                  color: '#1f2937',
+                  marginBottom: '1rem'
+                }}>
+                 Clínicas Estéticas ou Odontológicas
+                </h3>
+                <div style={{
+                  fontSize: '3rem',
+                  fontWeight: '800',
+                  color: '#10b981',
+                  marginBottom: '0.5rem',
+                  lineHeight: '1'
+                }}>
+                  R$ 100
+                </div>
+                <p style={{
+                  fontSize: '1rem',
+                  color: '#6b7280',
+                  fontWeight: '500',
+                  marginBottom: '1rem'
+                }}>
+                  por clínica indicada
+                </p>
+                
+                {/* Destaque do Bônus ES */}
+                <div style={{
+                  background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  border: '2px solid #f59e0b',
+                  marginBottom: '1rem',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '3px',
+                    background: 'linear-gradient(90deg, #f59e0b 0%, #d97706 50%, #f59e0b 100%)',
+                    backgroundSize: '200% 100%',
+                    animation: 'shimmer 2s linear infinite'
+                  }}></div>
+                  <div style={{
+                    fontSize: '0.75rem',
+                    color: '#92400e',
+                    fontWeight: '600',
+                    textTransform: 'uppercase',
+                    marginBottom: '0.25rem',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Bônus Especial
+                  </div>
+                  <div style={{
+                    fontSize: '1.5rem',
+                    fontWeight: '800',
+                    color: '#f59e0b',
+                    marginBottom: '0.25rem'
+                  }}>
+                    R$ 200
+                  </div>
+                  <div style={{
+                    fontSize: '0.85rem',
+                    color: '#92400e',
+                    fontWeight: '600'
+                  }}>
+                    Para clínicas no Espírito Santo ou Curitiba
+                  </div>
+                </div>
+                
+                <div style={{
+                  background: '#f0fdf4',
+                  padding: '0.75rem',
+                  borderRadius: '8px',
+                  border: '1px solid #bbf7d0'
+                }}>
+                  <p style={{
+                    fontSize: '0.9rem',
+                    color: '#065f46',
+                    fontWeight: '600',
+                    margin: 0
+                  }}>
+                    ✓ Pagamento quando a clínica fechar parceria conosco
+                  </p>
+                </div>
+              </div>
+
+              {/* Card Pacientes */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.95)',
+                borderRadius: '12px',
+                padding: '2rem',
+                textAlign: 'center',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+                border: '3px solid rgba(255, 255, 255, 0.3)',
+                transition: 'transform 0.3s ease'
+              }}>
+                <div style={{
+                  width: '60px',
+                  height: '60px',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 1rem'
+                }}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" style={{ marginLeft: '0.5rem' }}>
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                  </svg>
+                </div>
+                <h3 style={{
+                  fontSize: '1.3rem',
+                  fontWeight: '700',
+                  color: '#1f2937',
+                  marginBottom: '1rem'
+                }}>
+                  Pacientes
+                </h3>
+                <div style={{
+                  fontSize: '3rem',
+                  fontWeight: '800',
+                  color: '#3b82f6',
+                  marginBottom: '0.5rem',
+                  lineHeight: '1'
+                }}>
+                  R$ 50
+                </div>
+                <p style={{
+                  fontSize: '1rem',
+                  color: '#6b7280',
+                  fontWeight: '500',
+                  marginBottom: '1rem'
+                }}>
+                  a cada R$ 5.000 do tratamento
+                </p>
+                <div style={{
+                  background: '#eff6ff',
+                  padding: '0.75rem',
+                  borderRadius: '8px',
+                  border: '1px solid #bfdbfe'
+                }}>
+                  <p style={{
+                    fontSize: '0.9rem',
+                    color: '#1e40af',
+                    fontWeight: '600',
+                    margin: 0
+                  }}>
+                      Ex: Tratamento de R$ 3.000 = R$ 30 de comissão<br /><br />
+                    ✓ Comissão após primeiro pagamento do tratamento
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <h3 style={{ fontSize: window.innerWidth <= 768 ? '1.3rem' : '1.5rem', padding: window.innerWidth <= 768 ? '0 1rem' : '0' }}>Tudo pronto!</h3>
+          <p style={{ fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem', padding: window.innerWidth <= 768 ? '0 1rem' : '0' }}>Agora é só compartilhar e acompanhar o status das suas indicações na página Clínicas ou Pacientes. <strong>Todos que se cadastrarem pelo seu link serão atribuídos a você no sistema
           </strong></p>
-          <div className="action-buttons">
-            <button className="action-button primary" onClick={() => window.location.href = '/dashboard'}>
+          <div className="action-buttons" style={{ padding: window.innerWidth <= 768 ? '0 1rem' : '0' }}>
+            <button 
+              className="action-button primary" 
+              onClick={() => window.location.href = '/dashboard'}
+              style={{ fontSize: window.innerWidth <= 768 ? '0.85rem' : '1rem' }}
+            >
               Ver Dashboard
             </button>
-            <button className="action-button secondary" onClick={() => window.location.href = activeTab === 'clinicas' ? '/clinicas' : '/pacientes'}>
+            <button 
+              className="action-button secondary" 
+              onClick={() => window.location.href = activeTab === 'clinicas' ? '/clinicas' : '/pacientes'}
+              style={{ fontSize: window.innerWidth <= 768 ? '0.85rem' : '1rem' }}
+            >
               Minhas Indicações
             </button>
           </div>
@@ -1923,6 +1564,8 @@ const Indicacoes = () => {
           </div>
         </div>
       )}
+
+      
 
       {/* Tutorial Overlay */}
       <TutorialIndicacoes

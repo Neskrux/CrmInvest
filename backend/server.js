@@ -579,7 +579,7 @@ app.post('/api/login', async (req, res) => {
       empresa_id: usuario.empresa_id || null, // ID da empresa (para consultores vinculados ou login como empresa)
       podealterarstatus: (tipoLogin === 'empresa' || tipoLogin === 'clinica') ? false : (usuario.podealterarstatus || usuario.tipo === 'admin' || false),
       pode_ver_todas_novas_clinicas: (tipoLogin === 'empresa' || tipoLogin === 'clinica') ? false : (usuario.pode_ver_todas_novas_clinicas || false),
-      is_freelancer: (tipoLogin === 'empresa' || tipoLogin === 'clinica') ? false : (usuario.is_freelancer !== false) // Empresas e clínicas não são freelancers
+      is_freelancer: (tipoLogin === 'admin' || tipoLogin === 'empresa' || tipoLogin === 'clinica') ? false : (usuario.is_freelancer === true) // Admin, empresas e clínicas não são freelancers
     };
 
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
@@ -1032,7 +1032,7 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
         clinica_id: tipo === 'clinica' ? usuario.id : null, // Incluir clinica_id
         podealterarstatus: (tipo === 'empresa' || tipo === 'clinica') ? false : (usuario.podealterarstatus || tipo === 'admin' || false),
         pode_ver_todas_novas_clinicas: (tipo === 'empresa' || tipo === 'clinica') ? false : (usuario.pode_ver_todas_novas_clinicas || false),
-        is_freelancer: (tipo === 'empresa' || tipo === 'clinica') ? false : (usuario.is_freelancer !== false) // Empresas e clínicas não são freelancers
+        is_freelancer: (tipo === 'admin' || tipo === 'empresa' || tipo === 'clinica') ? false : (usuario.is_freelancer === true) // Admin, empresas e clínicas não são freelancers
       }
     });
   } catch (error) {

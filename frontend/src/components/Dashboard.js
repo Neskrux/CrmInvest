@@ -1368,9 +1368,9 @@ const Dashboard = () => {
       };
 
       if (isClinica) {
-        // 1. Evolução Mensal (últimos 6 meses)
+        // 1. Evolução Mensal (últimos 3 meses)
         const mesesArray = [];
-        for (let i = 5; i >= 0; i--) {
+        for (let i = 2; i >= 0; i--) {
           const data = new Date(hoje);
           data.setMonth(hoje.getMonth() - i);
           const mes = data.getMonth();
@@ -2013,7 +2013,7 @@ const Dashboard = () => {
             <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
               <h2 className="card-title" style={{ color: '#1a1d23', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <TrendingUp size={24} />
-                Evolução dos Últimos 6 Meses
+                Evolução dos Últimos 3 Meses
               </h2>
               <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0, fontWeight: '500' }}>
                 Acompanhe o crescimento de agendamentos e fechamentos
@@ -2044,6 +2044,7 @@ const Dashboard = () => {
                   <YAxis 
                     tick={{ fontSize: 12, fill: '#6b7280' }}
                     axisLine={{ stroke: '#e5e7eb' }}
+                    label={{ value: 'Quantidade', angle: -90, position: 'insideLeft', style: { fontSize: '12px', fill: '#6b7280' } }}
                   />
                   <Tooltip 
                     contentStyle={{ 
@@ -2053,8 +2054,9 @@ const Dashboard = () => {
                       boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
                     }}
                     formatter={(value, name) => {
-                      if (name === 'valor') return [formatCurrency(value), 'Valor'];
-                      return [value, name === 'agendamentos' ? 'Agendamentos' : 'Fechamentos'];
+                      if (name === 'Agendamentos') return [value, 'Agendamentos'];
+                      if (name === 'Fechamentos') return [value, 'Fechamentos'];
+                      return [value, name];
                     }}
                   />
                   <Legend 
@@ -2062,8 +2064,7 @@ const Dashboard = () => {
                     formatter={(value) => {
                       const labels = {
                         agendamentos: 'Agendamentos',
-                        fechamentos: 'Fechamentos',
-                        valor: 'Valor Total'
+                        fechamentos: 'Fechamentos'
                       };
                       return labels[value] || value;
                     }}
@@ -2074,6 +2075,7 @@ const Dashboard = () => {
                     stroke="#3b82f6" 
                     fill="url(#agendamentosGradient)" 
                     strokeWidth={2}
+                    name="Agendamentos"
                   />
                   <Area 
                     type="monotone" 
@@ -2081,13 +2083,7 @@ const Dashboard = () => {
                     stroke="#10b981" 
                     fill="url(#fechamentosGradient)" 
                     strokeWidth={2}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="valor" 
-                    stroke="#f59e0b" 
-                    strokeWidth={2}
-                    dot={{ r: 4, fill: '#f59e0b' }}
+                    name="Fechamentos"
                   />
                 </ComposedChart>
               </ResponsiveContainer>
@@ -2236,7 +2232,7 @@ const Dashboard = () => {
 
       {/* Cards de Comissão (dados filtrados) - Ocultar para clínicas */}
       {!isClinica && (
-      <div className="stats-grid" style={{ marginTop: '2rem', gridTemplateColumns: 'repeat(2, 1fr)', padding: '2rem' }}>
+      <div className="stats-grid" style={{ marginTop: '2rem', gridTemplateColumns: window.innerWidth <= 768 ? 'repeat(1, 1fr)' : 'repeat(2, 1fr)', padding: '2rem' }}>
         <div className="stat-card" style={{ 
           background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
           border: '2px solid #f97316'
@@ -2568,7 +2564,7 @@ const Dashboard = () => {
       {/* Pipeline de Vendas - Largura inteira para clínicas, metade para outros */}
       <div className={isClinica ? "" : "grid grid-2"} style={isClinica ? {} : { gap: '2rem' }}>
         {/* Pipeline de Vendas (dados filtrados) */}
-        <div className="card" style={{ minWidth: 0 }} data-tutorial="sales-pipeline">
+        <div className="card" style={{ minWidth: 0, padding: '1.5rem' }} data-tutorial="sales-pipeline">
           <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
             <h2 className="card-title" style={{ color: '#1a1d23', fontWeight: '700' }}>Pipeline de Vendas</h2>
           </div>
@@ -2610,7 +2606,7 @@ const Dashboard = () => {
 
         {/* Ranking dos Consultores - Ocultar para clínicas */}
         {!isClinica && (
-        <div className="card" style={{ minWidth: 0 }} data-tutorial="ranking">
+        <div className="card" style={{ minWidth: 0, padding: '1.5rem' }} data-tutorial="ranking">
           <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
             <h2 className="card-title" style={{ color: '#1a1d23', fontWeight: '700' }}>Ranking de Performance</h2>
             <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0, fontWeight: '500' }}>
@@ -2972,7 +2968,7 @@ const Dashboard = () => {
       </div>
 
       {/* Gráfico de Conversão (dados filtrados) */}
-      <div className="card" style={{ marginTop: '2rem' }} data-tutorial="conversion-rate">
+      <div className="card" style={{ marginTop: '2rem', padding: '2rem' }} data-tutorial="conversion-rate">
         <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
           <h2 className="card-title" style={{ color: '#1a1d23', fontWeight: '700' }}>Taxa de Conversão do Funil</h2>
         </div>
