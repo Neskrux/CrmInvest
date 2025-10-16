@@ -97,6 +97,7 @@ const AppContentWithNotifications = () => {
     if (path.includes('/clinicas')) return 'clinicas';
     if (path.includes('/agendamentos')) return 'agendamentos';
     if (path.includes('/fechamentos')) return 'fechamentos';
+    if (path.includes('/calculo-carteira')) return 'calculo-carteira';
     if (path.includes('/meta-ads')) return 'meta-ads';
     if (path.includes('/whatsapp')) return 'whatsapp';
     if (path.includes('/simulador')) return 'simulador';
@@ -257,6 +258,7 @@ const AppContentWithNotifications = () => {
         <Route path="/clinicas" element={<Clinicas />} />
         <Route path="/agendamentos" element={<Agendamentos />} />
         <Route path="/fechamentos" element={<Fechamentos />} />
+        <Route path="/calculo-carteira" element={<Pacientes />} />
         <Route path="/meta-ads" element={<MetaAds />} />
         {/* Rota WhatsApp temporariamente removida */}
         {/* <Route path="/whatsapp" element={<WhatsApp />} /> */}
@@ -639,6 +641,25 @@ const AppContentWithNotifications = () => {
                   <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                 </svg>
                 Fechamentos
+              </Link>
+            </div>
+          )}
+
+          {/* Cálculo de Carteira - Apenas para Admin e Consultores Invest Money (NÃO para clínicas) */}
+          {user.tipo !== 'empresa' && !user.empresa_id && user.tipo !== 'clinica' && (
+            <div className="nav-item">
+              <Link
+                to="/calculo-carteira"
+                className={`nav-link ${activeTab === 'calculo-carteira' ? 'active' : ''}`}
+                onClick={handleMobileNavigation}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <path d="M9 9h6v6H9z"/>
+                  <path d="M12 6v12"/>
+                  <path d="M6 12h12"/>
+                </svg>
+                Cálculo de Carteira
               </Link>
             </div>
           )}

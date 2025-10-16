@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import TutorialPacientes from './TutorialPacientes';
 import ModalEvidencia from './ModalEvidencia';
 
 const Pacientes = () => {
+  const location = useLocation();
   const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isFreelancer, isClinica, deveFiltrarPorClinica } = useAuth();
   const navigate = useNavigate();
   // Verificar se usuário é consultor
@@ -18,8 +19,16 @@ const Pacientes = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingPaciente, setEditingPaciente] = useState(null);
   const [loading, setLoading] = useState(true);
-  // Define aba inicial baseada no tipo de usuário
-  const [activeTab, setActiveTab] = useState(isClinica ? 'meus-pacientes' : 'pacientes');
+  
+  // Verificar se está na rota de cálculo de carteira
+  const isCalculoCarteira = location.pathname === '/calculo-carteira';
+  
+  // Define aba inicial baseada no tipo de usuário e rota
+  const [activeTab, setActiveTab] = useState(() => {
+    if (isCalculoCarteira) return 'carteira-existente';
+    if (isClinica) return 'meus-pacientes';
+    return 'pacientes';
+  });
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [filtroNome, setFiltroNome] = useState('');
   const [filtroTelefone, setFiltroTelefone] = useState('');
@@ -52,6 +61,213 @@ const Pacientes = () => {
   const [activeObservacoesTab, setActiveObservacoesTab] = useState('observacoes');
   const [evidenciasPaciente, setEvidenciasPaciente] = useState([]);
   const [pacienteObservacoes, setPacienteObservacoes] = useState(null);
+  
+  // Estados para Carteira Existente
+  const [showCarteiraModal, setShowCarteiraModal] = useState(false);
+  const [carteiraFormData, setCarteiraFormData] = useState({
+    cpf: '',
+    nomeCompleto: '',
+    valorParcela: '',
+    numeroParcelasAberto: '',
+    primeiraVencimento: '',
+    numeroParcelasAntecipar: ''
+  });
+  const [pacientesCarteira, setPacientesCarteira] = useState([]);
+  const [carteiraCalculos, setCarteiraCalculos] = useState(null);
+  const [percentualAlvoCarteira, setPercentualAlvoCarteira] = useState(130);
+
+  // Função para preencher automaticamente dados de teste
+  const preencherDadosTeste = () => {
+    const dadosTeste = [
+      {
+        cpf: '123.456.789-01',
+        nomeCompleto: 'Bruno Silva',
+        valorParcela: '500',
+        numeroParcelasAberto: '12',
+        primeiraVencimento: '2025-10-20',
+        numeroParcelasAntecipar: '8'
+      },
+      {
+        cpf: '987.654.321-00',
+        nomeCompleto: 'Diego Santos',
+        valorParcela: '750',
+        numeroParcelasAberto: '15',
+        primeiraVencimento: '2025-11-15',
+        numeroParcelasAntecipar: '10'
+      },
+      {
+        cpf: '456.789.123-45',
+        nomeCompleto: 'Maria Oliveira',
+        valorParcela: '300',
+        numeroParcelasAberto: '18',
+        primeiraVencimento: '2025-10-25',
+        numeroParcelasAntecipar: '6'
+      },
+      {
+        cpf: '111.222.333-44',
+        nomeCompleto: 'João Carlos',
+        valorParcela: '650',
+        numeroParcelasAberto: '20',
+        primeiraVencimento: '2025-12-05',
+        numeroParcelasAntecipar: '12'
+      },
+      {
+        cpf: '555.666.777-88',
+        nomeCompleto: 'Ana Paula',
+        valorParcela: '400',
+        numeroParcelasAberto: '14',
+        primeiraVencimento: '2025-10-30',
+        numeroParcelasAntecipar: '7'
+      },
+      {
+        cpf: '999.888.777-66',
+        nomeCompleto: 'Pedro Henrique',
+        valorParcela: '850',
+        numeroParcelasAberto: '16',
+        primeiraVencimento: '2025-11-25',
+        numeroParcelasAntecipar: '9'
+      },
+      {
+        cpf: '444.333.222-11',
+        nomeCompleto: 'Carla Mendes',
+        valorParcela: '550',
+        numeroParcelasAberto: '22',
+        primeiraVencimento: '2025-12-10',
+        numeroParcelasAntecipar: '11'
+      },
+      {
+        cpf: '777.888.999-00',
+        nomeCompleto: 'Rafael Costa',
+        valorParcela: '350',
+        numeroParcelasAberto: '13',
+        primeiraVencimento: '2025-11-05',
+        numeroParcelasAntecipar: '5'
+      },
+      {
+        cpf: '222.333.444-55',
+        nomeCompleto: 'Fernanda Lima',
+        valorParcela: '700',
+        numeroParcelasAberto: '19',
+        primeiraVencimento: '2025-12-15',
+        numeroParcelasAntecipar: '13'
+      },
+      {
+        cpf: '666.777.888-99',
+        nomeCompleto: 'Marcos Antonio',
+        valorParcela: '450',
+        numeroParcelasAberto: '17',
+        primeiraVencimento: '2025-11-10',
+        numeroParcelasAntecipar: '8'
+      },
+      {
+        cpf: '333.444.555-66',
+        nomeCompleto: 'Juliana Santos',
+        valorParcela: '600',
+        numeroParcelasAberto: '21',
+        primeiraVencimento: '2025-12-20',
+        numeroParcelasAntecipar: '10'
+      },
+      {
+        cpf: '888.999.000-11',
+        nomeCompleto: 'Lucas Ferreira',
+        valorParcela: '380',
+        numeroParcelasAberto: '15',
+        primeiraVencimento: '2025-10-18',
+        numeroParcelasAntecipar: '6'
+      },
+      {
+        cpf: '555.444.333-22',
+        nomeCompleto: 'Patricia Alves',
+        valorParcela: '520',
+        numeroParcelasAberto: '18',
+        primeiraVencimento: '2025-11-20',
+        numeroParcelasAntecipar: '9'
+      },
+      {
+        cpf: '111.000.999-88',
+        nomeCompleto: 'Roberto Silva',
+        valorParcela: '680',
+        numeroParcelasAberto: '24',
+        primeiraVencimento: '2025-12-25',
+        numeroParcelasAntecipar: '14'
+      },
+      {
+        cpf: '777.666.555-44',
+        nomeCompleto: 'Camila Rodrigues',
+        valorParcela: '420',
+        numeroParcelasAberto: '16',
+        primeiraVencimento: '2025-11-30',
+        numeroParcelasAntecipar: '7'
+      },
+      {
+        cpf: '333.222.111-00',
+        nomeCompleto: 'Gabriel Martins',
+        valorParcela: '580',
+        numeroParcelasAberto: '20',
+        primeiraVencimento: '2025-12-30',
+        numeroParcelasAntecipar: '12'
+      },
+      {
+        cpf: '999.888.777-66',
+        nomeCompleto: 'Isabela Costa',
+        valorParcela: '480',
+        numeroParcelasAberto: '14',
+        primeiraVencimento: '2025-10-22',
+        numeroParcelasAntecipar: '6'
+      },
+      {
+        cpf: '444.555.666-77',
+        nomeCompleto: 'Thiago Oliveira',
+        valorParcela: '720',
+        numeroParcelasAberto: '23',
+        primeiraVencimento: '2026-01-15',
+        numeroParcelasAntecipar: '15'
+      },
+      {
+        cpf: '222.111.000-99',
+        nomeCompleto: 'Beatriz Souza',
+        valorParcela: '390',
+        numeroParcelasAberto: '17',
+        primeiraVencimento: '2025-11-12',
+        numeroParcelasAntecipar: '8'
+      },
+      {
+        cpf: '666.555.444-33',
+        nomeCompleto: 'Felipe Pereira',
+        valorParcela: '630',
+        numeroParcelasAberto: '19',
+        primeiraVencimento: '2026-01-20',
+        numeroParcelasAntecipar: '11'
+      }
+    ];
+
+    // Limpar carteira atual
+    setPacientesCarteira([]);
+    setCarteiraCalculos(null);
+
+    // Adicionar pacientes de teste
+    dadosTeste.forEach((dados, index) => {
+      setTimeout(() => {
+        const novoPaciente = {
+          id: Date.now() + index,
+          cpf: dados.cpf,
+          nomeCompleto: dados.nomeCompleto,
+          valorParcela: parseInt(dados.valorParcela),
+          numeroParcelasAberto: parseInt(dados.numeroParcelasAberto),
+          primeiraVencimento: dados.primeiraVencimento,
+          numeroParcelasAntecipar: parseInt(dados.numeroParcelasAntecipar)
+        };
+
+        setPacientesCarteira(prev => [...prev, novoPaciente]);
+      }, index * 100); // Delay de 100ms entre cada paciente
+    });
+
+    // Calcular automaticamente após adicionar todos
+    setTimeout(() => {
+      calcularCarteiraExistente();
+    }, dadosTeste.length * 100 + 500);
+  };
+
 
   // Estados para controlar o tutorial
   const [showTutorial, setShowTutorial] = useState(false);
@@ -682,6 +898,282 @@ const Pacientes = () => {
     setShowViewModal(false);
     setViewPaciente(null);
     setActiveViewTab('informacoes');
+  };
+
+  // Funções para Carteira Existente
+  const adicionarPacienteCarteira = () => {
+    const {
+      cpf,
+      nomeCompleto,
+      valorParcela,
+      numeroParcelasAberto,
+      primeiraVencimento,
+      numeroParcelasAntecipar
+    } = carteiraFormData;
+
+    if (!cpf || !nomeCompleto || !valorParcela || !numeroParcelasAberto || !primeiraVencimento || !numeroParcelasAntecipar) {
+      showErrorToast('Preencha todos os campos obrigatórios');
+      return;
+    }
+
+    const novoPaciente = {
+      id: Date.now(), // ID temporário
+      cpf,
+      nomeCompleto,
+      valorParcela: parseFloat(valorParcela.replace(/[^\d,]/g, '').replace(',', '.')),
+      numeroParcelasAberto: parseInt(numeroParcelasAberto),
+      primeiraVencimento,
+      numeroParcelasAntecipar: parseInt(numeroParcelasAntecipar)
+    };
+
+    setPacientesCarteira(prev => [...prev, novoPaciente]);
+    
+    // Limpar formulário
+    setCarteiraFormData({
+      cpf: '',
+      nomeCompleto: '',
+      valorParcela: '',
+      numeroParcelasAberto: '',
+      primeiraVencimento: '',
+      numeroParcelasAntecipar: ''
+    });
+
+    showSuccessToast('Paciente adicionado à carteira!');
+  };
+
+  const removerPacienteCarteira = (id) => {
+    setPacientesCarteira(prev => prev.filter(p => p.id !== id));
+    setCarteiraCalculos(null); // Limpar cálculos quando remover paciente
+  };
+
+  const calcularCarteiraExistente = (percentualAlvo = 130) => {
+    if (pacientesCarteira.length === 0) {
+      showErrorToast('Adicione pelo menos um paciente antes de calcular');
+      return;
+    }
+
+    // Valores fixos conforme especificação
+    const fatorAMNum = 0.33; // Fator fixo de 0.33%
+    const dataAceite = '2025-10-15'; // Data fixa conforme testecarteira
+
+    // Primeiro, calcular todas as parcelas
+    const todasParcelas = [];
+    (pacientesCarteira || []).forEach(paciente => {
+      const valorParcelaNum = paciente.valorParcela;
+      const numeroParcelasAnteciparNum = paciente.numeroParcelasAntecipar;
+
+      for (let i = 0; i < numeroParcelasAnteciparNum; i++) {
+        const dataPrimeira = new Date(paciente.primeiraVencimento);
+        const dataVencimento = new Date(dataPrimeira);
+        dataVencimento.setMonth(dataVencimento.getMonth() + i);
+
+        const dataAceiteObj = new Date(dataAceite);
+        const dias = Math.ceil((dataVencimento - dataAceiteObj) / (1000 * 60 * 60 * 24));
+
+        // Deságio calculado conforme testecarteira
+        const desagio = valorParcelaNum * (fatorAMNum / 100) * dias;
+        const liquidez = valorParcelaNum - desagio;
+
+        todasParcelas.push({
+          paciente: paciente.nomeCompleto,
+          parcela: i + 1,
+          valor: valorParcelaNum,
+          vencimento: dataVencimento.toISOString().split('T')[0],
+          dias: dias,
+          desagio: desagio,
+          liquidez: liquidez,
+          pacienteId: paciente.id,
+          score: desagio / valorParcelaNum // Perda relativa para heurística
+        });
+      }
+    });
+
+    // HEURÍSTICA GULOSA para atingir o percentual alvo
+    // 1. Inicializar todos como OP
+    todasParcelas.forEach(p => p.aloc = 'OP');
+    
+    // 2. Ordenar por score (perda relativa) decrescente
+    const parcelasOrdenadas = [...todasParcelas].sort((a, b) => b.score - a.score);
+    
+    // 3. Mover parcelas de OP → COL até atingir o percentual alvo
+    const percentualAlvoDecimal = percentualAlvo / 100; // Ex: 130% = 1.30
+    
+    let oFace = todasParcelas.reduce((sum, p) => sum + p.valor, 0);
+    let cFace = 0;
+    
+    for (const parcela of parcelasOrdenadas) {
+      if (cFace / oFace >= percentualAlvoDecimal) {
+        break; // Já atingimos o percentual alvo
+      }
+      
+      // Mover de OP para COL
+      parcela.aloc = 'COL';
+      oFace -= parcela.valor;
+      cFace += parcela.valor;
+    }
+    
+    // 4. AJUSTE FINO: tentar reduzir o slack sem ficar abaixo do alvo
+    let melhorSlack = cFace / oFace - percentualAlvoDecimal;
+    let houveMelhoria = true;
+    
+    while (houveMelhoria) {
+      houveMelhoria = false;
+      
+      // Tentar trocar um título de COL por um de OP
+      const parcelasCOL = todasParcelas.filter(p => p.aloc === 'COL');
+      const parcelasOP = todasParcelas.filter(p => p.aloc === 'OP');
+      
+      for (const pCol of parcelasCOL) {
+        for (const pOp of parcelasOP) {
+          // Simular a troca
+          const novoOFace = oFace + pCol.valor - pOp.valor;
+          const novoCFace = cFace - pCol.valor + pOp.valor;
+          
+          if (novoOFace > 0) {
+            const novoRatio = novoCFace / novoOFace;
+            const novoSlack = novoRatio - percentualAlvoDecimal;
+            
+            // Se melhorou o slack e ainda está acima do alvo
+            if (novoSlack >= 0 && novoSlack < melhorSlack) {
+              // Fazer a troca
+              pCol.aloc = 'OP';
+              pOp.aloc = 'COL';
+              oFace = novoOFace;
+              cFace = novoCFace;
+              melhorSlack = novoSlack;
+              houveMelhoria = true;
+              break;
+            }
+          }
+        }
+        if (houveMelhoria) break;
+      }
+    }
+    
+    // Calcular valores finais usando a alocação da heurística
+    const parcelasDetalhadas = todasParcelas.map(p => ({
+      ...p,
+      tipo: p.aloc === 'COL' ? 'colateral' : 'operacao'
+    }));
+
+    // Calcular valores separados por tipo na base de FACE
+    const valorColateralFaceCalculado = todasParcelas
+      .filter(p => p.aloc === 'COL')
+      .reduce((sum, p) => sum + p.valor, 0);
+
+    const valorOperacaoFaceCalculado = todasParcelas
+      .filter(p => p.aloc === 'OP')
+      .reduce((sum, p) => sum + p.valor, 0);
+
+    // Calcular valores ENTREGUES
+    // IMPORTANTE: Deságio aplicado APENAS na operação, colateral não tem deságio
+    const valorColateralEntregue = valorColateralFaceCalculado; // Colateral = sem deságio
+
+    const valorOperacaoEntregue = todasParcelas
+      .filter(p => p.aloc === 'OP')
+      .reduce((sum, p) => sum + p.liquidez, 0); // Com deságio
+
+    // Deságio total = apenas da operação
+    const desagioColateral = 0; // Colateral não tem deságio
+    const desagioOperacao = todasParcelas
+      .filter(p => p.aloc === 'OP')
+      .reduce((sum, p) => sum + p.desagio, 0);
+
+    const desagioTotal = desagioOperacao;
+    const valorEntregueTotal = valorColateralEntregue + valorOperacaoEntregue;
+    const valorFaceTotal = valorColateralFaceCalculado + valorOperacaoFaceCalculado;
+
+    // Calcular percentual final e slack
+    const percentualFinalCalculado = valorOperacaoFaceCalculado > 0 ? 
+      (valorColateralFaceCalculado / valorOperacaoFaceCalculado) * 100 : 0;
+    
+    const slack = (valorColateralFaceCalculado / valorOperacaoFaceCalculado) - percentualAlvoDecimal;
+
+    setCarteiraCalculos({
+      parcelasDetalhadas,
+      valorEntregueTotal,
+      desagioTotal,
+      valorFaceTotal,
+      valorTotalOperacao: valorOperacaoFaceCalculado,
+      valorColateral: valorColateralFaceCalculado,
+      valorColateralEntregue,
+      valorOperacaoEntregue,
+      desagioColateral,
+      desagioOperacao,
+      percentualFinal: percentualFinalCalculado,
+      percentualAlvo: percentualAlvo,
+      slack: slack * 100, // Convertendo para porcentagem
+      pacientesCarteira
+    });
+  };
+
+  const salvarCarteiraExistente = async () => {
+    if (!carteiraCalculos || pacientesCarteira.length === 0) {
+      showErrorToast('Calcule os valores antes de salvar');
+      return;
+    }
+
+    try {
+      // Salvar cada paciente da carteira
+      const promises = (pacientesCarteira || []).map(paciente => {
+        const pacienteData = {
+          nome: paciente.nomeCompleto,
+          cpf: paciente.cpf,
+          telefone: '', // Será preenchido depois
+          cidade: '',
+          estado: '',
+          tipo_tratamento: 'Carteira Existente',
+          status: 'fechado',
+          observacoes: 'Paciente da carteira existente',
+          carteira_existente: true,
+          clinica_id: user.id,
+          cadastrado_por_clinica: true,
+          // Dados específicos da carteira
+          valor_parcela: parseFloat(paciente.valorParcela.toString().replace(/[^\d,]/g, '').replace(',', '.')),
+          numero_parcelas_aberto: paciente.numeroParcelasAberto,
+          primeira_vencimento: paciente.primeiraVencimento,
+          numero_parcelas_antecipar: paciente.numeroParcelasAntecipar,
+          fator_am: 0.33, // Valor fixo
+          data_aceite: new Date().toISOString().split('T')[0], // Data atual
+          // Resultados do cálculo global
+          valor_entregue_total: carteiraCalculos?.valorEntregueTotal || 0,
+          desagio_total: carteiraCalculos?.desagioTotal || 0,
+          valor_face_total: carteiraCalculos?.valorFaceTotal || 0,
+          valor_total_operacao: carteiraCalculos?.valorTotalOperacao || 0,
+          valor_colateral: carteiraCalculos?.valorColateral || 0,
+          percentual_final: carteiraCalculos?.percentualFinal || 0
+        };
+
+        return makeRequest('/pacientes', {
+          method: 'POST',
+          body: JSON.stringify(pacienteData)
+        });
+      });
+
+      const responses = await Promise.all(promises);
+      const errors = responses.filter(response => !response.ok);
+
+      if (errors.length === 0) {
+        showSuccessToast(`${pacientesCarteira.length} pacientes da carteira existente cadastrados com sucesso!`);
+        setShowCarteiraModal(false);
+        setCarteiraFormData({
+          cpf: '',
+          nomeCompleto: '',
+          valorParcela: '',
+          numeroParcelasAberto: '',
+          primeiraVencimento: '',
+          numeroParcelasAntecipar: ''
+        });
+        setPacientesCarteira([]);
+        setCarteiraCalculos(null);
+        await fetchPacientes();
+      } else {
+        showErrorToast(`Erro ao cadastrar ${errors.length} pacientes`);
+      }
+    } catch (error) {
+      console.error('Erro ao salvar carteira existente:', error);
+      showErrorToast('Erro de conexão: ' + error.message);
+    }
   };
 
   // Função para upload de documentos do paciente
@@ -2023,21 +2515,34 @@ const Pacientes = () => {
       {/* Para Admin e Consultor Interno */}
       {(isAdmin || isConsultorInterno) && !isClinica && (
         <div className="tabs">
+          {!isCalculoCarteira && (
+            <>
+              <button
+                className={`tab ${activeTab === 'pacientes' ? 'active' : ''}`}
+                onClick={() => setActiveTab('pacientes')}
+              >
+                Pacientes
+              </button>
+              <button
+                className={`tab ${activeTab === 'novos-leads' ? 'active' : ''}`}
+                onClick={() => setActiveTab('novos-leads')}
+                style={{ position: 'relative' }}
+              >
+                Novos Leads
+                {novosLeads.length > 0 && (
+                  <span className="tab-badge">{novosLeads.length}</span>
+                )}
+              </button>
+            </>
+          )}
           <button
-            className={`tab ${activeTab === 'pacientes' ? 'active' : ''}`}
-            onClick={() => setActiveTab('pacientes')}
+            className={`tab ${activeTab === 'carteira-existente' ? 'active' : ''}`}
+            onClick={() => setActiveTab('carteira-existente')}
           >
-            Pacientes
-          </button>
-          <button
-            className={`tab ${activeTab === 'novos-leads' ? 'active' : ''}`}
-            onClick={() => setActiveTab('novos-leads')}
-            style={{ position: 'relative' }}
-          >
-            Novos Leads
-            {novosLeads.length > 0 && (
-              <span className="tab-badge">{novosLeads.length}</span>
-            )}
+            Carteira Existente
+            <span style={{ marginLeft: '0.5rem', fontSize: '0.875rem', opacity: 0.8 }}>
+              ({pacientes.filter(p => p.carteira_existente === true).length})
+            </span>
           </button>
         </div>
       )}
@@ -2074,6 +2579,15 @@ const Pacientes = () => {
                   return temAgendamento && p.status !== 'fechado';
                 }).length;
               })()})
+            </span>
+          </button>
+          <button
+            className={`tab ${activeTab === 'carteira-existente' ? 'active' : ''}`}
+            onClick={() => setActiveTab('carteira-existente')}
+          >
+            Carteira Existente
+            <span style={{ marginLeft: '0.5rem', fontSize: '0.875rem', opacity: 0.8 }}>
+              ({pacientes.filter(p => p.carteira_existente === true).length})
             </span>
           </button>
         </div>
@@ -3136,6 +3650,123 @@ const Pacientes = () => {
         </>
       )}
 
+      {/* Conteúdo da aba Carteira Existente (apenas para clínicas) */}
+      {activeTab === 'carteira-existente' && isClinica && (
+        <>
+          <div className="card">
+            <div className="card-header">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h2 className="card-title">Carteira Existente</h2>
+                  <p style={{ margin: 0, color: '#6b7280', fontSize: '0.875rem' }}>
+                    Cadastre pacientes da sua carteira existente para calcular antecipações
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowCarteiraModal(true)}
+                  style={{
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                    border: 'none',
+                    color: 'white',
+                    cursor: 'pointer',
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    boxShadow: '0 2px 8px rgba(59, 130, 246, 0.25)',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.35)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.25)';
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  Cadastrar Paciente
+                </button>
+              </div>
+            </div>
+            <div className="card-content">
+              {pacientes.filter(p => p.carteira_existente === true).length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ marginBottom: '1rem', opacity: 0.5 }}>
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <path d="M9 9h6v6H9z"></path>
+                  </svg>
+                  <p>Nenhum paciente da carteira existente cadastrado</p>
+                  <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                    Clique em "Cadastrar Paciente" para começar
+                  </p>
+                </div>
+              ) : (
+                <div className="table-container">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Nome</th>
+                        <th>CPF</th>
+                        <th>Valor da Parcela</th>
+                        <th>Parcelas em Aberto</th>
+                        <th>1ª Vencimento</th>
+                        <th>Parcelas a Antecipar</th>
+                        <th>Valor Entregue</th>
+                        <th>Deságio</th>
+                        <th>Valor de Face</th>
+                        <th>% Final</th>
+                        <th>Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pacientes.filter(p => p.carteira_existente === true).map(paciente => (
+                        <tr key={paciente.id}>
+                          <td><strong>{paciente.nome}</strong></td>
+                          <td>{paciente.cpf}</td>
+                          <td>{formatarMoeda(paciente.valor_parcela || 0)}</td>
+                          <td>{paciente.numero_parcelas_aberto || 0}</td>
+                          <td>{paciente.primeira_vencimento ? new Date(paciente.primeira_vencimento).toLocaleDateString('pt-BR') : '-'}</td>
+                          <td>{paciente.numero_parcelas_antecipar || 0}</td>
+                          <td>{formatarMoeda(paciente.valor_entregue_total || 0)}</td>
+                          <td>{formatarMoeda(paciente.desagio_total || 0)}</td>
+                          <td>{formatarMoeda(paciente.valor_face_total || 0)}</td>
+                          <td>{paciente.percentual_final ? `${paciente.percentual_final.toFixed(2)}%` : '-'}</td>
+                          <td>
+                            <button
+                              onClick={() => handleView(paciente)}
+                              style={{
+                                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                                border: 'none',
+                                color: 'white',
+                                cursor: 'pointer',
+                                padding: '0.5rem',
+                                borderRadius: '6px',
+                                fontSize: '0.75rem',
+                                fontWeight: '600'
+                              }}
+                            >
+                              Ver
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Modal de Cadastro - Formulário Simples (para freelancers) */}
       {showModal && !editingPaciente && isConsultor && !isAdmin && !isConsultorInterno && (
         <div className="modal-overlay">
@@ -4094,40 +4725,42 @@ const Pacientes = () => {
                   </>
                 )}
                 
-                <button
-                  onClick={() => handleTabChange('evidencias')}
-                  style={{
-                    padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
-                    border: 'none',
-                    background: 'none',
-                    fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
-                    fontWeight: '500',
-                    color: activeViewTab === 'evidencias' ? '#3b82f6' : '#6b7280',
-                    borderBottom: activeViewTab === 'evidencias' ? '2px solid #3b82f6' : '2px solid transparent',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    whiteSpace: 'nowrap',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}
-                >
-                  Evidências
-                  {evidenciasPaciente.length > 0 && (
-                    <span style={{
-                      backgroundColor: '#3b82f6',
-                      color: 'white',
-                      fontSize: '0.7rem',
-                      fontWeight: '600',
-                      padding: '0.125rem 0.375rem',
-                      borderRadius: '9999px',
-                      minWidth: '20px',
-                      textAlign: 'center'
-                    }}>
-                      {evidenciasPaciente.length}
-                    </span>
-                  )}
-                </button>
+                {!isClinica && (
+                  <button
+                    onClick={() => handleTabChange('evidencias')}
+                    style={{
+                      padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
+                      border: 'none',
+                      background: 'none',
+                      fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
+                      fontWeight: '500',
+                      color: activeViewTab === 'evidencias' ? '#3b82f6' : '#6b7280',
+                      borderBottom: activeViewTab === 'evidencias' ? '2px solid #3b82f6' : '2px solid transparent',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    Evidências
+                    {evidenciasPaciente.length > 0 && (
+                      <span style={{
+                        backgroundColor: '#3b82f6',
+                        color: 'white',
+                        fontSize: '0.7rem',
+                        fontWeight: '600',
+                        padding: '0.125rem 0.375rem',
+                        borderRadius: '9999px',
+                        minWidth: '20px',
+                        textAlign: 'center'
+                      }}>
+                        {evidenciasPaciente.length}
+                      </span>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
             
@@ -4713,7 +5346,7 @@ const Pacientes = () => {
               )}
               
               {/* Aba de Evidências */}
-              {activeViewTab === 'evidencias' && (
+              {activeViewTab === 'evidencias' && !isClinica && (
                 <div>
                   <h3 style={{ 
                     fontSize: '1.125rem', 
@@ -4859,39 +5492,41 @@ const Pacientes = () => {
                 Observações
               </button>
               
-                <button
-                  onClick={() => setActiveObservacoesTab('evidencias')}
-                  style={{
-                    padding: '0.75rem 0',
-                    border: 'none',
-                    background: 'none',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    color: activeObservacoesTab === 'evidencias' ? '#3b82f6' : '#6b7280',
-                    borderBottom: activeObservacoesTab === 'evidencias' ? '2px solid #3b82f6' : '2px solid transparent',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}
-                >
-                  Evidências
-                {evidenciasPaciente.length > 0 && (
-                  <span style={{
-                    backgroundColor: '#3b82f6',
-                    color: 'white',
-                    fontSize: '0.7rem',
-                    fontWeight: '600',
-                    padding: '0.125rem 0.375rem',
-                    borderRadius: '9999px',
-                    minWidth: '20px',
-                    textAlign: 'center'
-                  }}>
-                    {evidenciasPaciente.length}
-                  </span>
-              )}
-              </button>
+                {!isClinica && (
+                  <button
+                    onClick={() => setActiveObservacoesTab('evidencias')}
+                    style={{
+                      padding: '0.75rem 0',
+                      border: 'none',
+                      background: 'none',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: activeObservacoesTab === 'evidencias' ? '#3b82f6' : '#6b7280',
+                      borderBottom: activeObservacoesTab === 'evidencias' ? '2px solid #3b82f6' : '2px solid transparent',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    Evidências
+                  {evidenciasPaciente.length > 0 && (
+                    <span style={{
+                      backgroundColor: '#3b82f6',
+                      color: 'white',
+                      fontSize: '0.7rem',
+                      fontWeight: '600',
+                      padding: '0.125rem 0.375rem',
+                      borderRadius: '9999px',
+                      minWidth: '20px',
+                      textAlign: 'center'
+                    }}>
+                      {evidenciasPaciente.length}
+                    </span>
+                  )}
+                  </button>
+                )}
             </div>
             
             <div style={{ padding: '1.5rem', flex: 1, overflowY: 'auto' }}>
@@ -4913,7 +5548,7 @@ const Pacientes = () => {
               )}
               
               {/* Aba de Evidências */}
-              {activeObservacoesTab === 'evidencias' && (
+              {activeObservacoesTab === 'evidencias' && !isClinica && (
                 <div>
                   <h3 style={{ 
                     fontSize: '1rem', 
@@ -6636,6 +7271,703 @@ const Pacientes = () => {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Carteira Existente */}
+      {showCarteiraModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '900px', maxHeight: '90vh' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Cadastrar Paciente - Carteira Existente</h2>
+              <button className="close-btn" onClick={() => setShowCarteiraModal(false)}>×</button>
+            </div>
+            
+            <div style={{ padding: '2rem', overflowY: 'auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                {/* Formulário */}
+                <div>
+                  <h3 style={{ marginBottom: '1.5rem', color: '#1e293b' }}>Adicionar Paciente</h3>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {/* CPF */}
+                    <div>
+                      <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                        CPF *
+                      </label>
+                      <input
+                        type="text"
+                        value={carteiraFormData.cpf}
+                        onChange={(e) => {
+                          const valor = e.target.value.replace(/\D/g, '');
+                          const cpfFormatado = valor.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+                          setCarteiraFormData(prev => ({ ...prev, cpf: cpfFormatado }));
+                        }}
+                        placeholder="000.000.000-00"
+                        maxLength="14"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '2px solid #e5e7eb',
+                          borderRadius: '8px',
+                          fontSize: '1rem'
+                        }}
+                      />
+                    </div>
+
+                    {/* Nome Completo */}
+                    <div>
+                      <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                        Nome Completo *
+                      </label>
+                      <input
+                        type="text"
+                        value={carteiraFormData.nomeCompleto}
+                        onChange={(e) => setCarteiraFormData(prev => ({ ...prev, nomeCompleto: e.target.value }))}
+                        placeholder="Nome completo do paciente"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '2px solid #e5e7eb',
+                          borderRadius: '8px',
+                          fontSize: '1rem'
+                        }}
+                      />
+                    </div>
+
+                    {/* Valor da Parcela */}
+                    <div>
+                      <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                        Valor da Parcela (R$) *
+                      </label>
+                      <input
+                        type="text"
+                        value={carteiraFormData.valorParcela}
+                        onChange={(e) => {
+                          // Remover tudo exceto números
+                          let valor = e.target.value.replace(/[^\d]/g, '');
+                          
+                          // Se não há números, limpar o campo
+                          if (!valor) {
+                            setCarteiraFormData(prev => ({ ...prev, valorParcela: '' }));
+                            return;
+                          }
+                          
+                          // Converter para número inteiro
+                          const numero = parseInt(valor);
+                          
+                          // Se zero, limpar
+                          if (numero === 0) {
+                            setCarteiraFormData(prev => ({ ...prev, valorParcela: '' }));
+                            return;
+                          }
+                          
+                          // Formatar simples: apenas o número
+                          setCarteiraFormData(prev => ({ ...prev, valorParcela: numero.toString() }));
+                        }}
+                        onFocus={(e) => {
+                          // Se o campo estiver vazio, mostrar placeholder com R$
+                          if (!e.target.value) {
+                            e.target.placeholder = 'R$ 0,00';
+                          }
+                        }}
+                        onBlur={(e) => {
+                          // Adicionar R$ se não estiver presente
+                          if (e.target.value && !e.target.value.includes('R$')) {
+                            e.target.value = 'R$ ' + e.target.value;
+                            setCarteiraFormData(prev => ({ ...prev, valorParcela: 'R$ ' + prev.valorParcela }));
+                          }
+                        }}
+                        placeholder="Ex: 500"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '2px solid #e5e7eb',
+                          borderRadius: '8px',
+                          fontSize: '1rem'
+                        }}
+                      />
+                      <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem', marginBottom: 0 }}>
+                        Digite apenas números (ex: 500)
+                      </p>
+                    </div>
+
+                    {/* Número de Parcelas em Aberto */}
+                    <div>
+                      <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                        Nº de Parcelas em Aberto *
+                      </label>
+                      <input
+                        type="number"
+                        value={carteiraFormData.numeroParcelasAberto}
+                        onChange={(e) => setCarteiraFormData(prev => ({ ...prev, numeroParcelasAberto: e.target.value }))}
+                        placeholder="Ex: 15"
+                        min="1"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '2px solid #e5e7eb',
+                          borderRadius: '8px',
+                          fontSize: '1rem'
+                        }}
+                      />
+                    </div>
+
+                    {/* 1ª Vencimento */}
+                    <div>
+                      <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                        1ª Vencimento *
+                      </label>
+                      <input
+                        type="date"
+                        value={carteiraFormData.primeiraVencimento}
+                        onChange={(e) => setCarteiraFormData(prev => ({ ...prev, primeiraVencimento: e.target.value }))}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '2px solid #e5e7eb',
+                          borderRadius: '8px',
+                          fontSize: '1rem'
+                        }}
+                      />
+                    </div>
+
+                    {/* Número de Parcelas a Antecipar */}
+                    <div>
+                      <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                        Nº de Parcelas a Antecipar *
+                      </label>
+                      <input
+                        type="number"
+                        value={carteiraFormData.numeroParcelasAntecipar}
+                        onChange={(e) => setCarteiraFormData(prev => ({ ...prev, numeroParcelasAntecipar: e.target.value }))}
+                        placeholder="Ex: 6"
+                        min="1"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '2px solid #e5e7eb',
+                          borderRadius: '8px',
+                          fontSize: '1rem'
+                        }}
+                      />
+                    </div>
+
+                    {/* Botão Adicionar */}
+                    <button
+                      type="button"
+                      onClick={adicionarPacienteCarteira}
+                      style={{
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                        border: 'none',
+                        color: 'white',
+                        cursor: 'pointer',
+                        padding: '0.875rem',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        fontWeight: '600',
+                        marginTop: '1rem'
+                      }}
+                    >
+                      Adicionar à Carteira
+                    </button>
+                  </div>
+                </div>
+
+                {/* Lista de Pacientes e Cálculos */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <h3 style={{ margin: 0, color: '#1e293b' }}>Pacientes da Carteira ({pacientesCarteira.length})</h3>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        onClick={preencherDadosTeste}
+                        style={{
+                          background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                          border: 'none',
+                          color: 'white',
+                          cursor: 'pointer',
+                          padding: '0.5rem 1rem',
+                          borderRadius: '6px',
+                          fontSize: '0.875rem',
+                          fontWeight: '600'
+                        }}
+                      >
+                        🧪 Dados Teste
+                      </button>
+                      {pacientesCarteira.length > 0 && (
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <label style={{ fontSize: '0.875rem', color: '#374151', fontWeight: '500' }}>
+                              Percentual Alvo:
+                            </label>
+                            <input
+                              type="number"
+                              value={percentualAlvoCarteira}
+                              onChange={(e) => {
+                                const valor = parseFloat(e.target.value);
+                                if (!isNaN(valor) && valor >= 100 && valor <= 200) {
+                                  setPercentualAlvoCarteira(valor);
+                                }
+                              }}
+                              style={{
+                                width: '80px',
+                                padding: '0.5rem',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '6px',
+                                fontSize: '0.875rem',
+                                textAlign: 'center'
+                              }}
+                              min="100"
+                              max="200"
+                              step="1"
+                            />
+                            <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>%</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => calcularCarteiraExistente(percentualAlvoCarteira)}
+                            style={{
+                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              border: 'none',
+                              color: 'white',
+                              cursor: 'pointer',
+                              padding: '0.5rem 1rem',
+                              borderRadius: '6px',
+                              fontSize: '0.875rem',
+                              fontWeight: '600'
+                            }}
+                          >
+                            Calcular Carteira
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {pacientesCarteira.length === 0 ? (
+                    <div style={{ 
+                      textAlign: 'center', 
+                      padding: '2rem 1rem',
+                      color: '#6b7280',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '2px dashed #d1d5db'
+                    }}>
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ marginBottom: '0.5rem', opacity: 0.5 }}>
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <path d="M9 9h6v6H9z"></path>
+                      </svg>
+                      <p style={{ margin: 0, fontSize: '0.875rem' }}>Nenhum paciente adicionado</p>
+                    </div>
+                  ) : (
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      {(pacientesCarteira || []).map(paciente => (
+                        <div key={paciente.id} style={{
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          padding: '1rem',
+                          marginBottom: '0.5rem',
+                          backgroundColor: '#f9fafb'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>{paciente.nomeCompleto}</div>
+                              <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>CPF: {paciente.cpf}</div>
+                              <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                {formatarMoeda(paciente.valorParcela)} × {paciente.numeroParcelasAntecipar} parcelas
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => removerPacienteCarteira(paciente.id)}
+                              style={{
+                                background: '#ef4444',
+                                border: 'none',
+                                color: 'white',
+                                cursor: 'pointer',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem'
+                              }}
+                            >
+                              Remover
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {carteiraCalculos ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      {/* Tabela de Parcelas */}
+                      <div style={{ 
+                        border: '1px solid #e5e7eb', 
+                        borderRadius: '8px', 
+                        overflow: 'hidden',
+                        maxHeight: '300px',
+                        overflowY: 'auto'
+                      }}>
+                        <table style={{ width: '100%', fontSize: '0.875rem' }}>
+                          <thead style={{ backgroundColor: '#f8fafc' }}>
+                            <tr>
+                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Paciente</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Tipo</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Detalhe</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Valor</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Vencimento</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Dias</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Deságio</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Liquidez</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(carteiraCalculos.parcelasDetalhadas || []).map((parcela, index) => (
+                              <tr key={`${parcela.paciente}-${parcela.parcela}-${index}`}>
+                                <td style={{ padding: '0.5rem', fontWeight: '600' }}>{parcela.paciente}</td>
+                                <td style={{ padding: '0.5rem' }}>
+                                  <span style={{
+                                    backgroundColor: parcela.tipo === 'colateral' ? '#fef2f2' : '#f0f9ff',
+                                    color: parcela.tipo === 'colateral' ? '#dc2626' : '#0369a1',
+                                    padding: '0.25rem 0.5rem',
+                                    borderRadius: '4px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600',
+                                    textTransform: 'uppercase'
+                                  }}>
+                                    {parcela.tipo}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '0.5rem' }}>
+                                  {parcela.tipo === 'colateral' 
+                                    ? `Parcela ${parcela.parcela} (Colateral)`
+                                    : `Parcela ${parcela.parcela} (Operação)`
+                                  }
+                                </td>
+                                <td style={{ padding: '0.5rem' }}>{formatarMoeda(parcela.valor)}</td>
+                                <td style={{ padding: '0.5rem' }}>{new Date(parcela.vencimento).toLocaleDateString('pt-BR')}</td>
+                                <td style={{ padding: '0.5rem' }}>{parcela.dias}</td>
+                                <td style={{ padding: '0.5rem' }}>{formatarMoeda(parcela.desagio)}</td>
+                                <td style={{ padding: '0.5rem' }}>{formatarMoeda(parcela.liquidez)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Resumo Final */}
+                      <div style={{ 
+                        backgroundColor: '#ffffff', 
+                        border: '1px solid #e5e7eb', 
+                        borderRadius: '16px',
+                        padding: '2rem',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                      }}>
+                        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                          <h3 style={{ 
+                            margin: '0 0 0.5rem 0', 
+                            color: '#1f2937',
+                            fontSize: '1.5rem',
+                            fontWeight: '600'
+                          }}>
+                            Resumo Financeiro
+                          </h3>
+                          <p style={{ 
+                            margin: 0, 
+                            color: '#6b7280',
+                            fontSize: '0.875rem'
+                          }}>
+                            Cálculo consolidado da carteira
+                          </p>
+                        </div>
+
+                        {/* Cards dos valores */}
+                        <div style={{ 
+                          display: 'grid', 
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                          gap: '1.5rem',
+                          marginBottom: '2rem'
+                        }}>
+                          {/* Valor Entregue */}
+                          <div style={{
+                            backgroundColor: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '12px',
+                            padding: '1.5rem',
+                            textAlign: 'center'
+                          }}>
+                            <div style={{ 
+                              fontSize: '0.75rem', 
+                              fontWeight: '600', 
+                              color: '#64748b',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              marginBottom: '1rem'
+                            }}>
+                              Valor Entregue
+                            </div>
+                            <div style={{ marginBottom: '0.75rem' }}>
+                              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>
+                                Colateral (Entregue)
+                              </div>
+                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b' }}>
+                                {formatarMoeda(carteiraCalculos?.valorColateralEntregue || 0)}
+                              </div>
+                            </div>
+                            <div style={{ marginBottom: '0.75rem' }}>
+                              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>
+                                Operação (Entregue)
+                              </div>
+                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b' }}>
+                                {formatarMoeda(carteiraCalculos?.valorOperacaoEntregue || 0)}
+                              </div>
+                            </div>
+                            <div style={{ 
+                              borderTop: '1px solid #e2e8f0', 
+                              paddingTop: '0.75rem',
+                              marginTop: '0.75rem'
+                            }}>
+                              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>
+                                Total Entregue
+                              </div>
+                              <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#1e293b' }}>
+                                {formatarMoeda((carteiraCalculos?.valorColateralEntregue || 0) + (carteiraCalculos?.valorOperacaoEntregue || 0))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Deságio */}
+                          <div style={{
+                            backgroundColor: '#fef2f2',
+                            border: '1px solid #fecaca',
+                            borderRadius: '12px',
+                            padding: '1.5rem',
+                            textAlign: 'center'
+                          }}>
+                            <div style={{ 
+                              fontSize: '0.75rem', 
+                              fontWeight: '600', 
+                              color: '#991b1b',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              marginBottom: '1rem'
+                            }}>
+                              Deságio
+                            </div>
+                            <div style={{ marginBottom: '0.75rem' }}>
+                              <div style={{ fontSize: '0.875rem', color: '#991b1b', marginBottom: '0.25rem' }}>
+                                Colateral
+                              </div>
+                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#dc2626' }}>
+                                -
+                              </div>
+                            </div>
+                            <div style={{ marginBottom: '0.75rem' }}>
+                              <div style={{ fontSize: '0.875rem', color: '#991b1b', marginBottom: '0.25rem' }}>
+                                Operação
+                              </div>
+                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#dc2626' }}>
+                                {formatarMoeda(carteiraCalculos?.desagioTotal || 0)}
+                              </div>
+                            </div>
+                            <div style={{ 
+                              borderTop: '1px solid #fecaca', 
+                              paddingTop: '0.75rem',
+                              marginTop: '0.75rem'
+                            }}>
+                              <div style={{ fontSize: '0.875rem', color: '#991b1b', marginBottom: '0.25rem' }}>
+                                Total Deságio
+                              </div>
+                              <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#dc2626' }}>
+                                {formatarMoeda(carteiraCalculos?.desagioTotal || 0)}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Valor de Face */}
+                          <div style={{
+                            backgroundColor: '#f0f9ff',
+                            border: '1px solid #bae6fd',
+                            borderRadius: '12px',
+                            padding: '1.5rem',
+                            textAlign: 'center'
+                          }}>
+                            <div style={{ 
+                              fontSize: '0.75rem', 
+                              fontWeight: '600', 
+                              color: '#0369a1',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              marginBottom: '1rem'
+                            }}>
+                              Valor de Face
+                            </div>
+                            <div style={{ marginBottom: '0.75rem' }}>
+                              <div style={{ fontSize: '0.875rem', color: '#0369a1', marginBottom: '0.25rem' }}>
+                                Colateral (Face)
+                              </div>
+                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0c4a6e' }}>
+                                {formatarMoeda(carteiraCalculos?.valorColateral || 0)}
+                              </div>
+                            </div>
+                            <div style={{ marginBottom: '0.75rem' }}>
+                              <div style={{ fontSize: '0.875rem', color: '#0369a1', marginBottom: '0.25rem' }}>
+                                Operação (Face)
+                              </div>
+                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0c4a6e' }}>
+                                {formatarMoeda(carteiraCalculos?.valorTotalOperacao || 0)}
+                              </div>
+                            </div>
+                            <div style={{ 
+                              borderTop: '1px solid #bae6fd', 
+                              paddingTop: '0.75rem',
+                              marginTop: '0.75rem'
+                            }}>
+                              <div style={{ fontSize: '0.875rem', color: '#0369a1', marginBottom: '0.25rem' }}>
+                                Total Face
+                              </div>
+                              <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#0c4a6e' }}>
+                                {formatarMoeda((carteiraCalculos?.valorColateral || 0) + (carteiraCalculos?.valorTotalOperacao || 0))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Status do Colateral */}
+                        {(() => {
+                          const percentual = carteiraCalculos?.percentualFinal || 0;
+                          const alvo = carteiraCalculos?.percentualAlvo || 130;
+                          const diferenca = Math.abs(percentual - alvo);
+                          
+                          // Determinar cor baseada na proximidade do alvo
+                          let backgroundColor, borderColor, textColor, icon;
+                          
+                          if (diferenca <= 0.5) {
+                            // Muito próximo do alvo (≤ 0.5% de diferença)
+                            backgroundColor = '#f0fdf4';
+                            borderColor = '#bbf7d0';
+                            textColor = '#166534';
+                            icon = '🎯';
+                          } else if (diferenca <= 1.0) {
+                            // Próximo do alvo (≤ 1% de diferença)
+                            backgroundColor = '#fef3c7';
+                            borderColor = '#fde68a';
+                            textColor = '#92400e';
+                            icon = '✅';
+                          } else if (percentual >= alvo) {
+                            // Atende ao mínimo mas não está próximo
+                            backgroundColor = '#f0fdf4';
+                            borderColor = '#bbf7d0';
+                            textColor = '#166534';
+                            icon = '✓';
+                          } else {
+                            // Abaixo do alvo
+                            backgroundColor = '#fffbeb';
+                            borderColor = '#fed7aa';
+                            textColor = '#d97706';
+                            icon = '⚠️';
+                          }
+                          
+                          return (
+                            <div style={{ 
+                              backgroundColor, 
+                              border: `1px solid ${borderColor}`,
+                              borderRadius: '12px',
+                              padding: '1.5rem',
+                              textAlign: 'center'
+                            }}>
+                              <div style={{ 
+                                fontSize: '2rem', 
+                                fontWeight: '800', 
+                                color: textColor,
+                                marginBottom: '0.5rem'
+                              }}>
+                                {percentual.toFixed(2)}% {icon}
+                              </div>
+                              <div style={{ 
+                                fontSize: '0.875rem', 
+                                color: textColor,
+                                fontWeight: '500'
+                              }}>
+                                {diferenca <= 0.5 
+                                  ? `Perfeito! Colateral muito próximo de ${alvo}%`
+                                  : diferenca <= 1.0
+                                  ? `Ótimo! Colateral próximo de ${alvo}%`
+                                  : percentual >= alvo
+                                  ? `Colateral atende ao mínimo de ${alvo}%`
+                                  : `Colateral abaixo do alvo de ${alvo}%`
+                                }
+                              </div>
+                              <div style={{ 
+                                fontSize: '0.75rem', 
+                                color: textColor,
+                                opacity: 0.7,
+                                marginTop: '0.25rem'
+                              }}>
+                                Diferença de {diferenca.toFixed(2)}% do alvo
+                              </div>
+                              {carteiraCalculos?.slack !== undefined && (
+                                <div style={{ 
+                                  fontSize: '0.75rem', 
+                                  color: textColor,
+                                  opacity: 0.7,
+                                  marginTop: '0.1rem'
+                                }}>
+                                  Slack: {carteiraCalculos.slack.toFixed(2)}%
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                        <div style={{ 
+                          fontSize: '0.75rem', 
+                          color: '#6b7280',
+                          marginTop: '0.25rem',
+                          fontStyle: 'italic'
+                        }}>
+                          Operação = antecipação principal | Colateral = garantia mínima
+                        </div>
+                      </div>
+
+                      {/* Botão Salvar */}
+                      <button
+                        type="button"
+                        onClick={salvarCarteiraExistente}
+                        style={{
+                          background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                          border: 'none',
+                          color: 'white',
+                          cursor: 'pointer',
+                          padding: '0.875rem',
+                          borderRadius: '8px',
+                          fontSize: '1rem',
+                          fontWeight: '600',
+                          marginTop: '1rem'
+                        }}
+                      >
+                        Salvar Paciente
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ 
+                      textAlign: 'center', 
+                      padding: '3rem 1rem',
+                      color: '#6b7280',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '2px dashed #d1d5db'
+                    }}>
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ marginBottom: '1rem', opacity: 0.5 }}>
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <path d="M9 9h6v6H9z"></path>
+                      </svg>
+                      <p>Preencha os dados e clique em "Calcular Valores"</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
