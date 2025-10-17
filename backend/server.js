@@ -3060,12 +3060,19 @@ app.get('/api/pacientes', authenticateToken, async (req, res) => {
       tipo: req.user.tipo,
       nome: req.user.nome
     });
+    
+    // Status que devem permanecer em "Novos Leads" e "Negativas"
+    const statusNovosLeads = ['lead', 'sem_primeiro_contato'];
+    const statusNegativos = ['nao_existe', 'nao_tem_interesse', 'nao_reconhece', 'nao_responde', 'sem_clinica', 'nao_passou_cpf', 'nao_tem_outro_cpf', 'cpf_reprovado'];
+    const statusExcluir = [...statusNovosLeads, ...statusNegativos];
+    
     let query = supabaseAdmin
       .from('pacientes')
       .select(`
         *,
         consultores(nome)
       `)
+      .not('status', 'in', `(${statusExcluir.join(',')})`) // EXCLUIR status que devem aparecer apenas em Novos Leads e Negativas
       .order('created_at', { ascending: false });
 
     // Se for clínica, buscar pacientes que têm agendamentos nesta clínica OU foram cadastrados por ela
@@ -3137,12 +3144,18 @@ app.get('/api/pacientes', authenticateToken, async (req, res) => {
 
 app.get('/api/dashboard/pacientes', authenticateToken, async (req, res) => {
   try {
+    // Status que devem permanecer em "Novos Leads" e "Negativas"
+    const statusNovosLeads = ['lead', 'sem_primeiro_contato'];
+    const statusNegativos = ['nao_existe', 'nao_tem_interesse', 'nao_reconhece', 'nao_responde', 'sem_clinica', 'nao_passou_cpf', 'nao_tem_outro_cpf', 'cpf_reprovado'];
+    const statusExcluir = [...statusNovosLeads, ...statusNegativos];
+    
     let query = supabaseAdmin
       .from('pacientes')
       .select(`
         *,
         consultores(nome)
       `)
+      .not('status', 'in', `(${statusExcluir.join(',')})`) // EXCLUIR status que devem aparecer apenas em Novos Leads e Negativas
       .order('created_at', { ascending: false });
 
     // Se for consultor freelancer (não tem as duas permissões), filtrar pacientes atribuídos a ele OU vinculados através de agendamentos OU fechamentos
@@ -3548,34 +3561,99 @@ app.delete('/api/pacientes/:id', authenticateToken, async (req, res) => {
 // === NOVOS LEADS === (Funcionalidade para pegar leads)
 app.get('/api/novos-leads', authenticateToken, async (req, res) => {
   try {
-    // Buscar pacientes sem consultor_id
-    const { data: pacientesSemConsultor, error } = await supabaseAdmin
+    // Buscar leads com status = 'lead' e 'sem_primeiro_contato' (prospecção ativa)
+    const statusNovosLeads = ['lead', 'sem_primeiro_contato'];
+    
+    const { data: novosLeads, error } = await supabaseAdmin
       .from('pacientes')
       .select('*')
-      .is('consultor_id', null)
+      .in('status', statusNovosLeads)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
     
-    // Buscar todos os fechamentos para identificar pacientes de clínicas
-    const { data: fechamentos, error: fechError } = await supabaseAdmin
-      .from('fechamentos')
-      .select('paciente_id');
-      
-    if (fechError) throw fechError;
-    
-    // Criar Set de IDs de pacientes que têm fechamento
-    const pacientesComFechamento = new Set(fechamentos?.map(f => f.paciente_id) || []);
-    
-    // Filtrar apenas pacientes que NÃO têm fechamento (são leads verdadeiros)
-    const novosLeads = pacientesSemConsultor.filter(p => !pacientesComFechamento.has(p.id));
-    
-    console.log('🔍 Pacientes sem consultor:', pacientesSemConsultor?.length || 0);
-    console.log('🔍 Pacientes com fechamento (excluídos):', pacientesComFechamento.size);
-    console.log('🔍 Novos leads verdadeiros:', novosLeads?.length || 0);
+    console.log('🔍 Novos leads (status: lead, sem_primeiro_contato):', novosLeads?.length || 0);
     
     res.json(novosLeads);
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === LEADS NEGATIVOS === (Funcionalidade para pegar leads negativos)
+app.get('/api/leads-negativos', authenticateToken, async (req, res) => {
+  try {
+    // Buscar pacientes com status negativos (SEM 'sem_primeiro_contato' que vai para Novos Leads)
+    const statusNegativos = [
+      'nao_existe',
+      'nao_tem_interesse',
+      'nao_reconhece',
+      'nao_responde',
+      'sem_clinica',
+      'nao_passou_cpf',
+      'nao_tem_outro_cpf',
+      'cpf_reprovado'
+    ];
+    
+    const { data: leadsNegativos, error } = await supabaseAdmin
+      .from('pacientes')
+      .select('*')
+      .in('status', statusNegativos)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    
+    console.log('🔍 Leads negativos (status:', statusNegativos.join(', '), '):', leadsNegativos?.length || 0);
+    
+    res.json(leadsNegativos);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === APROVAR LEAD === (Muda status de 'lead' para 'em_conversa')
+app.put('/api/novos-leads/:id/aprovar', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    console.log('✅ Aprovando lead:', id);
+    
+    // Verificar se o lead existe e tem status 'lead'
+    const { data: pacienteAtual, error: checkError } = await supabaseAdmin
+      .from('pacientes')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (checkError) throw checkError;
+    
+    if (!pacienteAtual) {
+      return res.status(404).json({ error: 'Lead não encontrado!' });
+    }
+    
+    if (pacienteAtual.status !== 'lead') {
+      return res.status(400).json({ error: 'Este lead já foi processado!' });
+    }
+
+    // Mudar status de 'lead' para 'em_conversa'
+    const { error } = await supabaseAdmin
+      .from('pacientes')
+      .update({ status: 'em_conversa' })
+      .eq('id', id);
+
+    if (error) throw error;
+    
+    console.log('✅ Lead aprovado com sucesso! ID:', id);
+    
+    // Emitir evento Socket.IO para atualizar contagem de leads
+    if (io) {
+      console.log('📢 Lead aprovado - atualizando contagem via Socket.IO');
+      setTimeout(() => updateLeadCount(), 100);
+    }
+    
+    res.json({ message: 'Lead aprovado com sucesso! Status alterado para "em_conversa".' });
+  } catch (error) {
+    console.error('❌ Erro ao aprovar lead:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -3632,31 +3710,43 @@ app.put('/api/novos-leads/:id/pegar', authenticateToken, async (req, res) => {
   }
 });
 
-// Excluir lead da aba Novos Leads (apenas admin)
+// Excluir lead (apenas admin) - aceita leads e negativas
 app.delete('/api/novos-leads/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Verificar se o lead existe e não está atribuído
+    // Status permitidos para exclusão (Novos Leads + Negativas)
+    const statusNovosLeads = ['lead', 'sem_primeiro_contato'];
+    const statusNegativos = ['nao_existe', 'nao_tem_interesse', 'nao_reconhece', 'nao_responde', 'sem_clinica', 'nao_passou_cpf', 'nao_tem_outro_cpf', 'cpf_reprovado'];
+    const statusPermitidos = [...statusNovosLeads, ...statusNegativos];
+    
+    // Verificar se o lead existe
     const { data: pacienteAtual, error: checkError } = await supabaseAdmin
       .from('pacientes')
-      .select('consultor_id, nome')
+      .select('consultor_id, nome, status')
       .eq('id', id)
       .single();
 
     if (checkError) throw checkError;
-
-    if (pacienteAtual.consultor_id !== null) {
-      return res.status(400).json({ error: 'Não é possível excluir um lead que já foi atribuído a um consultor!' });
+    
+    if (!pacienteAtual) {
+      return res.status(404).json({ error: 'Lead não encontrado!' });
+    }
+    
+    // Verificar se o lead tem status permitido para exclusão
+    if (!statusPermitidos.includes(pacienteAtual.status)) {
+      return res.status(400).json({ error: 'Apenas leads com status permitido podem ser excluídos desta forma!' });
     }
 
-    // Excluir o lead
+    // Excluir o lead (independente de ter consultor_id ou não)
     const { error } = await supabaseAdmin
       .from('pacientes')
       .delete()
       .eq('id', id);
 
     if (error) throw error;
+    
+    console.log('✅ Lead excluído com sucesso! ID:', id, 'Nome:', pacienteAtual.nome, 'Status:', pacienteAtual.status);
     
     // Emitir evento Socket.IO para atualizar contagem de leads
     if (io) {
@@ -3666,6 +3756,7 @@ app.delete('/api/novos-leads/:id', authenticateToken, requireAdmin, async (req, 
     
     res.json({ message: 'Lead excluído com sucesso!' });
   } catch (error) {
+    console.error('❌ Erro ao excluir lead:', error);
     res.status(500).json({ error: error.message });
   }
 });
