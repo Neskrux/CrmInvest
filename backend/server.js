@@ -3066,14 +3066,23 @@ app.get('/api/pacientes', authenticateToken, async (req, res) => {
     const statusNegativos = ['nao_existe', 'nao_tem_interesse', 'nao_reconhece', 'nao_responde', 'sem_clinica', 'nao_passou_cpf', 'nao_tem_outro_cpf', 'cpf_reprovado'];
     const statusExcluir = [...statusNovosLeads, ...statusNegativos];
     
+    // Verificar se é freelancer (consultor sem as duas permissões)
+    const isFreelancer = req.user.tipo === 'consultor' && !(req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true);
+    
     let query = supabaseAdmin
       .from('pacientes')
       .select(`
         *,
         consultores(nome)
-      `)
-      .not('status', 'in', `(${statusExcluir.join(',')})`) // EXCLUIR status que devem aparecer apenas em Novos Leads e Negativas
-      .order('created_at', { ascending: false });
+      `);
+    
+    // Para freelancers, não excluir nenhum status (mostrar todos os pacientes atribuídos)
+    // Para outros usuários, excluir status que devem aparecer apenas em Novos Leads e Negativas
+    if (!isFreelancer) {
+      query = query.not('status', 'in', `(${statusExcluir.join(',')})`);
+    }
+    
+    query = query.order('created_at', { ascending: false });
 
     // Se for clínica, buscar pacientes que têm agendamentos nesta clínica OU foram cadastrados por ela
     if (req.user.tipo === 'clinica') {
@@ -3149,14 +3158,23 @@ app.get('/api/dashboard/pacientes', authenticateToken, async (req, res) => {
     const statusNegativos = ['nao_existe', 'nao_tem_interesse', 'nao_reconhece', 'nao_responde', 'sem_clinica', 'nao_passou_cpf', 'nao_tem_outro_cpf', 'cpf_reprovado'];
     const statusExcluir = [...statusNovosLeads, ...statusNegativos];
     
+    // Verificar se é freelancer (consultor sem as duas permissões)
+    const isFreelancer = req.user.tipo === 'consultor' && !(req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true);
+    
     let query = supabaseAdmin
       .from('pacientes')
       .select(`
         *,
         consultores(nome)
-      `)
-      .not('status', 'in', `(${statusExcluir.join(',')})`) // EXCLUIR status que devem aparecer apenas em Novos Leads e Negativas
-      .order('created_at', { ascending: false });
+      `);
+    
+    // Para freelancers, não excluir nenhum status (mostrar todos os pacientes atribuídos)
+    // Para outros usuários, excluir status que devem aparecer apenas em Novos Leads e Negativas
+    if (!isFreelancer) {
+      query = query.not('status', 'in', `(${statusExcluir.join(',')})`);
+    }
+    
+    query = query.order('created_at', { ascending: false });
 
     // Se for consultor freelancer (não tem as duas permissões), filtrar pacientes atribuídos a ele OU vinculados através de agendamentos OU fechamentos
     // Consultores internos (com pode_ver_todas_novas_clinicas=true E podealterarstatus=true) veem todos os pacientes
@@ -3728,7 +3746,7 @@ app.delete('/api/novos-leads/:id', authenticateToken, requireAdmin, async (req, 
       .single();
 
     if (checkError) throw checkError;
-    
+
     if (!pacienteAtual) {
       return res.status(404).json({ error: 'Lead não encontrado!' });
     }

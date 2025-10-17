@@ -2331,14 +2331,25 @@ const Pacientes = () => {
       return true; // Sempre mostrar pacientes fechados, mesmo sem consultor
     }
     
-    // Admins e consultores internos veem todos os pacientes
-    // Freelancers veem apenas os atribuídos a eles
-    // Leads não atribuídos (sem consultor_id) NÃO devem aparecer aqui para ninguém
-    if (!isAdmin && !isConsultorInterno && semConsultor) return false;
-    
-    // Para consultores internos e admins, também remover leads não atribuídos da aba "Geral"
-    // (eles devem aparecer apenas em "Novos Leads")
-    if ((isAdmin || isConsultorInterno) && semConsultor) return false;
+    // Para freelancers: mostrar todos os pacientes indicados por eles (com consultor_id dele)
+    // independente do status, incluindo leads
+    if (isFreelancer) {
+      // Se o paciente tem o consultor_id do freelancer, mostrar
+      if (p.consultor_id && Number(p.consultor_id) === Number(user?.consultor_id)) {
+        // Continuar com os outros filtros abaixo
+      } else {
+        return false; // Não mostrar pacientes de outros consultores
+      }
+    } else {
+      // Para não-freelancers: lógica original
+      // Admins e consultores internos veem todos os pacientes
+      // Leads não atribuídos (sem consultor_id) NÃO devem aparecer aqui para ninguém
+      if (!isAdmin && !isConsultorInterno && semConsultor) return false;
+      
+      // Para consultores internos e admins, também remover leads não atribuídos da aba "Geral"
+      // (eles devem aparecer apenas em "Novos Leads")
+      if ((isAdmin || isConsultorInterno) && semConsultor) return false;
+    }
     
     const matchNome = !filtroNome || p.nome.toLowerCase().includes(filtroNome.toLowerCase());
     const matchTelefone = !filtroTelefone || (p.telefone || '').includes(filtroTelefone);
@@ -2724,18 +2735,23 @@ const Pacientes = () => {
                     <select className="form-select" value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}>
                       <option value="">Todos</option>
                       {statusOptions
-                        .filter(option => ![
-                          'lead',
-                          'sem_primeiro_contato',
-                          'nao_existe',
-                          'nao_tem_interesse',
-                          'nao_reconhece',
-                          'nao_responde',
-                          'sem_clinica',
-                          'nao_passou_cpf',
-                          'nao_tem_outro_cpf',
-                          'cpf_reprovado'
-                        ].includes(option.value))
+                        .filter(option => {
+                          // Freelancers veem todos os status
+                          if (isFreelancer) return true;
+                          // Outros usuários não veem status de leads e negativas
+                          return ![
+                            'lead',
+                            'sem_primeiro_contato',
+                            'nao_existe',
+                            'nao_tem_interesse',
+                            'nao_reconhece',
+                            'nao_responde',
+                            'sem_clinica',
+                            'nao_passou_cpf',
+                            'nao_tem_outro_cpf',
+                            'cpf_reprovado'
+                          ].includes(option.value);
+                        })
                         .map(option => (
                           <option key={option.value} value={option.value}>{option.label}</option>
                         ))}
@@ -2984,18 +3000,23 @@ const Pacientes = () => {
                               title={statusInfo.description || statusInfo.label}
                             >
                               {statusOptions
-                                .filter(option => ![
-                                  'lead',
-                                  'sem_primeiro_contato',
-                                  'nao_existe',
-                                  'nao_tem_interesse',
-                                  'nao_reconhece',
-                                  'nao_responde',
-                                  'sem_clinica',
-                                  'nao_passou_cpf',
-                                  'nao_tem_outro_cpf',
-                                  'cpf_reprovado'
-                                ].includes(option.value))
+                                .filter(option => {
+                                  // Freelancers veem todos os status
+                                  if (isFreelancer) return true;
+                                  // Outros usuários não veem status de leads e negativas
+                                  return ![
+                                    'lead',
+                                    'sem_primeiro_contato',
+                                    'nao_existe',
+                                    'nao_tem_interesse',
+                                    'nao_reconhece',
+                                    'nao_responde',
+                                    'sem_clinica',
+                                    'nao_passou_cpf',
+                                    'nao_tem_outro_cpf',
+                                    'cpf_reprovado'
+                                  ].includes(option.value);
+                                })
                                 .map(option => (
                                   <option key={option.value} value={option.value} title={option.description}>
                                     {option.label}
