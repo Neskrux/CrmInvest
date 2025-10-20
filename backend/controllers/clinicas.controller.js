@@ -76,10 +76,10 @@ const getClinicasEmAnalise = async (req, res) => {
       .eq('em_analise', true)
       .order('created_at', { ascending: false });
 
-    // Se for freelancer, filtrar apenas suas clínicas
+    // Se for freelancer, filtrar apenas suas clínicas (usar criado_por_consultor_id)
     if (isFreelancer) {
       console.log('👥 Freelancer buscando clínicas em análise - ID:', req.user.id);
-      query = query.eq('consultor_id', req.user.id);
+      query = query.eq('criado_por_consultor_id', req.user.id);
     }
 
     const { data, error } = await query;
@@ -89,7 +89,8 @@ const getClinicasEmAnalise = async (req, res) => {
     // Reformatar dados
     const formattedData = data.map(clinica => ({
       ...clinica,
-      consultor_nome: clinica.consultores?.nome,
+      consultor_responsavel_nome: clinica.consultores?.nome,
+      consultor_nome: clinica.consultores?.nome, // Mantém compatibilidade
       empresa_id: clinica.empresa_id || clinica.consultores?.empresa_id || null
     }));
     
@@ -167,7 +168,7 @@ const getAllClinicas = async (req, res) => {
     
     if (isFreelancer) {
       console.log('👥 Buscando clínicas do freelancer ID:', req.user.id);
-      query = query.eq('consultor_id', req.user.id);
+      query = query.eq('criado_por_consultor_id', req.user.id);
       const result = await query;
       data = result.data;
       error = result.error;
@@ -183,7 +184,8 @@ const getAllClinicas = async (req, res) => {
     // Reformatar dados para incluir nome do consultor, empresa_id e nome da parceiro
     const formattedData = data.map(clinica => ({
       ...clinica,
-      consultor_nome: clinica.consultores?.nome,
+      consultor_responsavel_nome: clinica.consultores?.nome,
+      consultor_nome: clinica.consultores?.nome, // Mantém compatibilidade
       empresa_id: clinica.empresa_id || clinica.consultores?.empresa_id || null
     }));
     
@@ -217,7 +219,8 @@ const createClinica = async (req, res) => {
     
     let { 
       nome, endereco, bairro, cidade, estado, nicho, telefone, email, status, em_analise, cnpj, responsavel,
-      telefone_socios, email_socios, banco_nome, banco_conta, banco_agencia, banco_pix, limite_credito
+      telefone_socios, email_socios, banco_nome, banco_conta, banco_agencia, banco_pix, limite_credito,
+      consultor_id, criado_por_consultor_id, empresa_id, tipo_origem
     } = req.body;
     
     // Normalizar email
@@ -257,7 +260,7 @@ const createClinica = async (req, res) => {
       status: status || 'ativo',
       latitude,
       longitude,
-      tipo_origem: 'direta',
+      tipo_origem: tipo_origem || 'direta',
       em_analise: em_analise || false
     };
 
@@ -271,11 +274,17 @@ const createClinica = async (req, res) => {
     if (banco_agencia) clinicaData.banco_agencia = banco_agencia;
     if (banco_pix) clinicaData.banco_pix = banco_pix;
     if (limite_credito) clinicaData.limite_credito = parseFloat(limite_credito);
+    if (empresa_id) clinicaData.empresa_id = empresa_id;
 
     // Se for consultor interno criando, adicionar consultor_id
     const isConsultorInterno = req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true;
     if (isConsultorInterno) {
-      clinicaData.consultor_id = req.user.id;
+      clinicaData.consultor_id = consultor_id || req.user.id;
+    }
+    
+    // Adicionar criado_por_consultor_id se fornecido (preserva o freelancer que indicou)
+    if (criado_por_consultor_id) {
+      clinicaData.criado_por_consultor_id = criado_por_consultor_id;
     }
 
     console.log('📝 Dados que serão inseridos:', clinicaData);
@@ -631,7 +640,7 @@ const removerAcesso = async (req, res) => {
 const updateClinica = async (req, res) => {
   try {
     const { id } = req.params;
-    const { evidencia_id } = req.body;
+    const { evidencia_id, consultor_id } = req.body;
     console.log('🔧 PUT /api/clinicas/:id recebido');
     console.log('🔧 ID da clínica:', id);
     console.log('🔧 Body recebido:', req.body);
@@ -639,9 +648,10 @@ const updateClinica = async (req, res) => {
     
     // Verificar se é admin, ou se é a própria clínica editando seus dados
     const isAdmin = req.user.tipo === 'admin';
+    const isConsultorInterno = req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true;
     const isPropriaClinica = req.user.tipo === 'clinica' && req.user.clinica_id === parseInt(id);
     
-    if (!isAdmin && !isPropriaClinica) {
+    if (!isAdmin && !isConsultorInterno && !isPropriaClinica) {
       return res.status(403).json({ error: 'Acesso negado. Você não tem permissão para editar esta clínica.' });
     }
     
@@ -656,7 +666,7 @@ const updateClinica = async (req, res) => {
     // Todos os campos permitidos (para admin)
     const camposPermitidos = [
       'nome', 'endereco', 'bairro', 'cidade', 'estado', 'nicho', 'telefone', 'email', 'status', 'em_analise', 'cnpj', 'responsavel',
-      'telefone_socios', 'email_socios', 'banco_nome', 'banco_conta', 'banco_agencia', 'banco_pix', 'limite_credito'
+      'telefone_socios', 'email_socios', 'banco_nome', 'banco_conta', 'banco_agencia', 'banco_pix', 'limite_credito', 'consultor_id'
     ];
     const updateData = {};
     for (const campo of camposPermitidos) {
@@ -679,6 +689,19 @@ const updateClinica = async (req, res) => {
         }
       }
     }
+    
+    // Se o status for "reuniao_marcada", garantir que em_analise seja true
+    if (updateData.status === 'reuniao_marcada') {
+      updateData.em_analise = true;
+      console.log('📋 Status é "reuniao_marcada" - definindo em_analise = true');
+    }
+    
+    // Se foi fornecido um consultor_id, adicionar aos dados de atualização
+    if (consultor_id) {
+      updateData.consultor_id = consultor_id;
+      console.log('👤 Atribuindo consultor interno:', consultor_id);
+    }
+    
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ error: 'Nenhum campo válido para atualizar.' });
     }
@@ -768,15 +791,69 @@ const deleteClinica = async (req, res) => {
 // Buscar clínicas negativas
 const getClinicasNegativas = async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin
+    // Status negativos (inativa NÃO é considerado negativo)
+    const statusNegativos = [
+      'negativa',
+      'nao_fechou',
+      'nao_tem_interesse',
+      'nao_e_nosso_publico',
+      'nao_responde',
+      'nao_reconhece'
+    ];
+
+    // Buscar clínicas negativas da tabela clinicas com JOIN com consultores
+    const { data: clinicasNegativas, error: errorClinicas } = await supabaseAdmin
       .from('clinicas')
-      .select('*')
-      .eq('status', 'negativa')
+      .select(`
+        *,
+        consultores!consultor_id(
+          nome, 
+          empresa_id
+        )
+      `)
+      .in('status', statusNegativos)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (errorClinicas) throw errorClinicas;
 
-    res.json(data);
+    // Buscar clínicas negativas da tabela novas_clinicas com JOIN com consultores
+    const { data: novasClinicasNegativas, error: errorNovasClinicas } = await supabaseAdmin
+      .from('novas_clinicas')
+      .select(`
+        *,
+        consultores!criado_por_consultor_id(
+          nome, 
+          empresa_id
+        )
+      `)
+      .in('status', statusNegativos)
+      .order('created_at', { ascending: false });
+
+    if (errorNovasClinicas) throw errorNovasClinicas;
+
+    // Reformatar dados da tabela clinicas
+    const clinicasFormatadas = (clinicasNegativas || []).map(clinica => ({
+      ...clinica,
+      consultor_responsavel_nome: clinica.consultores?.nome,
+      consultor_nome: clinica.consultores?.nome, // Mantém compatibilidade
+      empresa_id: clinica.empresa_id || clinica.consultores?.empresa_id || null
+    }));
+
+    // Reformatar dados da tabela novas_clinicas
+    const novasClinicasFormatadas = (novasClinicasNegativas || []).map(clinica => ({
+      ...clinica,
+      consultor_indicador_nome: clinica.consultores?.nome,
+      consultor_nome: clinica.consultores?.nome, // Mantém compatibilidade
+      empresa_id: clinica.empresa_id || clinica.consultores?.empresa_id || null
+    }));
+
+    // Combinar os resultados
+    const todasClinicasNegativas = [
+      ...clinicasFormatadas,
+      ...novasClinicasFormatadas
+    ];
+
+    res.json(todasClinicasNegativas);
   } catch (error) {
     console.error('Erro ao buscar clínicas negativas:', error);
     res.status(500).json({ error: error.message });
