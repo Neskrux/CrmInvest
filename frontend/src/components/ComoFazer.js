@@ -54,7 +54,7 @@ const ComoFazer = () => {
     },
     {
       pergunta: "O que é a IM e o que ela faz?",
-      resposta: "A IM é uma empresa que ajuda clínicas a receberem à vista o que os pacientes pagam parcelado. Ela antecipa o dinheiro pra clínica e depois recebe os boletos aos poucos. Assim, a clínica tem dinheiro agora e o paciente pode pagar tranquilo."
+      resposta: "A IM é uma parceiro que ajuda clínicas a receberem à vista o que os pacientes pagam parcelado. Ela antecipa o dinheiro pra clínica e depois recebe os boletos aos poucos. Assim, a clínica tem dinheiro agora e o paciente pode pagar tranquilo."
     },
     {
       pergunta: "O que significa ser um Freelancer IM?",
@@ -66,15 +66,15 @@ const ComoFazer = () => {
     },
     {
       pergunta: "É seguro participar?",
-      resposta: "Sim! A IM é uma empresa real, com contratos e processos 100% digitais e rastreáveis. Todo pagamento e comissão acontece de forma segura e registrada."
+      resposta: "Sim! A IM é uma parceiro real, com contratos e processos 100% digitais e rastreáveis. Todo pagamento e comissão acontece de forma segura e registrada."
     },
     {
       pergunta: "Meus dados e indicações ficam protegidos?",
       resposta: "Sim. Seus dados são usados só pra validar e pagar suas indicações. Tudo segue as regras da LGPD, a lei que protege informações pessoais no Brasil."
     },
     {
-      pergunta: "A IM é uma empresa registrada?",
-      resposta: "Sim. A IM é uma empresa registrada com CNPJ e sede oficial no Brasil, e atua dentro das normas do mercado financeiro."
+      pergunta: "A IM é uma parceiro registrada?",
+      resposta: "Sim. A IM é uma parceiro registrada com CNPJ e sede oficial no Brasil, e atua dentro das normas do mercado financeiro."
     }
   ];
 

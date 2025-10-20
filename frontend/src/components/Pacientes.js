@@ -14,6 +14,7 @@ const Pacientes = () => {
   const isConsultor = user?.tipo === 'consultor';
   const [pacientes, setPacientes] = useState([]);
   const [novosLeads, setNovosLeads] = useState([]);
+  const [leadsNegativos, setLeadsNegativos] = useState([]);
   const [consultores, setConsultores] = useState([]);
   const [agendamentos, setAgendamentos] = useState([]);
   const [fechamentos, setFechamentos] = useState([]);
@@ -42,6 +43,13 @@ const Pacientes = () => {
   const [filtroConsultor, setFiltroConsultor] = useState('');
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
   const [filtroDataFim, setFiltroDataFim] = useState('');
+  
+  // Filtros para Leads Negativos
+  const [mostrarFiltrosNegativos, setMostrarFiltrosNegativos] = useState(false);
+  const [filtroNomeNegativos, setFiltroNomeNegativos] = useState('');
+  const [filtroStatusNegativos, setFiltroStatusNegativos] = useState('');
+  const [filtroConsultorNegativos, setFiltroConsultorNegativos] = useState('');
+  
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
@@ -463,6 +471,7 @@ const Pacientes = () => {
     // Buscar novos leads apenas se pode alterar status (não freelancer) ou é consultor interno
     if (podeAlterarStatus || isConsultorInterno) {
       fetchNovosLeads();
+      fetchLeadsNegativos();
     }
     
     // Aplicar filtro automático por consultor se necessário
@@ -501,6 +510,7 @@ const Pacientes = () => {
       // Buscar novos leads apenas se pode alterar status (não freelancer) ou é consultor interno
       if (podeAlterarStatus || isConsultorInterno) {
         fetchNovosLeads();
+        fetchLeadsNegativos();
       }
     }, 30000); // 30 segundos
 
@@ -511,6 +521,8 @@ const Pacientes = () => {
   useEffect(() => {
     if (activeTab === 'novos-leads') {
       fetchNovosLeads(); // Atualizar quando entrar na aba
+    } else if (activeTab === 'negativas') {
+      fetchLeadsNegativos(); // Atualizar quando entrar na aba
     }
   }, [activeTab]);
 
@@ -684,6 +696,42 @@ const Pacientes = () => {
     }
   };
 
+  const fetchLeadsNegativos = async () => {
+    try {
+      const response = await makeRequest('/leads-negativos');
+      const data = await response.json();
+      
+      if (response.ok) {
+        setLeadsNegativos(data);
+      } else {
+        console.error('Erro ao carregar leads negativos:', data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar leads negativos:', error);
+    }
+  };
+
+  const aprovarLead = async (leadId) => {
+    try {
+      const response = await makeRequest(`/novos-leads/${leadId}/aprovar`, {
+        method: 'PUT'
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        showSuccessToast('Lead aprovado com sucesso!');
+        await fetchNovosLeads();
+        await fetchPacientes();
+      } else {
+        showErrorToast(data.error || 'Erro ao aprovar lead');
+      }
+    } catch (error) {
+      console.error('Erro ao aprovar lead:', error);
+      showErrorToast('Erro ao conectar com o servidor');
+    }
+  };
+
   const pegarLead = async (leadId) => {
     // Se for admin, abrir modal para escolher consultor
     if (isAdmin) {
@@ -732,7 +780,9 @@ const Pacientes = () => {
       
       if (response.ok) {
         showSuccessToast('Lead excluído com sucesso!');
+        // Atualizar ambas as listas para refletir a exclusão
         fetchNovosLeads();
+        fetchLeadsNegativos();
       } else {
         showErrorToast('Erro ao excluir lead: ' + data.error);
       }
@@ -743,6 +793,26 @@ const Pacientes = () => {
   };
 
   const alterarStatusNovoLead = async (leadId, novoStatus) => {
+    // VERIFICAR SE STATUS REQUER EVIDÊNCIA
+    if (STATUS_COM_EVIDENCIA_PACIENTES.includes(novoStatus)) {
+      // Procurar o lead nos arrays de novos leads e leads negativos
+      const lead = novosLeads.find(l => l.id === leadId) || leadsNegativos.find(l => l.id === leadId);
+      
+      if (lead) {
+        // Abrir modal de evidência
+        setEvidenciaData({
+          pacienteId: leadId,
+          pacienteNome: lead.nome,
+          statusAnterior: lead.status,
+          statusNovo: novoStatus,
+          evidenciaId: null
+        });
+        setShowEvidenciaModal(true);
+      }
+      return;
+    }
+
+    // Para outros status que não requerem evidência, atualizar diretamente
     try {
       const response = await makeRequest(`/novos-leads/${leadId}/status`, {
         method: 'PUT',
@@ -753,7 +823,9 @@ const Pacientes = () => {
       
       if (response.ok) {
         showSuccessToast('Status atualizado com sucesso!');
+        // Atualizar ambas as listas para refletir a mudança
         fetchNovosLeads();
+        fetchLeadsNegativos();
       } else {
         showErrorToast('Erro ao alterar status: ' + data.error);
       }
@@ -768,6 +840,10 @@ const Pacientes = () => {
     
     // Atualizar status agora que temos a evidência
     await updateStatus(evidenciaData.pacienteId, evidenciaData.statusNovo, evidenciaId);
+    
+    // Atualizar arrays de novos leads e leads negativos
+    fetchNovosLeads();
+    fetchLeadsNegativos();
     
     // Limpar status temporário
     setStatusTemporario(prev => {
@@ -2279,14 +2355,25 @@ const Pacientes = () => {
       return true; // Sempre mostrar pacientes fechados, mesmo sem consultor
     }
     
-    // Admins e consultores internos veem todos os pacientes
-    // Freelancers veem apenas os atribuídos a eles
-    // Leads não atribuídos (sem consultor_id) NÃO devem aparecer aqui para ninguém
-    if (!isAdmin && !isConsultorInterno && semConsultor) return false;
-    
-    // Para consultores internos e admins, também remover leads não atribuídos da aba "Geral"
-    // (eles devem aparecer apenas em "Novos Leads")
-    if ((isAdmin || isConsultorInterno) && semConsultor) return false;
+    // Para freelancers: mostrar todos os pacientes indicados por eles (com consultor_id dele)
+    // independente do status, incluindo leads
+    if (isFreelancer) {
+      // Se o paciente tem o consultor_id do freelancer, mostrar
+      if (p.consultor_id && Number(p.consultor_id) === Number(user?.consultor_id)) {
+        // Continuar com os outros filtros abaixo
+      } else {
+        return false; // Não mostrar pacientes de outros consultores
+      }
+    } else {
+      // Para não-freelancers: lógica original
+      // Admins e consultores internos veem todos os pacientes
+      // Leads não atribuídos (sem consultor_id) NÃO devem aparecer aqui para ninguém
+      if (!isAdmin && !isConsultorInterno && semConsultor) return false;
+      
+      // Para consultores internos e admins, também remover leads não atribuídos da aba "Geral"
+      // (eles devem aparecer apenas em "Novos Leads")
+      if ((isAdmin || isConsultorInterno) && semConsultor) return false;
+    }
     
     const matchNome = !filtroNome || p.nome.toLowerCase().includes(filtroNome.toLowerCase());
     const matchTelefone = !filtroTelefone || (p.telefone || '').includes(filtroTelefone);
@@ -2323,6 +2410,15 @@ const Pacientes = () => {
     }
     
     return matchNome && matchTelefone && matchCPF && matchTipo && matchStatus && matchConsultor && matchData;
+  });
+
+  // Filtro para Leads Negativos
+  const leadsNegativosFiltrados = leadsNegativos.filter(lead => {
+    const matchNome = !filtroNomeNegativos || lead.nome.toLowerCase().includes(filtroNomeNegativos.toLowerCase());
+    const matchStatus = !filtroStatusNegativos || lead.status === filtroStatusNegativos;
+    const matchConsultor = !filtroConsultorNegativos || String(lead.consultor_id) === filtroConsultorNegativos;
+    
+    return matchNome && matchStatus && matchConsultor;
   });
 
   const handleTutorialComplete = () => {
@@ -2530,9 +2626,15 @@ const Pacientes = () => {
                 style={{ position: 'relative' }}
               >
                 Novos Leads
-                {novosLeads.length > 0 && (
-                  <span className="tab-badge">{novosLeads.length}</span>
+                {novosLeads.filter(l => l.status === 'lead').length > 0 && (
+                  <span className="tab-badge">{novosLeads.filter(l => l.status === 'lead').length}</span>
                 )}
+              </button>
+              <button
+                className={`tab ${activeTab === 'negativas' ? 'active' : ''}`}
+                onClick={() => setActiveTab('negativas')}
+              >
+                Leads Negativos
               </button>
             </>
           )}
@@ -2599,10 +2701,6 @@ const Pacientes = () => {
         <>
           {/* Resumo de Estatísticas */}
           <div className="stats-grid" style={{ marginBottom: '2rem' }}>
-            <div className="stat-card">
-              <div className="stat-label">Leads</div>
-              <div className="stat-value">{pacientesFiltrados.filter(p => p.status === 'lead').length}</div>
-            </div>
             
             <div className="stat-card">
               <div className="stat-label">Agendamentos</div>
@@ -2611,23 +2709,14 @@ const Pacientes = () => {
             
             <div className="stat-card">
               <div className="stat-label">Fechados</div>
-              <div className="stat-value">{pacientesFiltrados.filter(p => p.status === 'fechado').length}</div>
-            </div>
-            
-            <div className="stat-card">
-              <div className="stat-label">Exibindo</div>
-              <div className="stat-value">{pacientesFiltrados.length}</div>
-              <div className="stat-sublabel">de {isConsultorInterno ? pacientes.length : pacientes.filter(p => {
-                const temConsultor = p.consultor_id && p.consultor_id !== '' && p.consultor_id !== null && p.consultor_id !== undefined && Number(p.consultor_id) !== 0;
-                return temConsultor || p.status === 'fechado';
-              }).length}</div>
+              <div className="stat-value">{pacientes.filter(p => p.status === 'fechado').length}</div>
             </div>
             
             <div className="stat-card">
               <div className="stat-label">Taxa Conversão</div>
               <div className="stat-value">
-                {pacientesFiltrados.length > 0 
-                  ? Math.round((pacientesFiltrados.filter(p => p.status === 'fechado').length / pacientesFiltrados.length) * 100)
+                {pacientes.length > 0 
+                  ? Math.round((pacientes.filter(p => p.status === 'fechado').length / pacientes.length) * 100)
                   : 0}%
               </div>
             </div>
@@ -2669,9 +2758,27 @@ const Pacientes = () => {
                     <label className="form-label">Status</label>
                     <select className="form-select" value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}>
                       <option value="">Todos</option>
-                      {statusOptions.map(option => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
+                      {statusOptions
+                        .filter(option => {
+                          // Freelancers veem todos os status
+                          if (isFreelancer) return true;
+                          // Outros usuários não veem status de leads e negativas
+                          return ![
+                            'lead',
+                            'sem_primeiro_contato',
+                            'nao_existe',
+                            'nao_tem_interesse',
+                            'nao_reconhece',
+                            'nao_responde',
+                            'sem_clinica',
+                            'nao_passou_cpf',
+                            'nao_tem_outro_cpf',
+                            'cpf_reprovado'
+                          ].includes(option.value);
+                        })
+                        .map(option => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
                     </select>
                   </div>
 
@@ -2743,7 +2850,12 @@ const Pacientes = () => {
 
           <div className="card">
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 className="card-title">Lista de Pacientes</h2>
+              <div>
+                <h2 className="card-title">Lista de Pacientes</h2>
+                <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                  {pacientesFiltrados.length} paciente(s)
+                </div>
+              </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button
                 className="btn btn-primary" 
@@ -2911,11 +3023,29 @@ const Pacientes = () => {
                               }}
                               title={statusInfo.description || statusInfo.label}
                             >
-                              {statusOptions.map(option => (
-                                <option key={option.value} value={option.value} title={option.description}>
-                                  {option.label}
-                                </option>
-                              ))}
+                              {statusOptions
+                                .filter(option => {
+                                  // Freelancers veem todos os status
+                                  if (isFreelancer) return true;
+                                  // Outros usuários não veem status de leads e negativas
+                                  return ![
+                                    'lead',
+                                    'sem_primeiro_contato',
+                                    'nao_existe',
+                                    'nao_tem_interesse',
+                                    'nao_reconhece',
+                                    'nao_responde',
+                                    'sem_clinica',
+                                    'nao_passou_cpf',
+                                    'nao_tem_outro_cpf',
+                                    'cpf_reprovado'
+                                  ].includes(option.value);
+                                })
+                                .map(option => (
+                                  <option key={option.value} value={option.value} title={option.description}>
+                                    {option.label}
+                                  </option>
+                                ))}
                             </select>
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarData(paciente.created_at)}</td>
@@ -3018,6 +3148,7 @@ const Pacientes = () => {
                   <thead>
                     <tr>
                       <th>Nome</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>CPF</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cidade</th>
@@ -3030,6 +3161,9 @@ const Pacientes = () => {
                   <tbody>
                     {novosLeads.map(lead => {
                       const statusInfo = getStatusInfo(lead.status);
+                      const consultorAtribuido = consultores.find(c => c.id === lead.consultor_id);
+                      const temConsultor = lead.consultor_id && lead.consultor_id !== null;
+                      
                       return (
                         <tr key={lead.id}>
                           <td>
@@ -3060,6 +3194,21 @@ const Pacientes = () => {
                                 </div>
                               )}
                             </div>
+                          </td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                            {temConsultor ? (
+                              <span style={{ 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '0.25rem'
+
+                              }}>
+  
+                                {consultorAtribuido?.nome || 'Consultor atribuído'}
+                              </span>
+                            ) : (
+                              <span style={{ color: '#6b7280', fontStyle: 'italic' }}>Sem consultor</span>
+                            )}
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarTelefone(lead.telefone)}</td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarCPF(lead.cpf)}</td>
@@ -3094,11 +3243,23 @@ const Pacientes = () => {
                                   borderRadius: '0.375rem'
                                 }}
                               >
-                                {statusOptions.map(option => (
-                                  <option key={option.value} value={option.value}>
-                                    {option.label}
-                                  </option>
-                                ))}
+                                {statusOptions
+                                  .filter(option => [
+                                    'lead',
+                                    'nao_existe',
+                                    'nao_tem_interesse',
+                                    'nao_reconhece',
+                                    'nao_responde',
+                                    'sem_clinica',
+                                    'nao_passou_cpf',
+                                    'nao_tem_outro_cpf',
+                                    'cpf_reprovado'
+                                  ].includes(option.value))
+                                  .map(option => (
+                                    <option key={option.value} value={option.value}>
+                                      {option.label}
+                                    </option>
+                                  ))}
                               </select>
                             ) : (
                               <span className="badge badge-warning">
@@ -3130,20 +3291,324 @@ const Pacientes = () => {
                                   <circle cx="12" cy="12" r="3" />
                                 </svg>
                               </button>
-                              <button
-                                onClick={() => pegarLead(lead.id)}
-                                className="btn btn-primary"
-                                style={{ 
-                                  fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.8rem',
-                                  padding: window.innerWidth <= 768 ? '0.375rem 0.5rem' : '0.5rem 0.75rem',
-                                  minWidth: '80px',
-                                  height: '32px',
-                                  whiteSpace: 'nowrap'
+                              {temConsultor ? (
+                                <button
+                                  onClick={() => aprovarLead(lead.id)}
+                                  className="btn"
+                                  style={{ 
+                                    fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.8rem',
+                                    padding: window.innerWidth <= 768 ? '0.375rem 0.5rem' : '0.5rem 0.75rem',
+                                    minWidth: '80px',
+                                    height: '32px',
+                                    whiteSpace: 'nowrap',
+                                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                    color: 'white',
+                                    border: 'none'
+                                  }}
+                                >
+                                  {window.innerWidth <= 768 ? 'Aprovar' : 'Aprovar Lead'}
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => pegarLead(lead.id)}
+                                  className="btn btn-primary"
+                                  style={{ 
+                                    fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.8rem',
+                                    padding: window.innerWidth <= 768 ? '0.375rem 0.5rem' : '0.5rem 0.75rem',
+                                    minWidth: '80px',
+                                    height: '32px',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                >
+                                  {window.innerWidth <= 768 ? 'Atribuir' : 'Atribuir Lead'}
+                                </button>
+                              )}
+                              {/* Botão de excluir - apenas para admin */}
+                              {isAdmin && (
+                                <button
+                                  onClick={() => excluirLead(lead.id)}
+                                  className="btn-action"
+                                  title="Excluir Lead"
+                                  style={{ 
+                                    color: '#dc2626',
+                                    padding: '0.375rem',
+                                    minWidth: '32px',
+                                    height: '32px',
+                                    backgroundColor: '#fef2f2',
+                                    border: '1px solid #fecaca',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <polyline points="3,6 5,6 21,6"></polyline>
+                                    <path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"></path>
+                                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {activeTab === 'negativas' && (
+        <>
+          {/* Resumo de Estatísticas */}
+          <div className="stats-grid" style={{ marginBottom: '2rem' }}>
+            <div className="stat-card">
+              <div className="stat-label">CPF Reprovado</div>
+              <div className="stat-value">{leadsNegativos.filter(l => l.status === 'cpf_reprovado').length}</div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">Sem Clínica</div>
+              <div className="stat-value">{leadsNegativos.filter(l => l.status === 'sem_clinica').length}</div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">Paciente não responde</div>
+              <div className="stat-value">{leadsNegativos.filter(l => l.status === 'nao_responde').length}</div>
+            </div>
+          </div>
+
+          <div className="card" style={{ marginBottom: '1.5rem' }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 className="card-title" style={{ fontSize: '1.1rem' }}>Filtros</h2>
+              <button className="btn btn-secondary" onClick={() => setMostrarFiltrosNegativos(!mostrarFiltrosNegativos)}>
+                {mostrarFiltrosNegativos ? 'Ocultar Filtros' : 'Filtros'}
+              </button>
+            </div>
+            {mostrarFiltrosNegativos && (
+              <div style={{ padding: '1.5rem', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                <div className="grid grid-3" style={{ gap: '1rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Nome</label>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      value={filtroNomeNegativos} 
+                      onChange={e => setFiltroNomeNegativos(e.target.value)} 
+                      placeholder="Buscar por nome" 
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Status</label>
+                    <select 
+                      className="form-select" 
+                      value={filtroStatusNegativos} 
+                      onChange={e => setFiltroStatusNegativos(e.target.value)}
+                    >
+                      <option value="">Todos</option>
+                      {statusOptions
+                        .filter(option => [
+                          'lead',
+                          'nao_existe',
+                          'nao_tem_interesse',
+                          'nao_reconhece',
+                          'nao_responde',
+                          'sem_clinica',
+                          'nao_passou_cpf',
+                          'nao_tem_outro_cpf',
+                          'cpf_reprovado'
+                        ].includes(option.value))
+                        .map(option => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Consultor</label>
+                    <select 
+                      className="form-select" 
+                      value={filtroConsultorNegativos} 
+                      onChange={e => setFiltroConsultorNegativos(e.target.value)}
+                    >
+                      <option value="">Todos</option>
+                      {consultores.map(c => (
+                        <option key={c.id} value={c.id}>{c.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Leads Negativos</h2>
+              <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                {leadsNegativosFiltrados.length} lead(s) negativos
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="loading">
+                <div className="spinner"></div>
+              </div>
+            ) : leadsNegativosFiltrados.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#6b7280', padding: '3rem' }}>
+                Nenhum lead negativo encontrado.
+              </div>
+            ) : (
+              <div className="table-container">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Nome</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>CPF</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cidade</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Tipo</th>
+                      <th>Status</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
+                      <th style={{ width: '80px' }}>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leadsNegativosFiltrados.map(lead => {
+                      const statusInfo = getStatusInfo(lead.status);
+                      const consultorAtribuido = consultores.find(c => c.id === lead.consultor_id);
+                      const temConsultor = lead.consultor_id && lead.consultor_id !== null;
+                      
+                      return (
+                        <tr key={lead.id}>
+                          <td>
+                            <div>
+                              <strong>{lead.nome}</strong>
+                              {lead.observacoes && (
+                                <div style={{ marginTop: '0.25rem' }}>
+                                  <button
+                                    onClick={() => handleViewObservacoes(lead.observacoes, lead)}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: '#6b7280',
+                                      cursor: 'pointer',
+                                      fontSize: '0.75rem',
+                                      padding: '0.25rem',
+                                      borderRadius: '4px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center'
+                                    }}
+                                    title="Ver observações"
+                                    onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                                  >
+                                    •••
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                            {temConsultor ? (
+                              <span style={{ 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '0.25rem'
+                              }}>
+                                {consultorAtribuido?.nome || 'Consultor atribuído'}
+                              </span>
+                            ) : (
+                              <span style={{ color: '#6b7280', fontStyle: 'italic' }}>Sem consultor</span>
+                            )}
+                          </td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarTelefone(lead.telefone)}</td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarCPF(lead.cpf)}</td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                            {lead.cidade || lead.estado ? (
+                              <>
+                                {lead.cidade && <div>{lead.cidade}</div>}
+                                {lead.estado && <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{lead.estado}</div>}
+                              </>
+                            ) : '-'}
+                          </td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                            {lead.tipo_tratamento && (
+                              <span className={`badge badge-${lead.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
+                                {lead.tipo_tratamento}
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            {(isAdmin || podeAlterarStatus) ? (
+                              <select
+                                value={lead.status}
+                                onChange={(e) => alterarStatusNovoLead(lead.id, e.target.value)}
+                                className="form-select"
+                                style={{
+                                  fontSize: '0.75rem',
+                                  padding: '0.25rem 0.5rem',
+                                  border: 'none',
+                                  backgroundColor: statusInfo.color + '20',
+                                  color: statusInfo.color,
+                                  fontWeight: '600',
+                                  borderRadius: '0.375rem'
                                 }}
                               >
-                                {window.innerWidth <= 768 ? 'Atribuir' : 'Atribuir Lead'}
+                                {statusOptions
+                                  .filter(option => [
+                                    'lead',
+                                    'nao_existe',
+                                    'nao_tem_interesse',
+                                    'nao_reconhece',
+                                    'nao_responde',
+                                    'sem_clinica',
+                                    'nao_passou_cpf',
+                                    'nao_tem_outro_cpf',
+                                    'cpf_reprovado'
+                                  ].includes(option.value))
+                                  .map(option => (
+                                    <option key={option.value} value={option.value}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                              </select>
+                            ) : (
+                              <span className="badge badge-warning">
+                                {statusInfo.label}
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarData(lead.created_at)}</td>
+                          <td style={{ padding: '0.5rem' }}>
+                            <div style={{ 
+                              display: 'flex', 
+                              gap: '0.25rem', 
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              justifyContent: 'flex-start'
+                            }}>
+                              <button
+                                onClick={() => handleView(lead)}
+                                className="btn-action"
+                                title="Visualizar"
+                                style={{ 
+                                  padding: '0.375rem',
+                                  minWidth: '32px',
+                                  height: '32px'
+                                }}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                  <circle cx="12" cy="12" r="3" />
+                                </svg>
                               </button>
-                              {/* Botão de excluir - apenas para admin */}
                               {isAdmin && (
                                 <button
                                   onClick={() => excluirLead(lead.id)}

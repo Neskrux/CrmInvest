@@ -158,20 +158,20 @@ A Clínica vê **APENAS PACIENTES AGENDADOS/ATENDIDOS NELA**:
 ---
 
 ### 5. **EMPRESA**
-**Tipo**: `empresa`
-**Tabela**: `empresas`
+**Tipo**: `parceiro`
+**Tabela**: `parceiros`
 
 #### 📍 O que vê:
-- ✅ **Apenas consultores** vinculados à empresa (empresa_id = seu ID)
+- ✅ **Apenas consultores** vinculados à parceiro (empresa_id = seu ID)
 - ✅ **Apenas clínicas** cadastradas por seus consultores
-- ✅ Dashboard filtrado pelos dados da empresa
-- ❌ **NÃO vê** dados de outras empresas
+- ✅ Dashboard filtrado pelos dados da parceiro
+- ❌ **NÃO vê** dados de outras parceiros
 - ❌ **NÃO vê** consultores externos
 
 #### 🔐 O que pode fazer:
-- ✅ **Gerenciar** consultores da empresa (criar, editar, desativar)
-- ✅ **Ver** desempenho dos consultores da empresa
-- ✅ **Ver** clínicas cadastradas pela empresa
+- ✅ **Gerenciar** consultores da parceiro (criar, editar, desativar)
+- ✅ **Ver** desempenho dos consultores da parceiro
+- ✅ **Ver** clínicas cadastradas pela parceiro
 - ❌ **NÃO pode alterar** status de leads/pacientes
 - ❌ **NÃO pode excluir** registros críticos
 
@@ -398,7 +398,7 @@ A Empresa vê **PACIENTES DOS CONSULTORES DA EMPRESA**:
 - telefone
 - pix (para comissões)
 - ativo
-- empresa_id (FK → empresas)
+- empresa_id (FK → parceiros)
 - pode_ver_todas_novas_clinicas (boolean)
 - podealterarstatus (boolean)
 - is_freelancer (boolean)
@@ -419,7 +419,7 @@ A Empresa vê **PACIENTES DOS CONSULTORES DA EMPRESA**:
 - email_login (para login)
 - senha_hash (para login)
 - consultor_id (FK → consultores)
-- empresa_id (FK → empresas)
+- empresa_id (FK → parceiros)
 - ativo_no_sistema
 - ultimo_acesso
 - nicho (estético/odontológico)
@@ -492,7 +492,7 @@ A Empresa vê **PACIENTES DOS CONSULTORES DA EMPRESA**:
 - created_at
 ```
 
-### Tabela: **empresas**
+### Tabela: **parceiros**
 ```sql
 - id (PK)
 - nome
@@ -519,14 +519,14 @@ A Empresa vê **PACIENTES DOS CONSULTORES DA EMPRESA**:
 | **Criar agendamentos** | ✅ | ✅ | ✅ | ❌ | ❌ |
 | **Ver todos os fechamentos** | ✅ | ✅ | ❌ (só seus) | ❌ (só da clínica) | ❌ |
 | **Aprovar/Reprovar fechamentos** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Ver todas as clínicas** | ✅ | ✅ | ❌ (só suas) | ❌ (só própria) | ❌ (só da empresa) |
+| **Ver todas as clínicas** | ✅ | ✅ | ❌ (só suas) | ❌ (só própria) | ❌ (só da parceiro) |
 | **Criar/Editar clínicas** | ✅ | ✅ | ✅ | ❌ | ✅ |
 | **Excluir registros** | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **Ver metas do sistema** | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **Editar metas** | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **Ver ranking completo** | ✅ | ✅ | ❌ | ❌ | ❌ |
 | **Ver comissões (todas)** | ✅ | ✅ | ❌ (só suas) | ❌ | ❌ |
-| **Gerenciar consultores** | ✅ | ❌ | ❌ | ❌ | ✅ (da empresa) |
+| **Gerenciar consultores** | ✅ | ❌ | ❌ | ❌ | ✅ (da parceiro) |
 
 ---
 

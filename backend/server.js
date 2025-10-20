@@ -365,10 +365,10 @@ const requireAdminOrConsultorInterno = (req, res, next) => {
   next();
 };
 
-// Middleware para verificar se é admin ou empresa
+// Middleware para verificar se é admin ou parceiro
 const requireAdminOrEmpresa = (req, res, next) => {
-  if (req.user.tipo !== 'admin' && req.user.tipo !== 'empresa') {
-    return res.status(403).json({ error: 'Acesso negado. Apenas administradores ou empresas.' });
+  if (req.user.tipo !== 'admin' && req.user.tipo !== 'parceiro') {
+    return res.status(403).json({ error: 'Acesso negado. Apenas administradores ou parceiros.' });
   }
   next();
 };
@@ -476,37 +476,37 @@ app.post('/api/login', async (req, res) => {
       }
     }
 
-  // Se não encontrou admin nem clínica, tentar login como empresa
+  // Se não encontrou admin nem clínica, tentar login como parceiro
   if (!usuario && typeof email === 'string' && email.includes('@')) {
       console.log('🔍 [3/4] Buscando em EMPRESAS...');
       
-      const { data: empresas, error } = await supabaseAdmin
-        .from('empresas')
+      const { data: parceiros, error } = await supabaseAdmin
+        .from('parceiros')
         .select('*')
         .eq('email', emailNormalizado)
         .eq('ativo', true);
 
       if (error) {
-        console.error('❌ Erro ao buscar em empresas:', error);
+        console.error('❌ Erro ao buscar em parceiros:', error);
         throw error;
       }
 
-      console.log('🔍 Resultados em EMPRESAS:', empresas ? empresas.length : 0);
+      console.log('🔍 Resultados em EMPRESAS:', parceiros ? parceiros.length : 0);
 
-      if (empresas && empresas.length > 0) {
-        if (empresas.length > 1) {
-          console.error('⚠️ ALERTA: Múltiplas empresas com o mesmo email!', empresas.map(e => ({ id: e.id, email: e.email })));
+      if (parceiros && parceiros.length > 0) {
+        if (parceiros.length > 1) {
+          console.error('⚠️ ALERTA: Múltiplas parceiros com o mesmo email!', parceiros.map(e => ({ id: e.id, email: e.email })));
         }
-        usuario = empresas[0];
-        tipoLogin = 'empresa';
+        usuario = parceiros[0];
+        tipoLogin = 'parceiro';
         console.log('✅ Usuário encontrado em: EMPRESA');
         console.log('📋 ID:', usuario.id, '| Nome:', usuario.nome);
       } else {
-        console.log('❌ Não encontrado em empresas');
+        console.log('❌ Não encontrado em parceiros');
       }
     }
 
-  // Se não encontrou admin, clínica nem empresa, tentar login como consultor
+  // Se não encontrou admin, clínica nem parceiro, tentar login como consultor
   if (!usuario && typeof email === 'string' && email.includes('@')) {
       console.log('🔍 [4/4] Buscando em CONSULTORES...');
       
@@ -573,13 +573,13 @@ app.post('/api/login', async (req, res) => {
       id: usuario.id,
       nome: usuario.nome,
       email: tipoLogin === 'clinica' ? usuario.email_login : usuario.email,
-      tipo: tipoLogin === 'empresa' ? 'empresa' : (tipoLogin === 'clinica' ? 'clinica' : usuario.tipo),
+      tipo: tipoLogin === 'parceiro' ? 'parceiro' : (tipoLogin === 'clinica' ? 'clinica' : usuario.tipo),
       clinica_id: tipoLogin === 'clinica' ? usuario.id : null, // ID da clínica quando for login de clínica
       consultor_id: usuario.consultor_id !== undefined ? usuario.consultor_id : (tipoLogin === 'consultor' ? usuario.id : null),
-      empresa_id: usuario.empresa_id || null, // ID da empresa (para consultores vinculados ou login como empresa)
-      podealterarstatus: (tipoLogin === 'empresa' || tipoLogin === 'clinica') ? false : (usuario.podealterarstatus || usuario.tipo === 'admin' || false),
-      pode_ver_todas_novas_clinicas: (tipoLogin === 'empresa' || tipoLogin === 'clinica') ? false : (usuario.pode_ver_todas_novas_clinicas || false),
-      is_freelancer: (tipoLogin === 'admin' || tipoLogin === 'empresa' || tipoLogin === 'clinica') ? false : (usuario.is_freelancer === true) // Admin, empresas e clínicas não são freelancers
+      empresa_id: usuario.empresa_id || null, // ID da parceiro (para consultores vinculados ou login como parceiro)
+      podealterarstatus: (tipoLogin === 'parceiro' || tipoLogin === 'clinica') ? false : (usuario.podealterarstatus || usuario.tipo === 'admin' || false),
+      pode_ver_todas_novas_clinicas: (tipoLogin === 'parceiro' || tipoLogin === 'clinica') ? false : (usuario.pode_ver_todas_novas_clinicas || false),
+      is_freelancer: (tipoLogin === 'admin' || tipoLogin === 'parceiro' || tipoLogin === 'clinica') ? false : (usuario.is_freelancer === true) // Admin, parceiros e clínicas não são freelancers
     };
 
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
@@ -836,10 +836,10 @@ app.get('/api/consultores/perfil', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Buscar dados completos do consultor incluindo dados da empresa se houver
+    // Buscar dados completos do consultor
     const { data: consultor, error } = await supabaseAdmin
       .from('consultores')
-      .select('id, nome, email, telefone, pix, ativo, created_at, codigo_referencia, pode_ver_todas_novas_clinicas, podealterarstatus, is_freelancer, empresa_id, empresas(nome)')
+      .select('id, nome, email, telefone, pix, ativo, created_at, codigo_referencia, pode_ver_todas_novas_clinicas, podealterarstatus, is_freelancer, empresa_id')
       .eq('id', userId)
       .single();
 
@@ -919,9 +919,9 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
         usuario = usuarioData;
         consultor_id = usuario.consultor_id || null;
       }
-    } else if (req.user.tipo === 'empresa') {
+    } else if (req.user.tipo === 'parceiro') {
       const { data: empresaData } = await supabaseAdmin
-        .from('empresas')
+        .from('parceiros')
         .select('*')
         .eq('id', req.user.id)
         .eq('ativo', true)
@@ -929,7 +929,7 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
 
       if (empresaData) {
         usuario = empresaData;
-        tipo = 'empresa';
+        tipo = 'parceiro';
         consultor_id = null;
       }
     } else if (req.user.tipo === 'consultor') {
@@ -975,7 +975,7 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
         consultor_id = usuario.consultor_id || null;
       } else {
         const { data: empresaData } = await supabaseAdmin
-          .from('empresas')
+          .from('parceiros')
           .select('*')
           .eq('id', req.user.id)
           .eq('ativo', true)
@@ -983,7 +983,7 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
 
         if (empresaData) {
           usuario = empresaData;
-          tipo = 'empresa';
+          tipo = 'parceiro';
           consultor_id = null;
         } else {
           const { data: consultorData } = await supabaseAdmin
@@ -1030,9 +1030,9 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
         consultor_id,
         empresa_id: usuario.empresa_id || null, // Incluir empresa_id
         clinica_id: tipo === 'clinica' ? usuario.id : null, // Incluir clinica_id
-        podealterarstatus: (tipo === 'empresa' || tipo === 'clinica') ? false : (usuario.podealterarstatus || tipo === 'admin' || false),
-        pode_ver_todas_novas_clinicas: (tipo === 'empresa' || tipo === 'clinica') ? false : (usuario.pode_ver_todas_novas_clinicas || false),
-        is_freelancer: (tipo === 'admin' || tipo === 'empresa' || tipo === 'clinica') ? false : (usuario.is_freelancer === true) // Admin, empresas e clínicas não são freelancers
+        podealterarstatus: (tipo === 'parceiro' || tipo === 'clinica') ? false : (usuario.podealterarstatus || tipo === 'admin' || false),
+        pode_ver_todas_novas_clinicas: (tipo === 'parceiro' || tipo === 'clinica') ? false : (usuario.pode_ver_todas_novas_clinicas || false),
+        is_freelancer: (tipo === 'admin' || tipo === 'parceiro' || tipo === 'clinica') ? false : (usuario.is_freelancer === true) // Admin, parceiros e clínicas não são freelancers
       }
     });
   } catch (error) {
@@ -1043,36 +1043,36 @@ app.get('/api/verify-token', authenticateToken, async (req, res) => {
 
 // ROTAS DA API
 
-// === EMPRESAS === (Rotas para gerenciamento de empresas)
+// === EMPRESAS === (Rotas para gerenciamento de parceiros)
 
-// Buscar perfil da empresa
-app.get('/api/empresas/perfil', authenticateToken, async (req, res) => {
+// Buscar perfil da parceiro
+app.get('/api/parceiros/perfil', authenticateToken, async (req, res) => {
   try {
     const empresaId = req.user.id;
 
-    // Buscar dados completos da empresa
-    const { data: empresa, error } = await supabaseAdmin
-      .from('empresas')
+    // Buscar dados completos da parceiro
+    const { data: parceiro, error } = await supabaseAdmin
+      .from('parceiros')
       .select('id, nome, cnpj, razao_social, email, telefone, cidade, estado, responsavel, ativo, created_at')
       .eq('id', empresaId)
       .single();
 
-    if (error || !empresa) {
+    if (error || !parceiro) {
       return res.status(404).json({ error: 'Empresa não encontrada' });
     }
 
     res.json({
-      empresa: empresa
+      parceiro: parceiro
     });
 
   } catch (error) {
-    console.error('Erro ao buscar perfil da empresa:', error);
+    console.error('Erro ao buscar perfil da parceiro:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
-// Atualizar perfil da empresa
-app.put('/api/empresas/perfil', authenticateToken, async (req, res) => {
+// Atualizar perfil da parceiro
+app.put('/api/parceiros/perfil', authenticateToken, async (req, res) => {
   try {
     const empresaId = req.user.id;
     const { nome, telefone, email, senhaAtual, novaSenha, responsavel, cidade, estado } = req.body;
@@ -1082,16 +1082,16 @@ app.put('/api/empresas/perfil', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Nome e email são obrigatórios' });
     }
 
-    // Verificar se o email já está sendo usado por outra empresa
+    // Verificar se o email já está sendo usado por outra parceiro
     const { data: emailExistente } = await supabaseAdmin
-      .from('empresas')
+      .from('parceiros')
       .select('id')
       .eq('email', email)
       .neq('id', empresaId)
       .single();
 
     if (emailExistente) {
-      return res.status(400).json({ error: 'Este email já está sendo usado por outra empresa' });
+      return res.status(400).json({ error: 'Este email já está sendo usado por outra parceiro' });
     }
 
     // Se foi fornecida nova senha, verificar senha atual
@@ -1100,19 +1100,19 @@ app.put('/api/empresas/perfil', authenticateToken, async (req, res) => {
         return res.status(400).json({ error: 'Senha atual é obrigatória para alterar a senha' });
       }
 
-      // Buscar senha atual da empresa
-      const { data: empresa, error: empresaError } = await supabaseAdmin
-        .from('empresas')
+      // Buscar senha atual da parceiro
+      const { data: parceiro, error: empresaError } = await supabaseAdmin
+        .from('parceiros')
         .select('senha')
         .eq('id', empresaId)
         .single();
 
-      if (empresaError || !empresa) {
+      if (empresaError || !parceiro) {
         return res.status(404).json({ error: 'Empresa não encontrada' });
       }
 
       // Verificar se senha atual está correta
-      const senhaCorreta = await bcrypt.compare(senhaAtual, empresa.senha);
+      const senhaCorreta = await bcrypt.compare(senhaAtual, parceiro.senha);
       if (!senhaCorreta) {
         return res.status(400).json({ error: 'Senha atual incorreta' });
       }
@@ -1137,7 +1137,7 @@ app.put('/api/empresas/perfil', authenticateToken, async (req, res) => {
 
     // Executar atualização
     const { error: updateError } = await supabaseAdmin
-      .from('empresas')
+      .from('parceiros')
       .update(updateData)
       .eq('id', empresaId);
 
@@ -1145,9 +1145,9 @@ app.put('/api/empresas/perfil', authenticateToken, async (req, res) => {
       throw updateError;
     }
 
-    // Buscar dados atualizados da empresa
+    // Buscar dados atualizados da parceiro
     const { data: empresaAtualizada, error: fetchError } = await supabaseAdmin
-      .from('empresas')
+      .from('parceiros')
       .select('id, nome, cnpj, razao_social, email, telefone, cidade, estado, responsavel, ativo, created_at')
       .eq('id', empresaId)
       .single();
@@ -1158,11 +1158,11 @@ app.put('/api/empresas/perfil', authenticateToken, async (req, res) => {
 
     res.json({
       message: 'Perfil atualizado com sucesso',
-      empresa: empresaAtualizada
+      parceiro: empresaAtualizada
     });
 
   } catch (error) {
-    console.error('Erro ao atualizar perfil da empresa:', error);
+    console.error('Erro ao atualizar perfil da parceiro:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -1242,8 +1242,7 @@ app.get('/api/clinicas/em-analise', authenticateToken, async (req, res) => {
         *,
         consultores!consultor_id(
           nome, 
-          empresa_id,
-          empresas(nome)
+          empresa_id
         )
       `)
       .eq('em_analise', true)
@@ -1263,8 +1262,7 @@ app.get('/api/clinicas/em-analise', authenticateToken, async (req, res) => {
     const formattedData = data.map(clinica => ({
       ...clinica,
       consultor_nome: clinica.consultores?.nome,
-      empresa_id: clinica.empresa_id || clinica.consultores?.empresa_id || null,
-      empresa_nome: clinica.consultores?.empresas?.nome || null
+      empresa_id: clinica.empresa_id || clinica.consultores?.empresa_id || null
     }));
     
     res.json(formattedData);
@@ -1308,8 +1306,7 @@ app.get('/api/clinicas', authenticateToken, async (req, res) => {
         *,
         consultores!consultor_id(
           nome, 
-          empresa_id,
-          empresas(nome)
+          empresa_id
         )
       `)
       .eq('em_analise', false) // Excluir clínicas em análise (elas aparecem na aba específica)
@@ -1357,13 +1354,12 @@ app.get('/api/clinicas', authenticateToken, async (req, res) => {
 
     if (error) throw error;
     
-    // Reformatar dados para incluir nome do consultor, empresa_id e nome da empresa
+    // Reformatar dados para incluir nome do consultor, empresa_id e nome da parceiro
     const formattedData = data.map(clinica => ({
       ...clinica,
       consultor_nome: clinica.consultores?.nome,
-      // empresa_id: pode vir diretamente da clínica (se empresa cadastrou) ou do consultor
-      empresa_id: clinica.empresa_id || clinica.consultores?.empresa_id || null,
-      empresa_nome: clinica.consultores?.empresas?.nome || null // Nome da empresa (do consultor)
+      // empresa_id: pode vir diretamente da clínica ou do consultor
+      empresa_id: clinica.empresa_id || clinica.consultores?.empresa_id || null
     }));
     
     // Filtrar por empresa se necessário
@@ -1375,14 +1371,15 @@ app.get('/api/clinicas', authenticateToken, async (req, res) => {
         clinica.empresa_id === req.user.id
       );
     }
-    // Se for FUNCIONÁRIO de empresa (não freelancer), filtrar clínicas de toda a empresa
-    else if (req.user.tipo === 'consultor' && req.user.empresa_id && req.user.is_freelancer === false) {
+    // Se for FUNCIONÁRIO de empresa (não freelancer E não consultor interno), filtrar clínicas de toda a empresa
+    else if (req.user.tipo === 'consultor' && req.user.empresa_id && req.user.is_freelancer === false && !isConsultorInterno) {
       finalData = formattedData.filter(clinica => 
         clinica.empresa_id === req.user.empresa_id && // Da mesma empresa
         clinica.consultor_id !== null // E que tenha consultor (não públicas)
       );
     }
     // Freelancer de empresa já foi filtrado acima (query.eq)
+    // Consultor interno vê todas as clínicas (sem filtro adicional)
     
     res.json(finalData);
   } catch (error) {
@@ -2007,8 +2004,8 @@ app.get('/api/consultores', authenticateToken, async (req, res) => {
       .select('*')
       .order('nome');
     
-    // Se for empresa, filtrar apenas consultores vinculados a ela
-    if (req.user.tipo === 'empresa') {
+    // Se for parceiro, filtrar apenas consultores vinculados a ela
+    if (req.user.tipo === 'parceiro') {
       query = query.eq('empresa_id', req.user.id);
     }
     // Admin vê todos os consultores
@@ -2067,8 +2064,8 @@ app.post('/api/consultores', authenticateToken, requireAdminOrEmpresa, async (re
       is_freelancer
     };
     
-    // Se for empresa criando, vincular o consultor à empresa
-    if (req.user.tipo === 'empresa') {
+    // Se for parceiro criando, vincular o consultor à parceiro
+    if (req.user.tipo === 'parceiro') {
       consultorData.empresa_id = req.user.id;
       // Empresa pode escolher se é freelancer ou consultor fixo
       // Ambos só indicam (não alteram status)
@@ -2086,8 +2083,8 @@ app.post('/api/consultores', authenticateToken, requireAdminOrEmpresa, async (re
     const consultorId = data[0].id;
     
     // Gerar código de referência automaticamente para:
-    // - Freelancers sem empresa (is_freelancer=true, empresa_id=NULL)
-    // - Consultores de empresa (freelancers E funcionários com empresa_id preenchido)
+    // - Freelancers sem parceiro (is_freelancer=true, empresa_id=NULL)
+    // - Consultores de parceiro (freelancers E funcionários com empresa_id preenchido)
     // NÃO gerar para: Consultores Internos Invest Money (is_freelancer=false, empresa_id=NULL)
     const deveGerarCodigo = consultorData.is_freelancer === true || consultorData.empresa_id !== undefined;
     
@@ -2682,8 +2679,8 @@ app.put('/api/consultores/:id', authenticateToken, requireAdminOrEmpresa, async 
     const { id } = req.params;
     const { nome, telefone, email, senha, pix, cidade, estado, is_freelancer } = req.body;
     
-    // Se for empresa, verificar se o consultor pertence a ela
-    if (req.user.tipo === 'empresa') {
+    // Se for parceiro, verificar se o consultor pertence a ela
+    if (req.user.tipo === 'parceiro') {
       const { data: consultor, error: checkError } = await supabaseAdmin
         .from('consultores')
         .select('empresa_id')
@@ -2695,7 +2692,7 @@ app.put('/api/consultores/:id', authenticateToken, requireAdminOrEmpresa, async 
       }
       
       if (consultor.empresa_id !== req.user.id) {
-        return res.status(403).json({ error: 'Você não pode editar consultores de outra empresa' });
+        return res.status(403).json({ error: 'Você não pode editar consultores de outra parceiro' });
       }
     }
     
@@ -2748,8 +2745,8 @@ app.put('/api/consultores/:id', authenticateToken, requireAdminOrEmpresa, async 
 
 // DELETE - Excluir consultor (apenas admin)
 app.delete('/api/consultores/:id', authenticateToken, requireAdminOrEmpresa, async (req, res) => {
-  // Se for empresa, verificar se o consultor pertence a ela
-  if (req.user.tipo === 'empresa') {
+  // Se for parceiro, verificar se o consultor pertence a ela
+  if (req.user.tipo === 'parceiro') {
     const { data: consultor, error: checkError } = await supabaseAdmin
       .from('consultores')
       .select('empresa_id')
@@ -2761,7 +2758,7 @@ app.delete('/api/consultores/:id', authenticateToken, requireAdminOrEmpresa, asy
     }
     
     if (consultor.empresa_id !== req.user.id) {
-      return res.status(403).json({ error: 'Você não pode excluir consultores de outra empresa' });
+      return res.status(403).json({ error: 'Você não pode excluir consultores de outra parceiro' });
     }
   }
   
@@ -3005,7 +3002,7 @@ app.get('/api/consultores/:id/link-personalizado', authenticateToken, async (req
     const podeAcessar = 
       req.user.tipo === 'admin' || // Admin vê todos
       req.user.id === parseInt(id) || // Próprio consultor
-      (req.user.tipo === 'empresa' && consultor.empresa_id === req.user.id); // Empresa vê seus consultores
+      (req.user.tipo === 'parceiro' && consultor.empresa_id === req.user.id); // Empresa vê seus consultores
     
     if (!podeAcessar) {
       return res.status(403).json({ error: 'Acesso negado' });
@@ -3060,13 +3057,29 @@ app.get('/api/pacientes', authenticateToken, async (req, res) => {
       tipo: req.user.tipo,
       nome: req.user.nome
     });
+    
+    // Status que devem permanecer em "Novos Leads" e "Negativas"
+    const statusNovosLeads = ['lead', 'sem_primeiro_contato'];
+    const statusNegativos = ['nao_existe', 'nao_tem_interesse', 'nao_reconhece', 'nao_responde', 'sem_clinica', 'nao_passou_cpf', 'nao_tem_outro_cpf', 'cpf_reprovado'];
+    const statusExcluir = [...statusNovosLeads, ...statusNegativos];
+    
+    // Verificar se é freelancer (consultor sem as duas permissões)
+    const isFreelancer = req.user.tipo === 'consultor' && !(req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true);
+    
     let query = supabaseAdmin
       .from('pacientes')
       .select(`
         *,
         consultores(nome)
-      `)
-      .order('created_at', { ascending: false });
+      `);
+    
+    // Para freelancers, não excluir nenhum status (mostrar todos os pacientes atribuídos)
+    // Para outros usuários, excluir status que devem aparecer apenas em Novos Leads e Negativas
+    if (!isFreelancer) {
+      query = query.not('status', 'in', `(${statusExcluir.join(',')})`);
+    }
+    
+    query = query.order('created_at', { ascending: false });
 
     // Se for clínica, buscar pacientes que têm agendamentos nesta clínica OU foram cadastrados por ela
     if (req.user.tipo === 'clinica') {
@@ -3137,13 +3150,28 @@ app.get('/api/pacientes', authenticateToken, async (req, res) => {
 
 app.get('/api/dashboard/pacientes', authenticateToken, async (req, res) => {
   try {
+    // Status que devem permanecer em "Novos Leads" e "Negativas"
+    const statusNovosLeads = ['lead', 'sem_primeiro_contato'];
+    const statusNegativos = ['nao_existe', 'nao_tem_interesse', 'nao_reconhece', 'nao_responde', 'sem_clinica', 'nao_passou_cpf', 'nao_tem_outro_cpf', 'cpf_reprovado'];
+    const statusExcluir = [...statusNovosLeads, ...statusNegativos];
+    
+    // Verificar se é freelancer (consultor sem as duas permissões)
+    const isFreelancer = req.user.tipo === 'consultor' && !(req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true);
+    
     let query = supabaseAdmin
       .from('pacientes')
       .select(`
         *,
         consultores(nome)
-      `)
-      .order('created_at', { ascending: false });
+      `);
+    
+    // Para freelancers, não excluir nenhum status (mostrar todos os pacientes atribuídos)
+    // Para outros usuários, excluir status que devem aparecer apenas em Novos Leads e Negativas
+    if (!isFreelancer) {
+      query = query.not('status', 'in', `(${statusExcluir.join(',')})`);
+    }
+    
+    query = query.order('created_at', { ascending: false });
 
     // Se for consultor freelancer (não tem as duas permissões), filtrar pacientes atribuídos a ele OU vinculados através de agendamentos OU fechamentos
     // Consultores internos (com pode_ver_todas_novas_clinicas=true E podealterarstatus=true) veem todos os pacientes
@@ -3548,34 +3576,99 @@ app.delete('/api/pacientes/:id', authenticateToken, async (req, res) => {
 // === NOVOS LEADS === (Funcionalidade para pegar leads)
 app.get('/api/novos-leads', authenticateToken, async (req, res) => {
   try {
-    // Buscar pacientes sem consultor_id
-    const { data: pacientesSemConsultor, error } = await supabaseAdmin
+    // Buscar leads com status = 'lead' e 'sem_primeiro_contato' (prospecção ativa)
+    const statusNovosLeads = ['lead', 'sem_primeiro_contato'];
+    
+    const { data: novosLeads, error } = await supabaseAdmin
       .from('pacientes')
       .select('*')
-      .is('consultor_id', null)
+      .in('status', statusNovosLeads)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
     
-    // Buscar todos os fechamentos para identificar pacientes de clínicas
-    const { data: fechamentos, error: fechError } = await supabaseAdmin
-      .from('fechamentos')
-      .select('paciente_id');
-      
-    if (fechError) throw fechError;
-    
-    // Criar Set de IDs de pacientes que têm fechamento
-    const pacientesComFechamento = new Set(fechamentos?.map(f => f.paciente_id) || []);
-    
-    // Filtrar apenas pacientes que NÃO têm fechamento (são leads verdadeiros)
-    const novosLeads = pacientesSemConsultor.filter(p => !pacientesComFechamento.has(p.id));
-    
-    console.log('🔍 Pacientes sem consultor:', pacientesSemConsultor?.length || 0);
-    console.log('🔍 Pacientes com fechamento (excluídos):', pacientesComFechamento.size);
-    console.log('🔍 Novos leads verdadeiros:', novosLeads?.length || 0);
+    console.log('🔍 Novos leads (status: lead, sem_primeiro_contato):', novosLeads?.length || 0);
     
     res.json(novosLeads);
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === LEADS NEGATIVOS === (Funcionalidade para pegar leads negativos)
+app.get('/api/leads-negativos', authenticateToken, async (req, res) => {
+  try {
+    // Buscar pacientes com status negativos (SEM 'sem_primeiro_contato' que vai para Novos Leads)
+    const statusNegativos = [
+      'nao_existe',
+      'nao_tem_interesse',
+      'nao_reconhece',
+      'nao_responde',
+      'sem_clinica',
+      'nao_passou_cpf',
+      'nao_tem_outro_cpf',
+      'cpf_reprovado'
+    ];
+    
+    const { data: leadsNegativos, error } = await supabaseAdmin
+      .from('pacientes')
+      .select('*')
+      .in('status', statusNegativos)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    
+    console.log('🔍 Leads negativos (status:', statusNegativos.join(', '), '):', leadsNegativos?.length || 0);
+    
+    res.json(leadsNegativos);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === APROVAR LEAD === (Muda status de 'lead' para 'em_conversa')
+app.put('/api/novos-leads/:id/aprovar', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    console.log('✅ Aprovando lead:', id);
+    
+    // Verificar se o lead existe e tem status 'lead'
+    const { data: pacienteAtual, error: checkError } = await supabaseAdmin
+      .from('pacientes')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (checkError) throw checkError;
+    
+    if (!pacienteAtual) {
+      return res.status(404).json({ error: 'Lead não encontrado!' });
+    }
+    
+    if (pacienteAtual.status !== 'lead') {
+      return res.status(400).json({ error: 'Este lead já foi processado!' });
+    }
+
+    // Mudar status de 'lead' para 'em_conversa'
+    const { error } = await supabaseAdmin
+      .from('pacientes')
+      .update({ status: 'em_conversa' })
+      .eq('id', id);
+
+    if (error) throw error;
+    
+    console.log('✅ Lead aprovado com sucesso! ID:', id);
+    
+    // Emitir evento Socket.IO para atualizar contagem de leads
+    if (io) {
+      console.log('📢 Lead aprovado - atualizando contagem via Socket.IO');
+      setTimeout(() => updateLeadCount(), 100);
+    }
+    
+    res.json({ message: 'Lead aprovado com sucesso! Status alterado para "em_conversa".' });
+  } catch (error) {
+    console.error('❌ Erro ao aprovar lead:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -3632,31 +3725,43 @@ app.put('/api/novos-leads/:id/pegar', authenticateToken, async (req, res) => {
   }
 });
 
-// Excluir lead da aba Novos Leads (apenas admin)
+// Excluir lead (apenas admin) - aceita leads e negativas
 app.delete('/api/novos-leads/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Verificar se o lead existe e não está atribuído
+    // Status permitidos para exclusão (Novos Leads + Negativas)
+    const statusNovosLeads = ['lead', 'sem_primeiro_contato'];
+    const statusNegativos = ['nao_existe', 'nao_tem_interesse', 'nao_reconhece', 'nao_responde', 'sem_clinica', 'nao_passou_cpf', 'nao_tem_outro_cpf', 'cpf_reprovado'];
+    const statusPermitidos = [...statusNovosLeads, ...statusNegativos];
+    
+    // Verificar se o lead existe
     const { data: pacienteAtual, error: checkError } = await supabaseAdmin
       .from('pacientes')
-      .select('consultor_id, nome')
+      .select('consultor_id, nome, status')
       .eq('id', id)
       .single();
 
     if (checkError) throw checkError;
 
-    if (pacienteAtual.consultor_id !== null) {
-      return res.status(400).json({ error: 'Não é possível excluir um lead que já foi atribuído a um consultor!' });
+    if (!pacienteAtual) {
+      return res.status(404).json({ error: 'Lead não encontrado!' });
+    }
+    
+    // Verificar se o lead tem status permitido para exclusão
+    if (!statusPermitidos.includes(pacienteAtual.status)) {
+      return res.status(400).json({ error: 'Apenas leads com status permitido podem ser excluídos desta forma!' });
     }
 
-    // Excluir o lead
+    // Excluir o lead (independente de ter consultor_id ou não)
     const { error } = await supabaseAdmin
       .from('pacientes')
       .delete()
       .eq('id', id);
 
     if (error) throw error;
+    
+    console.log('✅ Lead excluído com sucesso! ID:', id, 'Nome:', pacienteAtual.nome, 'Status:', pacienteAtual.status);
     
     // Emitir evento Socket.IO para atualizar contagem de leads
     if (io) {
@@ -3666,6 +3771,7 @@ app.delete('/api/novos-leads/:id', authenticateToken, requireAdmin, async (req, 
     
     res.json({ message: 'Lead excluído com sucesso!' });
   } catch (error) {
+    console.error('❌ Erro ao excluir lead:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -3758,8 +3864,7 @@ app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
         *,
         consultores!criado_por_consultor_id(
           nome, 
-          empresa_id,
-          empresas(nome)
+          empresa_id
         )
       `)
       .order('created_at', { ascending: false });
@@ -3797,13 +3902,12 @@ app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
 
     if (error) throw error;
     
-    // Reformatar dados para incluir nome do consultor, empresa_id e nome da empresa
+    // Reformatar dados para incluir nome do consultor, empresa_id e nome da parceiro
     const formattedData = data.map(clinica => ({
       ...clinica,
       consultor_nome: clinica.consultores?.nome,
-      // empresa_id: pode vir diretamente da clínica (se empresa cadastrou) ou do consultor
-      empresa_id: clinica.empresa_id || clinica.consultores?.empresa_id || null,
-      empresa_nome: clinica.consultores?.empresas?.nome || null // Nome da empresa (do consultor)
+      // empresa_id: pode vir diretamente da clínica ou do consultor
+      empresa_id: clinica.empresa_id || clinica.consultores?.empresa_id || null
     }));
     
     // Filtrar por empresa se necessário
@@ -3817,8 +3921,8 @@ app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
       );
       console.log('🔍 Clínicas filtradas para empresa:', finalData.length);
     }
-    // Se for FUNCIONÁRIO de empresa (não freelancer), filtrar clínicas de toda a empresa
-    else if (req.user.tipo === 'consultor' && req.user.empresa_id && req.user.is_freelancer === false) {
+    // Se for FUNCIONÁRIO de empresa (não freelancer E não consultor interno), filtrar clínicas de toda a empresa
+    else if (req.user.tipo === 'consultor' && req.user.empresa_id && req.user.is_freelancer === false && !isConsultorInterno) {
       console.log('🔍 Filtrando clínicas para FUNCIONÁRIO de empresa. Empresa ID:', req.user.empresa_id);
       finalData = formattedData.filter(clinica => 
         clinica.empresa_id === req.user.empresa_id && // Da mesma empresa
@@ -3827,8 +3931,44 @@ app.get('/api/novas-clinicas', authenticateToken, async (req, res) => {
       console.log('🔍 Clínicas filtradas para funcionário de empresa:', finalData.length);
     }
     // Freelancer de empresa já foi filtrado acima (query.eq) - vê apenas suas
+    // Consultor interno vê todas as novas clínicas (sem filtro adicional)
     
     res.json(finalData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Endpoint para buscar clínicas negativas (apenas admin e consultor interno)
+app.get('/api/clinicas-negativas', authenticateToken, async (req, res) => {
+  try {
+    // Status negativos
+    const statusNegativos = ['nao_tem_interesse', 'nao_e_nosso_publico', 'nao_responde', 'nao_reconhece'];
+    
+    let query = supabase
+      .from('novas_clinicas')
+      .select(`
+        *,
+        consultores!criado_por_consultor_id(
+          nome, 
+          empresa_id
+        )
+      `)
+      .in('status', statusNegativos)
+      .order('created_at', { ascending: false });
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+    
+    // Reformatar dados para incluir nome do consultor, empresa_id e nome da parceiro
+    const formattedData = data.map(clinica => ({
+      ...clinica,
+      consultor_nome: clinica.consultores?.nome,
+      empresa_id: clinica.empresa_id || clinica.consultores?.empresa_id || null,
+    }));
+    
+    res.json(formattedData);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -3899,7 +4039,7 @@ app.post('/api/novas-clinicas', authenticateToken, async (req, res) => {
       latitude,
       longitude,
       criado_por_consultor_id: req.user.tipo === 'consultor' ? req.user.id : null,
-      empresa_id: req.user.tipo === 'empresa' ? req.user.id : null, // Setar empresa_id quando empresa cadastra diretamente
+      empresa_id: req.user.tipo === 'parceiro' ? req.user.id : null, // Setar empresa_id quando parceiro cadastra diretamente
       tipo_origem: 'aprovada' // Todas as novas clínicas serão aprovadas
     };
     
@@ -4075,7 +4215,7 @@ app.put('/api/novas-clinicas/:id/pegar', authenticateToken, async (req, res) => 
       status: 'em_analise',
       em_analise: true, // Marcar como em análise
       consultor_id: clinicaAtual.criado_por_consultor_id, // Definir consultor_id baseado em quem criou
-      empresa_id: clinicaAtual.empresa_id, // Transferir empresa_id se foi empresa que cadastrou
+      empresa_id: clinicaAtual.empresa_id, // Transferir empresa_id se foi parceiro que cadastrou
       tipo_origem: 'aprovada' // Clínicas aprovadas da aba "Novas Clínicas"
     };
 
