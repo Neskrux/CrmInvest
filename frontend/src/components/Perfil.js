@@ -109,7 +109,7 @@ const Perfil = () => {
       try {
         // Determinar qual rota usar baseado no tipo de usuário
         const endpoint = user?.tipo === 'consultor' ? '/consultores/perfil' : 
-                        user?.tipo === 'empresa' ? '/empresas/perfil' : 
+                        user?.tipo === 'parceiro' ? '/parceiros/perfil' : 
                         '/usuarios/perfil';
         
         const response = await makeRequest(endpoint, {
@@ -120,7 +120,7 @@ const Perfil = () => {
           const data = await response.json();
           // Usar a chave correta baseada no tipo de usuário
           const perfilData = user?.tipo === 'consultor' ? data.consultor : 
-                            user?.tipo === 'empresa' ? data.empresa : 
+                            user?.tipo === 'parceiro' ? data.parceiro : 
                             data.usuario;
           
           setPerfilCompleto(perfilData);
@@ -156,13 +156,13 @@ const Perfil = () => {
         if (consultorResponse.ok && responseData.consultor) {
           const consultorData = responseData.consultor;
           
-          // Verificar se é consultor interno Invest Money (tem as duas permissões E não tem empresa)
+          // Verificar se é consultor interno Invest Money (tem as duas permissões E não tem parceiro)
           const isConsultorInterno = consultorData.pode_ver_todas_novas_clinicas === true && 
                                      consultorData.podealterarstatus === true &&
                                      !consultorData.empresa_id;
           
           if (!isConsultorInterno) {
-            // Freelancer (solo ou empresa) ou Funcionário de empresa: link personalizado
+            // Freelancer (solo ou parceiro) ou Funcionário de parceiro: link personalizado
             if (consultorData.codigo_referencia) {
               setLinkPersonalizado(`https://solumn.com.br/captura-lead?ref=${consultorData.codigo_referencia}`);
               setLinkClinicas(`https://solumn.com.br/captura-clinica?ref=${consultorData.codigo_referencia}`);
@@ -314,8 +314,8 @@ const Perfil = () => {
         newErrors.email = 'E-mail inválido';
       }
       
-      // Validações de telefone para consultores e empresas
-      if (user?.tipo === 'consultor' || user?.tipo === 'empresa') {
+      // Validações de telefone para consultores e parceiros
+      if (user?.tipo === 'consultor' || user?.tipo === 'parceiro') {
         if (!formData.telefone.trim()) {
           newErrors.telefone = 'Telefone é obrigatório';
         } else if (!validatePhone(formData.telefone)) {
@@ -369,8 +369,8 @@ const Perfil = () => {
         updateData.pix = formData.pix.trim() || null;
       }
       
-      // Adicionar campos específicos de empresa
-      if (user?.tipo === 'empresa') {
+      // Adicionar campos específicos de parceiro
+      if (user?.tipo === 'parceiro') {
         updateData.telefone = formData.telefone.trim() || null;
       }
 
@@ -382,7 +382,7 @@ const Perfil = () => {
 
       // Determinar qual rota usar baseado no tipo de usuário
       const endpoint = user?.tipo === 'consultor' ? '/consultores/perfil' : 
-                      user?.tipo === 'empresa' ? '/empresas/perfil' : 
+                      user?.tipo === 'parceiro' ? '/parceiros/perfil' : 
                       '/usuarios/perfil';
       
       const response = await makeRequest(endpoint, {
@@ -551,8 +551,8 @@ const Perfil = () => {
             )}
           </div>
 
-          {/* Campo Telefone - para consultores e empresas */}
-          {(user?.tipo === 'consultor' || user?.tipo === 'empresa') && (
+          {/* Campo Telefone - para consultores e parceiros */}
+          {(user?.tipo === 'consultor' || user?.tipo === 'parceiro') && (
             <div className="form-group">
               <label className="form-label">Telefone *</label>
               <input
@@ -612,7 +612,7 @@ const Perfil = () => {
                 readOnly
                 style={{ backgroundColor: '#f3f4f6', color: '#6b7280' }}
               />
-            ) : user?.tipo === 'empresa' ? (
+            ) : user?.tipo === 'parceiro' ? (
               <input
                 type="text"
                 className="form-input"
@@ -758,7 +758,7 @@ const Perfil = () => {
             <h2 className="card-title">
               {perfilCompleto?.empresa_id ? 'Meus Links de Divulgação' : 'Meus Links de Divulgação'}
             </h2>
-            {perfilCompleto?.empresa_id && perfilCompleto?.empresas?.nome && (
+            {perfilCompleto?.empresa_id && perfilCompleto?.parceiros?.nome && (
               <div style={{ 
                 fontSize: '0.875rem', 
                 color: '#6b7280',
@@ -773,7 +773,7 @@ const Perfil = () => {
                   fontSize: '0.75rem',
                   padding: '4px 10px'
                 }}>
-                  {perfilCompleto.empresas.nome}
+                  {perfilCompleto.parceiros.nome}
                 </span>
                 <span>Empresa vinculada</span>
               </div>
@@ -796,7 +796,7 @@ const Perfil = () => {
               </div>
             ) : (linkPersonalizado || linkClinicas) ? (
               <div>
-                {/* Link para Pacientes - Apenas para consultores SEM empresa */}
+                {/* Link para Pacientes - Apenas para consultores SEM parceiro */}
                 {linkPersonalizado && !perfilCompleto?.empresa_id && (
                   <div style={{ 
                     backgroundColor: '#f0fdf4', 
@@ -912,7 +912,7 @@ const Perfil = () => {
                   </div>
                 )}
                 
-                {/* Caixinha de instruções - Apenas para consultores SEM empresa */}
+                {/* Caixinha de instruções - Apenas para consultores SEM parceiro */}
                 {!perfilCompleto?.empresa_id && (
                   <div style={{ 
                     backgroundColor: '#f8fafc', 
@@ -962,7 +962,7 @@ const Perfil = () => {
         </div>
       )}
 
-      {/* Seção do Grupo do WhatsApp - Apenas para consultores SEM empresa */}
+      {/* Seção do Grupo do WhatsApp - Apenas para consultores SEM parceiro */}
       {user?.tipo === 'consultor' && !perfilCompleto?.empresa_id && (
         <div className="card" style={{ maxWidth: '600px', margin: '2rem auto 0' }}>
           <div className="card-header">

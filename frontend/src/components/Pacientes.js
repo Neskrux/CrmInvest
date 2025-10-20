@@ -793,6 +793,26 @@ const Pacientes = () => {
   };
 
   const alterarStatusNovoLead = async (leadId, novoStatus) => {
+    // VERIFICAR SE STATUS REQUER EVIDÊNCIA
+    if (STATUS_COM_EVIDENCIA_PACIENTES.includes(novoStatus)) {
+      // Procurar o lead nos arrays de novos leads e leads negativos
+      const lead = novosLeads.find(l => l.id === leadId) || leadsNegativos.find(l => l.id === leadId);
+      
+      if (lead) {
+        // Abrir modal de evidência
+        setEvidenciaData({
+          pacienteId: leadId,
+          pacienteNome: lead.nome,
+          statusAnterior: lead.status,
+          statusNovo: novoStatus,
+          evidenciaId: null
+        });
+        setShowEvidenciaModal(true);
+      }
+      return;
+    }
+
+    // Para outros status que não requerem evidência, atualizar diretamente
     try {
       const response = await makeRequest(`/novos-leads/${leadId}/status`, {
         method: 'PUT',
@@ -820,6 +840,10 @@ const Pacientes = () => {
     
     // Atualizar status agora que temos a evidência
     await updateStatus(evidenciaData.pacienteId, evidenciaData.statusNovo, evidenciaId);
+    
+    // Atualizar arrays de novos leads e leads negativos
+    fetchNovosLeads();
+    fetchLeadsNegativos();
     
     // Limpar status temporário
     setStatusTemporario(prev => {

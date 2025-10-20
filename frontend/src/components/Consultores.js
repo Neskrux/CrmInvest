@@ -889,18 +889,18 @@ Digite o número da opção desejada:`;
     <div>
       <div className="page-header">
         <h1 className="page-title">
-          {user?.tipo === 'empresa' ? 'Minha Equipe de Consultores' : 'Gerenciar Consultores'}
+          {user?.tipo === 'parceiro' ? 'Minha Equipe de Consultores' : 'Gerenciar Consultores'}
         </h1>
         <p className="page-subtitle">
-          {user?.tipo === 'empresa' ? 'Gerencie os consultores da sua empresa' : 'Gerencie a equipe de consultores'}
+          {user?.tipo === 'parceiro' ? 'Gerencie os consultores da sua parceiro' : 'Gerencie a equipe de consultores'}
         </p>
       </div>
 
       {/* Resumo de Estatísticas */}
       <div className="stats-grid" style={{ 
         marginBottom: '2rem',
-        gridTemplateColumns: user?.tipo === 'empresa' 
-          ? 'repeat(3, 1fr)'  // Grid 3 colunas para empresas
+        gridTemplateColumns: user?.tipo === 'parceiro' 
+          ? 'repeat(3, 1fr)'  // Grid 3 colunas para parceiros
           : 'repeat(auto-fit, minmax(150px, 1fr))' // Grid responsivo para admin
       }}>
         <div className="stat-card">
@@ -910,14 +910,14 @@ Digite o número da opção desejada:`;
         
         <div className="stat-card">
           <div className="stat-label">
-            {user?.tipo === 'empresa' ? 'Freelancers' : 'Freelancers'}
+            {user?.tipo === 'parceiro' ? 'Freelancers' : 'Freelancers'}
           </div>
           <div className="stat-value">{consultores.filter(c => c.is_freelancer !== false).length}</div>
         </div>
         
         <div className="stat-card">
           <div className="stat-label">
-            {user?.tipo === 'empresa' ? 'Funcionários' : 'Internos'}
+            {user?.tipo === 'parceiro' ? 'Funcionários' : 'Internos'}
           </div>
           <div className="stat-value">{consultores.filter(c => c.is_freelancer === false).length}</div>
         </div>
@@ -1114,7 +1114,7 @@ Digite o número da opção desejada:`;
                     </td>
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                       {consultor.empresa_id ? (
-                        // Consultor de empresa (mostra se é freelancer ou funcionário)
+                        // Consultor de parceiro (mostra se é freelancer ou funcionário)
                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                           <span className={`status-badge ${consultor.is_freelancer !== false ? 'freelancer' : 'interno'}`}>
                             {consultor.is_freelancer !== false ? 'Freelancer' : 'Funcionário'}
@@ -1130,7 +1130,7 @@ Digite o número da opção desejada:`;
                           </span>
                         </div>
                       ) : (
-                        // Consultor sem empresa (Invest Money)
+                        // Consultor sem parceiro (Invest Money)
                       <span className={`status-badge ${consultor.is_freelancer !== false ? 'freelancer' : 'interno'}`}>
                         {consultor.is_freelancer !== false ? 'Freelancer' : 'Interno'}
                       </span>
@@ -1186,7 +1186,7 @@ Digite o número da opção desejada:`;
                             <circle cx="12" cy="12" r="3" />
                           </svg>
                         </button>
-                        {(isAdmin || user?.tipo === 'empresa') && (
+                        {(isAdmin || user?.tipo === 'parceiro') && (
                           <button
                             onClick={() => handleEdit(consultor)}
                             className="btn-action"
@@ -1209,7 +1209,7 @@ Digite o número da opção desejada:`;
                             <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                           </svg>
                         </button>
-                        {(isAdmin || user?.tipo === 'empresa') && (
+                        {(isAdmin || user?.tipo === 'parceiro') && (
                           <button
                             onClick={() => excluirConsultor(consultor)}
                             className="btn-action"
@@ -1315,14 +1315,14 @@ Digite o número da opção desejada:`;
                   </div>
                 )}
                 
-                {/* Tipo de Vínculo - Para consultores de empresa */}
+                {/* Tipo de Vínculo - Para consultores de parceiro */}
                 <div>
                   <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>
                     {viewingConsultor.empresa_id ? 'Tipo de Vínculo' : 'Tipo'}
                   </label>
                   <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
                     {viewingConsultor.empresa_id ? (
-                      // Consultor de empresa
+                      // Consultor de parceiro
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <span className={`status-badge ${viewingConsultor.is_freelancer !== false ? 'freelancer' : 'interno'}`}>
                           {viewingConsultor.is_freelancer !== false ? 'Freelancer (terceirizado)' : 'Funcionário (fixo)'}
@@ -1590,7 +1590,7 @@ Digite o número da opção desejada:`;
 
               <div className="form-group">
                 <label className="form-label">
-                  {user?.tipo === 'empresa' ? 'Tipo de Vínculo' : 'Tipo de Consultor'}
+                  {user?.tipo === 'parceiro' ? 'Tipo de Vínculo' : 'Tipo de Consultor'}
                 </label>
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
@@ -1601,7 +1601,7 @@ Digite o número da opção desejada:`;
                       checked={formData.is_freelancer === true}
                       onChange={() => setFormData(prev => ({ ...prev, is_freelancer: true }))}
                     />
-                    <span>{user?.tipo === 'empresa' ? 'Freelancer (terceirizado)' : 'Freelancer (link personalizado)'}</span>
+                    <span>{user?.tipo === 'parceiro' ? 'Freelancer (terceirizado)' : 'Freelancer (link personalizado)'}</span>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
                     <input
@@ -1611,12 +1611,12 @@ Digite o número da opção desejada:`;
                       checked={formData.is_freelancer === false}
                       onChange={() => setFormData(prev => ({ ...prev, is_freelancer: false }))}
                     />
-                    <span>{user?.tipo === 'empresa' ? 'Funcionário (fixo)' : 'Interno (link geral)'}</span>
+                    <span>{user?.tipo === 'parceiro' ? 'Funcionário (fixo)' : 'Interno (link geral)'}</span>
                   </label>
                 </div>
                 <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
-                  {user?.tipo === 'empresa' 
-                    ? 'Ambos os tipos veem as clínicas da empresa. Diferença apenas para controle interno.'
+                  {user?.tipo === 'parceiro' 
+                    ? 'Ambos os tipos veem as clínicas da parceiro. Diferença apenas para controle interno.'
                     : 'Freelancers veem apenas leads do seu código. Internos veem leads gerais.'}
                 </small>
               </div>
@@ -1815,7 +1815,7 @@ Digite o número da opção desejada:`;
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
                       {linkConsultor.empresa_id 
-                        ? 'Use estes links para indicar clínicas em nome da empresa'
+                        ? 'Use estes links para indicar clínicas em nome da parceiro'
                         : 'Use este link para divulgar e capturar leads com sua referência'}
                     </div>
                   </div>
@@ -1837,7 +1837,7 @@ Digite o número da opção desejada:`;
                     </div>
                   </div>
 
-                  {/* Link para Pacientes - Apenas para consultores SEM empresa */}
+                  {/* Link para Pacientes - Apenas para consultores SEM parceiro */}
                   {linkConsultor.link_personalizado && !linkConsultor.empresa_id && (
                   <div style={{ marginBottom: '1.5rem' }}>
                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem', display: 'block', marginBottom: '0.5rem' }}>
