@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import useBranding from '../hooks/useBranding';
 import { useToast } from '../components/Toast';
 
 const Consultores = () => {
+  const { t } = useBranding();
   const { makeRequest, isAdmin, user } = useAuth();
   const { showErrorToast, showSuccessToast } = useToast();
   const [consultores, setConsultores] = useState([]);

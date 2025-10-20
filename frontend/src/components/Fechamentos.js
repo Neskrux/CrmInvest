@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import useBranding from '../hooks/useBranding';
 import { useToast } from '../components/Toast';
 import TutorialFechamentos from './TutorialFechamentos';
 import ModalEvidencia from './ModalEvidencia';
 
 const Fechamentos = () => {
+  const { t } = useBranding();
   const { makeRequest, isAdmin, user, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isClinica } = useAuth();
   const [fechamentos, setFechamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);

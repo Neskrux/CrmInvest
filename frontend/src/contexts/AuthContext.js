@@ -236,6 +236,7 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     makeRequest,
+    empresaId: user?.empresa_id || user?.empresaId || null,
     isAuthenticated: !!user && !!token,
     isAdmin: user?.tipo === 'admin',
     isConsultor: user?.tipo === 'consultor',
