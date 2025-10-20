@@ -160,31 +160,6 @@ const Login = () => {
               Esqueci minha senha
             </button>
           </div>
-
-          <div style={{
-            textAlign: 'center',
-            paddingTop: '1rem',
-            borderTop: '1px solid #e5e7eb'
-          }}>
-           
-            
-            <button
-              type="button"
-              onClick={() => navigate('/')}
-              style={{
-                  background: '#f3f4f6',
-                  color: '#374151',
-                  border: 'none',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '6px',
-                  fontSize: '0.875rem',
-                  cursor: 'pointer',
-                  fontWeight: '500'
-                }}
-              >
-                ← Voltar
-              </button>
-          </div>
         </form>
       </div>
 

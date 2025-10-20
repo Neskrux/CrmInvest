@@ -15,6 +15,7 @@ const Clinicas = () => {
   const [clinicas, setClinicas] = useState([]);
   const [novasClinicas, setNovasClinicas] = useState([]);
   const [clinicasEmAnalise, setClinicasEmAnalise] = useState([]);
+  const [clinicasNegativas, setClinicasNegativas] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showNovaClinicaModal, setShowNovaClinicaModal] = useState(false);
   const [editingClinica, setEditingClinica] = useState(null);
@@ -38,6 +39,13 @@ const Clinicas = () => {
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroCity, setFiltroCity] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
+  
+  // Filtros para Clínicas Negativas
+  const [mostrarFiltrosNegativos, setMostrarFiltrosNegativos] = useState(false);
+  const [filtroNomeNegativos, setFiltroNomeNegativos] = useState('');
+  const [filtroStatusNegativos, setFiltroStatusNegativos] = useState('');
+  const [filtroEstadoNegativos, setFiltroEstadoNegativos] = useState('');
+  const [filtroCidadeNegativos, setFiltroCidadeNegativos] = useState('');
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewingClinica, setViewingClinica] = useState(null);
   const [viewNovaClinicaModalOpen, setViewNovaClinicaModalOpen] = useState(false);
@@ -163,6 +171,18 @@ const Clinicas = () => {
   const [clinicaObservacoes, setClinicaObservacoes] = useState(null);
   const [tipoClinicaObservacoes, setTipoClinicaObservacoes] = useState(''); // 'clinica' ou 'nova_clinica'
 
+  // Estados para modal de seleção de consultor interno
+  const [showConsultorInternoModal, setShowConsultorInternoModal] = useState(false);
+  const [consultorInternoData, setConsultorInternoData] = useState({
+    clinicaId: null,
+    clinicaNome: '',
+    statusAnterior: '',
+    statusNovo: '',
+    tipoClinica: '', // 'clinica' ou 'nova_clinica'
+    consultorSelecionado: null
+  });
+  const [consultoresInternos, setConsultoresInternos] = useState([]);
+
   // Status disponíveis para clínicas gerais
   const statusClinicaOptions = [
     { value: 'ativa', label: 'Ativa', color: '#10b981' },
@@ -282,11 +302,21 @@ const Clinicas = () => {
       fetchClinicasEmAnalise();
     }
     
+    // Buscar clínicas negativas se for admin ou consultor interno
+    if (isAdmin || isConsultorInterno) {
+      fetchClinicasNegativas();
+    }
+    
     // Buscar links personalizados se for consultor
     if (isConsultor) {
       buscarLinkPersonalizado();
     } else {
       setLoadingLink(false);
+    }
+    
+    // Buscar consultores internos se for admin ou consultor interno
+    if (isAdmin || isConsultorInterno) {
+      fetchConsultoresInternos();
     }
     
     // Verificar se tutorial foi completado
@@ -309,7 +339,7 @@ const Clinicas = () => {
 
   // Controlar scroll do body quando modal estiver aberto
   useEffect(() => {
-    if (showModal || showNovaClinicaModal || showAcessoModal || viewModalOpen || viewNovaClinicaModalOpen || showEvidenciaModal || showObservacoesModal) {
+    if (showModal || showNovaClinicaModal || showAcessoModal || viewModalOpen || viewNovaClinicaModalOpen || showEvidenciaModal || showObservacoesModal || showConsultorInternoModal) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
@@ -318,7 +348,7 @@ const Clinicas = () => {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [showModal, showNovaClinicaModal, showAcessoModal, viewModalOpen, viewNovaClinicaModalOpen, showEvidenciaModal, showObservacoesModal]);
+  }, [showModal, showNovaClinicaModal, showAcessoModal, viewModalOpen, viewNovaClinicaModalOpen, showEvidenciaModal, showObservacoesModal, showConsultorInternoModal]);
 
   // Regeocodificar quando filtros/dados mudarem e a aba for mapa
   useEffect(() => {
@@ -337,8 +367,8 @@ const Clinicas = () => {
         // Backend já retorna dados filtrados:
         // - Admin: todas as clínicas
         // - Consultor interno: todas as clínicas
-        // - Consultor freelancer SEM empresa: apenas suas clínicas ou públicas
-        // - Consultor de empresa: clínicas de todos os consultores da mesma empresa
+        // - Consultor freelancer SEM parceiro: apenas suas clínicas ou públicas
+        // - Consultor de parceiro: clínicas de todos os consultores da mesma parceiro
         // - Empresa: clínicas de todos seus consultores
         setClinicas(data);
       } else {
@@ -350,6 +380,23 @@ const Clinicas = () => {
       showErrorToast('Erro ao conectar com o servidor');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchConsultoresInternos = async () => {
+    try {
+      const response = await makeRequest('/consultores');
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Filtrar apenas consultores internos (com as duas permissões)
+        const internos = data.filter(c => c.pode_ver_todas_novas_clinicas === true && c.podealterarstatus === true);
+        setConsultoresInternos(internos);
+      } else {
+        console.error('Erro ao carregar consultores internos:', data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar consultores internos:', error);
     }
   };
 
@@ -454,8 +501,8 @@ const Clinicas = () => {
         // Backend já retorna dados filtrados:
         // - Admin: todas as novas clínicas
         // - Consultor interno: todas as novas clínicas
-        // - Consultor freelancer SEM empresa: apenas suas clínicas
-        // - Consultor de empresa: clínicas de todos os consultores da mesma empresa
+        // - Consultor freelancer SEM parceiro: apenas suas clínicas
+        // - Consultor de parceiro: clínicas de todos os consultores da mesma parceiro
         // - Empresa: clínicas de todos seus consultores
         setNovasClinicas(data);
       } else {
@@ -485,6 +532,23 @@ const Clinicas = () => {
     }
   };
 
+  const fetchClinicasNegativas = async () => {
+    try {
+      const response = await makeRequest('/clinicas-negativas');
+      const data = await response.json();
+      
+      if (response.ok) {
+        setClinicasNegativas(data);
+      } else {
+        console.error('Erro ao carregar clínicas negativas:', data.error);
+        showErrorToast('Erro ao carregar clínicas negativas: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar clínicas negativas:', error);
+      showErrorToast('Erro ao conectar com o servidor');
+    }
+  };
+
   const buscarLinkPersonalizado = async () => {
     try {
       // Usar a rota de perfil que o consultor pode acessar
@@ -494,13 +558,13 @@ const Clinicas = () => {
       if (consultorResponse.ok && responseData.consultor) {
         const consultorData = responseData.consultor;
         
-        // Verificar se é consultor interno Invest Money (tem as duas permissões E não tem empresa)
+        // Verificar se é consultor interno Invest Money (tem as duas permissões E não tem parceiro)
         const isConsultorInterno = consultorData.pode_ver_todas_novas_clinicas === true && 
                                    consultorData.podealterarstatus === true &&
                                    !consultorData.empresa_id;
         
         if (!isConsultorInterno) {
-          // Freelancer (solo ou empresa) ou Funcionário de empresa: link personalizado
+          // Freelancer (solo ou parceiro) ou Funcionário de parceiro: link personalizado
           if (consultorData.codigo_referencia) {
             setLinkPersonalizado(`https://solumn.com.br/captura-lead?ref=${consultorData.codigo_referencia}`);
             setLinkClinicas(`https://solumn.com.br/captura-clinica?ref=${consultorData.codigo_referencia}`);
@@ -1630,7 +1694,25 @@ const Clinicas = () => {
     return statusAnaliseOptions.find(option => option.value === status) || statusAnaliseOptions[0];
   };
 
-  const alterarStatusNovaClinica = async (clinicaId, novoStatus, evidenciaId = null) => {
+  const alterarStatusNovaClinica = async (clinicaId, novoStatus, evidenciaId = null, consultorInternoId = null) => {
+    // VERIFICAR SE STATUS É "REUNIÃO MARCADA" - Abrir modal para selecionar consultor interno
+    if (novoStatus === 'reuniao_marcada' && !consultorInternoId) {
+      const clinica = novasClinicas.find(c => c.id === clinicaId);
+      if (clinica) {
+        // Abrir modal de seleção de consultor interno
+        setConsultorInternoData({
+          clinicaId: clinicaId,
+          clinicaNome: clinica.nome,
+          statusAnterior: clinica.status,
+          statusNovo: novoStatus,
+          tipoClinica: 'nova_clinica',
+          consultorSelecionado: null
+        });
+        setShowConsultorInternoModal(true);
+      }
+      return;
+    }
+
     // VERIFICAR SE STATUS REQUER EVIDÊNCIA
     if (STATUS_COM_EVIDENCIA_CLINICAS.includes(novoStatus) && !evidenciaId) {
       const clinica = novasClinicas.find(c => c.id === clinicaId);
@@ -1663,6 +1745,8 @@ const Clinicas = () => {
       if (response.ok) {
         showSuccessToast('Status atualizado com sucesso!');
         fetchNovasClinicas();
+        // Atualizar também a lista de clínicas negativas
+        fetchClinicasNegativas();
       } else {
         showErrorToast('Erro ao alterar status: ' + data.error);
       }
@@ -1695,6 +1779,38 @@ const Clinicas = () => {
       tipoClinica: '',
       evidenciaId: null
     });
+  };
+
+  // Função para fechar modal de consultor interno
+  const handleConsultorInternoClose = () => {
+    setShowConsultorInternoModal(false);
+    setConsultorInternoData({
+      clinicaId: null,
+      clinicaNome: '',
+      statusAnterior: '',
+      statusNovo: '',
+      tipoClinica: '',
+      consultorSelecionado: null
+    });
+  };
+
+  // Função para confirmar seleção de consultor interno
+  const handleConsultorInternoConfirm = async () => {
+    if (!consultorInternoData.consultorSelecionado) {
+      showErrorToast('Por favor, selecione um consultor interno');
+      return;
+    }
+
+    // Atualizar status com o consultor interno selecionado
+    await alterarStatusNovaClinica(
+      consultorInternoData.clinicaId,
+      consultorInternoData.statusNovo,
+      null,
+      consultorInternoData.consultorSelecionado
+    );
+
+    // Fechar modal
+    handleConsultorInternoClose();
   };
 
   // Função auxiliar para atualizar status de clínicas gerais
@@ -2159,10 +2275,20 @@ const Clinicas = () => {
             style={{ position: 'relative' }}
           >
               {isAdmin ? 'Novas Clínicas' : 'Minhas Indicações'}
-            {novasClinicas.length > 0 && (
-              <span className="tab-badge">{novasClinicas.length}</span>
+            {(isFreelancer ? novasClinicas : novasClinicas.filter(c => ['tem_interesse', 'em_contato', 'reuniao_marcada'].includes(c.status))).length > 0 && (
+              <span className="tab-badge">{(isFreelancer ? novasClinicas : novasClinicas.filter(c => ['tem_interesse', 'em_contato', 'reuniao_marcada'].includes(c.status))).length}</span>
             )}
           </button>
+          )}
+          
+          {/* Aba Leads Negativos: apenas para Admin e Consultor Interno */}
+          {(isAdmin || isConsultorInterno) && (
+            <button
+              className={`tab ${activeTab === 'leads-negativos' ? 'active' : ''}`}
+              onClick={() => setActiveTab('leads-negativos')}
+            >
+              Leads Negativos
+            </button>
           )}
           
           {(isAdmin || isConsultorInterno) && (
@@ -2557,7 +2683,7 @@ const Clinicas = () => {
             className="stats-grid" 
             style={{ 
               marginBottom: '2rem',
-              // Grid 2x2 para freelancers e empresas, 6 colunas para admin/interno
+              // Grid 2x2 para freelancers e parceiros, 6 colunas para admin/interno
               gridTemplateColumns: (isAdmin || isConsultorInterno) 
                 ? 'repeat(auto-fit, minmax(150px, 1fr))' 
                 : 'repeat(2, 1fr)'
@@ -2984,7 +3110,7 @@ const Clinicas = () => {
             <h2 className="card-title">Novas Clínicas Encontradas</h2>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
               <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                {novasClinicas.length} clínica(s) disponível(eis)
+                {(isFreelancer ? novasClinicas : novasClinicas.filter(c => ['tem_interesse', 'em_contato', 'reuniao_marcada'].includes(c.status))).length} clínica(s) disponível(eis)
               </div>
               {/* Botão oculto para freelancers na aba minhas indicações */}
               {!isFreelancer && (
@@ -2995,7 +3121,7 @@ const Clinicas = () => {
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M12 5v14M5 12h14" />
                   </svg>
-                  {user?.tipo === 'empresa' ? 'Indicar Nova Clínica' : 'Cadastrar Nova Clínica'}
+                  {user?.tipo === 'parceiro' ? 'Indicar Nova Clínica' : 'Cadastrar Nova Clínica'}
                 </button>
               )}
             </div>
@@ -3005,7 +3131,7 @@ const Clinicas = () => {
             <div className="loading">
               <div className="spinner"></div>
             </div>
-          ) : novasClinicas.length === 0 ? (
+          ) : (isFreelancer ? novasClinicas : novasClinicas.filter(c => ['tem_interesse', 'em_contato', 'reuniao_marcada'].includes(c.status))).length === 0 ? (
             <div style={{ textAlign: 'center', color: '#6b7280', padding: '3rem' }}>
               Nenhuma nova clínica encontrada no momento.
             </div>
@@ -3060,7 +3186,7 @@ const Clinicas = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {novasClinicas.map(clinica => {
+                  {(isFreelancer ? novasClinicas : novasClinicas.filter(c => ['tem_interesse', 'em_contato', 'reuniao_marcada'].includes(c.status))).map(clinica => {
                     const statusInfo = getStatusNovaClinicaInfo(clinica.status);
                     return (
                       <tr key={clinica.id}>
@@ -3978,6 +4104,261 @@ const Clinicas = () => {
             </div>
           )}
         </div>
+      )}
+
+      {/* Conteúdo da aba Leads Negativos */}
+      {activeTab === 'leads-negativos' && (
+        <>
+          {/* Resumo de Estatísticas */}
+          <div className="stats-grid" style={{ marginBottom: '2rem' }}>
+            <div className="stat-card">
+              <div className="stat-label">Não Responde</div>
+              <div className="stat-value">{clinicasNegativas.filter(c => c.status === 'nao_responde').length}</div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">Não tem Interesse</div>
+              <div className="stat-value">{clinicasNegativas.filter(c => c.status === 'nao_tem_interesse').length}</div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">Não é nosso público</div>
+              <div className="stat-value">{clinicasNegativas.filter(c => c.status === 'nao_e_nosso_publico').length}</div>
+            </div>
+          </div>
+
+          <div className="card" style={{ marginBottom: '1.5rem' }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 className="card-title" style={{ fontSize: '1.1rem' }}>Filtros</h2>
+              <button className="btn btn-secondary" onClick={() => setMostrarFiltrosNegativos(!mostrarFiltrosNegativos)}>
+                {mostrarFiltrosNegativos ? 'Ocultar Filtros' : 'Filtros'}
+              </button>
+            </div>
+            {mostrarFiltrosNegativos && (
+              <div style={{ padding: '1.5rem', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                <div className="grid grid-3" style={{ gap: '1rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Nome</label>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      value={filtroNomeNegativos} 
+                      onChange={e => setFiltroNomeNegativos(e.target.value)} 
+                      placeholder="Buscar por nome" 
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Status</label>
+                    <select 
+                      className="form-select" 
+                      value={filtroStatusNegativos} 
+                      onChange={e => setFiltroStatusNegativos(e.target.value)}
+                    >
+                      <option value="">Todos</option>
+                      {statusNovaClinicaOptions
+                        .filter(option => [
+                          'nao_tem_interesse',
+                          'nao_e_nosso_publico',
+                          'nao_responde',
+                          'nao_reconhece'
+                        ].includes(option.value))
+                        .map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Estado</label>
+                    <select 
+                      className="form-select" 
+                      value={filtroEstadoNegativos} 
+                      onChange={e => setFiltroEstadoNegativos(e.target.value)}
+                    >
+                      <option value="">Todos</option>
+                      {estadosBrasileiros.map(estado => (
+                        <option key={estado.sigla} value={estado.sigla}>
+                          {estado.sigla} - {estado.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <button className="btn btn-sm btn-secondary" style={{ marginTop: '1rem' }} onClick={() => {
+                  setFiltroNomeNegativos(''); 
+                  setFiltroStatusNegativos(''); 
+                  setFiltroEstadoNegativos('');
+                  setFiltroCidadeNegativos('');
+                }}>Limpar Filtros</button>
+              </div>
+            )}
+          </div>
+
+          <div className="card">
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 className="card-title">Clínicas Negativas</h2>
+                <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                  {clinicasNegativas.filter(clinica => {
+                    const matchNome = !filtroNomeNegativos || clinica.nome.toLowerCase().includes(filtroNomeNegativos.toLowerCase());
+                    const matchStatus = !filtroStatusNegativos || clinica.status === filtroStatusNegativos;
+                    const matchEstado = !filtroEstadoNegativos || clinica.estado === filtroEstadoNegativos;
+                    return matchNome && matchStatus && matchEstado;
+                  }).length} clínica(s)
+                </div>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="loading">
+                <div className="spinner"></div>
+              </div>
+            ) : clinicasNegativas.filter(clinica => {
+              const matchNome = !filtroNomeNegativos || clinica.nome.toLowerCase().includes(filtroNomeNegativos.toLowerCase());
+              const matchStatus = !filtroStatusNegativos || clinica.status === filtroStatusNegativos;
+              const matchEstado = !filtroEstadoNegativos || clinica.estado === filtroEstadoNegativos;
+              return matchNome && matchStatus && matchEstado;
+            }).length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#6b7280', padding: '3rem' }}>
+                Nenhuma clínica negativa encontrada.
+              </div>
+            ) : (
+              <div className="table-container">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Nome</th>
+                      <th style={{ display: isMobile ? 'none' : 'table-cell' }}>CNPJ</th>
+                      <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Cidade/Estado</th>
+                      <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Telefone</th>
+                      <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Status</th>
+                      <th style={{ display: isMobile ? 'none' : 'table-cell' }}>Cadastrado</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clinicasNegativas.filter(clinica => {
+                      const matchNome = !filtroNomeNegativos || clinica.nome.toLowerCase().includes(filtroNomeNegativos.toLowerCase());
+                      const matchStatus = !filtroStatusNegativos || clinica.status === filtroStatusNegativos;
+                      const matchEstado = !filtroEstadoNegativos || clinica.estado === filtroEstadoNegativos;
+                      return matchNome && matchStatus && matchEstado;
+                    }).map(clinica => {
+                      const statusInfo = getStatusNovaClinicaInfo(clinica.status);
+                      return (
+                        <tr key={clinica.id}>
+                          <td style={{ fontWeight: '500' }}>{clinica.nome}</td>
+                          <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                            {clinica.cnpj ? formatarCNPJ(clinica.cnpj) : '-'}
+                          </td>
+                          <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                            {clinica.cidade && clinica.estado ? `${clinica.cidade}/${clinica.estado}` : '-'}
+                          </td>
+                          <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                            {clinica.telefone ? formatarTelefone(clinica.telefone) : '-'}
+                          </td>
+                          <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                            {(isAdmin || podeAlterarStatus) ? (
+                              <select
+                                value={clinica.status}
+                                onChange={(e) => alterarStatusNovaClinica(clinica.id, e.target.value)}
+                                className="form-select"
+                                style={{
+                                  fontSize: '0.75rem',
+                                  padding: '0.25rem 0.5rem',
+                                  border: 'none',
+                                  backgroundColor: statusInfo.color + '20',
+                                  color: statusInfo.color,
+                                  fontWeight: '600',
+                                  borderRadius: '0.375rem'
+                                }}
+                              >
+                                {statusNovaClinicaOptions
+                                  .filter(option => [
+                                    'nao_tem_interesse',
+                                    'nao_e_nosso_publico',
+                                    'nao_responde',
+                                    'nao_reconhece',
+                                    'tem_interesse',
+                                    'em_contato',
+                                    'reuniao_marcada'
+                                  ].includes(option.value))
+                                  .map(option => (
+                                    <option key={option.value} value={option.value}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                              </select>
+                            ) : (
+                              <span 
+                                className="badge"
+                                style={{
+                                  backgroundColor: statusInfo.color + '20',
+                                  color: statusInfo.color,
+                                  fontWeight: '600',
+                                  fontSize: '0.75rem',
+                                  padding: '0.25rem 0.5rem',
+                                  borderRadius: '0.375rem'
+                                }}
+                              >
+                                {statusInfo.label}
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
+                            {formatarData(clinica.created_at)}
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
+                              <button
+                                onClick={() => handleViewNovaClinica(clinica)}
+                                className="btn-action"
+                                title="Visualizar"
+                                style={{ 
+                                  padding: '0.375rem',
+                                  minWidth: '32px',
+                                  height: '32px'
+                                }}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                  <circle cx="12" cy="12" r="3" />
+                                </svg>
+                              </button>
+                              {isAdmin && (
+                                <button
+                                  onClick={() => handleDeleteNovaClinica(clinica.id)}
+                                  className="btn-action"
+                                  title="Excluir"
+                                  style={{ 
+                                    color: '#dc2626',
+                                    padding: '0.375rem',
+                                    minWidth: '32px',
+                                    height: '32px',
+                                    backgroundColor: '#fef2f2',
+                                    border: '1px solid #fecaca',
+                                    borderRadius: '4px'
+                                  }}
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <polyline points="3,6 5,6 21,6"></polyline>
+                                    <path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"></path>
+                                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {/* Modal de Cadastro/Edição */}
@@ -7029,6 +7410,55 @@ const Clinicas = () => {
                   Entendi
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Seleção de Consultor Interno */}
+      {showConsultorInternoModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Selecionar Consultor Interno</h2>
+            </div>
+            <div className="modal-body">
+              <div style={{ marginBottom: '1rem' }}>
+                <p style={{ color: '#6b7280', marginBottom: '0.5rem' }}>
+                  Clínica: <strong>{consultorInternoData.clinicaNome}</strong>
+                </p>
+                <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                  Selecione o consultor interno que irá acompanhar esta clínica:
+                </p>
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">Consultor Interno *</label>
+                <select
+                  className="form-select"
+                  value={consultorInternoData.consultorSelecionado || ''}
+                  onChange={(e) => setConsultorInternoData(prev => ({
+                    ...prev,
+                    consultorSelecionado: e.target.value
+                  }))}
+                  required
+                >
+                  <option value="">Selecione um consultor...</option>
+                  {consultoresInternos.map(consultor => (
+                    <option key={consultor.id} value={consultor.id}>
+                      {consultor.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={handleConsultorInternoClose}>
+                Cancelar
+              </button>
+              <button className="btn btn-primary" onClick={handleConsultorInternoConfirm}>
+                Confirmar
+              </button>
             </div>
           </div>
         </div>

@@ -6,7 +6,6 @@ import { ToastProvider } from './components/Toast';
 import { LeadNotificationProvider, useLeadNotification } from './components/LeadNotificationProvider';
 import { AudioProvider } from './contexts/AudioContext';
 import { HelpCircle } from 'lucide-react';
-import LandingPage from './components/LandingPage';
 import CadastroConsultor from './components/CadastroConsultor';
 import CadastroSucesso from './components/CadastroSucesso';
 import CapturaLead from './components/CapturaLead';
@@ -60,7 +59,7 @@ const ProtectedRoute = ({ children }) => {
 
 // Componente interno que usa o hook de notificação
 const AppContentWithNotifications = () => {
-  const { user, logout, loading, isAdmin, isEmpresa } = useAuth();
+  const { user, logout, loading, isAdmin, isParceiro }	 = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -170,7 +169,7 @@ const AppContentWithNotifications = () => {
         <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={<Login />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
@@ -178,7 +177,7 @@ const AppContentWithNotifications = () => {
 
   // Se o usuário está autenticado, mostrar a aplicação principal
   const RenderContent = () => {
-    const { isEmpresa, isFreelancer } = useAuth();
+    const { isParceiro, isFreelancer } = useAuth();
     
     // Interface simplificada para Freelancers Consultores
     if (isFreelancer && user?.tipo === 'consultor') {
@@ -224,8 +223,8 @@ const AppContentWithNotifications = () => {
       );
     }
 
-    // Empresas têm acesso limitado: consultores (da empresa), clínicas, materiais e perfil
-    if (isEmpresa) {
+    // Empresas têm acesso limitado: consultores (da parceiro), clínicas, materiais e perfil
+    if (isParceiro) {
       return (
         <Routes>
           <Route path="/consultores" element={<Consultores />} />
@@ -239,8 +238,9 @@ const AppContentWithNotifications = () => {
       );
     }
     
-    // Consultores de empresa também têm acesso limitado: clínicas, materiais e perfil
-    if (user.tipo === 'consultor' && user.empresa_id) {
+    // Consultores de empresa (freelancers) têm acesso limitado: clínicas, materiais e perfil
+    // MAS consultores internos (com permissões) veem tudo como admin
+    if (user.tipo === 'consultor' && user.empresa_id && !(user.pode_ver_todas_novas_clinicas && user.podealterarstatus)) {
       return (
         <Routes>
           <Route path="/clinicas" element={<Clinicas />} />
@@ -576,7 +576,7 @@ const AppContentWithNotifications = () => {
 
         <nav className="sidebar-nav">
           {/* Dashboard - Para Admin, Consultores Invest Money e Clínicas */}
-          {(user.tipo !== 'empresa' && !user.empresa_id) || user.tipo === 'clinica' ? (
+          {user.tipo === 'admin' || (user.tipo === 'consultor' && user.pode_ver_todas_novas_clinicas && user.podealterarstatus) || user.tipo === 'clinica' ? (
             <div className="nav-item">
               <Link
                 to="/dashboard"
@@ -595,7 +595,7 @@ const AppContentWithNotifications = () => {
           ) : null}
 
           {/* Pacientes - Para Admin, Consultores Invest Money e Clínicas (com label diferente para clínicas) */}
-          {(user.tipo !== 'empresa' && !user.empresa_id) || user.tipo === 'clinica' ? (
+          {user.tipo === 'admin' || (user.tipo === 'consultor' && user.pode_ver_todas_novas_clinicas && user.podealterarstatus) || user.tipo === 'clinica' ? (
             <div className="nav-item">
               <Link
                 to="/pacientes"
@@ -614,7 +614,7 @@ const AppContentWithNotifications = () => {
           ) : null}
 
           {/* Agendamentos - Para Admin, Consultores Invest Money e Clínicas */}
-          {(user.tipo !== 'empresa' && !user.empresa_id) || user.tipo === 'clinica' ? (
+          {user.tipo === 'admin' || (user.tipo === 'consultor' && user.pode_ver_todas_novas_clinicas && user.podealterarstatus) || user.tipo === 'clinica' ? (
             <div className="nav-item">
               <Link
                 to="/agendamentos"
@@ -633,7 +633,7 @@ const AppContentWithNotifications = () => {
           ) : null}
 
           {/* Fechamentos - Apenas para Admin e Consultores Invest Money (NÃO para clínicas) */}
-          {user.tipo !== 'empresa' && !user.empresa_id && user.tipo !== 'clinica' && (
+          {(user.tipo === 'admin' || (user.tipo === 'consultor' && user.pode_ver_todas_novas_clinicas && user.podealterarstatus)) && user.tipo !== 'clinica' && (
             <div className="nav-item">
               <Link
                 to="/fechamentos"
@@ -650,7 +650,7 @@ const AppContentWithNotifications = () => {
           )}
 
           {/* Cálculo de Carteira - Apenas para Admin e Consultores Invest Money (NÃO para clínicas) */}
-          {user.tipo !== 'empresa' && !user.empresa_id && user.tipo !== 'clinica' && (
+          {(user.tipo === 'admin' || (user.tipo === 'consultor' && user.pode_ver_todas_novas_clinicas && user.podealterarstatus)) && user.tipo !== 'clinica' && (
             <div className="nav-item">
               <Link
                 to="/calculo-carteira"
@@ -786,7 +786,7 @@ const AppContentWithNotifications = () => {
 
 
           {/* Consultores - Admin e Empresas */}
-          {(user.tipo === 'admin' || user.tipo === 'empresa') && (
+          {(user.tipo === 'admin' || user.tipo === 'parceiro') && (
             <div className="nav-item">
               <Link
                 to="/consultores"
@@ -871,7 +871,7 @@ const AppContentWithNotifications = () => {
             </div>
             <div className="user-details">
               <h3>{user.nome}</h3>
-              <p>{user.tipo === 'admin' ? 'Administrador' : user.tipo === 'empresa' ? 'Empresa' : user.tipo === 'clinica' ? 'Clínica' : 'Consultor'}</p>
+              <p>{user.tipo === 'admin' ? 'Administrador' : user.tipo === 'parceiro' ? 'Empresa' : user.tipo === 'clinica' ? 'Clínica' : 'Consultor'}</p>
             </div>
           </div>
           <Link
@@ -992,7 +992,7 @@ const AppContentWithNotifications = () => {
                   {user.nome}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                  {user.tipo === 'admin' ? 'Administrador' : user.tipo === 'empresa' ? 'Empresa' : user.tipo === 'clinica' ? 'Clínica' : 'Consultor'}
+                  {user.tipo === 'admin' ? 'Administrador' : user.tipo === 'parceiro' ? 'Empresa' : user.tipo === 'clinica' ? 'Clínica' : 'Consultor'}
                 </div>
               </div>
               <svg 
