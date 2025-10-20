@@ -183,28 +183,20 @@ const Clinicas = () => {
   });
   const [consultoresInternos, setConsultoresInternos] = useState([]);
 
-  // Status disponíveis para clínicas gerais
+  // Status disponíveis para clínicas gerais (apenas ativa e inativa)
   const statusClinicaOptions = [
     { value: 'ativa', label: 'Ativa', color: '#10b981' },
-    { value: 'inativa', label: 'Inativa', color: '#ef4444' },
-    { value: 'em_contato', label: 'Em Contato', color: '#3b82f6' },
-    { value: 'reuniao_marcada', label: 'Reunião Marcada', color: '#8b5cf6' },
-    { value: 'aguardando_documentacao', label: 'Aguardando Documentação', color: '#f59e0b' },
-    { value: 'nao_fechou', label: 'Não Fechou', color: '#f59e0b' },
-    { value: 'nao_e_nosso_publico', label: 'Não é nosso público alvo', color: '#9ca3af' },
-    { value: 'nao_responde', label: 'Não responde', color: '#6b7280' },
-    { value: 'nao_reconhece', label: 'Não reconhece', color: '#6b7280' }
+    { value: 'inativa', label: 'Inativa', color: '#ef4444' }
   ];
 
   // Status disponíveis para novas clínicas
   const statusNovaClinicaOptions = [
-    { value: 'sem_primeiro_contato', label: 'Prospecção Ativa', color: '#6b7280' },
     { value: 'tem_interesse', label: 'Tem Interesse', color: '#10b981' },
     { value: 'nao_tem_interesse', label: 'Não tem Interesse', color: '#ef4444' },
     { value: 'em_contato', label: 'Em Contato', color: '#3b82f6' },
     { value: 'reuniao_marcada', label: 'Reunião Marcada', color: '#8b5cf6' },
     { value: 'aguardando_documentacao', label: 'Aguardando Documentação', color: '#f59e0b' },
-    { value: 'nao_fechou', label: 'Não Fechou', color: '#f59e0b' },
+    { value: 'nao_fechou', label: 'Não Fechou', color: '#dc2626' },
     { value: 'nao_e_nosso_publico', label: 'Não é nosso público alvo', color: '#9ca3af' },
     { value: 'nao_responde', label: 'Não responde', color: '#6b7280' },
     { value: 'nao_reconhece', label: 'Não reconhece', color: '#6b7280' }
@@ -213,11 +205,8 @@ const Clinicas = () => {
   // Status disponíveis para clínicas em análise
   const statusAnaliseOptions = [
     { value: 'aguardando_documentacao', label: 'Aguardando Documentação', color: '#f59e0b' },
-    { value: 'documentacao_incompleta', label: 'Documentação Incompleta', color: '#ef4444' },
-    { value: 'em_analise', label: 'Em Análise', color: '#3b82f6' },
     { value: 'documentacao_reprovada', label: 'Documentação Reprovada', color: '#dc2626' },
-    { value: 'ativa', label: 'Aprovada (Ativa)', color: '#10b981' },
-    { value: 'inativa', label: 'Inativa', color: '#6b7280' }
+    { value: 'nao_fechou', label: 'Não Fechou', color: '#dc2626' }
   ];
 
   // Status que requerem evidência obrigatória
@@ -225,7 +214,8 @@ const Clinicas = () => {
     'nao_fechou',
     'nao_e_nosso_publico',
     'nao_responde',
-    'nao_tem_interesse'
+    'nao_tem_interesse',
+    'nao_reconhece'
   ];
 
   // Verificar se usuário é consultor
@@ -1687,14 +1677,195 @@ const Clinicas = () => {
   };
 
   const getStatusNovaClinicaInfo = (status) => {
+    // Se o status for "negativa", retornar informações do status "Não Fechou"
+    if (status === 'negativa') {
+      return statusNovaClinicaOptions.find(option => option.value === 'nao_fechou') || statusNovaClinicaOptions[0];
+    }
     return statusNovaClinicaOptions.find(option => option.value === status) || statusNovaClinicaOptions[0];
   };
 
   const getStatusAnaliseInfo = (status) => {
+    // Se o status for "negativa", retornar informações do status "Não Fechou"
+    if (status === 'negativa') {
+      return statusAnaliseOptions.find(option => option.value === 'nao_fechou') || statusAnaliseOptions[0];
+    }
     return statusAnaliseOptions.find(option => option.value === status) || statusAnaliseOptions[0];
   };
 
+  // Função para alterar status de clínicas negativas (detecta se é da tabela clinicas ou novas_clinicas)
+  const alterarStatusClinicaNegativa = async (clinicaId, novoStatus, evidenciaId = null, consultorInternoId = null) => {
+    // VERIFICAR SE STATUS É "REUNIÃO MARCADA" - Abrir modal para selecionar consultor interno
+    if (novoStatus === 'reuniao_marcada' && !consultorInternoId) {
+      const clinica = clinicasNegativas.find(c => c.id === clinicaId);
+      if (clinica) {
+        // Detectar de qual tabela a clínica vem (clinicas tem campo em_analise)
+        const clinicaDaTabelaClinicas = clinicas.find(c => c.id === clinicaId);
+        const tipoClinica = clinicaDaTabelaClinicas ? 'clinica_negativa' : 'nova_clinica_negativa';
+        
+        // Abrir modal de seleção de consultor interno
+        setConsultorInternoData({
+          clinicaId: clinicaId,
+          clinicaNome: clinica.nome,
+          statusAnterior: clinica.status,
+          statusNovo: novoStatus,
+          tipoClinica: tipoClinica,
+          consultorSelecionado: null
+        });
+        setShowConsultorInternoModal(true);
+      }
+      return;
+    }
+
+    // Verificar se a clínica está na tabela clinicas (tem campo em_analise)
+    const clinicaDaTabelaClinicas = clinicas.find(c => c.id === clinicaId);
+    
+    if (clinicaDaTabelaClinicas) {
+      // É da tabela clinicas - usar updateClinicaStatus
+      try {
+        const response = await makeRequest(`/clinicas/${clinicaId}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            ...clinicaDaTabelaClinicas,
+            status: novoStatus === 'nao_fechou' ? 'negativa' : novoStatus
+          })
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+          showSuccessToast('Status atualizado com sucesso!');
+          fetchClinicas();
+          fetchClinicasNegativas();
+          // Se o status for "reuniao_marcada", atualizar também a aba Em Análise
+          if (novoStatus === 'reuniao_marcada') {
+            fetchClinicasEmAnalise();
+          }
+        } else {
+          showErrorToast('Erro ao alterar status: ' + data.error);
+        }
+      } catch (error) {
+        console.error('Erro ao alterar status:', error);
+        showErrorToast('Erro ao alterar status da clínica');
+      }
+    } else {
+      // É da tabela novas_clinicas - usar alterarStatusNovaClinica
+      await alterarStatusNovaClinica(clinicaId, novoStatus, evidenciaId, consultorInternoId);
+    }
+  };
+
   const alterarStatusNovaClinica = async (clinicaId, novoStatus, evidenciaId = null, consultorInternoId = null) => {
+    // VERIFICAR SE STATUS É "AGUARDANDO DOCUMENTAÇÃO" - Mover para Em Análise
+    if (novoStatus === 'aguardando_documentacao') {
+      // Verificar se a clínica está realmente na tabela novas_clinicas
+      const clinicaNova = novasClinicas.find(c => c.id === clinicaId);
+      
+      // Se não está em novas_clinicas, verificar se está em clinicas
+      if (!clinicaNova) {
+        const clinicaExistente = clinicas.find(c => c.id === clinicaId);
+        if (clinicaExistente) {
+          // Clínica já está na tabela clinicas, apenas atualizar status
+          try {
+            const response = await makeRequest(`/clinicas/${clinicaId}`, {
+              method: 'PUT',
+              body: JSON.stringify({
+                ...clinicaExistente,
+                status: novoStatus,
+                em_analise: true
+              })
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+              showSuccessToast('Status atualizado com sucesso!');
+              fetchClinicas();
+              fetchClinicasEmAnalise();
+            } else {
+              showErrorToast('Erro ao atualizar status: ' + data.error);
+            }
+          } catch (error) {
+            console.error('Erro ao atualizar status:', error);
+            showErrorToast('Erro ao atualizar status da clínica');
+          }
+          return;
+        } else {
+          showErrorToast('Clínica não encontrada!');
+          fetchNovasClinicas();
+          fetchClinicasEmAnalise();
+          return;
+        }
+      }
+      
+      // Se a clínica tem consultor_id, ela já foi atribuída e não pode ser movida via /pegar
+      // Nesse caso, precisamos mover manualmente para a tabela clinicas
+      if (clinicaNova.consultor_id) {
+        try {
+          // Criar a clínica na tabela clinicas
+          const response = await makeRequest(`/clinicas`, {
+            method: 'POST',
+            body: JSON.stringify({
+              nome: clinicaNova.nome,
+              endereco: clinicaNova.endereco,
+              bairro: clinicaNova.bairro,
+              cidade: clinicaNova.cidade,
+              estado: clinicaNova.estado,
+              nicho: clinicaNova.nicho,
+              telefone: clinicaNova.telefone,
+              email: clinicaNova.email,
+              cnpj: clinicaNova.cnpj,
+              responsavel: clinicaNova.responsavel,
+              status: 'aguardando_documentacao',
+              em_analise: true,
+              consultor_id: clinicaNova.consultor_id,
+              criado_por_consultor_id: clinicaNova.criado_por_consultor_id,
+              empresa_id: clinicaNova.empresa_id,
+              tipo_origem: 'aprovada'
+            })
+          });
+
+          const data = await response.json();
+          
+          if (response.ok) {
+            // Remover da tabela novas_clinicas
+            await makeRequest(`/novas-clinicas/${clinicaId}`, {
+              method: 'DELETE'
+            });
+            
+            showSuccessToast('Clínica movida para Em Análise!');
+            fetchNovasClinicas();
+            fetchClinicasEmAnalise();
+          } else {
+            showErrorToast('Erro ao mover clínica: ' + data.error);
+          }
+        } catch (error) {
+          console.error('Erro ao mover clínica:', error);
+          showErrorToast('Erro ao mover clínica para análise');
+        }
+        return;
+      }
+      
+      // Se não tem consultor_id, pode usar o endpoint /pegar normalmente
+      try {
+        const response = await makeRequest(`/novas-clinicas/${clinicaId}/pegar`, {
+          method: 'PUT'
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+          showSuccessToast('Clínica movida para Em Análise!');
+          fetchNovasClinicas();
+          fetchClinicasEmAnalise();
+        } else {
+          showErrorToast('Erro ao mover clínica: ' + data.error);
+        }
+      } catch (error) {
+        console.error('Erro ao mover clínica:', error);
+        showErrorToast('Erro ao mover clínica para análise');
+      }
+      return;
+    }
+
     // VERIFICAR SE STATUS É "REUNIÃO MARCADA" - Abrir modal para selecionar consultor interno
     if (novoStatus === 'reuniao_marcada' && !consultorInternoId) {
       const clinica = novasClinicas.find(c => c.id === clinicaId);
@@ -1736,7 +1907,8 @@ const Clinicas = () => {
         method: 'PUT',
         body: JSON.stringify({ 
           status: novoStatus,
-          evidencia_id: evidenciaId 
+          evidencia_id: evidenciaId,
+          consultor_id: consultorInternoId 
         })
       });
 
@@ -1801,13 +1973,52 @@ const Clinicas = () => {
       return;
     }
 
-    // Atualizar status com o consultor interno selecionado
-    await alterarStatusNovaClinica(
-      consultorInternoData.clinicaId,
-      consultorInternoData.statusNovo,
-      null,
-      consultorInternoData.consultorSelecionado
-    );
+    // Verificar se é clínica negativa (da tabela clinicas)
+    if (consultorInternoData.tipoClinica === 'clinica_negativa') {
+      const clinica = clinicasNegativas.find(c => c.id === consultorInternoData.clinicaId);
+      if (clinica) {
+        try {
+          const response = await makeRequest(`/clinicas/${consultorInternoData.clinicaId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              ...clinica,
+              consultor_id: consultorInternoData.consultorSelecionado,
+              status: consultorInternoData.statusNovo
+            })
+          });
+
+          const data = await response.json();
+          
+          if (response.ok) {
+            showSuccessToast('Consultor interno atribuído com sucesso!');
+            fetchClinicas();
+            fetchClinicasNegativas();
+            fetchClinicasEmAnalise();
+          } else {
+            showErrorToast('Erro ao atribuir consultor: ' + data.error);
+          }
+        } catch (error) {
+          console.error('Erro ao atribuir consultor:', error);
+          showErrorToast('Erro ao atribuir consultor interno');
+        }
+      }
+    } else if (consultorInternoData.tipoClinica === 'nova_clinica_negativa') {
+      // Atualizar status com o consultor interno selecionado (novas_clinicas)
+      await alterarStatusNovaClinica(
+        consultorInternoData.clinicaId,
+        consultorInternoData.statusNovo,
+        null,
+        consultorInternoData.consultorSelecionado
+      );
+    } else {
+      // Para novas_clinicas normais
+      await alterarStatusNovaClinica(
+        consultorInternoData.clinicaId,
+        consultorInternoData.statusNovo,
+        null,
+        consultorInternoData.consultorSelecionado
+      );
+    }
 
     // Fechar modal
     handleConsultorInternoClose();
@@ -1927,10 +2138,15 @@ const Clinicas = () => {
     }
   };
 
-  // Filtrar clínicas (excluir as que estão em análise)
+  // Filtrar clínicas (excluir as que estão em análise e as negativas)
   const clinicasFiltradas = clinicas.filter(clinica => {
     // Excluir clínicas em análise (elas aparecem na aba "Em Análise")
     if (clinica.em_analise === true) return false;
+    
+    // Excluir clínicas negativas (elas aparecem na aba "Leads Negativos")
+    // NOTA: 'inativa' NÃO é considerado negativo, fica na aba geral
+    const statusNegativos = ['negativa', 'nao_fechou', 'nao_tem_interesse', 'nao_e_nosso_publico', 'nao_responde', 'nao_reconhece'];
+    if (statusNegativos.includes(clinica.status)) return false;
     
     const matchEstado = !filtroEstado || clinica.estado === filtroEstado;
     const matchCidade = !filtroCity || clinica.cidade?.toLowerCase().includes(filtroCity.toLowerCase());
@@ -1938,15 +2154,17 @@ const Clinicas = () => {
     return matchEstado && matchCidade && matchStatus;
   });
 
-  // Obter listas únicas para filtros (excluindo clínicas em análise)
+  // Obter listas únicas para filtros (excluindo clínicas em análise e negativas)
+  // NOTA: 'inativa' NÃO é considerado negativo, fica na aba geral
+  const statusNegativos = ['negativa', 'nao_fechou', 'nao_tem_interesse', 'nao_e_nosso_publico', 'nao_responde', 'nao_reconhece'];
   const estadosDisponiveis = [...new Set(clinicas
-    .filter(c => !c.em_analise)
+    .filter(c => !c.em_analise && !statusNegativos.includes(c.status))
     .map(c => c.estado)
     .filter(estado => estado && estado.trim() !== '')
   )].sort();
 
   const cidadesDisponiveis = [...new Set(clinicas
-    .filter(c => !c.em_analise && (!filtroEstado || c.estado === filtroEstado))
+    .filter(c => !c.em_analise && !statusNegativos.includes(c.status) && (!filtroEstado || c.estado === filtroEstado))
     .map(c => c.cidade)
     .filter(cidade => cidade && cidade.trim() !== '')
   )].sort();
@@ -2691,22 +2909,22 @@ const Clinicas = () => {
           >
             <div className="stat-card">
               <div className="stat-label">Total</div>
-              <div className="stat-value">{clinicas.filter(c => !c.em_analise).length}</div>
+              <div className="stat-value">{clinicas.filter(c => !c.em_analise && !['negativa', 'nao_fechou', 'nao_tem_interesse', 'nao_e_nosso_publico', 'nao_responde', 'nao_reconhece'].includes(c.status)).length}</div>
             </div>
             
             <div className="stat-card">
               <div className="stat-label">Odontológica</div>
-              <div className="stat-value">{clinicas.filter(c => c.nicho === 'Odontológico' && !c.em_analise).length}</div>
+              <div className="stat-value">{clinicas.filter(c => c.nicho === 'Odontológico' && !c.em_analise && !['negativa', 'nao_fechou', 'nao_tem_interesse', 'nao_e_nosso_publico', 'nao_responde', 'nao_reconhece'].includes(c.status)).length}</div>
             </div>
             
             <div className="stat-card">
               <div className="stat-label">Estética</div>
-              <div className="stat-value">{clinicas.filter(c => c.nicho === 'Estético' && !c.em_analise).length}</div>
+              <div className="stat-value">{clinicas.filter(c => c.nicho === 'Estético' && !c.em_analise && !['negativa', 'nao_fechou', 'nao_tem_interesse', 'nao_e_nosso_publico', 'nao_responde', 'nao_reconhece'].includes(c.status)).length}</div>
             </div>
             
             <div className="stat-card">
               <div className="stat-label">Ambos</div>
-              <div className="stat-value">{clinicas.filter(c => c.nicho === 'Ambos' && !c.em_analise).length}</div>
+              <div className="stat-value">{clinicas.filter(c => c.nicho === 'Ambos' && !c.em_analise && !['negativa', 'nao_fechou', 'nao_tem_interesse', 'nao_e_nosso_publico', 'nao_responde', 'nao_reconhece'].includes(c.status)).length}</div>
             </div>
           </div>
 
@@ -3707,13 +3925,16 @@ const Clinicas = () => {
                               onChange={async (e) => {
                                 const novoStatus = e.target.value;
                                 
+                                // Se o status for "Não Fechou", salvar como "negativa" no banco
+                                const statusParaSalvar = novoStatus === 'nao_fechou' ? 'negativa' : novoStatus;
+                                
                                 try {
                                   const response = await makeRequest(`/clinicas/${clinica.id}`, {
                                     method: 'PUT',
                                     body: JSON.stringify({
                                       ...clinica,
-                                      status: novoStatus,
-                                      em_analise: novoStatus !== 'ativa'
+                                      status: statusParaSalvar,
+                                      em_analise: novoStatus !== 'ativa' && novoStatus !== 'nao_fechou'
                                     })
                                   });
                                   
@@ -3721,6 +3942,8 @@ const Clinicas = () => {
                                     showSuccessToast('Status atualizado com sucesso!');
                                     fetchClinicasEmAnalise();
                                     fetchClinicas();
+                                    // Atualizar também a lista de clínicas negativas
+                                    fetchClinicasNegativas();
                                   } else {
                                     const data = await response.json();
                                     showErrorToast('Erro ao alterar status: ' + data.error);
@@ -4260,8 +4483,8 @@ const Clinicas = () => {
                           <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                             {(isAdmin || podeAlterarStatus) ? (
                               <select
-                                value={clinica.status}
-                                onChange={(e) => alterarStatusNovaClinica(clinica.id, e.target.value)}
+                                value={clinica.status === 'negativa' ? 'nao_fechou' : clinica.status}
+                                onChange={(e) => alterarStatusClinicaNegativa(clinica.id, e.target.value)}
                                 className="form-select"
                                 style={{
                                   fontSize: '0.75rem',
@@ -5818,17 +6041,12 @@ const Clinicas = () => {
                  
                 {viewingClinica.consultor_nome && (
                   <div>
-                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Indicado por</label>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Consultor Responsável</label>
                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <span className="badge" style={{ backgroundColor: '#3b82f6', color: 'white' }}>
+                        <span className="badge" style={{ backgroundColor: '#10b981', color: 'white' }}>
                           {viewingClinica.consultor_nome}
                         </span>
-                        {viewingClinica.empresa_nome && (
-                          <span className="badge" style={{ backgroundColor: '#8b5cf6', color: 'white' }}>
-                            {viewingClinica.empresa_nome}
-                          </span>
-                        )}
                       </div>
                     </p>
                   </div>

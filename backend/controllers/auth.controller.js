@@ -114,7 +114,7 @@ const login = async (req, res) => {
       if (isDevelopment) console.log('🔍 [3/5] Buscando em EMPRESA (multi-tenancy)...');
       
       const { data: empresas, error } = await supabaseAdmin
-        .from('empresa')
+        .from('empresas')
         .select('*')
         .eq('email', emailNormalizado)
         .eq('ativo', true);
@@ -326,7 +326,7 @@ const verifyToken = async (req, res) => {
       }
     } else if (req.user.tipo === 'empresa') {
       const { data: empresaData } = await supabaseAdmin
-        .from('empresa')
+        .from('empresas')
         .select('*')
         .eq('id', req.user.id)
         .eq('ativo', true)

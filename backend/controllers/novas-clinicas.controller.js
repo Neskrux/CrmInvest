@@ -56,7 +56,8 @@ const getAllNovasClinicas = async (req, res) => {
     // Reformatar dados para incluir nome do consultor, empresa_id e nome da parceiro
     const formattedData = data.map(clinica => ({
       ...clinica,
-      consultor_nome: clinica.consultores?.nome,
+      consultor_indicador_nome: clinica.consultores?.nome,
+      consultor_nome: clinica.consultores?.nome, // Mantém compatibilidade
       // empresa_id: pode vir diretamente da clínica ou do consultor
       empresa_id: clinica.empresa_id || clinica.consultores?.empresa_id || null
     }));
@@ -330,9 +331,10 @@ const pegarClinica = async (req, res) => {
       nicho: clinicaAtual.nicho,
       telefone: clinicaAtual.telefone,
       email: clinicaAtual.email,
-      status: 'em_analise',
+      status: 'aguardando_documentacao', // Status inicial quando vai para análise
       em_analise: true, // Marcar como em análise
-      consultor_id: clinicaAtual.criado_por_consultor_id, // Definir consultor_id baseado em quem criou
+      consultor_id: null, // Consultor interno será atribuído depois
+      criado_por_consultor_id: clinicaAtual.criado_por_consultor_id, // Freelancer que indicou
       empresa_id: clinicaAtual.empresa_id, // Transferir empresa_id se foi parceiro que cadastrou
       tipo_origem: 'aprovada' // Clínicas aprovadas da aba "Novas Clínicas"
     };
@@ -375,11 +377,12 @@ const pegarClinica = async (req, res) => {
 const updateStatusNovaClinica = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, evidencia_id } = req.body;
+    const { status, evidencia_id, consultor_id } = req.body;
     
     console.log('🔧 PUT /api/novas-clinicas/:id/status recebido');
     console.log('🔧 ID da clínica:', id);
     console.log('🔧 Novo status:', status);
+    console.log('🔧 Consultor ID:', consultor_id);
     console.log('🔧 Usuário autenticado:', req.user);
     
     // Verificar se o status é válido
@@ -415,7 +418,7 @@ const updateStatusNovaClinica = async (req, res) => {
 
     if (checkError) {
       console.error('❌ Erro ao buscar clínica:', checkError);
-      return res.status(404).json({ error: 'Clínica não encontrada!' });
+    return res.status(404).json({ error: 'Clínica não encontrada!' });
     }
     
     if (!clinicaAtual) {
@@ -424,10 +427,19 @@ const updateStatusNovaClinica = async (req, res) => {
     
     console.log('✅ Clínica encontrada:', clinicaAtual.nome);
     
-    // Atualizar o status da clínica
+    // Preparar dados para atualização
+    const updateData = { status: status };
+    
+    // Se foi fornecido um consultor_id e o status é "reuniao_marcada", atualizar o consultor_id
+    if (consultor_id && status === 'reuniao_marcada') {
+      updateData.consultor_id = consultor_id;
+      console.log('👤 Atribuindo consultor interno:', consultor_id);
+    }
+    
+    // Atualizar o status da clínica (e consultor_id se aplicável)
     const { data: clinicaAtualizada, error: updateError } = await supabaseAdmin
       .from('novas_clinicas')
-      .update({ status: status })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
@@ -438,6 +450,9 @@ const updateStatusNovaClinica = async (req, res) => {
     }
     
     console.log('✅ Status atualizado com sucesso!');
+    if (consultor_id && status === 'reuniao_marcada') {
+      console.log('✅ Consultor interno atribuído com sucesso!');
+    }
     
     res.json({ 
       message: 'Status atualizado com sucesso!',
