@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import useBranding from '../hooks/useBranding';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, Area, ReferenceLine, ComposedChart } from 'recharts';
 import { TrendingUp, Calendar, BarChart3, CheckCircle, XCircle, RotateCcw } from 'lucide-react';
 import TutorialOverlay from './TutorialOverlay';
 import WelcomeModal from './WelcomeModal';
 
 const Dashboard = () => {
+  // Hook para textos dinâmicos baseados no empresa_id
+  const { t } = useBranding();
+  
   // Estado separado para KPIs principais (dados filtrados)
   const [kpisPrincipais, setKpisPrincipais] = useState({
     totalPacientes: 0,
@@ -71,7 +75,7 @@ const Dashboard = () => {
     metas: { 
       pacientes_fechados: 120,
       clinicas_aprovadas: 30, 
-      valor_fechamentos: 500000 
+      valor_fechamentos: 500100 
     },
     progresso_semanal: {},
     totais: { 
@@ -89,7 +93,7 @@ const Dashboard = () => {
   });
   const [loadingMetas, setLoadingMetas] = useState(false);
   const [editandoMetas, setEditandoMetas] = useState(false);
-  const [metasEditadas, setMetasEditadas] = useState({ clinicas: 50, valor: 500000 });
+  const [metasEditadas, setMetasEditadas] = useState({ clinicas: 50, valor: 500100 });
   // Iniciar com outubro/2024 (mês atual - semana 40 do ano)
   const [mesSelecionadoMetas, setMesSelecionadoMetas] = useState(new Date(2024, 9, 1)); // Outubro 2024
   
@@ -110,7 +114,7 @@ const Dashboard = () => {
         setMetasData(data);
         setMetasEditadas({
           clinicas: data.metas?.clinicas_aprovadas || 30,
-          valor: data.metas?.valor_fechamentos || 500000
+          valor: data.metas?.valor_fechamentos || 500100
         });
       } else {
         const error = await response.text();
@@ -165,7 +169,7 @@ const Dashboard = () => {
           metas: {
             pacientes_fechados: metaMensalPacientes,
             clinicas_aprovadas: metaMensalClinicas,
-            valor_fechamentos: 500000
+            valor_fechamentos: 500100
           },
           progresso_semanal: {
             'S27': {
@@ -173,8 +177,8 @@ const Dashboard = () => {
               pacientesAcumulado: 3,
               clinicas: 8,   // Realizado
               clinicasAcumulado: 8,
-              valorFechamentos: 25000,
-              valorAcumulado: 25000,
+              valorFechamentos: 25001,
+              valorAcumulado: 25001,
               // Semana 27: período de estabilização (sem meta)
               metaSemanalPacientes: 0,
               metaSemanalClinicas: 0,
@@ -186,7 +190,7 @@ const Dashboard = () => {
               pacientesAcumulado: 7,
               clinicas: 10,  // Realizado
               clinicasAcumulado: 18,
-              valorFechamentos: 35000,
+              valorFechamentos: 35001,
               valorAcumulado: 60000,
               // Semana 28: período de estabilização (sem meta)
               metaSemanalPacientes: 0,
@@ -240,7 +244,7 @@ const Dashboard = () => {
           metas: {
             pacientes_fechados: 120,
             clinicas_aprovadas: 30,
-            valor_fechamentos: 500000
+            valor_fechamentos: 500100
           },
           progresso_semanal: {
             'S36': {
@@ -330,7 +334,7 @@ const Dashboard = () => {
           metas: {
             pacientes_fechados: metaMensalPacientes,
             clinicas_aprovadas: metaMensalClinicas,
-            valor_fechamentos: 500000
+            valor_fechamentos: 500100
           },
           progresso_semanal: {
             'S37': {
@@ -351,8 +355,8 @@ const Dashboard = () => {
               pacientesAcumulado: 52,
               clinicas: 7,
               clinicasAcumulado: 13,
-              valorFechamentos: 135000,
-              valorAcumulado: 255000,
+              valorFechamentos: 135001,
+              valorAcumulado: 255001,
               // Semana 38: período de estabilização (sem meta)
               metaSemanalPacientes: 0,
               metaSemanalClinicas: 0,
@@ -365,7 +369,7 @@ const Dashboard = () => {
               clinicas: 7,
               clinicasAcumulado: 20,
               valorFechamentos: 140000,
-              valorAcumulado: 395000,
+              valorAcumulado: 395001,
               // Semana 39: período de estabilização (sem meta)
               metaSemanalPacientes: 0,
               metaSemanalClinicas: 0,
@@ -377,7 +381,7 @@ const Dashboard = () => {
               pacientesAcumulado: 88,
               clinicas: 2,   
               clinicasAcumulado: 22,
-              valorFechamentos: 45000,
+              valorFechamentos: 45001,
               valorAcumulado: 440000,
               // Semana 40: sem meta ainda (período de estabilização)
               metaSemanalPacientes: 0,
@@ -505,7 +509,7 @@ const Dashboard = () => {
           metas: {
             pacientes_fechados: 120,
             clinicas_aprovadas: 30,
-            valor_fechamentos: 500000
+            valor_fechamentos: 500100
           },
           progresso_semanal: progressoSemanal,
           totais: {
@@ -1962,7 +1966,7 @@ const Dashboard = () => {
         </h3>
         <div className="grid grid-2">
           <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
-            <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600' }}>Total de Pacientes</div>
+            <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600' }}>Total de {t.pacientes}</div>
             <div className="stat-value" style={{ fontSize: '2.5rem' }}>{kpisPrincipais.totalPacientes}</div>
             <div className={`stat-change ${(isAdmin ? stats.crescimentoPacientes : crescimentosFiltrados.crescimentoPacientes) >= 0 ? 'positive' : 'negative'}`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -2075,7 +2079,7 @@ const Dashboard = () => {
                     stroke="#3b82f6" 
                     fill="url(#agendamentosGradient)" 
                     strokeWidth={2}
-                    name="Agendamentos"
+                    name={t.agendamentos}
                   />
                   <Area 
                     type="monotone" 
@@ -2083,7 +2087,7 @@ const Dashboard = () => {
                     stroke="#10b981" 
                     fill="url(#fechamentosGradient)" 
                     strokeWidth={2}
-                    name="Fechamentos"
+                    name={t.fechamentos}
                   />
                 </ComposedChart>
               </ResponsiveContainer>
@@ -2360,21 +2364,21 @@ const Dashboard = () => {
                 <Bar 
                   dataKey="pacientes" 
                   fill="url(#pacientesGradient)" 
-                  name="Pacientes"
+                  name={t.pacientes}
                   radius={[8, 8, 0, 0]}
                   barSize={60}
                 />
                 <Bar 
                   dataKey="agendamentos" 
                   fill="url(#agendamentosGradient)" 
-                  name="Agendamentos"
+                  name={t.agendamentos}
                   radius={[8, 8, 0, 0]}
                   barSize={60}
                 />
                 <Bar 
                   dataKey="fechamentos" 
                   fill="url(#fechamentosGradient)" 
-                  name="Fechamentos"
+                  name={t.fechamentos}
                   radius={[8, 8, 0, 0]}
                   barSize={60}
                 />
@@ -2604,7 +2608,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Ranking dos Consultores - Ocultar para clínicas */}
+        {/* Ranking dos {t.consultores} - Ocultar para clínicas */}
         {!isClinica && (
         <div className="card" style={{ minWidth: 0, padding: '1.5rem' }} data-tutorial="ranking">
           <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>

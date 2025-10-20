@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import useBranding from '../hooks/useBranding';
 import { useToast } from '../components/Toast';
 import TutorialPacientes from './TutorialPacientes';
 import ModalEvidencia from './ModalEvidencia';
 
 const Pacientes = () => {
+  const { t } = useBranding();
   const location = useLocation();
   const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isFreelancer, isClinica, deveFiltrarPorClinica } = useAuth();
   const navigate = useNavigate();

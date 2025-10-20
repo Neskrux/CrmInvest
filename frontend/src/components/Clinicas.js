@@ -5099,7 +5099,7 @@ const Clinicas = () => {
                           className="form-input"
                           value={formData.limite_credito}
                           onChange={handleInputChange}
-                          placeholder="Ex: 50000"
+                          placeholder="Ex: 50010"
                           step="0.01"
                         />
                       </div>
