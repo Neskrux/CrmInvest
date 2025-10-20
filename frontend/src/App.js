@@ -1191,10 +1191,7 @@ function App() {
                 <Route path="/captura-clientes" element={<CapturaClientes />} />
                 <Route path="/captura-sucesso-clientes" element={<CapturaSucessoClientes />} />
                 <Route path="/captura-indicador-cliente" element={<CapturaIndicadorClientes />} />
-                
-                {/* Rota de teste - REMOVER EM PRODUÇÃO */}
-                <Route path="/teste-branding" element={<TesteBranding />} />
-                
+
                 {/* Rotas da aplicação principal */}
                 <Route path="/*" element={<AppContentWithNotifications />} />
               </Routes>
