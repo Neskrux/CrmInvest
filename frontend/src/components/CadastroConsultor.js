@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logoBrasaoPreto from '../images/logohorizontalpreto.png';
 
@@ -19,6 +19,33 @@ const CadastroConsultor = () => {
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+
+  // Meta Pixel - Carregar script do Facebook
+  useEffect(() => {
+    // Carregar o script do Meta Pixel
+    const script = document.createElement('script');
+    script.innerHTML = `
+      !function(f,b,e,v,n,t,s)
+      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', '1981637492627156');
+      fbq('track', 'PageView');
+    `;
+    document.head.appendChild(script);
+
+    // Cleanup function
+    return () => {
+      const existingScript = document.querySelector('script[src="https://connect.facebook.net/en_US/fbevents.js"]');
+      if (existingScript) {
+        document.head.removeChild(existingScript);
+      }
+    };
+  }, []);
 
   const validateCPF = (cpf) => {
     cpf = cpf.replace(/[^\d]/g, '');
@@ -216,6 +243,14 @@ const CadastroConsultor = () => {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     
+    // Meta Pixel - Tracking quando usuário inicia preenchimento do formulário
+    if (window.fbq && formData.nome === '' && name === 'nome' && value.trim()) {
+      window.fbq('track', 'InitiateCheckout', {
+        content_name: 'Formulário de Cadastro',
+        content_category: 'Lead Generation'
+      });
+    }
+    
     let formattedValue = value;
     
     if (name === 'cpf') {
@@ -353,8 +388,26 @@ const CadastroConsultor = () => {
       const data = await response.json();
       
       if (response.ok) {
+        // Meta Pixel - Evento de cadastro bem-sucedido
+        if (window.fbq) {
+          window.fbq('track', 'CompleteRegistration', {
+            content_name: 'Cadastro de Consultor',
+            content_category: 'Lead Generation',
+            value: 50, // Valor da comissão
+            currency: 'BRL'
+          });
+        }
+        
         navigate('/cadastro-sucesso');
       } else {
+        // Meta Pixel - Evento de erro no cadastro
+        if (window.fbq) {
+          window.fbq('track', 'Lead', {
+            content_name: 'Tentativa de Cadastro - Erro',
+            content_category: 'Lead Generation'
+          });
+        }
+        
         let errorMsg = data.error || 'Erro ao cadastrar consultor';
         if (errorMsg && errorMsg.toLowerCase().includes('consultores_email_key')) {
           errorMsg = 'Já existe um consultor cadastrado com este e-mail. Por favor, utilize outro e-mail.';
@@ -371,7 +424,7 @@ const CadastroConsultor = () => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#f9fafb',
+      background: 'linear-gradient(135deg, #1a1d23 0%, #2d3748 100%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -404,7 +457,7 @@ const CadastroConsultor = () => {
             marginBottom: '0.75rem',
             letterSpacing: '-0.025em'
           }}>
-            Cadastro de Consultor
+            Faça seu cadastro
           </h1>
           <p style={{
             fontSize: '1rem',
@@ -717,13 +770,10 @@ const CadastroConsultor = () => {
                 />
                 <span style={{ fontSize: '0.875rem', color: '#374151' }}>
                   Aceito os{' '}
-                  <a href="#" style={{ color: '#1a1d23', textDecoration: 'underline' }}>
+                  <a href="https://idicuetpukxjqripbpwa.supabase.co/storage/v1/object/public/materiais-apoio/documento_1761076690439_294882875.docx" style={{ color: '#1a1d23', textDecoration: 'underline' }}>
                     termos de uso
                   </a>{' '}
-                  e{' '}
-                  <a href="#" style={{ color: '#1a1d23', textDecoration: 'underline' }}>
-                    política de privacidade
-                  </a>
+                  para utilizar o sistema
                 </span>
               </label>
               {errors.aceitaTermos && (
@@ -831,7 +881,7 @@ const CadastroConsultor = () => {
             lineHeight: '1.4'
           }}>
             <li>Seu PIX deve ser o mesmo CPF informado</li>
-            <li>Você receberá R$ 10 de comissão a cada R$ 1.000 fechados</li>
+            <li>Você receberá R$ 50 de comissão a cada R$ 5.000 fechados</li>
             <li>Seu login será feito com o e-mail informado</li>
           </ul>
         </div>
