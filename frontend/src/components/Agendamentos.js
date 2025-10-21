@@ -4,6 +4,7 @@ import useBranding from '../hooks/useBranding';
 import { useToast } from '../components/Toast';
 import TutorialAgendamentos from './TutorialAgendamentos';
 import ModalEvidencia from './ModalEvidencia';
+import useSmartPolling from '../hooks/useSmartPolling';
 
 const Agendamentos = () => {
   const { t } = useBranding();
@@ -114,15 +115,24 @@ const Agendamentos = () => {
     // Os usuários podem acessá-lo manualmente através do botão "Ver Tutorial"
   }, [deveFiltrarPorConsultor, user?.consultor_id]);
 
-  // Atualização automática dos dados a cada 30 segundos
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchAgendamentos();
-      fetchPacientes();
-    }, 30000); // 30 segundos
+  // Função de polling inteligente
+  const pollingCallback = async () => {
+    console.log('🔄 Executando polling inteligente - Agendamentos...');
+    
+    try {
+      // Executar chamadas em paralelo (mais eficiente)
+      await Promise.allSettled([
+        fetchAgendamentos(),
+        fetchPacientes()
+      ]);
+      console.log('✅ Polling inteligente concluído - Agendamentos');
+    } catch (error) {
+      console.warn('⚠️ Erro no polling inteligente - Agendamentos:', error);
+    }
+  };
 
-    return () => clearInterval(interval);
-  }, []);
+  // Polling inteligente (2 minutos em vez de 30 segundos)
+  useSmartPolling(pollingCallback, 120000, []);
 
   // Listener para sincronização entre telas
   useEffect(() => {
