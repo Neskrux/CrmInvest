@@ -6,6 +6,7 @@ import useBranding from '../hooks/useBranding';
 import { useToast } from '../components/Toast';
 import TutorialPacientes from './TutorialPacientes';
 import ModalEvidencia from './ModalEvidencia';
+import useSmartPolling from '../hooks/useSmartPolling';
 
 const Pacientes = () => {
   const { t } = useBranding();
@@ -503,21 +504,30 @@ const Pacientes = () => {
     }
   }, [podeAlterarStatus, isConsultorInterno, activeTab, isConsultor]);
 
-  // Atualização automática dos dados a cada 30 segundos
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchPacientes();
-      fetchAgendamentos();
-      fetchFechamentos();
+  // Função de polling inteligente
+  const pollingCallback = async () => {
+    try {
+      // Executar todas as chamadas em paralelo (mais eficiente)
+      const promises = [
+        fetchPacientes(),
+        fetchAgendamentos(),
+        fetchFechamentos()
+      ];
+
       // Buscar novos leads apenas se pode alterar status (não freelancer) ou é consultor interno
       if (podeAlterarStatus || isConsultorInterno) {
-        fetchNovosLeads();
-        fetchLeadsNegativos();
+        promises.push(fetchNovosLeads());
+        promises.push(fetchLeadsNegativos());
       }
-    }, 30000); // 30 segundos
 
-    return () => clearInterval(interval);
-  }, [podeAlterarStatus, isConsultorInterno, isConsultor]);
+      await Promise.allSettled(promises);
+    } catch (error) {
+      console.warn('⚠️ Erro no polling inteligente - Pacientes:', error);
+    }
+  };
+
+  // Polling inteligente (2 minutos em vez de 30 segundos)
+  useSmartPolling(pollingCallback, 120000, [podeAlterarStatus, isConsultorInterno, isConsultor]);
 
   // Atualizar novos leads quando mudar de aba
   useEffect(() => {
