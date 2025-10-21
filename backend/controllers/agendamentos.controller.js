@@ -19,6 +19,10 @@ const getAllAgendamentos = async (req, res) => {
     if (req.user.tipo === 'clinica') {
       query = query.eq('clinica_id', req.user.clinica_id);
     }
+    // Se for admin ou parceiro, filtrar apenas agendamentos de consultores da empresa
+    else if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
+      query = query.eq('empresa_id', req.user.empresa_id);
+    }
     // Se for consultor freelancer (não tem as duas permissões), filtrar apenas seus agendamentos
     // Consultores internos (com pode_ver_todas_novas_clinicas=true E podealterarstatus=true) veem todos os agendamentos
     else if (req.user.tipo === 'consultor' && !(req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true)) {
@@ -58,9 +62,13 @@ const getDashboardAgendamentos = async (req, res) => {
       .order('data_agendamento', { ascending: false })
       .order('horario');
 
+    // Se for admin ou parceiro, filtrar apenas agendamentos de consultores da empresa
+    if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
+      query = query.eq('empresa_id', req.user.empresa_id);
+    }
     // Se for consultor freelancer (não tem as duas permissões), filtrar apenas seus agendamentos
     // Consultores internos (com pode_ver_todas_novas_clinicas=true E podealterarstatus=true) veem todos os agendamentos
-    if (req.user.tipo === 'consultor' && !(req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true)) {
+    else if (req.user.tipo === 'consultor' && !(req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true)) {
       query = query.eq('consultor_id', req.user.id);
     }
 
@@ -318,6 +326,7 @@ const uploadEvidencia = async (req, res) => {
         observacao: observacao || null,
         alterado_por_id: req.user?.id || null,
         alterado_por_nome: req.user?.nome || req.user?.username || null,
+        empresa_id: req.user?.empresa_id || 3, // Usar empresa_id do usuário ou 3 (Invest Money) como padrão
         created_at: brasiliaTime.toISOString()
       }])
       .select();
@@ -373,13 +382,23 @@ const getEvidencias = async (req, res) => {
 // GET /api/evidencias/todas - Listar todas as evidências (apenas admin)
 const getAllEvidencias = async (req, res) => {
   try {
-    console.log('📋 Buscando todas as evidências para admin');
+    console.log('📋 Buscando evidências para usuário:', {
+      tipo: req.user.tipo,
+      empresa_id: req.user.empresa_id
+    });
     
-    // Buscar todas as evidências ordenadas por data
-    const { data: evidencias, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('historico_status_evidencias')
       .select('*')
       .order('created_at', { ascending: false });
+    
+    // Se for admin ou parceiro, filtrar apenas evidências da empresa
+    if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
+      console.log('🏢 Filtrando evidências da empresa ID:', req.user.empresa_id);
+      query = query.eq('empresa_id', req.user.empresa_id);
+    }
+    
+    const { data: evidencias, error } = await query;
     
     if (error) {
       console.error('❌ Erro ao buscar evidências:', error);

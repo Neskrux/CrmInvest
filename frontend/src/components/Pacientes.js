@@ -2466,8 +2466,8 @@ const Pacientes = () => {
       <div className="page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h1 className="page-title">Meus Pacientes</h1>
-            <p className="page-subtitle">Acompanhe o status de seus pacientes indicados</p>
+            <h1 className="page-title">Meus {t.paciente.toLowerCase()+'s'}</h1>
+            <p className="page-subtitle">Acompanhe o status de seus {t.paciente.toLowerCase()+'s'}</p>
           </div>
           {!isClinica && (
             <button
@@ -2853,9 +2853,9 @@ const Pacientes = () => {
           <div className="card">
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h2 className="card-title">Lista de Pacientes</h2>
+                <h2 className="card-title">Lista de {t.paciente.toLowerCase()+'s'}</h2>
                 <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                  {pacientesFiltrados.length} paciente(s)
+                  {pacientesFiltrados.length} {t.paciente.toLowerCase()}(s)
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -2895,7 +2895,7 @@ const Pacientes = () => {
               </div>
             ) : pacientesFiltrados.length === 0 ? (
               <div style={{ textAlign: 'center', color: '#6b7280', padding: '3rem' }}>
-                Nenhum paciente cadastrado ainda.
+                Nenhum {t.paciente.toLowerCase()} cadastrado ainda.
               </div>
             ) : (
               <>
@@ -3855,7 +3855,7 @@ const Pacientes = () => {
           <div className="card">
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
               <div>
-                <h2 className="card-title" style={{ marginBottom: '0.5rem' }}>Lista de Pacientes com Fechamento</h2>
+                <h2 className="card-title" style={{ marginBottom: '0.5rem' }}>Lista de {t.paciente.toLowerCase()+'s'} com Fechamento</h2>
                 <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                   Upload de documentos é necessário para aprovação final.
                 </div>
@@ -3875,7 +3875,7 @@ const Pacientes = () => {
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
                   </svg>
-                  Cadastrar Paciente
+                  Cadastrar {t.paciente}
                 </button>
               </div>
             </div>
@@ -3903,7 +3903,7 @@ const Pacientes = () => {
                       <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                     </svg>
                     <p style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                      Nenhum paciente com fechamento
+                      Nenhum {t.paciente.toLowerCase()} com fechamento
                     </p>
                     <p style={{ fontSize: '0.875rem', color: '#9ca3af' }}>
                       Os pacientes aparecerão aqui quando tiverem um fechamento registrado na sua clínica.
@@ -4160,7 +4160,7 @@ const Pacientes = () => {
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
                   </svg>
-                  Cadastrar Paciente
+                  Cadastrar {t.paciente}
                 </button>
               </div>
             </div>
@@ -4171,9 +4171,9 @@ const Pacientes = () => {
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                     <path d="M9 9h6v6H9z"></path>
                   </svg>
-                  <p>Nenhum paciente da carteira existente cadastrado</p>
+                  <p>Nenhum {t.paciente.toLowerCase()} da carteira existente cadastrado</p>
                   <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
-                    Clique em "Cadastrar Paciente" para começar
+                    Clique em "Cadastrar {t.paciente}" para começar
                   </p>
                 </div>
               ) : (
@@ -4502,7 +4502,7 @@ const Pacientes = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  Cadastrar Paciente
+                  Cadastrar {t.paciente}
                 </button>
               </div>
             </form>
@@ -4697,7 +4697,7 @@ const Pacientes = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  Cadastrar Paciente
+                  Cadastrar {t.paciente}
                 </button>
               </div>
 
@@ -6526,7 +6526,7 @@ const Pacientes = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  {editingPaciente ? 'Salvar Alterações' : 'Cadastrar Paciente'}
+                  {editingPaciente ? 'Salvar Alterações' : `Cadastrar ${t.paciente}`}
                 </button>
               </div>
             </form>
@@ -7102,7 +7102,7 @@ const Pacientes = () => {
             margin: window.innerWidth <= 768 ? '10px' : 'auto'
           }}>
             <div className="modal-header">
-              <h2 className="modal-title">Cadastrar Paciente</h2>
+              <h2 className="modal-title">Cadastrar {t.paciente}</h2>
               <button className="close-btn" onClick={resetCadastroCompleto}>×</button>
             </div>
 
@@ -7697,7 +7697,7 @@ const Pacientes = () => {
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <polyline points="20 6 9 17 4 12"></polyline>
                       </svg>
-                      Cadastrar Paciente
+                      Cadastrar {t.paciente}
                     </>
                   )}
                 </button>
@@ -7749,7 +7749,7 @@ const Pacientes = () => {
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: '900px', maxHeight: '90vh' }}>
             <div className="modal-header">
-              <h2 className="modal-title">Cadastrar Paciente - Carteira Existente</h2>
+              <h2 className="modal-title">Cadastrar {t.paciente} - Carteira Existente</h2>
               <button className="close-btn" onClick={() => setShowCarteiraModal(false)}>×</button>
             </div>
             
@@ -8028,7 +8028,7 @@ const Pacientes = () => {
                         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                         <path d="M9 9h6v6H9z"></path>
                       </svg>
-                      <p style={{ margin: 0, fontSize: '0.875rem' }}>Nenhum paciente adicionado</p>
+                      <p style={{ margin: 0, fontSize: '0.875rem' }}>Nenhum {t.paciente.toLowerCase()} adicionado</p>
                     </div>
                   ) : (
                     <div style={{ marginBottom: '1.5rem' }}>

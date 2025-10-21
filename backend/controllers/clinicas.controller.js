@@ -169,15 +169,19 @@ const getAllClinicas = async (req, res) => {
     if (isFreelancer) {
       console.log('👥 Buscando clínicas do freelancer ID:', req.user.id);
       query = query.eq('criado_por_consultor_id', req.user.id);
-      const result = await query;
-      data = result.data;
-      error = result.error;
-      console.log('   Clínicas encontradas:', data?.length || 0);
-    } else {
-      const result = await query;
-      data = result.data;
-      error = result.error;
+    } else if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
+      // Admin/Parceiro: filtrar por empresa_id na query
+      console.log('🏢 Buscando clínicas da empresa ID:', req.user.empresa_id);
+      query = query.eq('empresa_id', req.user.empresa_id);
+    } else if (req.user.tipo === 'consultor' && req.user.empresa_id && req.user.is_freelancer === false && !isConsultorInterno) {
+      // Funcionário de empresa: filtrar por empresa_id na query
+      console.log('👥 Buscando clínicas da empresa do funcionário ID:', req.user.empresa_id);
+      query = query.eq('empresa_id', req.user.empresa_id);
     }
+    
+    const result = await query;
+    data = result.data;
+    error = result.error;
 
     if (error) throw error;
     
@@ -189,24 +193,8 @@ const getAllClinicas = async (req, res) => {
       empresa_id: clinica.empresa_id || clinica.consultores?.empresa_id || null
     }));
     
-    // Filtrar por empresa se necessário
-    let finalData = formattedData;
-    
-    // Se for empresa, filtrar apenas clínicas de consultores vinculados a ela OU cadastradas diretamente pela empresa
-    if (req.user.tipo === 'empresa') {
-      finalData = formattedData.filter(clinica => 
-        clinica.empresa_id === req.user.id
-      );
-    }
-    // Se for FUNCIONÁRIO de empresa (não freelancer E não consultor interno), filtrar clínicas de toda a empresa
-    else if (req.user.tipo === 'consultor' && req.user.empresa_id && req.user.is_freelancer === false && !isConsultorInterno) {
-      finalData = formattedData.filter(clinica => 
-        clinica.empresa_id === req.user.empresa_id &&
-        clinica.consultor_id !== null
-      );
-    }
-    
-    res.json(finalData);
+    // Dados já filtrados na query, não precisa filtrar novamente
+    res.json(formattedData);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -274,7 +262,17 @@ const createClinica = async (req, res) => {
     if (banco_agencia) clinicaData.banco_agencia = banco_agencia;
     if (banco_pix) clinicaData.banco_pix = banco_pix;
     if (limite_credito) clinicaData.limite_credito = parseFloat(limite_credito);
-    if (empresa_id) clinicaData.empresa_id = empresa_id;
+    
+    // Preencher empresa_id automaticamente baseado no usuário logado
+    if (empresa_id) {
+      clinicaData.empresa_id = empresa_id;
+    } else if (req.user.tipo === 'parceiro') {
+      clinicaData.empresa_id = req.user.id;
+    } else if (req.user.tipo === 'admin' && req.user.empresa_id) {
+      clinicaData.empresa_id = req.user.empresa_id;
+    } else if (req.user.tipo === 'consultor' && req.user.empresa_id && !req.user.is_freelancer) {
+      clinicaData.empresa_id = req.user.empresa_id;
+    }
 
     // Se for consultor interno criando, adicionar consultor_id
     const isConsultorInterno = req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true;
@@ -791,6 +789,11 @@ const deleteClinica = async (req, res) => {
 // Buscar clínicas negativas
 const getClinicasNegativas = async (req, res) => {
   try {
+    console.log('🔍 GET /api/clinicas-negativas - Usuário:', {
+      tipo: req.user.tipo,
+      empresa_id: req.user.empresa_id
+    });
+    
     // Status negativos (inativa NÃO é considerado negativo)
     const statusNegativos = [
       'negativa',
@@ -802,7 +805,7 @@ const getClinicasNegativas = async (req, res) => {
     ];
 
     // Buscar clínicas negativas da tabela clinicas com JOIN com consultores
-    const { data: clinicasNegativas, error: errorClinicas } = await supabaseAdmin
+    let clinicasQuery = supabaseAdmin
       .from('clinicas')
       .select(`
         *,
@@ -814,10 +817,17 @@ const getClinicasNegativas = async (req, res) => {
       .in('status', statusNegativos)
       .order('created_at', { ascending: false });
 
+    // Se for admin ou parceiro, filtrar apenas clínicas da empresa
+    if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
+      console.log('🏢 Filtrando clínicas negativas da empresa ID:', req.user.empresa_id);
+      clinicasQuery = clinicasQuery.eq('empresa_id', req.user.empresa_id);
+    }
+
+    const { data: clinicasNegativas, error: errorClinicas } = await clinicasQuery;
     if (errorClinicas) throw errorClinicas;
 
     // Buscar clínicas negativas da tabela novas_clinicas com JOIN com consultores
-    const { data: novasClinicasNegativas, error: errorNovasClinicas } = await supabaseAdmin
+    let novasClinicasQuery = supabaseAdmin
       .from('novas_clinicas')
       .select(`
         *,
@@ -829,6 +839,13 @@ const getClinicasNegativas = async (req, res) => {
       .in('status', statusNegativos)
       .order('created_at', { ascending: false });
 
+    // Se for admin ou parceiro, filtrar apenas novas clínicas da empresa
+    if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
+      console.log('🏢 Filtrando novas clínicas negativas da empresa ID:', req.user.empresa_id);
+      novasClinicasQuery = novasClinicasQuery.eq('empresa_id', req.user.empresa_id);
+    }
+
+    const { data: novasClinicasNegativas, error: errorNovasClinicas } = await novasClinicasQuery;
     if (errorNovasClinicas) throw errorNovasClinicas;
 
     // Reformatar dados da tabela clinicas

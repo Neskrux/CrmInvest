@@ -187,7 +187,7 @@ const Consultores = () => {
       const data = await response.json();
       
       if (response.ok) {
-        showSuccessToast(editingConsultor ? 'Consultor atualizado com sucesso!' : 'Consultor cadastrado com sucesso!');
+        showSuccessToast(editingConsultor ? `${t.consultor.toLowerCase()} atualizado com sucesso!` : `${t.consultor.toLowerCase()} cadastrado com sucesso!`);
         setShowModal(false);
         setEditingConsultor(null);
         setFormData({
@@ -891,10 +891,10 @@ Digite o número da opção desejada:`;
     <div>
       <div className="page-header">
         <h1 className="page-title">
-          {user?.tipo === 'parceiro' ? 'Minha Equipe de Consultores' : 'Gerenciar Consultores'}
+          {user?.tipo === 'parceiro' ? `Minha Equipe de ${t.consultores.toLowerCase()}` : `Gerenciar ${t.consultores.toLowerCase()}`}
         </h1>
         <p className="page-subtitle">
-          {user?.tipo === 'parceiro' ? 'Gerencie os consultores da sua parceiro' : 'Gerencie a equipe de consultores'}
+          {user?.tipo === 'parceiro' ? `Gerencie os ${t.consultores.toLowerCase()} da sua parceiro` : `Gerencie a equipe de ${t.consultores.toLowerCase()}`}
         </p>
       </div>
 
@@ -942,7 +942,7 @@ Digite o número da opção desejada:`;
 
       <div className="card">
         <div className="card-header">
-          <h2 className="card-title">Equipe de Consultores</h2>
+          <h2 className="card-title">Equipe de {t.consultores.toLowerCase()}</h2>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
             {/* Botão de gerar links - apenas para admin */}
             {isAdmin && (
@@ -965,7 +965,7 @@ Digite o número da opção desejada:`;
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 5v14M5 12h14" />
               </svg>
-              Novo Consultor
+              Novo {t.consultor.toLowerCase()}
             </button>
           </div>
         </div>
@@ -1067,7 +1067,7 @@ Digite o número da opção desejada:`;
             gap: '0.5rem'
           }}>
             <span>
-              Mostrando {consultoresFiltrados.length} de {consultores.length} consultores
+              Mostrando {consultoresFiltrados.length} de {consultores.length} {t.consultores.toLowerCase()}
             </span>
             {(filtros.busca || filtros.tipo !== 'todos' || filtros.statusSenha !== 'todos' || 
               filtros.statusPix !== 'todos' || filtros.statusLink !== 'todos') && (
@@ -1091,8 +1091,8 @@ Digite o número da opção desejada:`;
         ) : consultoresFiltrados.length === 0 ? (
           <p style={{ textAlign: 'center', color: '#6b7280', padding: '2rem' }}>
             {consultores.length === 0 
-              ? 'Nenhum consultor cadastrado ainda.'
-              : 'Nenhum consultor encontrado com os filtros aplicados.'
+              ? `Nenhum ${t.consultor.toLowerCase()} cadastrado ainda.`
+              : `Nenhum ${t.consultor.toLowerCase()} encontrado com os filtros aplicados.`
             }
           </p>
         ) : (
@@ -1239,7 +1239,7 @@ Digite o número da opção desejada:`;
           <div className="modal" style={{ maxWidth: '600px' }}>
             <div className="modal-header">
               <h2 className="modal-title">
-                Detalhes do Consultor
+                Detalhes do {t.consultores.toLowerCase()}
               </h2>
               <button 
                 className="close-btn"
@@ -1376,7 +1376,7 @@ Digite o número da opção desejada:`;
           <div className="modal">
             <div className="modal-header">
               <h2 className="modal-title">
-                {editingConsultor ? 'Editar Consultor' : 'Novo Consultor'}
+                {editingConsultor ? `Editar ${t.consultor.toLowerCase()}` : `Novo ${t.consultor.toLowerCase()}`}
               </h2>
               <button 
                 className="close-btn"
@@ -1395,7 +1395,7 @@ Digite o número da opção desejada:`;
                   className="form-input"
                   value={formData.nome}
                   onChange={handleInputChange}
-                  placeholder="Digite o nome do consultor"
+                  placeholder={`Digite o nome do ${t.consultor.toLowerCase()}`}
                   required
                   autoComplete="off"
                   style={{
@@ -1581,7 +1581,7 @@ Digite o número da opção desejada:`;
                   </div>
                 )}
                 <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
-                  Cidade onde o consultor reside ou atua
+                  Cidade onde o {t.consultor.toLowerCase()} reside ou atua
                 </small>
                 {errors.cidade && (
                   <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>
@@ -1592,7 +1592,7 @@ Digite o número da opção desejada:`;
 
               <div className="form-group">
                 <label className="form-label">
-                  {user?.tipo === 'parceiro' ? 'Tipo de Vínculo' : 'Tipo de Consultor'}
+                  {user?.tipo === 'parceiro' ? 'Tipo de Vínculo' : `Tipo de ${t.consultor.toLowerCase()}`}
                 </label>
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
@@ -1635,7 +1635,7 @@ Digite o número da opção desejada:`;
                   type="submit"
                   className="btn btn-primary"
                 >
-                  {editingConsultor ? 'Atualizar Consultor' : 'Cadastrar Consultor'}
+                  {editingConsultor ? `Atualizar ${t.consultor}` : `Cadastrar ${t.consultor}`}
                 </button>
               </div>
             </form>
