@@ -29,7 +29,8 @@ const getAllPacientes = async (req, res) => {
       .from('pacientes')
       .select(`
         *,
-        consultores(nome)
+        consultores(nome),
+        empreendimentos(nome, cidade, estado)
       `);
     
     // Para freelancers, não excluir nenhum status (mostrar todos os pacientes atribuídos)
@@ -67,6 +68,41 @@ const getAllPacientes = async (req, res) => {
       // Aplicar filtro OR
       query = query.or(conditions.join(','));
     }
+    // Se for admin ou parceiro, buscar pacientes da empresa (com empresa_id OU consultores da empresa)
+    else if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
+      console.log('🏢 Admin/Parceiro acessando pacientes:', {
+        empresa_id: req.user.empresa_id,
+        usuario_nome: req.user.nome,
+        tipo: req.user.tipo
+      });
+      
+      // Buscar consultores da empresa
+      const { data: consultores, error: consultorError } = await supabaseAdmin
+        .from('consultores')
+        .select('id')
+        .eq('empresa_id', req.user.empresa_id);
+
+      if (consultorError) throw consultorError;
+
+      const consultorIds = consultores ? consultores.map(c => c.id) : [];
+      
+      // Criar condições: pacientes com empresa_id da empresa OU pacientes dos consultores da empresa
+      const conditions = [];
+      
+      // Condição 1: Pacientes com empresa_id da empresa (leads diretos)
+      conditions.push(`empresa_id.eq.${req.user.empresa_id}`);
+      
+      // Condição 2: Pacientes dos consultores da empresa (se houver consultores)
+      if (consultorIds.length > 0) {
+        conditions.push(`consultor_id.in.(${consultorIds.join(',')})`);
+      }
+      
+      if (conditions.length > 0) {
+        query = query.or(conditions.join(','));
+      } else {
+        query = query.eq('id', 0); // Força resultado vazio
+      }
+    }
     // Se for consultor freelancer (não tem as duas permissões), filtrar pacientes atribuídos a ele OU vinculados através de agendamentos
     // Consultores internos (com pode_ver_todas_novas_clinicas=true E podealterarstatus=true) veem todos os pacientes
     else if (req.user.tipo === 'consultor' && !(req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true)) {
@@ -98,7 +134,10 @@ const getAllPacientes = async (req, res) => {
     // Reformatar dados para compatibilidade com frontend
     const formattedData = data.map(paciente => ({
       ...paciente,
-      consultor_nome: paciente.consultores?.nome
+      consultor_nome: paciente.consultores?.nome,
+      empreendimento_nome: paciente.empreendimentos?.nome,
+      empreendimento_cidade: paciente.empreendimentos?.cidade,
+      empreendimento_estado: paciente.empreendimentos?.estado
     }));
 
     res.json(formattedData);
@@ -119,7 +158,8 @@ const getDashboardPacientes = async (req, res) => {
       .from('pacientes')
       .select(`
         *,
-        consultores(nome)
+        consultores(nome),
+        empreendimentos(nome, cidade, estado)
       `);
     
     // Para freelancers, não excluir nenhum status (mostrar todos os pacientes atribuídos)
@@ -130,9 +170,38 @@ const getDashboardPacientes = async (req, res) => {
     
     query = query.order('created_at', { ascending: false });
 
+    // Se for admin ou parceiro, filtrar pacientes da empresa (com empresa_id OU consultores da empresa)
+    if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
+      // Buscar consultores da empresa
+      const { data: consultores, error: consultorError } = await supabaseAdmin
+        .from('consultores')
+        .select('id')
+        .eq('empresa_id', req.user.empresa_id);
+
+      if (consultorError) throw consultorError;
+
+      const consultorIds = consultores ? consultores.map(c => c.id) : [];
+      
+      // Criar condições: pacientes com empresa_id da empresa OU pacientes dos consultores da empresa
+      const conditions = [];
+      
+      // Condição 1: Pacientes com empresa_id da empresa (leads diretos)
+      conditions.push(`empresa_id.eq.${req.user.empresa_id}`);
+      
+      // Condição 2: Pacientes dos consultores da empresa (se houver consultores)
+      if (consultorIds.length > 0) {
+        conditions.push(`consultor_id.in.(${consultorIds.join(',')})`);
+      }
+      
+      if (conditions.length > 0) {
+        query = query.or(conditions.join(','));
+      } else {
+        query = query.eq('id', 0); // Força resultado vazio
+      }
+    }
     // Se for consultor freelancer (não tem as duas permissões), filtrar pacientes atribuídos a ele OU vinculados através de agendamentos OU fechamentos
     // Consultores internos (com pode_ver_todas_novas_clinicas=true E podealterarstatus=true) veem todos os pacientes
-    if (req.user.tipo === 'consultor' && !(req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true)) {
+    else if (req.user.tipo === 'consultor' && !(req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true)) {
       // Buscar pacientes com agendamentos deste consultor
       const { data: agendamentos, error: agendError } = await supabaseAdmin
         .from('agendamentos')
@@ -173,7 +242,10 @@ const getDashboardPacientes = async (req, res) => {
     // Reformatar dados para compatibilidade com frontend
     const formattedData = data.map(paciente => ({
       ...paciente,
-      consultor_nome: paciente.consultores?.nome
+      consultor_nome: paciente.consultores?.nome,
+      empreendimento_nome: paciente.empreendimentos?.nome,
+      empreendimento_cidade: paciente.empreendimentos?.cidade,
+      empreendimento_estado: paciente.empreendimentos?.estado
     }));
 
     res.json(formattedData);
@@ -536,12 +608,50 @@ const deletePaciente = async (req, res) => {
 // GET /api/novos-leads - Listar novos leads
 const getNovosLeads = async (req, res) => {
   try {
-    // Buscar leads com status = 'lead' e 'sem_primeiro_contato' (prospecção ativa)
-    const { data: novosLeads, error } = await supabaseAdmin
+    console.log('🔍 GET /api/novos-leads - Usuário:', {
+      tipo: req.user.tipo,
+      empresa_id: req.user.empresa_id
+    });
+    
+    let query = supabaseAdmin
       .from('pacientes')
       .select('*')
       .in('status', STATUS_NOVOS_LEADS)
       .order('created_at', { ascending: false });
+    
+    // Se for admin ou parceiro, filtrar pacientes da empresa (com empresa_id OU consultores da empresa)
+    if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
+      console.log('🏢 Filtrando novos leads da empresa ID:', req.user.empresa_id);
+      
+      // Buscar consultores da empresa
+      const { data: consultores, error: consultorError } = await supabaseAdmin
+        .from('consultores')
+        .select('id')
+        .eq('empresa_id', req.user.empresa_id);
+
+      if (consultorError) throw consultorError;
+
+      const consultorIds = consultores ? consultores.map(c => c.id) : [];
+      
+      // Criar condições: pacientes com empresa_id da empresa OU pacientes dos consultores da empresa
+      const conditions = [];
+      
+      // Condição 1: Pacientes com empresa_id da empresa (leads diretos)
+      conditions.push(`empresa_id.eq.${req.user.empresa_id}`);
+      
+      // Condição 2: Pacientes dos consultores da empresa (se houver consultores)
+      if (consultorIds.length > 0) {
+        conditions.push(`consultor_id.in.(${consultorIds.join(',')})`);
+      }
+      
+      if (conditions.length > 0) {
+        query = query.or(conditions.join(','));
+      } else {
+        query = query.eq('id', 0); // Força resultado vazio
+      }
+    }
+    
+    const { data: novosLeads, error } = await query;
 
     if (error) throw error;
     
@@ -556,12 +666,50 @@ const getNovosLeads = async (req, res) => {
 // GET /api/leads-negativos - Listar leads negativos
 const getLeadsNegativos = async (req, res) => {
   try {
-    // Buscar pacientes com status negativos
-    const { data: leadsNegativos, error } = await supabaseAdmin
+    console.log('🔍 GET /api/leads-negativos - Usuário:', {
+      tipo: req.user.tipo,
+      empresa_id: req.user.empresa_id
+    });
+    
+    let query = supabaseAdmin
       .from('pacientes')
       .select('*')
       .in('status', STATUS_NEGATIVOS)
       .order('created_at', { ascending: false });
+    
+    // Se for admin ou parceiro, filtrar pacientes da empresa (com empresa_id OU consultores da empresa)
+    if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
+      console.log('🏢 Filtrando leads negativos da empresa ID:', req.user.empresa_id);
+      
+      // Buscar consultores da empresa
+      const { data: consultores, error: consultorError } = await supabaseAdmin
+        .from('consultores')
+        .select('id')
+        .eq('empresa_id', req.user.empresa_id);
+
+      if (consultorError) throw consultorError;
+
+      const consultorIds = consultores ? consultores.map(c => c.id) : [];
+      
+      // Criar condições: pacientes com empresa_id da empresa OU pacientes dos consultores da empresa
+      const conditions = [];
+      
+      // Condição 1: Pacientes com empresa_id da empresa (leads diretos)
+      conditions.push(`empresa_id.eq.${req.user.empresa_id}`);
+      
+      // Condição 2: Pacientes dos consultores da empresa (se houver consultores)
+      if (consultorIds.length > 0) {
+        conditions.push(`consultor_id.in.(${consultorIds.join(',')})`);
+      }
+      
+      if (conditions.length > 0) {
+        query = query.or(conditions.join(','));
+      } else {
+        query = query.eq('id', 0); // Força resultado vazio
+      }
+    }
+    
+    const { data: leadsNegativos, error } = await query;
 
     if (error) throw error;
     
@@ -799,7 +947,7 @@ const updateStatusLead = async (req, res) => {
 const cadastroPublicoLead = async (req, res) => {
   try {
     console.log('📝 Cadastro de lead recebido:', req.body);
-    let { nome, telefone, cpf, tipo_tratamento, observacoes, cidade, estado, ref_consultor } = req.body;
+    let { nome, telefone, cpf, tipo_tratamento, empreendimento_id, observacoes, cidade, estado, ref_consultor } = req.body;
     
     // Validar campos obrigatórios
     if (!nome || !telefone) {
@@ -912,7 +1060,7 @@ const cadastroPublicoLead = async (req, res) => {
     }
     
     // Inserir lead/paciente
-    console.log('💾 Inserindo lead com consultor_id:', consultorId);
+    console.log('💾 Inserindo lead com consultor_id:', consultorId, 'e empresa_id: 5 (Incorporadora)');
     
     const { data, error } = await supabaseAdmin
       .from('pacientes')
@@ -921,11 +1069,13 @@ const cadastroPublicoLead = async (req, res) => {
         telefone: telefoneNumeros, // Usar telefone normalizado (apenas números)
         cpf: cpfNumeros,
         tipo_tratamento: tipo_tratamento || null,
+        empreendimento_id: empreendimento_id || null, // ID do empreendimento de interesse
         status: 'lead', 
         observacoes: observacoes || null,
         cidade: cidade ? cidade.trim() : null,
         estado: estado ? estado.trim() : null,
-        consultor_id: consultorId // Atribuir ao consultor se encontrado pelo código de referência
+        consultor_id: consultorId, // Atribuir ao consultor se encontrado pelo código de referência
+        empresa_id: 5 // Incorporadora - todos os leads do formulário CapturaClientes vêm para empresa_id=5
       }])
       .select();
 

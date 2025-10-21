@@ -937,7 +937,7 @@ const Fechamentos = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h1 className="page-title">{isConsultor ? 'Visualizar Fechamentos' : 'Gerenciar Fechamentos'}</h1>
-            <p className="page-subtitle">{isConsultor ? 'Visualize os fechamentos dos tratamentos dos seus pacientes' : 'Gerencie os fechamentos dos tratamentos dos pacientes'}</p>
+            <p className="page-subtitle">{isConsultor ? `Visualize os fechamentos dos tratamentos dos seus ${t.paciente.toLowerCase()+'s'}` : `Gerencie os fechamentos dos tratamentos dos ${t.paciente.toLowerCase()+'s'}`}</p>
           </div>
           {!isClinica && (
             <button

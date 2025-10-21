@@ -36,8 +36,16 @@ const getAllNovasClinicas = async (req, res) => {
       console.log('🔍 Aplicando filtro para freelancer - ID:', req.user.id);
       query = query.eq('criado_por_consultor_id', req.user.id);
       console.log('🔍 Query filtrada aplicada');
+    } else if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
+      // Admin/Parceiro: filtrar por empresa_id na query (mais eficiente)
+      console.log('🔍 Aplicando filtro para admin/parceiro - empresa_id:', req.user.empresa_id);
+      query = query.eq('empresa_id', req.user.empresa_id);
+    } else if (req.user.tipo === 'consultor' && req.user.empresa_id && req.user.is_freelancer === false && !isConsultorInterno) {
+      // Funcionário de empresa: filtrar por empresa_id na query
+      console.log('🔍 Aplicando filtro para funcionário de empresa - empresa_id:', req.user.empresa_id);
+      query = query.eq('empresa_id', req.user.empresa_id);
     } else {
-      console.log('🔍 Usuário tem acesso a todas as novas clínicas (ou será filtrado por empresa)');
+      console.log('🔍 Usuário tem acesso a todas as novas clínicas (consultor interno)');
     }
     // Admin e consultores internos veem todas as novas clínicas (com ou sem consultor_id)
 
@@ -62,30 +70,8 @@ const getAllNovasClinicas = async (req, res) => {
       empresa_id: clinica.empresa_id || clinica.consultores?.empresa_id || null
     }));
     
-    // Filtrar por empresa se necessário
-    let finalData = formattedData;
-    
-    // Se for empresa, filtrar apenas clínicas de consultores vinculados a ela OU cadastradas diretamente pela empresa
-    if (req.user.tipo === 'empresa') {
-      console.log('🔍 Filtrando clínicas para empresa ID:', req.user.id);
-      finalData = formattedData.filter(clinica => 
-        clinica.empresa_id === req.user.id
-      );
-      console.log('🔍 Clínicas filtradas para empresa:', finalData.length);
-    }
-    // Se for FUNCIONÁRIO de empresa (não freelancer E não consultor interno), filtrar clínicas de toda a empresa
-    else if (req.user.tipo === 'consultor' && req.user.empresa_id && req.user.is_freelancer === false && !isConsultorInterno) {
-      console.log('🔍 Filtrando clínicas para FUNCIONÁRIO de empresa. Empresa ID:', req.user.empresa_id);
-      finalData = formattedData.filter(clinica => 
-        clinica.empresa_id === req.user.empresa_id && // Da mesma empresa
-        clinica.criado_por_consultor_id !== null // E que tenha um consultor (não disponíveis)
-      );
-      console.log('🔍 Clínicas filtradas para funcionário de empresa:', finalData.length);
-    }
-    // Freelancer de empresa já foi filtrado acima (query.eq) - vê apenas suas
-    // Consultor interno vê todas as novas clínicas (sem filtro adicional)
-    
-    res.json(finalData);
+    // Dados já filtrados na query, não precisa filtrar novamente
+    res.json(formattedData);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -243,6 +243,8 @@ export const AuthProvider = ({ children }) => {
     isEmpresa: user?.tipo === 'parceiro',
     isClinica: user?.tipo === 'clinica',
     isFreelancer: user?.is_freelancer === true,
+    // Incorporadora: empresa_id = 5 (textos específicos: clientes, corretores, empreendimentos)
+    isIncorporadora: user?.empresa_id === 5,
     // Consultor interno: tem pode_ver_todas_novas_clinicas=true E podealterarstatus=true
     isConsultorInterno: user?.tipo === 'consultor' && user?.pode_ver_todas_novas_clinicas === true && user?.podealterarstatus === true,
     podeAlterarStatus: user?.podealterarstatus === true || user?.tipo === 'admin',

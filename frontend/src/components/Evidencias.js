@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from './Toast';
+import useBranding from '../hooks/useBranding';
 import { FileImage, Calendar, User, Filter, Search, Eye, X, Download } from 'lucide-react';
 
 const Evidencias = () => {
   const { makeRequest, isAdmin } = useAuth();
   const { showErrorToast, showSuccessToast } = useToast();
+  const { t } = useBranding();
   
   const [evidencias, setEvidencias] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -195,7 +197,7 @@ const Evidencias = () => {
           Histórico de Evidências
         </h1>
         <p style={{ color: '#6b7280', fontSize: '1rem' }}>
-          Visualize todas as evidências anexadas pelos consultores ao alterar status
+          Visualize todas as evidências anexadas pelos {t.consultores.toLowerCase()} ao alterar status
         </p>
       </div>
 
@@ -312,7 +314,7 @@ const Evidencias = () => {
           <p style={{ color: '#9ca3af' }}>
             {filtros.busca || filtros.tipo !== 'todos' || filtros.usuario !== 'todos' || filtros.dataInicio || filtros.dataFim
               ? 'Tente ajustar os filtros'
-              : 'Evidências aparecerão aqui quando os consultores alterarem status'}
+              : `Evidências aparecerão aqui quando os ${t.consultores.toLowerCase()} alterarem status`}
           </p>
         </div>
       )}

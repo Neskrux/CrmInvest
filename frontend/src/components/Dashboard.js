@@ -848,12 +848,15 @@ const Dashboard = () => {
       // Freelancers veem apenas seus dados; Admin e consultores internos veem todos
       const usarDadosFiltrados = isFreelancer;
       
+      // Para empresa_id=5 (Incorporadora), usar empreendimentos em vez de clínicas
+      const isIncorporadora = user?.empresa_id === 5;
+      
       const [pacientesRes, agendamentosRes, fechamentosRes, consultoresRes, clinicasRes] = await Promise.all([
         makeRequest('/dashboard/pacientes'),
         makeRequest(usarDadosFiltrados ? '/dashboard/agendamentos' : '/dashboard/gerais/agendamentos'),
         makeRequest('/dashboard/fechamentos'),
         makeRequest('/consultores'),
-        makeRequest(`/clinicas?${clinicasParams.toString()}`)
+        isIncorporadora ? makeRequest('/empreendimentos') : makeRequest(`/clinicas?${clinicasParams.toString()}`)
       ]);
 
       // Para gráfico de cidades e ranking, buscar dados gerais (não filtrados por consultor)
@@ -868,6 +871,9 @@ const Dashboard = () => {
       let fechamentos = await fechamentosRes.json();
       const consultores = await consultoresRes.json();
       const clinicasFiltradas = await clinicasRes.json();
+      
+      // Para incorporadora, usar empreendimentos em vez de clínicas
+      const locaisFiltrados = isIncorporadora ? clinicasFiltradas : clinicasFiltradas;
 
       // Dados gerais para gráfico de cidades e ranking
       let pacientesGerais = await pacientesGeraisRes.json();
@@ -1133,23 +1139,24 @@ const Dashboard = () => {
       // Calcular pacientes, agendamentos e fechamentos por cidade
       const dadosPorCidade = {};
       
-      // Buscar TODAS as clínicas (sem filtro de consultor) para o gráfico de cidades
+      // Buscar TODAS as clínicas/empreendimentos (sem filtro de consultor) para o gráfico de cidades
       let todasClinicas = [];
       try {
-        // Usar endpoint específico que retorna todas as clínicas sem filtro de consultor
-        const todasClinicasRes = await makeRequest('/dashboard/gerais/clinicas');
-          if (todasClinicasRes.ok) {
-            todasClinicas = await todasClinicasRes.json();
-          }
-        } catch (error) {
+        // Para incorporadora (empresa_id=5), usar empreendimentos; para outros, usar clínicas
+        const endpointClinicas = isIncorporadora ? '/empreendimentos' : '/dashboard/gerais/clinicas';
+        const todasClinicasRes = await makeRequest(endpointClinicas);
+        if (todasClinicasRes.ok) {
+          todasClinicas = await todasClinicasRes.json();
+        }
+      } catch (error) {
         // Fallback para clínicas filtradas se houver erro
         todasClinicas = clinicasFiltradas;
       }
 
-      // Criar mapa de clínicas por ID para facilitar a busca
+      // Criar mapa de clínicas/empreendimentos por ID para facilitar a busca
       const clinicasMap = {};
-      todasClinicas.forEach(clinica => {
-        clinicasMap[clinica.id] = clinica;
+      todasClinicas.forEach(local => {
+        clinicasMap[local.id] = local;
       });
       
       // Criar mapa de consultores para pegar a cidade/região

@@ -730,7 +730,7 @@ const Agendamentos = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h1 className="page-title">{isConsultor ? 'Visualizar Agendamentos' : 'Gerenciar Agendamentos'}</h1>
-            <p className="page-subtitle">{isConsultor ? 'Visualize os agendamentos dos seus pacientes' : 'Gerencie os agendamentos dos pacientes'}</p>
+            <p className="page-subtitle">{isConsultor ? `Visualize os agendamentos dos seus ${t.paciente.toLowerCase()+'s'}` : `Gerencie os agendamentos dos ${t.paciente.toLowerCase()+'s'}`}</p>
           </div>
           {!isClinica && (
             <button

@@ -23,6 +23,7 @@ const metasRoutes = require('./metas.routes');
 const novasClinicasRoutes = require('./novas-clinicas.routes');
 const pacientesFinanceiroRoutes = require('./pacientes-financeiro.routes');
 const metaAdsRoutes = require('./meta-ads.routes');
+const empreendimentosRoutes = require('./empreendimentos.routes');
 
 // Importar rotas de APIs externas
 const documentsRoutes = require('./documents.routes');
@@ -44,6 +45,7 @@ router.use('/', metasRoutes); // /api/metas/*
 router.use('/', novasClinicasRoutes); // /api/novas-clinicas/*
 router.use('/', pacientesFinanceiroRoutes); // /api/pacientes-financeiro/*
 router.use('/', metaAdsRoutes); // /api/meta-ads/*
+router.use('/', empreendimentosRoutes); // /api/empreendimentos/*
 
 // Rotas de APIs externas
 router.use('/documents', documentsRoutes);
