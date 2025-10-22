@@ -1708,58 +1708,27 @@ const Dashboard = () => {
 
         {/* Filtros por Região - Ocultar para clínicas */}
         {!isClinica && (
-        <div style={{ 
-          marginTop: '1rem',
-          paddingTop: '1rem',
-          borderTop: '1px solid #e5e7eb'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '600' }}>
-              Filtrar por região:
-            </span>
-            
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <select
-                value={filtroRegiao.estado}
-                onChange={(e) => setFiltroRegiao({ ...filtroRegiao, estado: e.target.value, cidade: '' })}
-                style={{
-                  padding: '0.25rem 0.5rem',
-                  fontSize: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  minWidth: '120px'
-                }}
-              >
-                <option value="">Todos os Estados</option>
-                {estadosDisponiveis.map(estado => (
-                  <option key={estado} value={estado}>{estado}</option>
-                ))}
-              </select>
-
-              <select
-                value={filtroRegiao.cidade}
-                onChange={(e) => setFiltroRegiao({ ...filtroRegiao, cidade: e.target.value })}
-                style={{
-                  padding: '0.25rem 0.5rem',
-                  fontSize: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  minWidth: '120px'
-                }}
-                disabled={!filtroRegiao.estado && cidadesDisponiveis.length > 20} // Desabilitar se muitas cidades
-              >
-                <option value="">Todas as Cidades</option>
-                {cidadesDisponiveis.map(cidade => (
-                  <option key={cidade} value={cidade}>{cidade}</option>
-                ))}
-              </select>
-
-              {(filtroRegiao.estado || filtroRegiao.cidade) && (
-                <button
-                  onClick={() => setFiltroRegiao({ cidade: '', estado: '' })}
-                  className="btn btn-secondary"
-                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                  title="Limpar filtros regionais"
+          <div style={{ 
+            marginTop: '1rem',
+            paddingTop: '1rem',
+            borderTop: '1px solid #e5e7eb'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '600' }}>
+                Filtrar por região:
+              </span>
+              
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <select
+                  value={filtroRegiao.estado}
+                  onChange={(e) => setFiltroRegiao({ ...filtroRegiao, estado: e.target.value, cidade: '' })}
+                  style={{
+                    padding: '0.25rem 0.5rem',
+                    fontSize: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    minWidth: '120px'
+                  }}
                 >
                   <option value="">Todos os Estados</option>
                   {estadosDisponiveis.map(estado => (
