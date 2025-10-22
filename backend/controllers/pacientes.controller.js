@@ -257,7 +257,7 @@ const getDashboardPacientes = async (req, res) => {
 // POST /api/pacientes - Criar paciente
 const createPaciente = async (req, res) => {
   try {
-    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado, cadastrado_por_clinica, clinica_id } = req.body;
+    const { nome, telefone, email, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado, cadastrado_por_clinica, clinica_id, grau_parentesco, tratamento_especifico } = req.body;
     
     // Normalizar telefone e CPF (remover formatação)
     const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
@@ -323,6 +323,7 @@ const createPaciente = async (req, res) => {
       .insert([{ 
         nome, 
         telefone: telefoneNumeros, // Usar telefone normalizado
+        email,
         cpf: cpfNumeros, // Usar CPF normalizado
         tipo_tratamento, 
         status: statusFinal, // Usar status diferenciado
@@ -331,7 +332,10 @@ const createPaciente = async (req, res) => {
         cidade,
         estado,
         clinica_id: finalClinicaId,
-        cadastrado_por_clinica: finalCadastradoPorClinica
+        cadastrado_por_clinica: finalCadastradoPorClinica,
+        grau_parentesco,
+        tratamento_especifico,
+        empresa_id: req.user.empresa_id // Adicionar empresa_id do usuário que está criando
       }])
       .select();
 
@@ -346,7 +350,7 @@ const createPaciente = async (req, res) => {
 const updatePaciente = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, telefone, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado, cadastrado_por_clinica, clinica_id } = req.body;
+    const { nome, telefone, email, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado, cadastrado_por_clinica, clinica_id, grau_parentesco, tratamento_especifico } = req.body;
     
     // Verificar se é consultor freelancer - freelancers não podem editar pacientes completamente
     if (req.user.tipo === 'consultor' && req.user.podealterarstatus !== true) {
@@ -425,13 +429,17 @@ const updatePaciente = async (req, res) => {
     const updateData = {
       nome, 
       telefone: telefoneNumeros, // Usar telefone normalizado
+      email,
       cpf: cpfNumeros, // Usar CPF normalizado
       tipo_tratamento, 
       status: statusFinal, // Usar status diferenciado
       observacoes,
       consultor_id: consultorId,
       cidade,
-      estado
+      estado,
+      grau_parentesco,
+      tratamento_especifico,
+      empresa_id: req.user.empresa_id // Atualizar empresa_id do usuário que está editando
     };
     
     // Se tem informações de clínica, incluir
@@ -947,7 +955,7 @@ const updateStatusLead = async (req, res) => {
 const cadastroPublicoLead = async (req, res) => {
   try {
     console.log('📝 Cadastro de lead recebido:', req.body);
-    let { nome, telefone, cpf, tipo_tratamento, empreendimento_id, observacoes, cidade, estado, ref_consultor } = req.body;
+    let { nome, telefone, email, cpf, tipo_tratamento, empreendimento_id, observacoes, cidade, estado, ref_consultor } = req.body;
     
     // Validar campos obrigatórios
     if (!nome || !telefone) {
@@ -1067,6 +1075,7 @@ const cadastroPublicoLead = async (req, res) => {
       .insert([{ 
         nome: nome.trim(), 
         telefone: telefoneNumeros, // Usar telefone normalizado (apenas números)
+        email: email ? email.trim() : null,
         cpf: cpfNumeros,
         tipo_tratamento: tipo_tratamento || null,
         empreendimento_id: empreendimento_id || null, // ID do empreendimento de interesse

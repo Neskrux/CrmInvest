@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import useBranding from '../hooks/useBranding';
 import { useToast } from '../components/Toast';
-import TutorialPacientes from './TutorialPacientes';
 import ModalEvidencia from './ModalEvidencia';
 import useSmartPolling from '../hooks/useSmartPolling';
 
@@ -281,9 +280,6 @@ const Pacientes = () => {
   };
 
 
-  // Estados para controlar o tutorial
-  const [showTutorial, setShowTutorial] = useState(false);
-  const [tutorialCompleted, setTutorialCompleted] = useState(false);
 
   // Estado para modal de explicação de permissões
   const [showPermissaoModal, setShowPermissaoModal] = useState(false);
@@ -489,13 +485,8 @@ const Pacientes = () => {
       setLoadingLink(false);
     }
     
-  // Verificar se tutorial foi completado
-  const completed = localStorage.getItem('tutorial-pacientes-completed');
-  setTutorialCompleted(!!completed);
   }, [podeAlterarStatus, isConsultorInterno, deveFiltrarPorConsultor, user?.consultor_id]);
 
-  // Tutorial automático desabilitado
-  // Os usuários podem acessá-lo manualmente através do botão "Ver Tutorial"
 
   // Garantir que freelancers fiquem na aba "Pacientes"
   useEffect(() => {
@@ -2433,20 +2424,6 @@ const Pacientes = () => {
     return matchNome && matchStatus && matchConsultor;
   });
 
-  const handleTutorialComplete = () => {
-    setShowTutorial(false);
-    setTutorialCompleted(true);
-    localStorage.setItem('tutorial-pacientes-completed', 'true');
-  };
-
-  const handleTutorialClose = () => {
-    setShowTutorial(false);
-    localStorage.setItem('tutorial-pacientes-dismissed', 'true');
-  };
-
-  const startTutorial = () => {
-    setShowTutorial(true);
-  };
 
   // Função para copiar link personalizado
   const copiarLink = async (link) => {
@@ -2479,36 +2456,6 @@ const Pacientes = () => {
             <h1 className="page-title">Meus {t.paciente.toLowerCase()+'s'}</h1>
             <p className="page-subtitle">Acompanhe o status de seus {t.paciente.toLowerCase()+'s'}</p>
           </div>
-          {!isClinica && (
-            <button
-              onClick={startTutorial}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 16px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                color: '#374151',
-                fontSize: '14px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#f9fafb';
-                e.target.style.borderColor = '#9ca3af';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = 'white';
-                e.target.style.borderColor = '#d1d5db';
-              }}
-              title="Ver tutorial da tela de pacientes"
-            >
-              Ver Tutorial
-            </button>
-          )}
         </div>
         
         <div style={{
@@ -3013,8 +2960,11 @@ const Pacientes = () => {
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                             {paciente.tipo_tratamento && (
-                              <span className={`badge badge-${paciente.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
-                                {paciente.tipo_tratamento}
+                              <span className={`badge badge-${paciente.tipo_tratamento === 'estetico' ? 'info' : 'warning'}`}>
+                                {paciente.tipo_tratamento === 'estetico' ? 'Estético' : 
+                                 paciente.tipo_tratamento === 'odontologico' ? 'Odontológico' : 
+                                 paciente.tipo_tratamento === 'ambos' ? 'Ambos' :
+                                 paciente.tipo_tratamento}
                               </span>
                             )}
                           </td>
@@ -3234,8 +3184,11 @@ const Pacientes = () => {
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                             {lead.tipo_tratamento && (
-                              <span className={`badge badge-${lead.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
-                                {lead.tipo_tratamento}
+                              <span className={`badge badge-${lead.tipo_tratamento === 'estetico' ? 'info' : 'warning'}`}>
+                                {lead.tipo_tratamento === 'estetico' ? 'Estético' : 
+                                 lead.tipo_tratamento === 'odontologico' ? 'Odontológico' : 
+                                 lead.tipo_tratamento === 'ambos' ? 'Ambos' :
+                                 lead.tipo_tratamento}
                               </span>
                             )}
                           </td>
@@ -3552,8 +3505,11 @@ const Pacientes = () => {
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                             {lead.tipo_tratamento && (
-                              <span className={`badge badge-${lead.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
-                                {lead.tipo_tratamento}
+                              <span className={`badge badge-${lead.tipo_tratamento === 'estetico' ? 'info' : 'warning'}`}>
+                                {lead.tipo_tratamento === 'estetico' ? 'Estético' : 
+                                 lead.tipo_tratamento === 'odontologico' ? 'Odontológico' : 
+                                 lead.tipo_tratamento === 'ambos' ? 'Ambos' :
+                                 lead.tipo_tratamento}
                               </span>
                             )}
                           </td>
@@ -3754,8 +3710,11 @@ const Pacientes = () => {
                                 <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarTelefone(paciente.telefone)}</td>
                                 <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                                   {paciente.tipo_tratamento && (
-                                    <span className={`badge badge-${paciente.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
-                                      {paciente.tipo_tratamento}
+                                    <span className={`badge badge-${paciente.tipo_tratamento === 'estetico' ? 'info' : 'warning'}`}>
+                                {paciente.tipo_tratamento === 'estetico' ? 'Estético' : 
+                                 paciente.tipo_tratamento === 'odontologico' ? 'Odontológico' : 
+                                 paciente.tipo_tratamento === 'ambos' ? 'Ambos' :
+                                 paciente.tipo_tratamento}
                                     </span>
                                   )}
                                 </td>
@@ -5281,7 +5240,10 @@ const Pacientes = () => {
                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
                         {viewPaciente.tipo_tratamento ? (
                           <span className={`badge badge-${viewPaciente.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
-                            {viewPaciente.tipo_tratamento}
+                            {viewPaciente.tipo_tratamento === 'estetico' ? 'Estético' : 
+                             viewPaciente.tipo_tratamento === 'odontologico' ? 'Odontológico' : 
+                             viewPaciente.tipo_tratamento === 'ambos' ? 'Ambos' :
+                             viewPaciente.tipo_tratamento}
                           </span>
                         ) : '-'}
                       </p>
@@ -5306,9 +5268,21 @@ const Pacientes = () => {
                       </p>
                 </div>
               </div>
+
+              <div className="grid grid-2">
+                    <div>
+                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Tratamento Específico</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewPaciente.tratamento_especifico || '-'}</p>
+                </div>
+                    
+                    <div>
+                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Grau de Parentesco de Quem Indicou</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewPaciente.grau_parentesco || '-'}</p>
+                </div>
+              </div>
                   
                   <div>
-                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Consultor Responsável</label>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Responsável</label>
                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
                       {consultores.find(c => String(c.id) === String(viewPaciente.consultor_id))?.nome || (
                         <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>Não atribuído</span>
@@ -8451,12 +8425,6 @@ const Pacientes = () => {
         </div>
       )}
 
-      {/* Tutorial Overlay */}
-      <TutorialPacientes
-        isOpen={showTutorial}
-        onClose={handleTutorialClose}
-        onComplete={handleTutorialComplete}
-      />
       
     </div>
   );

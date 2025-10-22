@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import useBranding from '../hooks/useBranding';
 import { useToast } from '../components/Toast';
-import TutorialAgendamentos from './TutorialAgendamentos';
 import ModalEvidencia from './ModalEvidencia';
 import useSmartPolling from '../hooks/useSmartPolling';
 
@@ -59,9 +58,6 @@ const Agendamentos = () => {
   const [vencimentoFechamento, setVencimentoFechamento] = useState('');
   const [antecipacaoFechamento, setAntecipacaoFechamento] = useState('');
 
-  // Estados para controlar o tutorial
-  const [showTutorial, setShowTutorial] = useState(false);
-  const [tutorialCompleted, setTutorialCompleted] = useState(false);
 
   // Estado para modal de explicação de permissões
   const [showPermissaoModal, setShowPermissaoModal] = useState(false);
@@ -111,8 +107,6 @@ const Agendamentos = () => {
       setFiltroConsultor(String(user.consultor_id));
     }
     
-    // Tutorial automático desabilitado
-    // Os usuários podem acessá-lo manualmente através do botão "Ver Tutorial"
   }, [deveFiltrarPorConsultor, user?.consultor_id]);
 
   // Função de polling inteligente
@@ -702,19 +696,6 @@ const Agendamentos = () => {
   // Verificar se há filtros ativos
   const temFiltrosAtivos = filtroConsultor || filtroClinica || filtroDataInicio || filtroDataFim || filtroStatus;
 
-  const handleTutorialComplete = () => {
-    setShowTutorial(false);
-    setTutorialCompleted(true);
-    localStorage.setItem('tutorial-agendamentos-completed', 'true');
-  };
-
-  const handleTutorialClose = () => {
-    setShowTutorial(false);
-  };
-
-  const startTutorial = () => {
-    setShowTutorial(true);
-  };
 
   // Função chamada quando evidência é enviada com sucesso
   const handleEvidenciaSuccess = async (evidenciaId) => {
@@ -742,36 +723,6 @@ const Agendamentos = () => {
             <h1 className="page-title">{isConsultor ? 'Visualizar Agendamentos' : 'Gerenciar Agendamentos'}</h1>
             <p className="page-subtitle">{isConsultor ? `Visualize os agendamentos dos seus ${t.paciente.toLowerCase()+'s'}` : `Gerencie os agendamentos dos ${t.paciente.toLowerCase()+'s'}`}</p>
           </div>
-          {!isClinica && (
-            <button
-              onClick={startTutorial}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 16px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                color: '#374151',
-                fontSize: '14px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#f9fafb';
-                e.target.style.borderColor = '#9ca3af';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = 'white';
-                e.target.style.borderColor = '#d1d5db';
-              }}
-              title="Ver tutorial da tela de agendamentos"
-            >
-              Ver Tutorial
-            </button>
-          )}
         </div>
       </div>
       {/* Dashboard de Agendamentos */}
@@ -1810,12 +1761,6 @@ const Agendamentos = () => {
         nomeRegistro={evidenciaData.agendamentoNome}
       />
 
-      {/* Tutorial Overlay */}
-      <TutorialAgendamentos
-        isOpen={showTutorial}
-        onClose={handleTutorialClose}
-        onComplete={handleTutorialComplete}
-      />
     </div>
   );
 };
