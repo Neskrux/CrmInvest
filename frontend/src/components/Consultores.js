@@ -4,7 +4,7 @@ import useBranding from '../hooks/useBranding';
 import { useToast } from '../components/Toast';
 
 const Consultores = () => {
-  const { t } = useBranding();
+  const { t, shouldShow } = useBranding();
   const { makeRequest, isAdmin, user } = useAuth();
   const { showErrorToast, showSuccessToast } = useToast();
   const [consultores, setConsultores] = useState([]);
@@ -899,53 +899,55 @@ Digite o número da opção desejada:`;
       </div>
 
       {/* Resumo de Estatísticas */}
-      <div className="stats-grid" style={{ 
-        marginBottom: '2rem',
-        gridTemplateColumns: user?.tipo === 'parceiro' 
-          ? 'repeat(3, 1fr)'  // Grid 3 colunas para parceiros
-          : 'repeat(auto-fit, minmax(150px, 1fr))' // Grid responsivo para admin
-      }}>
-        <div className="stat-card">
-          <div className="stat-label">Total</div>
-          <div className="stat-value">{consultores.length}</div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-label">
-            {user?.tipo === 'parceiro' ? 'Freelancers' : 'Freelancers'}
+      {shouldShow('consultores', 'mostrarCardsEstatisticas') && (
+        <div className="stats-grid" style={{ 
+          marginBottom: '2rem',
+          gridTemplateColumns: user?.tipo === 'parceiro' 
+            ? 'repeat(3, 1fr)'  // Grid 3 colunas para parceiros
+            : 'repeat(auto-fit, minmax(150px, 1fr))' // Grid responsivo para admin
+        }}>
+          <div className="stat-card">
+            <div className="stat-label">Total</div>
+            <div className="stat-value">{consultores.length}</div>
           </div>
-          <div className="stat-value">{consultores.filter(c => c.is_freelancer !== false).length}</div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-label">
-            {user?.tipo === 'parceiro' ? 'Funcionários' : 'Internos'}
+          
+          <div className="stat-card">
+            <div className="stat-label">
+              {user?.tipo === 'parceiro' ? 'Freelancers' : 'Freelancers'}
+            </div>
+            <div className="stat-value">{consultores.filter(c => c.is_freelancer !== false).length}</div>
           </div>
-          <div className="stat-value">{consultores.filter(c => c.is_freelancer === false).length}</div>
+          
+          <div className="stat-card">
+            <div className="stat-label">
+              {user?.tipo === 'parceiro' ? 'Funcionários' : 'Internos'}
+            </div>
+            <div className="stat-value">{consultores.filter(c => c.is_freelancer === false).length}</div>
+          </div>
+          
+          {/* KPIs de link - apenas para admin */}
+          {isAdmin && (
+            <>
+          <div className="stat-card">
+            <div className="stat-label">Com Link</div>
+            <div className="stat-value">{consultores.filter(c => c.codigo_referencia && c.codigo_referencia.trim() !== '').length}</div>
+          </div>
+          
+          <div className="stat-card">
+            <div className="stat-label">Sem Link</div>
+            <div className="stat-value">{consultores.filter(c => !c.codigo_referencia || c.codigo_referencia.trim() === '').length}</div>
+          </div>
+            </>
+          )}
         </div>
-        
-        {/* KPIs de link - apenas para admin */}
-        {isAdmin && (
-          <>
-        <div className="stat-card">
-          <div className="stat-label">Com Link</div>
-          <div className="stat-value">{consultores.filter(c => c.codigo_referencia && c.codigo_referencia.trim() !== '').length}</div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-label">Sem Link</div>
-          <div className="stat-value">{consultores.filter(c => !c.codigo_referencia || c.codigo_referencia.trim() === '').length}</div>
-        </div>
-          </>
-        )}
-      </div>
+      )}
 
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Equipe de {t.consultores.toLowerCase()}</h2>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
             {/* Botão de gerar links - apenas para admin */}
-            {isAdmin && (
+            {isAdmin && shouldShow('consultores', 'mostrarBotaoGerarLinks') && (
             <button 
               className="btn btn-secondary"
               onClick={gerarCodigosFaltantes}
@@ -971,6 +973,7 @@ Digite o número da opção desejada:`;
         </div>
 
         {/* Seção de Filtros */}
+        {shouldShow('consultores', 'mostrarFiltroCorretores') && (
         <div className="filters-section" style={{ 
           marginBottom: '1.5rem', 
           padding: '1rem', 
@@ -1083,6 +1086,7 @@ Digite o número da opção desejada:`;
             )}
           </div>
         </div>
+        )}
 
         {loading ? (
           <div className="loading">
@@ -1200,17 +1204,19 @@ Digite o número da opção desejada:`;
                             </svg>
                           </button>
                         )}
-                        <button
-                          onClick={() => visualizarLinkPersonalizado(consultor)}
-                          className="btn-action"
-                          title="Link personalizado"
-                          style={{ color: '#f59e0b' }}
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                          </svg>
-                        </button>
+                        {shouldShow('consultores', 'mostrarBotaoLink') && (
+                          <button
+                            onClick={() => visualizarLinkPersonalizado(consultor)}
+                            className="btn-action"
+                            title="Link personalizado"
+                            style={{ color: '#f59e0b' }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                            </svg>
+                          </button>
+                        )}
                         {(isAdmin || user?.tipo === 'parceiro') && (
                           <button
                             onClick={() => excluirConsultor(consultor)}
@@ -1590,38 +1596,40 @@ Digite o número da opção desejada:`;
                 )}
               </div>
 
-              <div className="form-group">
-                <label className="form-label">
-                  {user?.tipo === 'parceiro' ? 'Tipo de Vínculo' : `Tipo de ${t.consultor.toLowerCase()}`}
-                </label>
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="is_freelancer"
-                      value="true"
-                      checked={formData.is_freelancer === true}
-                      onChange={() => setFormData(prev => ({ ...prev, is_freelancer: true }))}
-                    />
-                    <span>{user?.tipo === 'parceiro' ? 'Freelancer (terceirizado)' : 'Freelancer (link personalizado)'}</span>
+              {shouldShow('consultores', 'mostrarTipoCorretor') && (
+                <div className="form-group">
+                  <label className="form-label">
+                    {user?.tipo === 'parceiro' ? 'Tipo de Vínculo' : `Tipo de ${t.consultor.toLowerCase()}`}
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="is_freelancer"
-                      value="false"
-                      checked={formData.is_freelancer === false}
-                      onChange={() => setFormData(prev => ({ ...prev, is_freelancer: false }))}
-                    />
-                    <span>{user?.tipo === 'parceiro' ? 'Funcionário (fixo)' : 'Interno (link geral)'}</span>
-                  </label>
+                  <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="is_freelancer"
+                        value="true"
+                        checked={formData.is_freelancer === true}
+                        onChange={() => setFormData(prev => ({ ...prev, is_freelancer: true }))}
+                      />
+                      <span>{user?.tipo === 'parceiro' ? 'Freelancer (terceirizado)' : 'Freelancer (link personalizado)'}</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="is_freelancer"
+                        value="false"
+                        checked={formData.is_freelancer === false}
+                        onChange={() => setFormData(prev => ({ ...prev, is_freelancer: false }))}
+                      />
+                      <span>{user?.tipo === 'parceiro' ? 'Funcionário (fixo)' : 'Interno (link geral)'}</span>
+                    </label>
+                  </div>
+                  <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                    {user?.tipo === 'parceiro' 
+                      ? 'Ambos os tipos veem as clínicas da parceiro. Diferença apenas para controle interno.'
+                      : 'Freelancers veem apenas leads do seu código. Internos veem leads gerais.'}
+                  </small>
                 </div>
-                <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>
-                  {user?.tipo === 'parceiro' 
-                    ? 'Ambos os tipos veem as clínicas da parceiro. Diferença apenas para controle interno.'
-                    : 'Freelancers veem apenas leads do seu código. Internos veem leads gerais.'}
-                </small>
-              </div>
+              )}
 
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
                 <button 

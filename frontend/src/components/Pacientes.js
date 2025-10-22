@@ -9,9 +9,9 @@ import ModalEvidencia from './ModalEvidencia';
 import useSmartPolling from '../hooks/useSmartPolling';
 
 const Pacientes = () => {
-  const { t } = useBranding();
+  const { t, empresaId, shouldShow } = useBranding();
   const location = useLocation();
-  const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isFreelancer, isClinica, deveFiltrarPorClinica } = useAuth();
+  const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isIncorporadora, isFreelancer, isClinica, deveFiltrarPorClinica } = useAuth();
   const navigate = useNavigate();
   // Verificar se usuário é consultor
   const isConsultor = user?.tipo === 'consultor';
@@ -19,6 +19,7 @@ const Pacientes = () => {
   const [novosLeads, setNovosLeads] = useState([]);
   const [leadsNegativos, setLeadsNegativos] = useState([]);
   const [consultores, setConsultores] = useState([]);
+  const [empreendimentos, setEmpreendimentos] = useState([]);
   const [agendamentos, setAgendamentos] = useState([]);
   const [fechamentos, setFechamentos] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -471,6 +472,15 @@ const Pacientes = () => {
     fetchAgendamentos();
     fetchFechamentos();
     
+    // Carregar empreendimentos apenas para empresa_id 5 (Incorporadora)
+    console.log('🔍 [Frontend] useEffect - Empresa ID:', empresaId);
+    if (empresaId === 5) {
+      console.log('✅ [Frontend] Empresa ID 5 detectada, carregando empreendimentos...');
+      fetchEmpreendimentos();
+    } else {
+      console.log('ℹ️ [Frontend] Empresa ID diferente de 5, não carregando empreendimentos');
+    }
+    
     // Buscar novos leads apenas se pode alterar status (não freelancer) ou é consultor interno
     if (podeAlterarStatus || isConsultorInterno) {
       fetchNovosLeads();
@@ -513,6 +523,11 @@ const Pacientes = () => {
         fetchAgendamentos(),
         fetchFechamentos()
       ];
+
+      // Carregar empreendimentos apenas para empresa_id 5 (Incorporadora)
+      if (empresaId === 5) {
+        promises.push(fetchEmpreendimentos());
+      }
 
       // Buscar novos leads apenas se pode alterar status (não freelancer) ou é consultor interno
       if (podeAlterarStatus || isConsultorInterno) {
@@ -600,6 +615,27 @@ const Pacientes = () => {
       }
     } catch (error) {
       console.error('Erro ao carregar consultores:', error);
+    }
+  };
+
+  const fetchEmpreendimentos = async () => {
+    try {
+      console.log('🔍 [Frontend] Iniciando fetchEmpreendimentos...');
+      console.log('👤 [Frontend] Empresa ID:', empresaId);
+      
+      const response = await makeRequest('/empreendimentos');
+      const data = await response.json();
+      
+      console.log('📡 [Frontend] Resposta da API:', { status: response.status, ok: response.ok, data });
+      
+      if (response.ok) {
+        setEmpreendimentos(data);
+        console.log('✅ [Frontend] Empreendimentos carregados com sucesso:', data);
+      } else {
+        console.error('❌ [Frontend] Erro ao carregar empreendimentos:', data.error);
+      }
+    } catch (error) {
+      console.error('💥 [Frontend] Erro ao carregar empreendimentos:', error);
     }
   };
 
@@ -2476,7 +2512,7 @@ const Pacientes = () => {
       <div className="page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h1 className="page-title">Meus {t.paciente.toLowerCase()+'s'}</h1>
+            <h1 className="page-title">Meus {t.pacientes.toLowerCase()}</h1>
             <p className="page-subtitle">Acompanhe o status de seus {t.paciente.toLowerCase()+'s'}</p>
           </div>
           {!isClinica && (
@@ -2759,11 +2795,27 @@ const Pacientes = () => {
                 </div>
                 <div className="grid grid-4" style={{ gap: '1rem' }}>
                   <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Tipo de Tratamento</label>
+                    <label className="form-label">{t.tipoTratamento}</label>
                     <select className="form-select" value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}>
                       <option value="">Todos</option>
-                      <option value="Estético">Estético</option>
-                      <option value="Odontológico">Odontológico</option>
+                      {isIncorporadora? (
+                        // Para incorporadora, mostrar empreendimentos da API
+                        (() => {
+                          console.log('🔍 [Frontend] Renderizando filtro - Empresa ID:', empresaId);
+                          console.log('📊 [Frontend] Empreendimentos disponíveis:', empreendimentos);
+                          return empreendimentos.map(empreendimento => (
+                            <option key={empreendimento.id} value={empreendimento.nome}>
+                              {empreendimento.nome}
+                            </option>
+                          ));
+                        })()
+                      ) : (
+                        // Para outras empresas, mostrar tipos fixos
+                        <>
+                          <option value="Estético">Estético</option>
+                          <option value="Odontológico">Odontológico</option>
+                        </>
+                      )}
                     </select>
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
@@ -2795,7 +2847,7 @@ const Pacientes = () => {
                   </div>
 
                    <div className="form-group" style={{ margin: 0 }}>
-                     <label className="form-label">Consultor</label>
+                     <label className="form-label">{t.consultor}</label>
                      <select 
                        className="form-select" 
                        value={filtroConsultor} 
@@ -2894,7 +2946,7 @@ const Pacientes = () => {
                   <line x1="12" y1="5" x2="12" y2="19"></line>
                   <line x1="5" y1="12" x2="19" y2="12"></line>
                 </svg>
-                Novo Paciente
+                {empresaId === 5 ? 'Novo Cliente' : 'Novo Paciente'}
               </button>
               </div>
             </div>
@@ -3377,23 +3429,25 @@ const Pacientes = () => {
 
       {activeTab === 'negativas' && (
         <>
-          {/* Resumo de Estatísticas */}
-          <div className="stats-grid" style={{ marginBottom: '2rem' }}>
-            <div className="stat-card">
-              <div className="stat-label">CPF Reprovado</div>
-              <div className="stat-value">{leadsNegativos.filter(l => l.status === 'cpf_reprovado').length}</div>
+          {/* Resumo de Estatísticas - Ocultar para incorporadora */}
+          {shouldShow('leadsNegativos', 'mostrarResumoEstatisticas') && (
+            <div className="stats-grid" style={{ marginBottom: '2rem' }}>
+              <div className="stat-card">
+                <div className="stat-label">CPF Reprovado</div>
+                <div className="stat-value">{leadsNegativos.filter(l => l.status === 'cpf_reprovado').length}</div>
+              </div>
+              
+              <div className="stat-card">
+                <div className="stat-label">Sem Clínica</div>
+                <div className="stat-value">{leadsNegativos.filter(l => l.status === 'sem_clinica').length}</div>
+              </div>
+              
+              <div className="stat-card">
+                <div className="stat-label">Paciente não responde</div>
+                <div className="stat-value">{leadsNegativos.filter(l => l.status === 'nao_responde').length}</div>
+              </div>
             </div>
-            
-            <div className="stat-card">
-              <div className="stat-label">Sem Clínica</div>
-              <div className="stat-value">{leadsNegativos.filter(l => l.status === 'sem_clinica').length}</div>
-            </div>
-            
-            <div className="stat-card">
-              <div className="stat-label">Paciente não responde</div>
-              <div className="stat-value">{leadsNegativos.filter(l => l.status === 'nao_responde').length}</div>
-            </div>
-          </div>
+          )}
 
           <div className="card" style={{ marginBottom: '1.5rem' }}>
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -3441,7 +3495,7 @@ const Pacientes = () => {
                     </select>
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Consultor</label>
+                    <label className="form-label">{t.consultor}</label>
                     <select 
                       className="form-select" 
                       value={filtroConsultorNegativos} 
@@ -3480,7 +3534,7 @@ const Pacientes = () => {
                   <thead>
                     <tr>
                       <th>Nome</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{t.consultor}</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>CPF</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cidade</th>
@@ -4860,7 +4914,7 @@ const Pacientes = () => {
 
               <div className="grid grid-2">
                 <div className="form-group">
-                  <label className="form-label">Tipo de Tratamento *</label>
+                  <label className="form-label">{empresaId === 5 ? 'Empreendimento *' : 'Tipo de Tratamento *'}</label>
                   <select
                     name="tipo_tratamento"
                     className="form-select"
@@ -4877,7 +4931,7 @@ const Pacientes = () => {
                 </div>
 
               <div className="form-group">
-                <label className="form-label">Consultor Responsável</label>
+                <label className="form-label">{empresaId === 5 ? 'Corretor Responsável' : 'Consultor Responsável'}</label>
                 <select
                   name="consultor_id"
                   className="form-select"

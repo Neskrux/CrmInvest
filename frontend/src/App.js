@@ -16,7 +16,6 @@ import CapturaClinicaSucesso from './components/CapturaClinicaSucesso';
 import CapturaClientes from './components/CapturaClientes';
 import CapturaSucessoClientes from './components/CapturaSucessoClientes';
 import CapturaIndicadorClientes from './components/CapturaIndicadorClientes';
-import TesteBranding from './components/TesteBranding';
 import Login from './components/Login';
 import ResetPassword from './components/ResetPassword';
 import Dashboard from './components/Dashboard';
