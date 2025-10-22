@@ -6,7 +6,7 @@ import TutorialFechamentos from './TutorialFechamentos';
 import ModalEvidencia from './ModalEvidencia';
 
 const Fechamentos = () => {
-  const { t } = useBranding();
+  const { t, shouldShow, empresaId } = useBranding();
   const { makeRequest, isAdmin, user, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isClinica } = useAuth();
   const [fechamentos, setFechamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
@@ -90,6 +90,13 @@ const Fechamentos = () => {
     // Tutorial automático desabilitado
     // Os usuários podem acessá-lo manualmente através do botão "Ver Tutorial"
   }, [deveFiltrarPorConsultor, user?.consultor_id]);
+
+  // Garantir que a aba ativa seja válida baseada no branding
+  useEffect(() => {
+    if (!shouldShow('fechamentos', 'mostrarAbaEmAnalise') && activeTab === 'em_analise') {
+      setActiveTab('fechamentos');
+    }
+  }, [shouldShow, activeTab]);
 
   // Detectar mudanças de tamanho da tela
   useEffect(() => {
@@ -937,7 +944,7 @@ const Fechamentos = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h1 className="page-title">{isConsultor ? 'Visualizar Fechamentos' : 'Gerenciar Fechamentos'}</h1>
-            <p className="page-subtitle">{isConsultor ? `Visualize os fechamentos dos tratamentos dos seus ${t.paciente.toLowerCase()+'s'}` : `Gerencie os fechamentos dos tratamentos dos ${t.paciente.toLowerCase()+'s'}`}</p>
+            <p className="page-subtitle">{isConsultor ? `Visualize os fechamentos dos ${empresaId === 5 ? 'empreendimentos' : 'tratamentos'} dos seus ${t.paciente.toLowerCase()+'s'}` : `Gerencie os fechamentos dos ${empresaId === 5 ? 'empreendimentos' : 'tratamentos'} dos ${t.paciente.toLowerCase()+'s'}`}</p>
           </div>
           {!isClinica && (
             <button
@@ -1157,58 +1164,60 @@ const Fechamentos = () => {
             </span>
           </button>
           
-          <button
-            className={`tab ${activeTab === 'em_analise' ? 'active' : ''}`}
-            onClick={() => setActiveTab('em_analise')}
-            title="Documentação pendente, reprovados e outros status não aprovados"
-            style={{
-              padding: '1rem 1.5rem',
-              border: 'none',
-              backgroundColor: 'transparent',
-              cursor: 'pointer',
-              borderBottom: activeTab === 'em_analise' ? '2px solid #3b82f6' : '2px solid transparent',
-              color: activeTab === 'em_analise' ? '#3b82f6' : '#6b7280',
-              fontWeight: activeTab === 'em_analise' ? '600' : '500',
-              fontSize: '0.875rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"></path>
-            </svg>
-            Em Análise
-            <span style={{ 
-              fontSize: '0.75rem', 
-              backgroundColor: activeTab === 'em_analise' ? '#3b82f6' : '#e5e7eb',
-              color: activeTab === 'em_analise' ? 'white' : '#6b7280',
-              padding: '0.125rem 0.5rem',
-              borderRadius: '12px',
-              fontWeight: '600'
-            }}>
-              {fechamentosFiltrados.filter(f => {
-                const paciente = pacientes.find(p => p.id === f.paciente_id);
-                if (!paciente) return false;
-                
-                const totalDocs = 4;
-                const docsEnviados = [
-                  paciente.selfie_doc_url,
-                  paciente.documento_url,
-                  paciente.comprovante_residencia_url,
-                  paciente.contrato_servico_url
-                ].filter(Boolean).length;
-                
-                let statusReal = f.aprovado || 'documentacao_pendente';
-                if (docsEnviados < totalDocs && statusReal !== 'reprovado') {
-                  statusReal = 'documentacao_pendente';
-                }
-                
-                return statusReal !== 'aprovado';
-              }).length}
-            </span>
-          </button>
+          {shouldShow('fechamentos', 'mostrarAbaEmAnalise') && (
+            <button
+              className={`tab ${activeTab === 'em_analise' ? 'active' : ''}`}
+              onClick={() => setActiveTab('em_analise')}
+              title="Documentação pendente, reprovados e outros status não aprovados"
+              style={{
+                padding: '1rem 1.5rem',
+                border: 'none',
+                backgroundColor: 'transparent',
+                cursor: 'pointer',
+                borderBottom: activeTab === 'em_analise' ? '2px solid #3b82f6' : '2px solid transparent',
+                color: activeTab === 'em_analise' ? '#3b82f6' : '#6b7280',
+                fontWeight: activeTab === 'em_analise' ? '600' : '500',
+                fontSize: '0.875rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"></path>
+              </svg>
+              Em Análise
+              <span style={{ 
+                fontSize: '0.75rem', 
+                backgroundColor: activeTab === 'em_analise' ? '#3b82f6' : '#e5e7eb',
+                color: activeTab === 'em_analise' ? 'white' : '#6b7280',
+                padding: '0.125rem 0.5rem',
+                borderRadius: '12px',
+                fontWeight: '600'
+              }}>
+                {fechamentosFiltrados.filter(f => {
+                  const paciente = pacientes.find(p => p.id === f.paciente_id);
+                  if (!paciente) return false;
+                  
+                  const totalDocs = 4;
+                  const docsEnviados = [
+                    paciente.selfie_doc_url,
+                    paciente.documento_url,
+                    paciente.comprovante_residencia_url,
+                    paciente.contrato_servico_url
+                  ].filter(Boolean).length;
+                  
+                  let statusReal = f.aprovado || 'documentacao_pendente';
+                  if (docsEnviados < totalDocs && statusReal !== 'reprovado') {
+                    statusReal = 'documentacao_pendente';
+                  }
+                  
+                  return statusReal !== 'aprovado';
+                }).length}
+              </span>
+            </button>
+          )}
         </div>
 
         <div className="card-body">
@@ -1547,7 +1556,7 @@ const Fechamentos = () => {
 
             <form onSubmit={(e) => { e.preventDefault(); salvarFechamento(); }}>
               <div className="form-group">
-                <label className="form-label">Paciente *</label>
+                <label className="form-label">{t.paciente} *</label>
                 <select 
                   className="form-select"
                   value={novoFechamento.paciente_id || ''}
@@ -1555,7 +1564,7 @@ const Fechamentos = () => {
                   required
                   disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                 >
-                  <option value="">Selecione um paciente</option>
+                  <option value="">Selecione um {t.paciente.toLowerCase()}</option>
                   {pacientes.filter(p => 
                     // Mostrar apenas pacientes com status apropriados para fechamento
                     ['agendado', 'compareceu', 'fechado'].includes(p.status)
@@ -1587,14 +1596,14 @@ const Fechamentos = () => {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Consultor</label>
+                  <label className="form-label">{t.consultor}</label>
                   <select 
                     className="form-select"
                     value={novoFechamento.consultor_id || ''}
                     onChange={(e) => setNovoFechamento({...novoFechamento, consultor_id: e.target.value})}
                     disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                   >
-                    <option value="">Selecione um consultor</option>
+                    <option value="">Selecione um {t.consultor.toLowerCase()}</option>
                     {consultores.map(c => (
                       <option key={c.id} value={c.id}>{c.nome}</option>
                     ))}
@@ -1602,20 +1611,22 @@ const Fechamentos = () => {
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Clínica</label>
-                <select 
-                  className="form-select"
-                  value={novoFechamento.clinica_id || ''}
-                  onChange={(e) => setNovoFechamento({...novoFechamento, clinica_id: e.target.value})}
-                  disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
-                >
-                  <option value="">Selecione uma clínica</option>
-                  {clinicas.map(c => (
-                    <option key={c.id} value={c.id}>{c.nome}</option>
-                  ))}
-                </select>
-              </div>
+              {shouldShow('fechamentos', 'mostrarFiltroClinica') && (
+                <div className="form-group">
+                  <label className="form-label">{t.clinica}</label>
+                  <select 
+                    className="form-select"
+                    value={novoFechamento.clinica_id || ''}
+                    onChange={(e) => setNovoFechamento({...novoFechamento, clinica_id: e.target.value})}
+                    disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
+                  >
+                    <option value="">Selecione um {t.clinica.toLowerCase()}</option>
+                    {clinicas.map(c => (
+                      <option key={c.id} value={c.id}>{c.nome}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="grid grid-2">
                 <div className="form-group">
@@ -1630,7 +1641,7 @@ const Fechamentos = () => {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Tipo de Tratamento</label>
+                  <label className="form-label">{t.tipoTratamento}</label>
                   <select 
                     className="form-select"
                     value={novoFechamento.tipo_tratamento || ''}
@@ -1750,7 +1761,7 @@ const Fechamentos = () => {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Antecipação (em meses)</label>
+                    <label className="form-label">{empresaId === 5 ? 'Observação' : 'Antecipação (em meses)'}</label>
                     <input 
                       type="number"
                       className="form-input"
@@ -1765,7 +1776,7 @@ const Fechamentos = () => {
               </div>
 
               {/* Seção de Dados Administrativos - Apenas Admin/Consultor Interno */}
-              {(isAdmin || isConsultorInterno) && (
+              {(isAdmin || isConsultorInterno) && empresaId !== 5 && (
                 <div style={{ 
                   border: '1px solid #3b82f6', 
                   borderRadius: '8px', 

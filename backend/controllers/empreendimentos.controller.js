@@ -5,30 +5,24 @@ const getAllEmpreendimentos = async (req, res) => {
   try {
     const { cidade, estado } = req.query;
     
-    let query = supabaseAdmin
+    console.log('🔍 [Backend] Iniciando query simples...');
+    console.log('👤 [Backend] Usuário:', req.user.tipo, 'Empresa ID:', req.user.empresa_id);
+    
+    // Query mais simples possível - apenas selecionar todos
+    const { data, error } = await supabaseAdmin
       .from('empreendimentos')
-      .select('*')
-      .order('nome');
+      .select('*');
 
-    // Filtrar por estado se especificado
-    if (estado) {
-      query = query.eq('estado', estado);
+    console.log('📡 [Backend] Query executada');
+    console.log('📊 [Backend] Empreendimentos encontrados:', data ? data.length : 'null');
+    console.log('📋 [Backend] Dados:', data);
+
+    if (error) {
+      console.error('❌ [Backend] Erro na query:', error);
+      throw error;
     }
 
-    // Filtrar por cidade se especificado
-    if (cidade) {
-      query = query.ilike('cidade', `%${cidade}%`);
-    }
-
-    // Se for admin ou parceiro, filtrar apenas empreendimentos da empresa
-    if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
-      query = query.eq('empresa_id', req.user.empresa_id);
-    }
-
-    const { data, error } = await query;
-
-    if (error) throw error;
-
+    console.log('✅ [Backend] Sucesso! Enviando dados para o frontend');
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
