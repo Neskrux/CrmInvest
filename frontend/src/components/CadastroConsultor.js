@@ -19,6 +19,15 @@ const CadastroConsultor = () => {
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  
+  // Modal de vídeo obrigatório
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  const [videoTimeWatched, setVideoTimeWatched] = useState(0);
+  const [canCloseModal, setCanCloseModal] = useState(false);
+  const [videoPlaying, setVideoPlaying] = useState(false);
+  const [showPlayButton, setShowPlayButton] = useState(false);
+  const [showControlButton, setShowControlButton] = useState(false);
+  const videoRef = React.useRef(null);
 
   // Meta Pixel - Carregar script do Facebook
   useEffect(() => {
@@ -46,6 +55,135 @@ const CadastroConsultor = () => {
       }
     };
   }, []);
+
+  // Modal de vídeo - Abrir na primeira visualização
+  useEffect(() => {
+    // Verificar se já foi mostrado antes (usando localStorage)
+    const hasSeenVideo = localStorage.getItem('cadastro-consultor-video-seen');
+    
+    if (!hasSeenVideo) {
+      setShowVideoModal(true);
+      setShowControlButton(true); // Mostrar botão inicial
+    }
+  }, []);
+
+  // Bloquear scroll quando modal estiver aberto
+  useEffect(() => {
+    if (showVideoModal) {
+      // Bloquear scroll
+      document.body.style.overflow = 'hidden';
+    } else {
+      // Liberar scroll
+      document.body.style.overflow = 'unset';
+    }
+
+    // Cleanup - sempre liberar scroll quando componente desmontar
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showVideoModal]);
+
+  // Forçar play do vídeo quando modal abrir
+  useEffect(() => {
+    if (showVideoModal && videoRef.current) {
+      // Pequeno delay para garantir que o vídeo esteja carregado
+      const timer = setTimeout(() => {
+        if (videoRef.current) {
+          // Garantir que o áudio esteja ativado
+          videoRef.current.muted = false;
+          videoRef.current.volume = 1;
+          
+          // Tentar tocar o vídeo
+          videoRef.current.play().then(() => {
+            setVideoPlaying(true);
+            setShowPlayButton(false);
+          }).catch(error => {
+            console.log('Autoplay bloqueado pelo navegador:', error);
+            setShowPlayButton(true);
+            setVideoPlaying(false);
+          });
+        }
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [showVideoModal]);
+
+  // Função para tocar o vídeo manualmente
+  const handlePlayVideo = async () => {
+    if (videoRef.current) {
+      try {
+        videoRef.current.muted = false;
+        videoRef.current.volume = 1;
+        await videoRef.current.play();
+        setVideoPlaying(true);
+        setShowPlayButton(false);
+        setShowControlButton(true);
+        
+        // Esconder botão após 2 segundos
+        setTimeout(() => {
+          setShowControlButton(false);
+        }, 2000);
+      } catch (error) {
+        console.log('Erro ao tocar vídeo:', error);
+      }
+    }
+  };
+
+  // Função para pausar o vídeo
+  const handlePauseVideo = () => {
+    if (videoRef.current) {
+      videoRef.current.pause();
+      setVideoPlaying(false);
+      setShowControlButton(true);
+      
+      // Esconder botão após 2 segundos
+      setTimeout(() => {
+        setShowControlButton(false);
+      }, 2000);
+    }
+  };
+
+  // Função para alternar play/pause ao clicar no vídeo
+  const handleVideoClick = () => {
+    if (videoRef.current) {
+      if (videoPlaying) {
+        // Se está tocando, pausar
+        videoRef.current.pause();
+        setVideoPlaying(false);
+      } else {
+        // Se está pausado, tocar
+        videoRef.current.play();
+        setVideoPlaying(true);
+      }
+      
+      // Mostrar botão e esconder após 2 segundos
+      setShowControlButton(true);
+      setTimeout(() => {
+        setShowControlButton(false);
+      }, 2000);
+    }
+  };
+
+  // Função para controlar o tempo assistido do vídeo
+  const handleVideoTimeUpdate = (e) => {
+    const currentTime = e.target.currentTime;
+    setVideoTimeWatched(currentTime);
+    
+    // Permitir fechar após 20 segundos
+    if (currentTime >= 20 && !canCloseModal) {
+      setCanCloseModal(true);
+    }
+  };
+
+  // Função para fechar o modal
+  const handleCloseModal = () => {
+    if (canCloseModal) {
+      setShowVideoModal(false);
+      // Marcar como visto no localStorage
+      localStorage.setItem('cadastro-consultor-video-seen', 'true');
+    }
+  };
 
   const validateCPF = (cpf) => {
     cpf = cpf.replace(/[^\d]/g, '');
@@ -433,7 +571,7 @@ const CadastroConsultor = () => {
       <div style={{
         background: 'white',
         borderRadius: '8px',
-        padding: '3rem',
+        padding: '2rem',
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)',
         border: '1px solid #e5e7eb',
         width: '100%',
@@ -886,6 +1024,246 @@ const CadastroConsultor = () => {
           </ul>
         </div>
       </div>
+
+      {/* Modal de Vídeo Obrigatório */}
+      {showVideoModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.9)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '2rem'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '2rem',
+            maxWidth: '400px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'hidden',
+            position: 'relative'
+          }}>
+            {/* Header do Modal */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem'
+            }}>
+              <h2 style={{
+                fontSize: '1.2rem',
+                fontWeight: '700',
+                color: '#1a1d23',
+                margin: 0
+              }}>
+                Boas vindas ao Solumn
+              </h2>
+              {canCloseModal ? (
+                <button
+                  onClick={handleCloseModal}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '1.2rem',
+                    color: '#6b7280',
+                    cursor: 'pointer',
+                    padding: '0.5rem',
+                    borderRadius: '50%',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                    e.target.style.color = '#374151';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                    e.target.style.color = '#6b7280';
+                  }}
+                >
+                  ✕
+                </button>
+              ) : (
+                <div style={{
+                  position: 'relative',
+                  width: '40px',
+                  height: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {/* Círculo de fundo */}
+                  <div style={{
+                    position: 'absolute',
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    border: '3px solid #e5e7eb',
+                    background: 'transparent'
+                  }} />
+                  
+                  {/* Círculo de progresso - preenchimento */}
+                  <div style={{
+                    position: 'absolute',
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    background: `conic-gradient(#1a1d23 0deg, #1a1d23 ${(videoTimeWatched / 20) * 360}deg, transparent ${(videoTimeWatched / 20) * 360}deg)`,
+                    transition: 'background 0.3s ease'
+                  }} />
+                  
+                  {/* Máscara interna para criar o efeito de anel */}
+                  <div style={{
+                    position: 'absolute',
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: '50%',
+                    background: 'white',
+                    top: '3px',
+                    left: '3px'
+                  }} />
+                  
+                  {/* Texto do tempo */}
+                  <span style={{
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    color: '#1a1d23',
+                    zIndex: 1
+                  }}>
+                    {Math.ceil(20 - videoTimeWatched)}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Vídeo */}
+            <div style={{
+              borderRadius: '8px',
+              overflow: 'hidden',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              position: 'relative'
+            }}>
+               <video
+                 ref={videoRef}
+                 src="/video-produto.mp4" // Substitua pelo nome do seu vídeo
+                 controls={false} // Controles sempre desabilitados
+                 autoPlay
+                 muted={false} // Sempre com áudio
+                 onTimeUpdate={handleVideoTimeUpdate}
+                 onPlay={() => setVideoPlaying(true)}
+                 onPause={() => setVideoPlaying(false)}
+                 onClick={handleVideoClick}
+                onSeeked={(e) => {
+                  // Bloquear avanço - voltar para posição atual se tentar pular
+                  if (!canCloseModal && e.target.currentTime > videoTimeWatched) {
+                    e.target.currentTime = videoTimeWatched;
+                  }
+                }}
+                onSeeking={(e) => {
+                  // Bloquear navegação temporal se ainda não pode fechar
+                  if (!canCloseModal) {
+                    e.target.currentTime = videoTimeWatched;
+                  }
+                }}
+                style={{
+                  width: '80%',
+                  objectFit: 'cover',
+                  cursor: 'pointer' // Cursor de clique
+                }}
+              >
+                Seu navegador não suporta vídeos.
+              </video>
+
+              {/* Botão de Play - quando vídeo está pausado */}
+              {!videoPlaying && showControlButton && (
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  zIndex: 10
+                }}>
+                  <button
+                    onClick={handlePlayVideo}
+                    style={{
+                      width: '80px',
+                      height: '80px',
+                      borderRadius: '50%',
+                      background: 'rgba(0, 0, 0, 0.8)',
+                      border: 'none',
+                      color: 'white',
+                      fontSize: '2rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.target.style.background = 'rgba(0, 0, 0, 0.9)';
+                      e.target.style.transform = 'scale(1.1)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.target.style.background = 'rgba(0, 0, 0, 0.8)';
+                      e.target.style.transform = 'scale(1)';
+                    }}
+                  >
+                    ▶
+                  </button>
+                </div>
+              )}
+
+              {/* Botão de Pause - quando vídeo está tocando */}
+              {videoPlaying && showControlButton && (
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  zIndex: 10
+                }}>
+                  <button
+                    onClick={handlePauseVideo}
+                    style={{
+                      width: '80px',
+                      height: '80px',
+                      borderRadius: '50%',
+                      background: 'rgba(0, 0, 0, 0.8)',
+                      border: 'none',
+                      color: 'white',
+                      fontSize: '2rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.target.style.background = 'rgba(0, 0, 0, 0.9)';
+                      e.target.style.transform = 'scale(1.1)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.target.style.background = 'rgba(0, 0, 0, 0.8)';
+                      e.target.style.transform = 'scale(1)';
+                    }}
+                  >
+                    ⏸
+                  </button>
+                </div>
+              )}
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

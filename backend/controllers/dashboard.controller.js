@@ -300,8 +300,8 @@ const getGeraisPacientes = async (req, res) => {
       } else {
         query = query.eq('id', 0); // Força resultado vazio
       }
-    } else if ((isAdmin || isParceiro) && empresaId) {
-      // Para admin/parceiro, buscar pacientes da empresa (com empresa_id OU consultores da empresa)
+    } else if ((isAdmin || isParceiro || isConsultor) && empresaId) {
+      // Para admin/parceiro/consultor, buscar pacientes da empresa (com empresa_id OU consultores da empresa)
       const { data: consultores, error: consultorError } = await supabaseAdmin
         .from('consultores')
         .select('id')
@@ -324,32 +324,6 @@ const getGeraisPacientes = async (req, res) => {
       
       if (conditions.length > 0) {
         query = query.or(conditions.join(','));
-      } else {
-        query = query.eq('id', 0); // Força resultado vazio
-      }
-    } else if (isConsultor) {
-      // Para consultor, buscar pacientes com agendamentos OU fechamentos dele
-      const { data: agendamentos, error: agendError } = await supabaseAdmin
-        .from('agendamentos')
-        .select('paciente_id')
-        .eq('consultor_id', req.user.id);
-
-      if (agendError) throw agendError;
-
-      const { data: fechamentos, error: fechError } = await supabaseAdmin
-        .from('fechamentos')
-        .select('paciente_id')
-        .eq('consultor_id', req.user.id);
-
-      if (fechError) throw fechError;
-
-      const pacienteIdsAgendamentos = agendamentos ? agendamentos.map(a => a.paciente_id) : [];
-      const pacienteIdsFechamentos = fechamentos ? fechamentos.map(f => f.paciente_id) : [];
-      
-      const todosPacienteIds = [...new Set([...pacienteIdsAgendamentos, ...pacienteIdsFechamentos])];
-      
-      if (todosPacienteIds.length > 0) {
-        query = query.in('id', todosPacienteIds);
       } else {
         query = query.eq('id', 0); // Força resultado vazio
       }
@@ -396,9 +370,7 @@ const getGeraisAgendamentos = async (req, res) => {
 
     if (isClinica) {
       query = query.eq('clinica_id', req.user.clinica_id);
-    } else if (isConsultor) {
-      query = query.eq('consultor_id', req.user.id);
-    } else if ((isAdmin || isParceiro) && empresaId) {
+    } else if ((isAdmin || isParceiro || isConsultor) && empresaId) {
       query = query.eq('empresa_id', empresaId);
     }
 
@@ -457,9 +429,7 @@ const getGeraisFechamentos = async (req, res) => {
       } else {
         query = query.eq('id', 0); // Força resultado vazio
       }
-    } else if (isConsultor) {
-      query = query.eq('consultor_id', req.user.id);
-    } else if ((isAdmin || isParceiro) && empresaId) {
+    } else if ((isAdmin || isParceiro || isConsultor) && empresaId) {
       query = query.eq('empresa_id', empresaId);
     }
 
@@ -496,11 +466,8 @@ const getGeraisClinicas = async (req, res) => {
     const isConsultor = req.user.tipo === 'consultor';
     const empresaId = req.user.empresa_id;
 
-    if (isConsultor) {
-      // Para consultor, buscar apenas clínicas criadas por ele
-      query = query.eq('criado_por_consultor_id', req.user.id);
-    } else if ((isAdmin || isParceiro) && empresaId) {
-      // Para admin/parceiro, buscar apenas clínicas da empresa
+    if ((isAdmin || isParceiro || isConsultor) && empresaId) {
+      // Para admin/parceiro/consultor, buscar clínicas da empresa
       query = query.eq('empresa_id', empresaId);
     }
 

@@ -326,6 +326,8 @@ const cadastroPublico = async (req, res) => {
     const saltRounds = 10;
     const senhaHash = await bcrypt.hash(senha, saltRounds);
     
+    console.log('🏢 Definindo empresa_id = 3 para cadastro público de consultor');
+    
     // Inserir consultor
     const { data, error } = await supabaseAdmin
       .from('consultores')
@@ -340,7 +342,8 @@ const cadastroPublico = async (req, res) => {
         estado,
         tipo: 'consultor',
         ativo: true,
-        is_freelancer: true
+        is_freelancer: true,
+        empresa_id: 3  // Sempre associar à empresa ID 3 para cadastros públicos
       }])
       .select();
 

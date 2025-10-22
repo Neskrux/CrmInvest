@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import useBranding from '../hooks/useBranding';
 import { useToast } from '../components/Toast';
-import TutorialFechamentos from './TutorialFechamentos';
 import ModalEvidencia from './ModalEvidencia';
 
 const Fechamentos = () => {
@@ -60,9 +59,6 @@ const Fechamentos = () => {
   const [evidenciasFechamento, setEvidenciasFechamento] = useState([]);
   const [fechamentoObservacoes, setFechamentoObservacoes] = useState(null);
 
-  // Estados para controlar o tutorial
-  const [showTutorial, setShowTutorial] = useState(false);
-  const [tutorialCompleted, setTutorialCompleted] = useState(false);
 
   // Estado para modal de explicação de permissões
   const [showPermissaoModal, setShowPermissaoModal] = useState(false);
@@ -87,8 +83,6 @@ const Fechamentos = () => {
       setFiltroConsultor(String(user.consultor_id));
     }
     
-    // Tutorial automático desabilitado
-    // Os usuários podem acessá-lo manualmente através do botão "Ver Tutorial"
   }, [deveFiltrarPorConsultor, user?.consultor_id]);
 
   // Garantir que a aba ativa seja válida baseada no branding
@@ -880,19 +874,6 @@ const Fechamentos = () => {
     }
   };
 
-  const handleTutorialComplete = () => {
-    setShowTutorial(false);
-    setTutorialCompleted(true);
-    localStorage.setItem('tutorial-fechamentos-completed', 'true');
-  };
-
-  const handleTutorialClose = () => {
-    setShowTutorial(false);
-  };
-
-  const startTutorial = () => {
-    setShowTutorial(true);
-  };
 
   // Função chamada quando evidência é enviada com sucesso
   const handleEvidenciaSuccess = async (evidenciaId) => {
@@ -946,36 +927,6 @@ const Fechamentos = () => {
             <h1 className="page-title">{isConsultor ? 'Visualizar Fechamentos' : 'Gerenciar Fechamentos'}</h1>
             <p className="page-subtitle">{isConsultor ? `Visualize os fechamentos dos ${empresaId === 5 ? 'empreendimentos' : 'tratamentos'} dos seus ${t.paciente.toLowerCase()+'s'}` : `Gerencie os fechamentos dos ${empresaId === 5 ? 'empreendimentos' : 'tratamentos'} dos ${t.paciente.toLowerCase()+'s'}`}</p>
           </div>
-          {!isClinica && (
-            <button
-              onClick={startTutorial}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 16px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                color: '#374151',
-                fontSize: '14px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#f9fafb';
-                e.target.style.borderColor = '#9ca3af';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = 'white';
-                e.target.style.borderColor = '#d1d5db';
-              }}
-              title="Ver tutorial da tela de fechamentos"
-            >
-              Ver Tutorial
-            </button>
-          )}
         </div>
       </div>
 
@@ -3240,12 +3191,6 @@ const Fechamentos = () => {
         nomeRegistro={evidenciaData.fechamentoNome}
       />
 
-      {/* Tutorial Overlay */}
-      <TutorialFechamentos
-        isOpen={showTutorial}
-        onClose={handleTutorialClose}
-        onComplete={handleTutorialComplete}
-      />
     </div>
   );
 };
