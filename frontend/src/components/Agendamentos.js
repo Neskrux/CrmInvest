@@ -753,7 +753,7 @@ const Agendamentos = () => {
           <div style={{ padding: '1.5rem', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
             <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Consultor</label>
+                <label className="form-label">{t.consultor}</label>
                 <select
                   value={filtroConsultor}
                   onChange={(e) => setFiltroConsultor(e.target.value)}
@@ -784,13 +784,13 @@ const Agendamentos = () => {
               </div>
 
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Clínica</label>
+                <label className="form-label">{t.clinica}</label>
                 <select
                   value={filtroClinica}
                   onChange={(e) => setFiltroClinica(e.target.value)}
                   className="form-select"
                 >
-                  <option value="">Todas as clínicas</option>
+                  <option value="">Todas as {t.clinica.toLowerCase()}s</option>
                   {clinicas.map(clinica => (
                     <option key={clinica.id} value={clinica.id}>
                       {clinica.nome}
@@ -1068,7 +1068,7 @@ const Agendamentos = () => {
 
             <form onSubmit={handleSubmit} autoComplete="off">
               <div className="form-group">
-                <label className="form-label">Paciente *</label>
+                <label className="form-label">{t.paciente} *</label>
                 <select
                   name="paciente_id"
                   className="form-select"
@@ -1076,7 +1076,7 @@ const Agendamentos = () => {
                   onChange={handleInputChange}
                   required
                 >
-                  <option value="">Selecione um paciente</option>
+                  <option value="">Selecione um {t.paciente.toLowerCase()}</option>
                   {pacientes.filter(paciente => 
                     // Mostrar apenas pacientes com status apropriados para agendamento
                     ['lead', 'em_conversa', 'cpf_aprovado', 'sem_cedente', 'agendado', 'compareceu', 'nao_compareceu', 'reagendado'].includes(paciente.status)
@@ -1088,14 +1088,14 @@ const Agendamentos = () => {
                 </select>
                 {pacientes.length === 0 && (
                   <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                    Nenhum paciente cadastrado. Cadastre um paciente primeiro.
+                    Nenhum {t.paciente.toLowerCase()} cadastrado. Cadastre um {t.paciente.toLowerCase()} primeiro.
                   </p>
                 )}
               </div>
 
               <div className="grid grid-2">
                 <div className="form-group">
-                  <label className="form-label">Consultor *</label>
+                  <label className="form-label">{t.consultor} *</label>
                   <select
                     name="consultor_id"
                     className="form-select"
@@ -1103,7 +1103,7 @@ const Agendamentos = () => {
                     onChange={handleInputChange}
                     required
                   >
-                    <option value="">Selecione um consultor</option>
+                    <option value="">Selecione um {t.consultor.toLowerCase()}</option>
                     {consultores.map(consultor => (
                       <option key={consultor.id} value={consultor.id}>
                         {consultor.nome}
@@ -1113,14 +1113,14 @@ const Agendamentos = () => {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Clínica</label>
+                  <label className="form-label">{t.clinica}</label>
                   <select
                     name="clinica_id"
                     className="form-select"
                     value={formData.clinica_id}
                     onChange={handleInputChange}
                   >
-                    <option value="">Selecione uma clínica</option>
+                    <option value="">Selecione um {t.clinica.toLowerCase()}</option>
                     {clinicas.map(clinica => (
                       <option key={clinica.id} value={clinica.id}>
                         {clinica.nome}

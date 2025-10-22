@@ -6,7 +6,7 @@ import { TrendingUp, Calendar, BarChart3, CheckCircle, XCircle, RotateCcw } from
 
 const Dashboard = () => {
   // Hook para textos dinâmicos baseados no empresa_id
-  const { t } = useBranding();
+  const { t, shouldShow } = useBranding();
   
   // Estado separado para KPIs principais (dados filtrados)
   const [kpisPrincipais, setKpisPrincipais] = useState({
@@ -1761,15 +1761,46 @@ const Dashboard = () => {
                   style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
                   title="Limpar filtros regionais"
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
-                </button>
-              )}
+                  <option value="">Todos os Estados</option>
+                  {estadosDisponiveis.map(estado => (
+                    <option key={estado} value={estado}>{estado}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={filtroRegiao.cidade}
+                  onChange={(e) => setFiltroRegiao({ ...filtroRegiao, cidade: e.target.value })}
+                  style={{
+                    padding: '0.25rem 0.5rem',
+                    fontSize: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    minWidth: '120px'
+                  }}
+                  disabled={!filtroRegiao.estado && cidadesDisponiveis.length > 20} // Desabilitar se muitas cidades
+                >
+                  <option value="">Todas as Cidades</option>
+                  {cidadesDisponiveis.map(cidade => (
+                    <option key={cidade} value={cidade}>{cidade}</option>
+                  ))}
+                </select>
+
+                {(filtroRegiao.estado || filtroRegiao.cidade) && (
+                  <button
+                    onClick={() => setFiltroRegiao({ cidade: '', estado: '' })}
+                    className="btn btn-secondary"
+                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                    title="Limpar filtros regionais"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
         )}
       </div>
 

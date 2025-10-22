@@ -428,7 +428,7 @@ const CapturaClientes = () => {
       const data = await response.json();
       
       if (response.ok) {
-        navigate('/captura-sucesso', { 
+        navigate('/captura-sucesso-clientes', { 
           state: { 
             nome: data.nome,
             message: data.message,
@@ -535,7 +535,8 @@ const CapturaClientes = () => {
                   <option value="5">Residencial Girassol</option>
                   <option value="6">Sintropia Sky Garden</option>
                   <option value="7">Residencial Lotus</option>
-                  <option value="8">RIver Sky Garden</option>
+                  <option value="8">River Sky Garden</option>
+                  <option value="9">Condomínio Figueira Garcia</option>
                 </select>
               </div>
 
