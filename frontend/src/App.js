@@ -3,8 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Link, us
 import './App.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './components/Toast';
-import { LeadNotificationProvider, useLeadNotification } from './components/LeadNotificationProvider';
-import { AudioProvider } from './contexts/AudioContext';
 import useBranding from './hooks/useBranding';
 import { HelpCircle } from 'lucide-react';
 import CadastroConsultor from './components/CadastroConsultor';
@@ -58,8 +56,8 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
-// Componente interno que usa o hook de notificação
-const AppContentWithNotifications = () => {
+// Componente interno principal
+const AppContent = () => {
   const { user, logout, loading, isAdmin, isParceiro, isIncorporadora }	 = useAuth();
   const { t } = useBranding();
   const location = useLocation();
@@ -190,7 +188,6 @@ const AppContentWithNotifications = () => {
           <Route path="/como-fazer" element={<ComoFazer />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/pacientes" element={<Pacientes />} />
-          <Route path="/clinicas" element={<Clinicas />} />
           <Route path="/materiais" element={<Materiais />} />
           <Route path="/perfil" element={<Perfil />} />
           <Route path="/" element={<Navigate to="/indicacoes" replace />} />
@@ -359,17 +356,6 @@ const AppContentWithNotifications = () => {
                   <circle cx="9" cy="7" r="4"/>
                 </svg>
                 <span>Pacientes</span>
-              </Link>
-
-              <Link
-                to="/clinicas"
-                className={`freelancer-nav-item ${activeTab === 'clinicas' ? 'active' : ''}`}
-              >
-                <svg className="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                  <polyline points="9 22 9 12 15 12 15 22"/>
-                </svg>
-                <span>Clínicas</span>
               </Link>
 
               <Link
@@ -1180,29 +1166,25 @@ function App() {
   return (
     <ToastProvider>
       <AuthProvider>
-        <AudioProvider>
-          <LeadNotificationProvider>
-            <Router>
-              <Routes>
-                {/* Rotas públicas - Captura de leads */}
-                <Route path="/captura-lead" element={<CapturaLead />} />
-                <Route path="/captura-sucesso" element={<CapturaSucesso />} />
-                
-                {/* Rotas públicas - Captura de clínicas */}
-                <Route path="/captura-clinica" element={<CapturaClinica />} />
-                <Route path="/captura-clinica-sucesso" element={<CapturaClinicaSucesso />} />
-                
-                {/* Rotas públicas - Captura de clientes */}
-                <Route path="/captura-clientes" element={<CapturaClientes />} />
-                <Route path="/captura-sucesso-clientes" element={<CapturaSucessoClientes />} />
-                <Route path="/captura-indicador-cliente" element={<CapturaIndicadorClientes />} />
+        <Router>
+            <Routes>
+              {/* Rotas públicas - Captura de leads */}
+              <Route path="/captura-lead" element={<CapturaLead />} />
+              <Route path="/captura-sucesso" element={<CapturaSucesso />} />
+              
+              {/* Rotas públicas - Captura de clínicas */}
+              <Route path="/captura-clinica" element={<CapturaClinica />} />
+              <Route path="/captura-clinica-sucesso" element={<CapturaClinicaSucesso />} />
+              
+              {/* Rotas públicas - Captura de clientes */}
+              <Route path="/captura-clientes" element={<CapturaClientes />} />
+              <Route path="/captura-sucesso-clientes" element={<CapturaSucessoClientes />} />
+              <Route path="/captura-indicador-cliente" element={<CapturaIndicadorClientes />} />
 
-                {/* Rotas da aplicação principal */}
-                <Route path="/*" element={<AppContentWithNotifications />} />
-              </Routes>
-            </Router>
-          </LeadNotificationProvider>
-        </AudioProvider>
+              {/* Rotas da aplicação principal */}
+              <Route path="/*" element={<AppContent />} />
+            </Routes>
+          </Router>
       </AuthProvider>
     </ToastProvider>
   );

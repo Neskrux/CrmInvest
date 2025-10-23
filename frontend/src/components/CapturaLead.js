@@ -10,6 +10,7 @@ const CapturaLead = () => {
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
+    email: '',
     tipo_tratamento: '',
     cpf: '',
     cidade: '',
@@ -381,6 +382,12 @@ const CapturaLead = () => {
       newErrors.telefone = 'Telefone deve ter pelo menos 10 dígitos';
     }
     
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email é obrigatório';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Email deve ter um formato válido';
+    }
+    
     if (!formData.cpf.trim()) {
       newErrors.cpf = 'CPF é obrigatório';
     } else if (formData.cpf.replace(/\D/g, '').length !== 11) {
@@ -523,6 +530,20 @@ const CapturaLead = () => {
                   disabled={loading}
                 />
                 {errors.telefone && <span className="field-error">{errors.telefone}</span>}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Email *</label>
+                <input
+                  type="email"
+                  name="email"
+                  className={`form-input ${errors.email ? 'error' : ''}`}
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  placeholder="seu@email.com"
+                  disabled={loading}
+                />
+                {errors.email && <span className="field-error">{errors.email}</span>}
               </div>
 
               <div className="form-group">

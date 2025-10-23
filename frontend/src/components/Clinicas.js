@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
-import TutorialClinicas from './TutorialClinicas';
 import ModalEvidencia from './ModalEvidencia';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -145,9 +144,6 @@ const Clinicas = () => {
   const [uploadingDocs, setUploadingDocs] = useState({});
   const [sociosDocsList, setSociosDocsList] = useState([]);
 
-  // Estados para controlar o tutorial
-  const [showTutorial, setShowTutorial] = useState(false);
-  const [tutorialCompleted, setTutorialCompleted] = useState(false);
 
   // Estado para modal de explicação de permissões
   const [showPermissaoModal, setShowPermissaoModal] = useState(false);
@@ -309,13 +305,8 @@ const Clinicas = () => {
       fetchConsultoresInternos();
     }
     
-    // Verificar se tutorial foi completado
-    const completed = localStorage.getItem('tutorial-clinicas-completed');
-    setTutorialCompleted(!!completed);
   }, []);
 
-  // Tutorial automático desabilitado
-  // Os usuários podem acessá-lo manualmente através do botão "Ver Tutorial"
 
   // Detectar mudanças de tamanho da tela
   useEffect(() => {
@@ -2172,20 +2163,6 @@ const Clinicas = () => {
   // Obter cidades sugeridas baseadas no estado selecionado
   const cidadesSugeridas = formData.estado ? (cidadesPorEstado[formData.estado] || []) : [];
 
-  const handleTutorialComplete = () => {
-    setShowTutorial(false);
-    setTutorialCompleted(true);
-    localStorage.setItem('tutorial-clinicas-completed', 'true');
-  };
-
-  const handleTutorialClose = () => {
-    setShowTutorial(false);
-    localStorage.setItem('tutorial-clinicas-dismissed', 'true');
-  };
-
-  const startTutorial = () => {
-    setShowTutorial(true);
-  };
 
   // Função para visualizar documento com autenticação
   const handleVisualizarDocumento = async (clinicaId, tipoDoc) => {
@@ -2320,36 +2297,6 @@ const Clinicas = () => {
             <h1 className="page-title">{isConsultor ? 'Minhas Clínicas' : 'Gerenciar Clínicas'}</h1>
             <p className="page-subtitle">{isConsultor ? 'Visualize as clínicas indicadas' : 'Gerencie as clínicas parceiras'}</p>
           </div>
-          {!isClinica && (
-          <button
-            onClick={startTutorial}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 16px',
-              border: '1px solid #d1d5db',
-              borderRadius: '8px',
-              backgroundColor: 'white',
-              color: '#374151',
-              fontSize: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = '#f9fafb';
-              e.target.style.borderColor = '#9ca3af';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'white';
-              e.target.style.borderColor = '#d1d5db';
-            }}
-            title="Ver tutorial da tela de clínicas"
-          >
-            Ver Tutorial
-          </button>
-          )}
         </div>
 
         <div style={{
@@ -7694,12 +7641,6 @@ const Clinicas = () => {
         nomeRegistro={evidenciaData.clinicaNome}
       />
 
-      {/* Tutorial Overlay */}
-      <TutorialClinicas
-        isOpen={showTutorial}
-        onClose={handleTutorialClose}
-        onComplete={handleTutorialComplete}
-      />
 
       {/* Modal de Gerenciar Acesso */}
       {showAcessoModal && clinicaParaAcesso && (
