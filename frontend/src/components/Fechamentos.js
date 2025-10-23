@@ -183,7 +183,14 @@ const Fechamentos = () => {
     }
     return fechamentos.filter(fechamento => {
       const consultorMatch = !filtroConsultor || fechamento.consultor_id === parseInt(filtroConsultor);
-      const clinicaMatch = !filtroClinica || fechamento.clinica_id === parseInt(filtroClinica);
+      
+      // Para incorporadora, filtrar por empreendimento (clinica_id contém empreendimento_id)
+      let clinicaMatch = true;
+      if (empresaId === 5) {
+        clinicaMatch = !filtroClinica || fechamento.clinica_id === parseInt(filtroClinica);
+      } else {
+        clinicaMatch = !filtroClinica || fechamento.clinica_id === parseInt(filtroClinica);
+      }
       
       let mesMatch = true;
       if (filtroMes) {
@@ -893,6 +900,78 @@ const Fechamentos = () => {
     });
   };
 
+  // Função para criar acesso freelancer
+  const handleCriarAcessoFreelancer = async (fechamentoId) => {
+    try {
+      // Buscar dados do fechamento para mostrar nome do paciente na confirmação
+      const fechamento = fechamentos.find(f => f.id === fechamentoId);
+      const paciente = pacientes.find(p => p.id === fechamento?.paciente_id);
+      
+      if (!fechamento || !paciente) {
+        showErrorToast('Fechamento ou paciente não encontrado');
+        return;
+      }
+
+      // Confirmação
+      const confirmacao = window.confirm(
+        `Tem certeza que deseja criar um acesso freelancer para ${paciente.nome}?\n\n` +
+        `Email: ${paciente.email || 'Não cadastrado'}\n\n` +
+        `As credenciais serão enviadas por email.`
+      );
+
+      if (!confirmacao) return;
+
+      // Verificar se paciente tem email
+      if (!paciente.email || paciente.email.trim() === '') {
+        showErrorToast('Paciente deve ter email cadastrado para criar acesso freelancer');
+        return;
+      }
+
+      // Verificar se paciente tem status "fechado"
+      if (paciente.status !== 'fechado') {
+        showErrorToast('Paciente deve ter status "fechado" para criar acesso freelancer');
+        return;
+      }
+
+      // Verificar se fechamento está aprovado
+      if (fechamento.aprovado !== 'aprovado') {
+        showErrorToast('Fechamento deve estar aprovado para criar acesso freelancer');
+        return;
+      }
+
+      // Verificar se email já existe em consultores
+      const consultorExistente = consultores.find(c => c.email === paciente.email);
+      if (consultorExistente) {
+        showErrorToast('Este email já possui acesso freelancer no sistema');
+        return;
+      }
+
+      // Fazer requisição para criar acesso
+      const response = await makeRequest(`/fechamentos/${fechamentoId}/criar-acesso-freelancer`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao criar acesso freelancer');
+      }
+
+      const result = await response.json();
+      
+      showSuccessToast(result.message || 'Acesso freelancer criado com sucesso!');
+      
+      // Recarregar dados para atualizar a interface
+      carregarDados();
+      
+    } catch (error) {
+      console.error('Erro ao criar acesso freelancer:', error);
+      showErrorToast(error.message || 'Erro ao criar acesso freelancer');
+    }
+  };
+
   if (carregando) {
     return (
       <div className="loading">
@@ -993,7 +1072,7 @@ const Fechamentos = () => {
           }}>
             <div className="grid grid-3" style={{ gap: '1rem', marginBottom: '1rem' }}>
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Consultor</label>
+                <label className="form-label">{empresaId === 5 ? 'Corretor' : 'Consultor'}</label>
                 <select 
                   className="form-select"
                   value={filtroConsultor} 
@@ -1022,16 +1101,29 @@ const Fechamentos = () => {
               </div>
 
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Clínica</label>
+                <label className="form-label">{empresaId === 5 ? 'Empreendimento' : 'Clínica'}</label>
                 <select 
                   className="form-select"
                   value={filtroClinica} 
                   onChange={(e) => setFiltroClinica(e.target.value)}
                 >
-                  <option value="">Todas</option>
-                  {clinicas.map(c => (
+                  <option value="">{empresaId === 5 ? 'Todos' : 'Todas'}</option>
+                  {empresaId === 5 ? (
+                    // Para incorporadora, mostrar empreendimentos hardcoded
+                    <>
+                      <option value="4">Laguna Sky Garden</option>
+                      <option value="5">Residencial Girassol</option>
+                      <option value="6">Sintropia Sky Garden</option>
+                      <option value="7">Residencial Lotus</option>
+                      <option value="8">River Sky Garden</option>
+                      <option value="9">Condomínio Figueira Garcia</option>
+                    </>
+                  ) : (
+                    // Para outras empresas, mostrar clínicas
+                    clinicas.map(c => (
                     <option key={c.id} value={c.id}>{c.nome}</option>
-                  ))}
+                    ))
+                  )}
                 </select>
               </div>
 
@@ -1057,7 +1149,8 @@ const Fechamentos = () => {
           </div>
         )}
 
-        {/* Abas */}
+        {/* Abas - Apenas para não incorporadora */}
+        {empresaId !== 5 && (
         <div style={{ 
           borderBottom: '1px solid #e5e7eb',
           display: 'flex',
@@ -1097,6 +1190,11 @@ const Fechamentos = () => {
                 const paciente = pacientes.find(p => p.id === f.paciente_id);
                 if (!paciente) return false;
                 
+                  // Para incorporadora (empresa_id = 5), não verificar documentação
+                  const isIncorporadora = empresaId === 5;
+                  let statusReal = f.aprovado || 'pendente';
+                  
+                  if (!isIncorporadora) {
                 const totalDocs = 4;
                 const docsEnviados = [
                   paciente.selfie_doc_url,
@@ -1105,9 +1203,9 @@ const Fechamentos = () => {
                   paciente.contrato_servico_url
                 ].filter(Boolean).length;
                 
-                let statusReal = f.aprovado || 'documentacao_pendente';
                 if (docsEnviados < totalDocs && statusReal !== 'reprovado') {
                   statusReal = 'documentacao_pendente';
+                    }
                 }
                 
                 return statusReal === 'aprovado';
@@ -1151,6 +1249,11 @@ const Fechamentos = () => {
                   const paciente = pacientes.find(p => p.id === f.paciente_id);
                   if (!paciente) return false;
                   
+                  // Para incorporadora (empresa_id = 5), não verificar documentação
+                  const isIncorporadora = empresaId === 5;
+                  let statusReal = f.aprovado || 'pendente';
+                  
+                  if (!isIncorporadora) {
                   const totalDocs = 4;
                   const docsEnviados = [
                     paciente.selfie_doc_url,
@@ -1159,9 +1262,9 @@ const Fechamentos = () => {
                     paciente.contrato_servico_url
                   ].filter(Boolean).length;
                   
-                  let statusReal = f.aprovado || 'documentacao_pendente';
                   if (docsEnviados < totalDocs && statusReal !== 'reprovado') {
                     statusReal = 'documentacao_pendente';
+                    }
                   }
                   
                   return statusReal !== 'aprovado';
@@ -1170,17 +1273,26 @@ const Fechamentos = () => {
             </button>
           )}
         </div>
+        )}
 
         <div className="card-body">
           {(() => {
-            // Filtrar fechamentos baseado na aba ativa
-            const fechamentosPorAba = fechamentosFiltrados.filter(fechamento => {
+            // Para incorporadora, mostrar todos os fechamentos filtrados
+            // Para outras empresas, filtrar baseado na aba ativa
+            const fechamentosPorAba = empresaId === 5 ? fechamentosFiltrados : fechamentosFiltrados.filter(fechamento => {
               // Encontrar o paciente correspondente para verificar documentação
               const paciente = pacientes.find(p => p.id === fechamento.paciente_id);
               
               if (!paciente) return false;
               
-              // Verificar se documentação está completa
+              // Para incorporadora (empresa_id = 5), não verificar documentação
+              const isIncorporadora = empresaId === 5;
+              
+              // Determinar status real do fechamento
+              let statusReal = fechamento.aprovado || 'pendente';
+              
+              if (!isIncorporadora) {
+                // Para outras empresas, verificar se documentação está completa
               const totalDocs = 4;
               const docsEnviados = [
                 paciente.selfie_doc_url,
@@ -1189,14 +1301,15 @@ const Fechamentos = () => {
                 paciente.contrato_servico_url
               ].filter(Boolean).length;
               
-              // Determinar status real do fechamento
-              let statusReal = fechamento.aprovado || 'documentacao_pendente';
               if (docsEnviados < totalDocs && statusReal !== 'reprovado') {
                 statusReal = 'documentacao_pendente';
+                }
               }
               
               if (activeTab === 'fechamentos') {
-                // Aba "Fechamentos": apenas pacientes aprovados E com documentação completa
+                // Aba "Fechamentos": apenas fechamentos aprovados
+                // Para incorporadora, mostrar apenas se aprovado
+                // Para outras empresas, mostrar se aprovado E documentação completa
                 return statusReal === 'aprovado';
               } else {
                 // Aba "Em Análise": todos os demais (pendente, reprovado, documentação pendente, etc.)
@@ -1218,11 +1331,17 @@ const Fechamentos = () => {
                   <tr>
                     <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Data</th>
                     <th>Paciente</th>
-                    <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
+                    <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{empresaId === 5 ? 'Corretor' : 'Consultor'}</th>
+                    {empresaId === 5 ? (
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Empreendimento</th>
+                    ) : (
+                      <>
                     <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Clínica</th>
                     <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Tipo</th>
+                      </>
+                    )}
                     <th style={{ textAlign: 'right', display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Valor</th>
-                    {(isAdmin || isConsultorInterno) && (
+                    {(isAdmin || isConsultorInterno) && empresaId !== 5 && (
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Dados Op.</th>
                     )}
                     <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
@@ -1304,6 +1423,24 @@ const Fechamentos = () => {
                           </div>
                         </td>
                         <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{consultor?.nome || 'N/A'}</td>
+                        {empresaId === 5 ? (
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                            {(() => {
+                              const empreendimentoMap = {
+                                4: 'Laguna Sky Garden',
+                                5: 'Residencial Girassol',
+                                6: 'Sintropia Sky Garden',
+                                7: 'Residencial Lotus',
+                                8: 'River Sky Garden',
+                                9: 'Condomínio Figueira Garcia'
+                              };
+                              // Usar empreendimento_id do paciente ou clinica_id do fechamento como fallback
+                              const empreendimentoId = fechamento.paciente_empreendimento_id || fechamento.clinica_id;
+                              return empreendimentoMap[empreendimentoId] || '-';
+                            })()}
+                          </td>
+                        ) : (
+                          <>
                         <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{clinica?.nome || 'N/A'}</td>
                         <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                           {fechamento.tipo_tratamento && (
@@ -1312,10 +1449,12 @@ const Fechamentos = () => {
                             </span>
                           )}
                         </td>
+                          </>
+                        )}
                         <td style={{ textAlign: 'right', fontWeight: '600', display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                           {formatarMoeda(fechamento.valor_fechado)}
                         </td>
-                        {(isAdmin || isConsultorInterno) && (
+                        {(isAdmin || isConsultorInterno) && empresaId !== 5 && (
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                             {(() => {
                               // Verificar se dados administrativos estão completos
@@ -1364,20 +1503,24 @@ const Fechamentos = () => {
                               return <span className="badge badge-warning">Paciente não encontrado</span>;
                             }
                             
-                            const totalDocs = 4;
-                            const docsEnviados = [
+                            // Para incorporadora (empresa_id = 5), não verificar documentação
+                            const isIncorporadora = empresaId === 5;
+                            let statusFechamento = fechamento.aprovado || 'pendente';
+                            let docsEnviados = 0;
+                            let totalDocs = 4;
+                            
+                            if (!isIncorporadora) {
+                              docsEnviados = [
                               pacienteFechamento.selfie_doc_url,
                               pacienteFechamento.documento_url,
                               pacienteFechamento.comprovante_residencia_url,
                               pacienteFechamento.contrato_servico_url
                             ].filter(Boolean).length;
                             
-                            // Determinar status baseado em documentação e aprovação
-                            let statusFechamento = fechamento.aprovado || 'documentacao_pendente';
-                            
                             // Se documentação incompleta, sempre mostrar "Documentação Pendente"
                             if (docsEnviados < totalDocs && statusFechamento !== 'reprovado') {
                               statusFechamento = 'documentacao_pendente';
+                              }
                             }
                             
                             const statusOptions = [
@@ -1411,9 +1554,11 @@ const Fechamentos = () => {
                                     </option>
                                   ))}
                                 </select>
+                                {!isIncorporadora && (
                                 <div style={{ fontSize: '0.7rem', color: '#6b7280', textAlign: 'center' }}>
                                   Docs: {docsEnviados}/{totalDocs}
                                 </div>
+                                )}
                               </div>
                             ) : (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center' }}>
@@ -1431,9 +1576,11 @@ const Fechamentos = () => {
                                 >
                                   {currentStatus.label}
                                 </span>
+                                {!isIncorporadora && (
                                 <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>
                                   {docsEnviados}/{totalDocs} docs
                                 </div>
+                                )}
                               </div>
                             );
                           })()}
@@ -1460,6 +1607,27 @@ const Fechamentos = () => {
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                              </button>
+                            )}
+                            {/* Botão para criar acesso freelancer */}
+                            {((isAdmin || empresaId === 5) && 
+                              fechamento.aprovado === 'aprovado' && 
+                              paciente?.status === 'fechado' && 
+                              paciente?.email && 
+                              !consultores.find(c => c.email === paciente.email)
+                            ) && (
+                              <button 
+                                className="btn-action"
+                                onClick={() => handleCriarAcessoFreelancer(fechamento.id)}
+                                title="Criar acesso freelancer"
+                                style={{ color: '#059669'}}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                  <circle cx="8.5" cy="7" r="4"></circle>
+                                  <path d="M20 8v6"></path>
+                                  <path d="M23 11h-6"></path>
                                 </svg>
                               </button>
                             )}
@@ -1562,22 +1730,33 @@ const Fechamentos = () => {
                 </div>
               </div>
 
-              {shouldShow('fechamentos', 'mostrarFiltroClinica') && (
                 <div className="form-group">
-                  <label className="form-label">{t.clinica}</label>
+                <label className="form-label">{empresaId === 5 ? 'Empreendimento' : t.clinica}</label>
                   <select 
                     className="form-select"
                     value={novoFechamento.clinica_id || ''}
                     onChange={(e) => setNovoFechamento({...novoFechamento, clinica_id: e.target.value})}
                     disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                   >
-                    <option value="">Selecione um {t.clinica.toLowerCase()}</option>
-                    {clinicas.map(c => (
+                  <option value="">{empresaId === 5 ? 'Selecione um empreendimento' : `Selecione um ${t.clinica.toLowerCase()}`}</option>
+                  {empresaId === 5 ? (
+                    // Para incorporadora, mostrar empreendimentos hardcoded
+                    <>
+                      <option value="4">Laguna Sky Garden</option>
+                      <option value="5">Residencial Girassol</option>
+                      <option value="6">Sintropia Sky Garden</option>
+                      <option value="7">Residencial Lotus</option>
+                      <option value="8">River Sky Garden</option>
+                      <option value="9">Condomínio Figueira Garcia</option>
+                    </>
+                  ) : (
+                    // Para outras empresas, mostrar clínicas
+                    clinicas.map(c => (
                       <option key={c.id} value={c.id}>{c.nome}</option>
-                    ))}
+                    ))
+                  )}
                   </select>
                 </div>
-              )}
 
               <div className="grid grid-2">
                 <div className="form-group">
@@ -1591,6 +1770,7 @@ const Fechamentos = () => {
                   />
                 </div>
 
+                {empresaId !== 5 && (
                 <div className="form-group">
                   <label className="form-label">{t.tipoTratamento}</label>
                   <select 
@@ -1604,6 +1784,7 @@ const Fechamentos = () => {
                     <option value="Odontológico">Odontológico</option>
                   </select>
                 </div>
+                )}
               </div>
 
               <div className="form-group">
@@ -1634,7 +1815,8 @@ const Fechamentos = () => {
                 />
               </div>
 
-              {/* Seção de Parcelamento */}
+              {/* Seção de Parcelamento - Apenas para não incorporadora */}
+              {empresaId !== 5 && (
               <div style={{ 
                 border: '1px solid #10b981', 
                 borderRadius: '8px', 
@@ -1712,7 +1894,7 @@ const Fechamentos = () => {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">{empresaId === 5 ? 'Observação' : 'Antecipação (em meses)'}</label>
+                      <label className="form-label">Antecipação (em meses)</label>
                     <input 
                       type="number"
                       className="form-input"
@@ -1725,6 +1907,7 @@ const Fechamentos = () => {
                   </div>
                 </div>
               </div>
+              )}
 
               {/* Seção de Dados Administrativos - Apenas Admin/Consultor Interno */}
               {(isAdmin || isConsultorInterno) && empresaId !== 5 && (
@@ -1861,7 +2044,8 @@ const Fechamentos = () => {
               </button>
             </div>
 
-            {/* Navegação por abas */}
+            {/* Navegação por abas - Apenas para não incorporadora */}
+            {empresaId !== 5 && (
             <div style={{ 
               display: 'flex', 
               gap: '2rem',
@@ -2015,10 +2199,11 @@ const Fechamentos = () => {
                 </button>
               )}
             </div>
+            )}
 
             <div style={{ padding: '0 1.5rem 1.5rem 1.5rem', flex: 1, overflowY: 'auto' }}>
               {/* Aba de Informações */}
-              {activeViewTab === 'informacoes' && (
+              {(activeViewTab === 'informacoes' || empresaId === 5) && (
                 <div style={{ display: 'grid', gap: '1rem' }}>
                   <div>
                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Paciente</label>
@@ -2059,14 +2244,30 @@ const Fechamentos = () => {
                   </div>
                   
                   <div>
-                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Clínica</label>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>{empresaId === 5 ? 'Empreendimento' : 'Clínica'}</label>
                     <div style={{ 
                       padding: '0.75rem', 
                       backgroundColor: '#f9fafb', 
                       borderRadius: '6px',
                       border: '1px solid #e5e7eb'
                     }}>
-                      {viewingFechamento.clinica_nome || 'Não informado'}
+                      {empresaId === 5 ? (
+                        (() => {
+                          const empreendimentoMap = {
+                            4: 'Laguna Sky Garden',
+                            5: 'Residencial Girassol',
+                            6: 'Sintropia Sky Garden',
+                            7: 'Residencial Lotus',
+                            8: 'River Sky Garden',
+                            9: 'Condomínio Figueira Garcia'
+                          };
+                          // Usar empreendimento_id do paciente ou clinica_id do fechamento como fallback
+                          const empreendimentoId = viewingFechamento.paciente_empreendimento_id || viewingFechamento.clinica_id;
+                          return empreendimentoMap[empreendimentoId] || 'Não informado';
+                        })()
+                      ) : (
+                        viewingFechamento.clinica_nome || 'Não informado'
+                      )}
                     </div>
                   </div>
 
@@ -2082,6 +2283,7 @@ const Fechamentos = () => {
                     </div>
                   </div>
                   
+                  {empresaId !== 5 && (
                   <div>
                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Tipo de Tratamento</label>
                     <div style={{ 
@@ -2093,6 +2295,7 @@ const Fechamentos = () => {
                       {viewingFechamento.tipo_tratamento || 'Não informado'}
                     </div>
                   </div>
+                  )}
                   {viewingFechamento.observacoes && (
                     <div>
                       <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Observações</label>
@@ -2105,6 +2308,76 @@ const Fechamentos = () => {
                       }}>
                         {viewingFechamento.observacoes}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Botão para ver contrato anexado - Incorporadora */}
+                  {empresaId === 5 && viewingFechamento.contrato_arquivo && (
+                    <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e5e7eb' }}>
+                      <button 
+                        className="btn btn-primary"
+                        onClick={() => downloadContrato(viewingFechamento)}
+                        style={{ 
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                          <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        Ver Contrato Anexado
+                      </button>
+                      <p style={{ 
+                        fontSize: '0.75rem', 
+                        color: '#6b7280', 
+                        marginTop: '0.5rem',
+                        marginBottom: 0
+                      }}>
+                        {viewingFechamento.contrato_nome_original || 'contrato.pdf'}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Botão para criar acesso freelancer */}
+                  {((isAdmin || empresaId === 5) && 
+                    viewingFechamento.aprovado === 'aprovado' && 
+                    (() => {
+                      const paciente = pacientes.find(p => p.id === viewingFechamento.paciente_id);
+                      return paciente?.status === 'fechado' && 
+                             paciente?.email && 
+                             !consultores.find(c => c.email === paciente.email);
+                    })()
+                  ) && (
+                    <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e5e7eb' }}>
+                      <button 
+                        className="btn btn-primary"
+                        onClick={() => handleCriarAcessoFreelancer(viewingFechamento.id)}
+                        style={{ 
+                          backgroundColor: '#059669',
+                          borderColor: '#059669',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                          <circle cx="8.5" cy="7" r="4"></circle>
+                          <path d="M20 8v6"></path>
+                          <path d="M23 11h-6"></path>
+                        </svg>
+                        Criar Acesso Freelancer
+                      </button>
+                      <p style={{ 
+                        fontSize: '0.75rem', 
+                        color: '#6b7280', 
+                        marginTop: '0.5rem',
+                        marginBottom: 0
+                      }}>
+                        Permite que o cliente acesse o sistema como freelancer para fazer indicações
+                      </p>
                     </div>
                   )}
                 </div>

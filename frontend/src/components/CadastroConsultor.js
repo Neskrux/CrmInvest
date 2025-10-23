@@ -16,6 +16,13 @@ const CadastroConsultor = () => {
     estado: '',
     aceitaTermos: false
   });
+  
+  // Verificar se é cliente da incorporadora (empresa_id = 5)
+  const [isClienteIncorporadora, setIsClienteIncorporadora] = useState(() => {
+    // Inicializar com o valor correto desde o início
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('cliente') === 'incorporadora';
+  });
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -28,6 +35,7 @@ const CadastroConsultor = () => {
   const [showPlayButton, setShowPlayButton] = useState(false);
   const [showControlButton, setShowControlButton] = useState(false);
   const videoRef = React.useRef(null);
+
 
   // Meta Pixel - Carregar script do Facebook
   useEffect(() => {
@@ -56,8 +64,13 @@ const CadastroConsultor = () => {
     };
   }, []);
 
-  // Modal de vídeo - Abrir na primeira visualização
+  // Modal de vídeo - Abrir na primeira visualização (apenas para consultores normais)
   useEffect(() => {
+    // Não mostrar vídeo para clientes da incorporadora
+    if (isClienteIncorporadora) {
+      return;
+    }
+    
     // Verificar se já foi mostrado antes (usando localStorage)
     const hasSeenVideo = localStorage.getItem('cadastro-consultor-video-seen');
     
@@ -65,10 +78,15 @@ const CadastroConsultor = () => {
       setShowVideoModal(true);
       setShowControlButton(true); // Mostrar botão inicial
     }
-  }, []);
+  }, [isClienteIncorporadora]);
 
-  // Bloquear scroll quando modal estiver aberto
+  // Bloquear scroll quando modal estiver aberto (apenas para consultores normais)
   useEffect(() => {
+    // Não aplicar bloqueio de scroll para clientes da incorporadora
+    if (isClienteIncorporadora) {
+      return;
+    }
+    
     if (showVideoModal) {
       // Bloquear scroll
       document.body.style.overflow = 'hidden';
@@ -81,10 +99,15 @@ const CadastroConsultor = () => {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [showVideoModal]);
+  }, [showVideoModal, isClienteIncorporadora]);
 
-  // Forçar play do vídeo quando modal abrir
+  // Forçar play do vídeo quando modal abrir (apenas para consultores normais)
   useEffect(() => {
+    // Não aplicar para clientes da incorporadora
+    if (isClienteIncorporadora) {
+      return;
+    }
+    
     if (showVideoModal && videoRef.current) {
       // Pequeno delay para garantir que o vídeo esteja carregado
       const timer = setTimeout(() => {
@@ -107,7 +130,7 @@ const CadastroConsultor = () => {
       
       return () => clearTimeout(timer);
     }
-  }, [showVideoModal]);
+  }, [showVideoModal, isClienteIncorporadora]);
 
   // Função para tocar o vídeo manualmente
   const handlePlayVideo = async () => {
@@ -519,7 +542,9 @@ const CadastroConsultor = () => {
           pix: formData.pix.replace(/\D/g, ''),
           cidade: formData.cidade,
           estado: formData.estado,
-          tipo: 'consultor'
+          tipo: 'consultor',
+          empresa_id: isClienteIncorporadora ? 5 : null, // Incorporadora
+          is_freelancer: isClienteIncorporadora ? true : false
         })
       });
       
@@ -536,7 +561,11 @@ const CadastroConsultor = () => {
           });
         }
         
-        navigate('/cadastro-sucesso');
+        if (isClienteIncorporadora) {
+          navigate('/indicacoes');
+        } else {
+          navigate('/cadastro-sucesso');
+        }
       } else {
         // Meta Pixel - Evento de erro no cadastro
         if (window.fbq) {
@@ -603,7 +632,10 @@ const CadastroConsultor = () => {
             lineHeight: '1.5',
             marginBottom: '1rem'
           }}>
-            Preencha os dados abaixo para criar sua conta
+            {isClienteIncorporadora 
+              ? 'Preencha os dados abaixo para acessar o sistema de indicações'
+              : 'Preencha os dados abaixo para criar sua conta'
+            }
           </p>
           <div style={{
             display: 'inline-flex',
@@ -612,7 +644,7 @@ const CadastroConsultor = () => {
             fontSize: '0.875rem',
             color: '#6b7280'
           }}>
-            <span>Já possui uma conta?</span>
+            <span>{isClienteIncorporadora ? 'Já possui acesso?' : 'Já possui uma conta?'}</span>
             <button
               type="button"
               onClick={() => navigate('/login')}
@@ -630,7 +662,7 @@ const CadastroConsultor = () => {
               onMouseOver={(e) => e.target.style.color = '#0f1114'}
               onMouseOut={(e) => e.target.style.color = '#1a1d23'}
             >
-              Fazer login
+              {isClienteIncorporadora ? 'Fazer login' : 'Fazer login'}
             </button>
           </div>
         </div>
@@ -989,7 +1021,7 @@ const CadastroConsultor = () => {
                   }
                 }}
               >
-                {loading ? 'Cadastrando...' : 'Cadastrar'}
+                {loading ? 'Cadastrando...' : (isClienteIncorporadora ? 'Acessar Sistema' : 'Cadastrar')}
               </button>
             </div>
           </div>
@@ -1018,9 +1050,20 @@ const CadastroConsultor = () => {
             paddingLeft: '1rem',
             lineHeight: '1.4'
           }}>
-            <li>Seu PIX deve ser o mesmo CPF informado</li>
-            <li>Você receberá R$ 50 de comissão a cada R$ 5.000 fechados</li>
-            <li>Seu login será feito com o e-mail informado</li>
+            {isClienteIncorporadora ? (
+              <>
+                <li>Seu PIX deve ser o mesmo CPF informado</li>
+                <li>Você receberá R$ 3.000 para estúdios e R$ 5.000 para apartamentos</li>
+                <li>Seu login será feito com o e-mail informado</li>
+                <li>Acesso direto ao sistema de indicações</li>
+              </>
+            ) : (
+              <>
+                <li>Seu PIX deve ser o mesmo CPF informado</li>
+                <li>Você receberá R$ 50 de comissão a cada R$ 5.000 fechados</li>
+                <li>Seu login será feito com o e-mail informado</li>
+              </>
+            )}
           </ul>
         </div>
       </div>

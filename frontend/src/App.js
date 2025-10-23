@@ -167,6 +167,7 @@ const AppContent = () => {
     return (
       <Routes>
         <Route path="/cadastro" element={<CadastroConsultor />} />
+        <Route path="/cadastro-consultor" element={<CadastroConsultor />} />
         <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
@@ -188,7 +189,7 @@ const AppContent = () => {
           <Route path="/como-fazer" element={<ComoFazer />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/pacientes" element={<Pacientes />} />
-          <Route path="/materiais" element={<Materiais />} />
+          {!isIncorporadora && <Route path="/materiais" element={<Materiais />} />}
           <Route path="/perfil" element={<Perfil />} />
           <Route path="/" element={<Navigate to="/indicacoes" replace />} />
           <Route path="*" element={<Navigate to="/indicacoes" replace />} />
@@ -230,7 +231,7 @@ const AppContent = () => {
           <Route path="/consultores" element={<Consultores />} />
           <Route path="/clinicas" element={<Clinicas />} />
           <Route path="/empreendimentos" element={<Empreendimentos />} />
-          <Route path="/materiais" element={<Materiais />} />
+          {!isIncorporadora && <Route path="/materiais" element={<Materiais />} />}
           <Route path="/perfil" element={<Perfil />} />
           {/* Redirecionar qualquer outra rota para clínicas (ou empreendimentos se for incorporadora) */}
           <Route path="/" element={<Navigate to={isIncorporadora ? "/empreendimentos" : "/clinicas"} replace />} />
@@ -355,9 +356,10 @@ const AppContent = () => {
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                   <circle cx="9" cy="7" r="4"/>
                 </svg>
-                <span>Pacientes</span>
+                <span>{isIncorporadora ? 'Clientes' : 'Pacientes'}</span>
               </Link>
 
+              {!isIncorporadora && (
               <Link
                 to="/materiais"
                 className={`freelancer-nav-item ${activeTab === 'materiais' ? 'active' : ''}`}
@@ -371,9 +373,10 @@ const AppContent = () => {
                 </svg>
                 <span>Materiais</span>
               </Link>
+              )}
 
               <a
-                href="https://chat.whatsapp.com/H58PhHmVQpj1mRSj7wlZgs"
+                href={user?.empresa_id === 5 ? "https://chat.whatsapp.com/CvVrPfTD5uo0b2kltK99vE" : "https://chat.whatsapp.com/H58PhHmVQpj1mRSj7wlZgs"}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="freelancer-nav-item"
@@ -599,7 +602,7 @@ const AppContent = () => {
                   <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                   <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
-                {user.tipo === 'clinica' ? 'Meus Pacientes' : t.pacientes}
+                {user.tipo === 'clinica' ? 'Meus Pacientes' : (isIncorporadora ? 'Clientes' : t.pacientes)}
               </Link>
             </div>
           ) : null}
@@ -840,7 +843,7 @@ const AppContent = () => {
           {user.is_freelancer && (
             <div className="nav-item">
               <Link
-                to="https://chat.whatsapp.com/H58PhHmVQpj1mRSj7wlZgs"
+                to={user?.empresa_id === 5 ? "https://chat.whatsapp.com/CvVrPfTD5uo0b2kltK99vE" : "https://chat.whatsapp.com/H58PhHmVQpj1mRSj7wlZgs"}
                 className={`nav-link`}
                 target="_blank"
                 onClick={handleMobileNavigation}

@@ -38,34 +38,23 @@ const testEmpreendimentos = async (req, res) => {
 // GET /api/empreendimentos - Listar empreendimentos
 const getAllEmpreendimentos = async (req, res) => {
   try {
-    console.log('🔍 [Backend] Iniciando busca de empreendimentos...');
-    console.log('👤 [Backend] Usuário:', req.user.tipo, 'Empresa ID:', req.user.empresa_id);
-    
-    // Testar conexão com Supabase primeiro
-    console.log('🔗 [Backend] Testando conexão com Supabase...');
-    
-    // Query mais simples possível - apenas selecionar todos
-    const { data, error } = await supabaseAdmin
+    // Filtrar empreendimentos por empresa_id se o usuário não for admin
+    let query = supabaseAdmin
       .from('empreendimentos')
       .select('*');
 
-    console.log('📡 [Backend] Query executada');
-    console.log('📊 [Backend] Empreendimentos encontrados:', data ? data.length : 'null');
-    
+    // Se não for admin, filtrar por empresa_id
+    if (req.user.tipo !== 'admin') {
+      query = query.eq('empresa_id', req.user.empresa_id);
+    }
+
+    const { data, error } = await query;
+
     if (error) {
-      console.error('❌ [Backend] Erro na query:', error);
-      console.error('❌ [Backend] Detalhes do erro:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      });
       throw error;
     }
 
-    console.log('✅ [Backend] Sucesso! Enviando dados para o frontend');
-    console.log('📋 [Backend] Dados enviados:', data);
-    res.json(data || []);
+    res.json(data);
   } catch (error) {
     console.error('❌ [Backend] Erro completo:', error);
     res.status(500).json({ 
