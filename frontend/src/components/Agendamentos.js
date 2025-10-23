@@ -917,8 +917,8 @@ const Agendamentos = () => {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Paciente</th>
-                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
+                  <th>{t.paciente}</th>
+                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{t.consultor}</th>
                   <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{user?.empresa_id === 5 ? 'Empreendimento' : 'Clínica'}</th>
                   <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Data</th>
                   <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Horário</th>

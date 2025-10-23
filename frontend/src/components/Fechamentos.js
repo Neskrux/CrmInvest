@@ -1330,7 +1330,7 @@ const Fechamentos = () => {
                 <thead>
                   <tr>
                     <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Data</th>
-                    <th>Paciente</th>
+                    <th>{t.paciente}</th>
                     <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{empresaId === 5 ? 'Corretor' : 'Consultor'}</th>
                     {empresaId === 5 ? (
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Empreendimento</th>
@@ -2206,7 +2206,7 @@ const Fechamentos = () => {
               {(activeViewTab === 'informacoes' || empresaId === 5) && (
                 <div style={{ display: 'grid', gap: '1rem' }}>
                   <div>
-                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Paciente</label>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>{t.paciente}</label>
                     <div style={{ 
                       padding: '0.75rem', 
                       backgroundColor: '#f9fafb', 
@@ -2232,7 +2232,7 @@ const Fechamentos = () => {
                   </div>
 
                   <div>
-                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Consultor</label>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>{t.consultor}	</label>
                     <div style={{ 
                       padding: '0.75rem', 
                       backgroundColor: '#f9fafb', 

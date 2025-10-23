@@ -429,10 +429,10 @@ const Pacientes = () => {
     { value: 'cpf_reprovado', label: 'CPF Reprovado', color: '#ef4444', description: 'CPF foi reprovado' },
     { value: 'nao_passou_cpf', label: 'Não forneceu CPF', color: '#6366f1', description: 'Cliente não forneceu CPF' },
     { value: 'nao_tem_outro_cpf', label: 'Não tem outro CPF', color: '#a3a3a3', description: 'Cliente não tem CPF alternativo' },
-    { value: 'nao_existe', label: 'Paciente não existe', color: '#9ca3af', description: 'Cliente não existe' },
-    { value: 'nao_tem_interesse', label: 'Paciente não tem interesse', color: '#9ca3af', description: 'Cliente não tem interesse' },
-    { value: 'nao_reconhece', label: 'Paciente não reconhece', color: '#9ca3af', description: 'Cliente não reconhece' },
-    { value: 'nao_responde', label: 'Paciente não responde', color: '#9ca3af', description: 'Cliente não responde' },
+    { value: 'nao_existe', label: `${t.paciente} não existe`, color: '#17202A', description: 'Cliente não existe' },
+    { value: 'nao_tem_interesse', label: `${t.paciente} não tem interesse`, color: '#17202A', description: 'Cliente não tem interesse' },
+    { value: 'nao_reconhece', label: `${t.paciente} não reconhece`, color: '#17202A', description: 'Cliente não reconhece' },
+    { value: 'nao_responde', label: `${t.paciente} não responde`, color: '#17202A', description: 'Cliente não responde' },
     { value: 'sem_clinica', label: 'Sem clínica', color: '#fbbf24', description: 'Sem clínica' },
     // Demais status no final
     { value: 'agendado', label: 'Agendado', color: '#3b82f6', description: 'Abre modal para criar agendamento' },
@@ -2430,7 +2430,7 @@ const Pacientes = () => {
                 className={`tab ${activeTab === 'pacientes' ? 'active' : ''}`}
                 onClick={() => setActiveTab('pacientes')}
               >
-                Pacientes
+                {t.pacientes}
               </button>
               <button
                 className={`tab ${activeTab === 'novos-leads' ? 'active' : ''}`}

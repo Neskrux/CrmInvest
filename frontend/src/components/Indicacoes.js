@@ -967,7 +967,7 @@ const Indicacoes = () => {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
                 <div className="form-group">
-                  <label className="form-label">Melhor dia para agendamento</label>
+                  <label className="form-label">Melhor dia</label>
                   <input
                     type="text"
                     name="melhor_dia1"
