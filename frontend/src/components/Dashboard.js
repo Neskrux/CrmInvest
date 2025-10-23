@@ -68,7 +68,7 @@ const Dashboard = () => {
     metas: { 
       pacientes_fechados: 120,
       clinicas_aprovadas: 30, 
-      valor_fechamentos: 500100 
+      valor_fechamentos: 500000 
     },
     progresso_semanal: {},
     totais: { 
@@ -86,7 +86,7 @@ const Dashboard = () => {
   });
   const [loadingMetas, setLoadingMetas] = useState(false);
   const [editandoMetas, setEditandoMetas] = useState(false);
-  const [metasEditadas, setMetasEditadas] = useState({ clinicas: 50, valor: 500100 });
+  const [metasEditadas, setMetasEditadas] = useState({ clinicas: 50, valor: 500000 });
   // Iniciar com outubro/2024 (mês atual - semana 40 do ano)
   const [mesSelecionadoMetas, setMesSelecionadoMetas] = useState(new Date(2024, 9, 1)); // Outubro 2024
   
@@ -107,7 +107,7 @@ const Dashboard = () => {
         setMetasData(data);
         setMetasEditadas({
           clinicas: data.metas?.clinicas_aprovadas || 30,
-          valor: data.metas?.valor_fechamentos || 500100
+          valor: data.metas?.valor_fechamentos || 500000
         });
       } else {
         const error = await response.text();
@@ -162,7 +162,7 @@ const Dashboard = () => {
           metas: {
             pacientes_fechados: metaMensalPacientes,
             clinicas_aprovadas: metaMensalClinicas,
-            valor_fechamentos: 500100
+            valor_fechamentos: 500000
           },
           progresso_semanal: {
             'S27': {
@@ -170,8 +170,8 @@ const Dashboard = () => {
               pacientesAcumulado: 3,
               clinicas: 8,   // Realizado
               clinicasAcumulado: 8,
-              valorFechamentos: 25001,
-              valorAcumulado: 25001,
+              valorFechamentos: 25000,
+              valorAcumulado: 25000,
               // Semana 27: período de estabilização (sem meta)
               metaSemanalPacientes: 0,
               metaSemanalClinicas: 0,
@@ -183,7 +183,7 @@ const Dashboard = () => {
               pacientesAcumulado: 7,
               clinicas: 10,  // Realizado
               clinicasAcumulado: 18,
-              valorFechamentos: 35001,
+              valorFechamentos: 35000,
               valorAcumulado: 60000,
               // Semana 28: período de estabilização (sem meta)
               metaSemanalPacientes: 0,
@@ -237,7 +237,7 @@ const Dashboard = () => {
           metas: {
             pacientes_fechados: 120,
             clinicas_aprovadas: 30,
-            valor_fechamentos: 500100
+            valor_fechamentos: 500000
           },
           progresso_semanal: {
             'S36': {
@@ -327,7 +327,7 @@ const Dashboard = () => {
           metas: {
             pacientes_fechados: metaMensalPacientes,
             clinicas_aprovadas: metaMensalClinicas,
-            valor_fechamentos: 500100
+            valor_fechamentos: 500000
           },
           progresso_semanal: {
             'S37': {
@@ -348,8 +348,8 @@ const Dashboard = () => {
               pacientesAcumulado: 52,
               clinicas: 7,
               clinicasAcumulado: 13,
-              valorFechamentos: 135001,
-              valorAcumulado: 255001,
+              valorFechamentos: 135000,
+              valorAcumulado: 255000,
               // Semana 38: período de estabilização (sem meta)
               metaSemanalPacientes: 0,
               metaSemanalClinicas: 0,
@@ -362,7 +362,7 @@ const Dashboard = () => {
               clinicas: 7,
               clinicasAcumulado: 20,
               valorFechamentos: 140000,
-              valorAcumulado: 395001,
+              valorAcumulado: 395000,
               // Semana 39: período de estabilização (sem meta)
               metaSemanalPacientes: 0,
               metaSemanalClinicas: 0,
@@ -374,7 +374,7 @@ const Dashboard = () => {
               pacientesAcumulado: 88,
               clinicas: 2,   
               clinicasAcumulado: 22,
-              valorFechamentos: 45001,
+              valorFechamentos: 45000,
               valorAcumulado: 440000,
               // Semana 40: sem meta ainda (período de estabilização)
               metaSemanalPacientes: 0,
@@ -502,7 +502,7 @@ const Dashboard = () => {
           metas: {
             pacientes_fechados: 120,
             clinicas_aprovadas: 30,
-            valor_fechamentos: 500100
+            valor_fechamentos: 500000
           },
           progresso_semanal: progressoSemanal,
           totais: {
