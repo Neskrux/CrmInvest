@@ -18,7 +18,8 @@ const Empreendimentos = () => {
       setError(null);
       
       console.log('🔍 Buscando empreendimentos do banco...');
-      const response = await fetch('http://localhost:5001/api/empreendimentos-public');
+      const config = await import('../config');
+      const response = await fetch(`${config.default.API_BASE_URL}/empreendimentos-public`);
       
       if (!response.ok) {
         throw new Error('Erro ao carregar empreendimentos');
