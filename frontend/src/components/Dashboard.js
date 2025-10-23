@@ -16,7 +16,7 @@ const Dashboard = () => {
     valorTotalFechamentos: 0,
     agendamentosHoje: 0
   });
-  const { makeRequest, user, isAdmin, isConsultorInterno, podeVerTodosDados, isClinica, isFreelancer } = useAuth();
+  const { makeRequest, user, isAdmin, isConsultorInterno, podeVerTodosDados, isClinica, isFreelancer, isIncorporadora } = useAuth();
   const [periodo, setPeriodo] = useState('total'); // total, semanal, mensal
   const [subPeriodo, setSubPeriodo] = useState(null); // para dias da semana
   const [semanaOpcao, setSemanaOpcao] = useState('atual'); // atual, proxima
@@ -568,8 +568,8 @@ const Dashboard = () => {
           });
           pacientes = pacientes.filter(p => pacientesIdsClinica.has(p.id));
         }
-        // Aplicar filtros por região se especificados (apenas para não-clínicas)
-        else if (filtroRegiao.cidade || filtroRegiao.estado) {
+        // Aplicar filtros por região se especificados (apenas para não-clínicas e não incorporadora)
+        else if ((filtroRegiao.cidade || filtroRegiao.estado) && user?.empresa_id !== 5) {
           const clinicasIds = clinicasFiltradas.map(c => c.id);
           
           // Filtrar agendamentos por região (via clínicas)
@@ -663,7 +663,7 @@ const Dashboard = () => {
         
         fechamentosParaComissao.forEach(f => {
           const valor = parseFloat(f.valor_fechado || 0);
-          const comissao = calcularComissao(valor);
+          const comissao = calcularComissao(valor, f.empreendimento_id);
           total += comissao;
           const dataFechamento = new Date(f.data_fechamento);
           if (dataFechamento.getMonth() === mesAtual && dataFechamento.getFullYear() === anoAtual) {
@@ -787,8 +787,15 @@ const Dashboard = () => {
     fetchCidades();
   }, [filtroRegiao.estado]);
 
-  const calcularComissao = (valorFechado) => {
-    return valorFechado * 0.01; // 1% do valor total
+  const calcularComissao = (valorFechado, empreendimentoId) => {
+    // Para incorporadora (empresa_id = 5), usar comissão fixa baseada no empreendimento
+    if (user?.empresa_id === 5) {
+      // empreendimento_id = 6: R$ 3.000 (estúdios)
+      // outros empreendimentos: R$ 5.000 (apartamentos e outros)
+      return empreendimentoId === 6 ? 3000 : 5000;
+    }
+
+    return valorFechado * 0.01;
   };
 
   const fetchStats = async () => {
@@ -893,8 +900,8 @@ const Dashboard = () => {
         });
         pacientes = pacientes.filter(p => pacientesIdsClinica.has(p.id));
       }
-      // Aplicar filtros por região se especificados (apenas para não-clínicas)
-      else if (filtroRegiao.cidade || filtroRegiao.estado) {
+      // Aplicar filtros por região se especificados (apenas para não-clínicas e não incorporadora)
+      else if ((filtroRegiao.cidade || filtroRegiao.estado) && user?.empresa_id !== 5) {
         const clinicasIds = clinicasFiltradas.map(c => c.id);
         
         // Filtrar agendamentos por região (via clínicas)
@@ -1304,7 +1311,7 @@ const Dashboard = () => {
             consultoresMap[f.consultor_nome].totalFechamentos++;
             consultoresMap[f.consultor_nome].valorFechado += valor;
             
-            const comissao = calcularComissao(valor);
+            const comissao = calcularComissao(valor, f.empreendimento_id);
             consultoresMap[f.consultor_nome].comissaoTotal += comissao;
             comissaoTotalGeral += comissao;
 
@@ -1706,8 +1713,8 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Filtros por Região - Ocultar para clínicas */}
-        {!isClinica && (
+        {/* Filtros por Região - Ocultar para clínicas e incorporadora */}
+        {!isClinica && user?.empresa_id !== 5 && (
           <div style={{ 
             marginTop: '1rem',
             paddingTop: '1rem',
@@ -2206,7 +2213,7 @@ const Dashboard = () => {
       )}
 
       {/* Gráfico de Pacientes, Agendamentos e Fechamentos por Cidade - Ocultar para clínicas */}
-      {!isClinica && stats.agendamentosPorCidade.length > 0 && (
+      {!isClinica && !isIncorporadora && stats.agendamentosPorCidade.length > 0 && (
         <div className="card" style={{ marginTop: '2rem' }}>
           <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
             <h2 className="card-title" style={{ color: '#1a1d23', fontWeight: '700' }}>Análise Geográfica de Performance</h2>
@@ -3011,7 +3018,7 @@ const Dashboard = () => {
       </div>
 
       {/* GRÁFICOS DE METAS - APENAS ADMIN */}
-      {isAdmin && (
+      {false && isAdmin && (
         <div style={{ marginTop: '3rem' }}>
           <div style={{ 
             display: 'flex', 

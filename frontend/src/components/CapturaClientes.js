@@ -743,7 +743,7 @@ const CapturaClientes = () => {
                   <div className="loading-spinner"></div>
                 ) : (
                   <>
-                    <span>Agendar Agendamento Gratuita</span>
+                    <span>Agendar gratuitamente</span>
                   </>
                 )}
               </button>

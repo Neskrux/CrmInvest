@@ -549,14 +549,17 @@ const updateStatusPaciente = async (req, res) => {
           .insert({
             paciente_id: id,
             consultor_id: paciente.consultor_id,
-            clinica_id: agendamento?.clinica_id || null,
+            // Para incorporadora (empresa_id = 5), usar empreendimento_id em vez de clinica_id
+            clinica_id: req.user.empresa_id === 5 ? null : (agendamento?.clinica_id || null),
+            empreendimento_id: req.user.empresa_id === 5 ? (paciente.empreendimento_id || null) : null,
             agendamento_id: agendamento?.id || null,
             valor_fechado: 0,
             data_fechamento: new Date().toISOString().split('T')[0],
-            tipo_tratamento: paciente.tipo_tratamento,
+            tipo_tratamento: req.user.empresa_id === 5 ? null : paciente.tipo_tratamento,
             forma_pagamento: 'A definir',
             observacoes: 'Fechamento criado automaticamente pelo pipeline',
-            aprovado: 'pendente'
+            aprovado: 'aprovado', // Para fechamentos automáticos, sempre aprovado
+            empresa_id: req.user.empresa_id
           });
       }
     }
@@ -955,7 +958,8 @@ const updateStatusLead = async (req, res) => {
 const cadastroPublicoLead = async (req, res) => {
   try {
     console.log('📝 Cadastro de lead recebido:', req.body);
-    let { nome, telefone, email, cpf, tipo_tratamento, empreendimento_id, observacoes, cidade, estado, ref_consultor } = req.body;
+    let { nome, telefone, email, cpf, tipo_tratamento, empreendimento_id, observacoes, cidade, estado, grau_parentesco, ref_consultor } = req.body;
+    console.log('👥 Grau de parentesco:', grau_parentesco);
     
     // Validar campos obrigatórios
     if (!nome || !telefone) {
@@ -1083,6 +1087,7 @@ const cadastroPublicoLead = async (req, res) => {
         observacoes: observacoes || null,
         cidade: cidade ? cidade.trim() : null,
         estado: estado ? estado.trim() : null,
+        grau_parentesco: grau_parentesco || null, // Grau de parentesco do indicador
         consultor_id: consultorId, // Atribuir ao consultor se encontrado pelo código de referência
         empresa_id: 5 // Incorporadora - todos os leads do formulário CapturaClientes vêm para empresa_id=5
       }])

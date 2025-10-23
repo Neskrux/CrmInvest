@@ -287,6 +287,8 @@ const login = async (req, res) => {
       nome: usuario.nome,
       tipo: usuario.tipo,
       clinica_id: usuario.clinica_id,
+      empresa_id: usuario.empresa_id,
+      is_freelancer: usuario.is_freelancer,
       email: usuario.email || usuario.email_login
     });
 

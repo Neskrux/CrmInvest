@@ -8,7 +8,7 @@ const getAllAgendamentos = async (req, res) => {
       .from('agendamentos')
       .select(`
         *,
-        pacientes(nome, telefone),
+        pacientes(nome, telefone, empreendimento_id),
         consultores(nome),
         clinicas(nome)
       `)
@@ -39,8 +39,18 @@ const getAllAgendamentos = async (req, res) => {
       paciente_nome: agendamento.pacientes?.nome,
       paciente_telefone: agendamento.pacientes?.telefone,
       consultor_nome: agendamento.consultores?.nome,
-      clinica_nome: agendamento.clinicas?.nome
+      clinica_nome: agendamento.clinicas?.nome,
+      empreendimento_id: agendamento.pacientes?.empreendimento_id || agendamento.empreendimento_id // Usar empreendimento_id do paciente
     }));
+
+    // Log temporário para debug
+    console.log('🔍 Agendamentos retornados:', formattedData.map(a => ({
+      id: a.id,
+      paciente_nome: a.paciente_nome,
+      clinica_id: a.clinica_id,
+      empreendimento_id: a.empreendimento_id,
+      paciente_empreendimento_id: a.pacientes?.empreendimento_id
+    })));
 
     res.json(formattedData);
   } catch (error) {
@@ -55,7 +65,7 @@ const getDashboardAgendamentos = async (req, res) => {
       .from('agendamentos')
       .select(`
         *,
-        pacientes(nome, telefone),
+        pacientes(nome, telefone, empreendimento_id),
         consultores(nome),
         clinicas(nome)
       `)
@@ -82,7 +92,8 @@ const getDashboardAgendamentos = async (req, res) => {
       paciente_nome: agendamento.pacientes?.nome,
       paciente_telefone: agendamento.pacientes?.telefone,
       consultor_nome: agendamento.consultores?.nome,
-      clinica_nome: agendamento.clinicas?.nome
+      clinica_nome: agendamento.clinicas?.nome,
+      empreendimento_id: agendamento.pacientes?.empreendimento_id || agendamento.empreendimento_id // Usar empreendimento_id do paciente
     }));
 
     res.json(formattedData);
@@ -96,10 +107,40 @@ const createAgendamento = async (req, res) => {
   try {
     const { paciente_id, consultor_id, clinica_id, data_agendamento, horario, status, observacoes } = req.body;
     
+    // Buscar empresa_id do paciente para atribuir ao agendamento
+    const { data: pacienteData, error: pacienteError } = await supabaseAdmin
+      .from('pacientes')
+      .select('empresa_id')
+      .eq('id', paciente_id)
+      .single();
+    
+    if (pacienteError) {
+      console.error('Erro ao buscar paciente:', pacienteError);
+      return res.status(400).json({ error: 'Paciente não encontrado' });
+    }
+    
+    const empresa_id = pacienteData?.empresa_id || req.user?.empresa_id;
+    
+    // Para incorporadora (empresa_id = 5), não usar clinica_id
+    const dadosAgendamento = {
+      paciente_id,
+      consultor_id,
+      data_agendamento,
+      horario,
+      status: status || 'agendado',
+      observacoes,
+      empresa_id
+    };
+    
+    // Só incluir clinica_id se não for incorporadora
+    if (empresa_id !== 5) {
+      dadosAgendamento.clinica_id = clinica_id;
+    }
+    
     // Primeiro, tenta inserir normalmente
     let { data, error } = await supabaseAdmin
       .from('agendamentos')
-      .insert([{ paciente_id, consultor_id, clinica_id, data_agendamento, horario, status: status || 'agendado', observacoes }])
+      .insert([dadosAgendamento])
       .select();
 
     // Se der erro de chave duplicada, tenta corrigir a sequência
@@ -112,7 +153,7 @@ const createAgendamento = async (req, res) => {
       // Tentar inserir novamente
       const retryResult = await supabaseAdmin
         .from('agendamentos')
-        .insert([{ paciente_id, consultor_id, clinica_id, data_agendamento, horario, status: status || 'agendado', observacoes }])
+        .insert([dadosAgendamento])
         .select();
       
       data = retryResult.data;

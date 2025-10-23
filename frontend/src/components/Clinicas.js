@@ -57,8 +57,6 @@ const Clinicas = () => {
   const [novasClinicasGeo, setNovasClinicasGeo] = useState([]);
   const [geocoding, setGeocoding] = useState(false);
 
-  // Estados para links personalizados
-  const [linkPersonalizado, setLinkPersonalizado] = useState(null);
   const [linkClinicas, setLinkClinicas] = useState(null);
   const [loadingLink, setLoadingLink] = useState(true);
   const [formData, setFormData] = useState({
@@ -293,10 +291,7 @@ const Clinicas = () => {
       fetchClinicasNegativas();
     }
     
-    // Buscar links personalizados se for consultor
-    if (isConsultor) {
-      buscarLinkPersonalizado();
-    } else {
+ else {
       setLoadingLink(false);
     }
     
@@ -530,48 +525,6 @@ const Clinicas = () => {
     }
   };
 
-  const buscarLinkPersonalizado = async () => {
-    try {
-      // Usar a rota de perfil que o consultor pode acessar
-      const consultorResponse = await makeRequest('/consultores/perfil');
-      const responseData = await consultorResponse.json();
-      
-      if (consultorResponse.ok && responseData.consultor) {
-        const consultorData = responseData.consultor;
-        
-        // Verificar se é consultor interno Invest Money (tem as duas permissões E não tem parceiro)
-        const isConsultorInterno = consultorData.pode_ver_todas_novas_clinicas === true && 
-                                   consultorData.podealterarstatus === true &&
-                                   !consultorData.empresa_id;
-        
-        if (!isConsultorInterno) {
-          // Freelancer (solo ou parceiro) ou Funcionário de parceiro: link personalizado
-          if (consultorData.codigo_referencia) {
-            setLinkPersonalizado(`https://solumn.com.br/captura-lead?ref=${consultorData.codigo_referencia}`);
-            setLinkClinicas(`https://solumn.com.br/captura-clinica?ref=${consultorData.codigo_referencia}`);
-          } else {
-            // Se não tem código de referência, mostrar mensagem
-            setLinkPersonalizado(null);
-            setLinkClinicas(null);
-          }
-        } else {
-          // Interno: usar link geral
-          setLinkPersonalizado('https://solumn.com.br/captura-lead');
-          setLinkClinicas('https://solumn.com.br/captura-clinica');
-        }
-      } else {
-        console.error('Erro ao buscar dados do consultor:', responseData);
-        setLinkPersonalizado(null);
-        setLinkClinicas(null);
-      }
-    } catch (error) {
-      console.error('Erro ao buscar link personalizado:', error);
-      setLinkPersonalizado(null);
-      setLinkClinicas(null);
-    } finally {
-      setLoadingLink(false);
-    }
-  };
 
   const aprovarClinica = async (clinicaId) => {
     try {
@@ -2246,22 +2199,6 @@ const Clinicas = () => {
     }
   };
 
-  // Função para copiar link personalizado
-  const copiarLink = async (link) => {
-    try {
-      await navigator.clipboard.writeText(link);
-      showSuccessToast('Link copiado para a área de transferência!');
-    } catch (error) {
-      // Fallback para navegadores mais antigos
-      const textArea = document.createElement('textarea');
-      textArea.value = link;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      showSuccessToast('Link copiado para a área de transferência!');
-    }
-  };
 
   const handleViewObservacoes = async (observacoes, clinica, tipo = 'clinica') => {
     setObservacoesAtual(observacoes || 'Nenhuma observação cadastrada.');
@@ -2307,105 +2244,6 @@ const Clinicas = () => {
         }}>
           
           
-          {/* Links personalizados para consultores freelancers (não internos) */}
-          {isConsultor && !isConsultorInterno && (
-            <div style={{ 
-              marginTop: '1rem', 
-              padding: '0.75rem',  
-              borderRadius: '6px' 
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'blue' }}>
-                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                </svg>
-                <strong style={{ color: 'blue' }}>Meu Link de Indicação</strong>
-              </div>
-              
-              {loadingLink ? (
-                <div style={{ textAlign: 'center', padding: '1rem', color: '#6b7280' }}>
-                  <div style={{ 
-                    width: '1.5rem', 
-                    height: '1.5rem', 
-                    border: '2px solid #f0fdf4', 
-                    borderTop: '2px solid #f0fdf4', 
-                    borderRadius: '50%', 
-                    animation: 'spin 1s linear infinite', 
-                    margin: '0 auto 0.5rem' 
-                  }}></div>
-                  Carregando links...
-                </div>
-              ) : (linkPersonalizado || linkClinicas) ? (
-                <div>
-                  {/* Link para Clínicas */}
-                  {linkClinicas && (
-                    <div style={{ 
-                      backgroundColor: '#eff6ff', 
-                      border: '1px solid #93c5fd', 
-                      borderRadius: '8px', 
-                      padding: '1rem'
-                    }}>
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'space-between',
-                        marginBottom: '0.5rem'
-                      }}>
-                        <span style={{ 
-                          color: '#1d4ed8', 
-                          fontWeight: '600',
-                          fontSize: '0.9rem'
-                        }}>
-                          Link para Clínicas:
-                        </span>
-                        <button
-                          onClick={() => copiarLink(linkClinicas)}
-                          style={{
-                            background: '#2563eb',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            padding: '6px 10px',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                            fontWeight: '500'
-                          }}
-                        >
-                          Copiar
-                        </button>
-                      </div>
-                      <div style={{ 
-                        color: '#1d4ed8', 
-                        fontSize: '12px',
-                        fontFamily: 'monospace',
-                        wordBreak: 'break-all',
-                        lineHeight: '1.4',
-                        backgroundColor: 'rgba(255,255,255,0.7)',
-                        padding: '8px',
-                        borderRadius: '6px'
-                      }}>
-                        {linkClinicas}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div style={{ 
-                  backgroundColor: '#fef2f2', 
-                  border: '1px solid #fecaca', 
-                  borderRadius: '6px', 
-                  padding: '1rem',
-                  textAlign: 'center'
-                }}>
-                  <div style={{ color: '#dc2626', fontSize: '14px', marginBottom: '4px' }}>
-                    Links personalizados não encontrados
-                  </div>
-                  <div style={{ color: '#6b7280', fontSize: '12px' }}>
-                    Entre em contato com o administrador para gerar seus links.
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
 

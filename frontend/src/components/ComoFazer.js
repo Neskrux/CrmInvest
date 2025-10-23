@@ -4,14 +4,75 @@ import { useAuth } from '../contexts/AuthContext';
 import { CheckCircle, HelpCircle, Zap } from 'lucide-react';
 
 const ComoFazer = () => {
-  const { user } = useAuth();
+  const { user, isIncorporadora } = useAuth();
   const [faqAberto, setFaqAberto] = useState(null);
 
   const toggleFaq = (index) => {
     setFaqAberto(faqAberto === index ? null : index);
   };
 
-  const faqs = [
+  const faqs = isIncorporadora ? [
+    {
+      pergunta: "Preciso pagar algo pra participar?",
+      resposta: "Não! Ser Freelancer é de graça. Você só ganha — nunca paga nada pra entrar."
+    },
+    {
+      pergunta: "Quanto ganho por indicar um cliente?",
+      resposta: "Cada cliente que compra um imóvel gera comissão pra você: R$ 3.000 para estúdios e R$ 5.000 para apartamentos e outros tipos de imóveis."
+    },
+    {
+      pergunta: "Tem limite de indicações ou ganhos?",
+      resposta: "Não tem limite! Você pode indicar quantos clientes quiser — quanto mais indicar, mais você ganha."
+    },
+    {
+      pergunta: "Como faço para indicar?",
+      resposta: "É muito fácil! Na página 'Indicações' você preenche o formulário com as informações do cliente que quer indicar. Basta cadastrar e nossa equipe entra em contato com o cliente."
+    },
+    {
+      pergunta: "Como acompanho meus ganhos e status?",
+      resposta: "Tudo acontece dentro da plataforma Solumn. Lá você encontra seus ganhos, o status de cada cliente indicado e o histórico completo das suas comissões. Basta acessar seu painel como freelancer, entrar na área 'Clientes' e acompanhar tudo em tempo real."
+    },
+    {
+      pergunta: "Posso indicar clientes de qualquer cidade?",
+      resposta: "Pode sim! Não tem limite — quanto mais clientes você indicar, melhor. Eles podem ser de qualquer cidade do Brasil."
+    },
+    {
+      pergunta: "Com quem falo se tiver dúvidas?",
+      resposta: "Clique no botão no canto inferior direito para entrar em contato com a nossa equipe, ou na aba 'Suporte'."
+    },
+    {
+      pergunta: "Existe algum grupo ou canal oficial de freelancers?",
+      resposta: "Sim! Participe da comunidade dos consultores para receber novidades, campanhas e tirar dúvidas com outros freelancers."
+    },
+    {
+      pergunta: "Posso atualizar meus dados depois do cadastro?",
+      resposta: "Sim. Dentro da plataforma Solumn, vá em 'Meu Perfil' e atualize suas informações sempre que precisar — como telefone, e-mail ou chave PIX."
+    },
+    {
+      pergunta: "O que é a IM Incorporadora e o que ela faz?",
+      resposta: "A IM Incorporadora é uma empresa que constrói e vende imóveis residenciais. Ela oferece condições facilitadas de pagamento para que as pessoas possam realizar o sonho da casa própria."
+    },
+    {
+      pergunta: "O que significa ser um Freelancer da IM Incorporadora?",
+      resposta: "É fazer parte da rede que indica clientes interessados em comprar imóveis. Você ajuda a conectar quem quer comprar com quem oferece os imóveis — e ganha por cada venda que acontece."
+    },
+    {
+      pergunta: "Como funciona o financiamento dos imóveis?",
+      resposta: "A IM Incorporadora oferece condições facilitadas de pagamento, com parcelas que cabem no bolso. O cliente pode financiar o imóvel com condições especiais e realizar o sonho da casa própria."
+    },
+    {
+      pergunta: "É seguro participar?",
+      resposta: "Sim! A IM Incorporadora é uma empresa real, com contratos e processos 100% digitais e rastreáveis. Todo pagamento e comissão acontece de forma segura e registrada."
+    },
+    {
+      pergunta: "Meus dados e indicações ficam protegidos?",
+      resposta: "Sim. Seus dados são usados só pra validar e pagar suas indicações. Tudo segue as regras da LGPD, a lei que protege informações pessoais no Brasil."
+    },
+    {
+      pergunta: "A IM Incorporadora é uma empresa registrada?",
+      resposta: "Sim. A IM Incorporadora é uma empresa registrada com CNPJ e sede oficial no Brasil, e atua dentro das normas do mercado imobiliário."
+    }
+  ] : [
     {
       pergunta: "Preciso pagar algo pra participar?",
       resposta: "Não! Ser Freelancer é de graça. Você só ganha — nunca paga nada pra entrar."
@@ -83,7 +144,10 @@ const ComoFazer = () => {
             Como Fazer Indicações?
           </h1>
           <p className="header-subtitle">
-            Aprenda passo a passo como ganhar dinheiro indicando pacientes
+            {isIncorporadora 
+              ? 'Aprenda passo a passo como ganhar dinheiro indicando clientes'
+              : 'Aprenda passo a passo como ganhar dinheiro indicando pacientes'
+            }
           </p>
         </div>
       </div>
@@ -93,8 +157,10 @@ const ComoFazer = () => {
         <div className="intro-card">
           <h2>Bem-vindo(a), {user?.nome}</h2>
           <p>
-            Aqui você vai aprender tudo sobre como fazer indicações de pacientes 
-            de forma simples e eficiente. Siga os passos abaixo e comece a ganhar!
+            {isIncorporadora 
+              ? 'Aqui você vai aprender tudo sobre como fazer indicações de clientes de forma simples e eficiente. Siga os passos abaixo e comece a ganhar!'
+              : 'Aqui você vai aprender tudo sobre como fazer indicações de pacientes de forma simples e eficiente. Siga os passos abaixo e comece a ganhar!'
+            }
           </p>
         </div>
       </div>
@@ -106,10 +172,16 @@ const ComoFazer = () => {
           <div className="section-title-container">
             <h2 className="section-title">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
+                {isIncorporadora ? (
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                ) : (
+                  <>
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                  </>
+                )}
               </svg>
-              Como Indicar Pacientes?
+              {isIncorporadora ? 'Como Indicar Clientes?' : 'Como Indicar Pacientes?'}
             </h2>
           </div>
           
@@ -117,13 +189,20 @@ const ComoFazer = () => {
             <div className="instruction-card">
               <div className="instruction-number">1</div>
               <div className="instruction-content">
-                <h3>Identifique Pacientes e os cadastre</h3>
+                <h3>{isIncorporadora ? 'Identifique Clientes e os cadastre' : 'Identifique Pacientes e os cadastre'}</h3>
                 <p>
-                  Procure por pacientes que possam ter interesse em parcelar o valor dos tratamentos odontológicos ou estéticos. 
-                  Vá até a página <strong>Indicações</strong> e preencha o formulário com as informações do paciente.
+                  {isIncorporadora 
+                    ? 'Procure por pessoas que possam ter interesse em comprar imóveis residenciais. Vá até a página Indicações e preencha o formulário com as informações do cliente.'
+                    : 'Procure por pacientes que possam ter interesse em parcelar o valor dos tratamentos odontológicos ou estéticos. Vá até a página Indicações e preencha o formulário com as informações do paciente.'
+                  }
                 </p>
                 <div className="instruction-tip">
-                  <span>Dica: Pense em familiares, amigos, conhecidos ou até você mesmo que possam precisar de tratamentos!</span>
+                  <span>
+                    {isIncorporadora 
+                      ? 'Dica: Pense em familiares, amigos, conhecidos ou até você mesmo que possam estar procurando um imóvel!'
+                      : 'Dica: Pense em familiares, amigos, conhecidos ou até você mesmo que possam precisar de tratamentos!'
+                    }
+                  </span>
                 </div>
               </div>
             </div>
@@ -133,12 +212,18 @@ const ComoFazer = () => {
               <div className="instruction-content">
                 <h3>Acompanhe o Andamento</h3>
                 <p>
-                  Após o cadastro, você pode acompanhar o status do paciente em tempo real 
-                  na página <strong>Pacientes</strong>. Veja quando ele foi contatado, agendou 
-                  consulta e fechou o tratamento.
+                  {isIncorporadora 
+                    ? 'Após o cadastro, você pode acompanhar o status do cliente em tempo real na página Clientes. Veja quando ele foi contatado, agendou visita e fechou negócio.'
+                    : 'Após o cadastro, você pode acompanhar o status do paciente em tempo real na página Pacientes. Veja quando ele foi contatado, agendou consulta e fechou o tratamento.'
+                  }
                 </p>
                 <div className="instruction-tip">
-                  <span>Dica: Não se esqueça de verificar frequentemente o status do paciente!</span>
+                  <span>
+                    {isIncorporadora 
+                      ? 'Dica: Não se esqueça de verificar frequentemente o status do cliente!'
+                      : 'Dica: Não se esqueça de verificar frequentemente o status do paciente!'
+                    }
+                  </span>
                 </div>
               </div>
             </div>
@@ -148,9 +233,10 @@ const ComoFazer = () => {
               <div className="instruction-content">
                 <h3>Receba sua Comissão</h3>
                 <p>
-                  Quando o paciente fechar o tratamento, você receberá <strong>R$ 50 a cada R$ 5.000 do valor total do tratamento </strong> 
-                  diretamente na sua chave PIX cadastrada. Acompanhe seus fechamentos na página Pacientes quando o status for
-                  <strong> Fechado</strong>.
+                  {isIncorporadora 
+                    ? 'Quando o cliente fechar negócio, você receberá R$ 3.000 para estúdios e R$ 5.000 para apartamentos e outros tipos de imóveis diretamente na sua chave PIX cadastrada. Acompanhe seus fechamentos na página Clientes quando o status for Fechado.'
+                    : 'Quando o paciente fechar o tratamento, você receberá R$ 50 a cada R$ 5.000 do valor total do tratamento diretamente na sua chave PIX cadastrada. Acompanhe seus fechamentos na página Pacientes quando o status for Fechado.'
+                  }
                 </p>
                 <div className="instruction-tip success">
                   <span>Pagamento rápido e automático via PIX!</span>
@@ -196,9 +282,12 @@ const ComoFazer = () => {
           <div className="pos-venda-grid">
             <div className="pos-venda-card">
               <div className="pos-venda-number">1</div>
-              <h3>Você cadastra o paciente</h3>
+              <h3>{isIncorporadora ? 'Você cadastra o cliente' : 'Você cadastra o paciente'}</h3>
               <p>
-                Preencha o formulário na página Indicações com as informações do paciente que você quer indicar.
+                {isIncorporadora 
+                  ? 'Preencha o formulário na página Indicações com as informações do cliente que você quer indicar.'
+                  : 'Preencha o formulário na página Indicações com as informações do paciente que você quer indicar.'
+                }
               </p>
               <div className="pos-venda-destaque">
                 Pronto. Sua parte termina aqui.
@@ -209,7 +298,10 @@ const ComoFazer = () => {
               <div className="pos-venda-number">2</div>
               <h3>Nossa equipe entra em ação</h3>
               <p>
-                A equipe da IM recebe sua indicação e entra em contato direto com o paciente.
+                {isIncorporadora 
+                  ? 'A equipe da IM Incorporadora recebe sua indicação e entra em contato direto com o cliente.'
+                  : 'A equipe da IM recebe sua indicação e entra em contato direto com o paciente.'
+                }
               </p>
               <div className="pos-venda-destaque">
                 Você não precisa fazer ligações nem negociar.
@@ -220,7 +312,7 @@ const ComoFazer = () => {
               <div className="pos-venda-number">3</div>
               <h3>Acompanhe os Status e receba seu pagamento</h3>
               <p style={{ marginBottom: '1rem' }}>
-                Acompanhe o status das suas indicações em tempo real na página Pacientes.
+                Acompanhe o status das suas indicações em tempo real na página {isIncorporadora ? 'Clientes' : 'Pacientes'}.
               </p>
               <div className="pos-venda-destaque">
                 Se o Status for "Fechado", você receberá o pagamento automaticamente.
@@ -250,8 +342,10 @@ const ComoFazer = () => {
               </div>
               <h3>Pense no seu círculo social</h3>
               <p>
-                Comece indicando familiares, amigos, conhecidos ou até você mesmo! 
-                Pessoas próximas são mais propensas a confiar na sua indicação.
+                {isIncorporadora 
+                  ? 'Comece indicando familiares, amigos, conhecidos ou até você mesmo! Pessoas próximas são mais propensas a confiar na sua indicação para compra de imóveis.'
+                  : 'Comece indicando familiares, amigos, conhecidos ou até você mesmo! Pessoas próximas são mais propensas a confiar na sua indicação.'
+                }
               </p>
             </div>
 
@@ -263,7 +357,7 @@ const ComoFazer = () => {
               </div>
               <h3>Acompanhe os Status</h3>
               <p>
-                Acompanhe os status das suas indicações em tempo real na página Pacientes.
+                Acompanhe os status das suas indicações em tempo real na página {isIncorporadora ? 'Clientes' : 'Pacientes'}.
               </p>
             </div>
 
@@ -291,8 +385,10 @@ const ComoFazer = () => {
               </div>
               <h3>Foque na Qualidade</h3>
               <p>
-                É melhor ter menos leads qualificados do que muitos desinteressados. 
-                Converse com os possíveis pacientes e entenda se eles realmente têm interesse.
+                {isIncorporadora 
+                  ? 'É melhor ter menos leads qualificados do que muitos desinteressados. Converse com os possíveis clientes e entenda se eles realmente têm interesse em comprar imóveis.'
+                  : 'É melhor ter menos leads qualificados do que muitos desinteressados. Converse com os possíveis pacientes e entenda se eles realmente têm interesse.'
+                }
               </p>
             </div>
 
@@ -326,7 +422,7 @@ const ComoFazer = () => {
                 Clique no botão abaixo para entrar.
               </p>
               <div className="action-buttons" style={{ marginTop: '1rem' }}>
-                <button className="action-button primary" onClick={() => window.location.href = 'https://chat.whatsapp.com/H58PhHmVQpj1mRSj7wlZgs'}>
+                <button className="action-button primary" onClick={() => window.location.href = isIncorporadora ? 'https://chat.whatsapp.com/CvVrPfTD5uo0b2kltK99vE' : 'https://chat.whatsapp.com/H58PhHmVQpj1mRSj7wlZgs'}>
                   Entrar no Grupo
                 </button>
               </div>
@@ -379,13 +475,15 @@ const ComoFazer = () => {
       <div className="final-actions">
         <h3>Pronto para Começar?</h3>
         <p>
-          Agora que você já sabe como funciona, está na hora de começar a indicar 
-          pacientes e ganhar dinheiro! Acesse a página de indicações e cadastre seu primeiro paciente!
+          {isIncorporadora 
+            ? 'Agora que você já sabe como funciona, está na hora de começar a indicar clientes e ganhar dinheiro! Acesse a página de indicações e cadastre seu primeiro cliente!'
+            : 'Agora que você já sabe como funciona, está na hora de começar a indicar pacientes e ganhar dinheiro! Acesse a página de indicações e cadastre seu primeiro paciente!'
+          }
         </p>
         <div className="action-buttons">
           <button className="action-button primary" onClick={() => window.location.href = '/indicacoes'}>
             <Zap size={20} />
-            Cadastrar Paciente
+            {isIncorporadora ? 'Cadastrar Cliente' : 'Cadastrar Paciente'}
           </button>
           <button className="action-button secondary" onClick={() => window.location.href = '/materiais'}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

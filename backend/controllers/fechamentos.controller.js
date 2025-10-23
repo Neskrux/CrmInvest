@@ -1,18 +1,23 @@
 const { supabase, supabaseAdmin } = require('../config/database');
 const { STORAGE_BUCKET_CONTRATOS } = require('../config/constants');
 const { uploadToSupabase } = require('../middleware/upload');
+const bcrypt = require('bcrypt');
+const transporter = require('../config/email');
 
 // GET /api/fechamentos - Listar fechamentos
 const getAllFechamentos = async (req, res) => {
   try {
+    // Query simples - o mapeamento será feito no frontend
+    const selectQuery = `
+      *,
+      pacientes(nome, telefone, cpf, empreendimento_id),
+      consultores(nome),
+      clinicas(nome)
+    `;
+
     let query = supabaseAdmin
       .from('fechamentos')
-      .select(`
-        *,
-        pacientes(nome, telefone, cpf),
-        consultores(nome),
-        clinicas(nome)
-      `)
+      .select(selectQuery)
       .order('data_fechamento', { ascending: false })
       .order('created_at', { ascending: false });
 
@@ -38,6 +43,7 @@ const getAllFechamentos = async (req, res) => {
         paciente_nome: fechamento.pacientes?.nome,
         paciente_telefone: fechamento.pacientes?.telefone,
         paciente_cpf: fechamento.pacientes?.cpf,
+        paciente_empreendimento_id: fechamento.pacientes?.empreendimento_id,
         consultor_nome: fechamento.consultores?.nome,
         clinica_nome: fechamento.clinicas?.nome
       };
@@ -52,14 +58,17 @@ const getAllFechamentos = async (req, res) => {
 // GET /api/dashboard/fechamentos - Listar fechamentos para dashboard
 const getDashboardFechamentos = async (req, res) => {
   try {
+    // Query simples - o mapeamento será feito no frontend
+    const selectQuery = `
+      *,
+      pacientes(nome, telefone, cpf, empreendimento_id),
+      consultores(nome),
+      clinicas(nome)
+    `;
+
     let query = supabaseAdmin
       .from('fechamentos')
-      .select(`
-        *,
-        pacientes(nome, telefone, cpf),
-        consultores(nome),
-        clinicas(nome)
-      `)
+      .select(selectQuery)
       .order('data_fechamento', { ascending: false })
       .order('created_at', { ascending: false });
 
@@ -85,6 +94,7 @@ const getDashboardFechamentos = async (req, res) => {
         paciente_nome: fechamento.pacientes?.nome,
         paciente_telefone: fechamento.pacientes?.telefone,
         paciente_cpf: fechamento.pacientes?.cpf,
+        paciente_empreendimento_id: fechamento.pacientes?.empreendimento_id,
         consultor_nome: fechamento.consultores?.nome,
         clinica_nome: fechamento.clinicas?.nome
       };
@@ -166,8 +176,8 @@ const createFechamento = async (req, res) => {
     // Se houver arquivo de contrato, fazer upload para Supabase Storage
     if (req.files?.contrato && req.files.contrato[0]) {
       try {
-        const uploadResult = await uploadToSupabase(req.files.contrato[0], 'contrato');
-        contratoArquivo = uploadResult.fileName;
+        const uploadResult = await uploadToSupabase(req.files.contrato[0], STORAGE_BUCKET_CONTRATOS, 'fechamentos', 'contrato');
+        contratoArquivo = uploadResult.path; // Usar o caminho completo em vez de apenas o nome
         contratoNomeOriginal = uploadResult.originalName;
         contratoTamanho = uploadResult.size;
       } catch (uploadError) {
@@ -182,8 +192,8 @@ const createFechamento = async (req, res) => {
     // Se houver arquivo de print de confirmação, fazer upload
     if (req.files?.print_confirmacao && req.files.print_confirmacao[0]) {
       try {
-        const uploadResult = await uploadToSupabase(req.files.print_confirmacao[0], 'print_confirmacao');
-        printConfirmacaoArquivo = uploadResult.fileName;
+        const uploadResult = await uploadToSupabase(req.files.print_confirmacao[0], STORAGE_BUCKET_CONTRATOS, 'fechamentos', 'print_confirmacao');
+        printConfirmacaoArquivo = uploadResult.path; // Usar o caminho completo em vez de apenas o nome
         printConfirmacaoNome = uploadResult.originalName;
         printConfirmacaoTamanho = uploadResult.size;
       } catch (uploadError) {
@@ -217,7 +227,8 @@ const createFechamento = async (req, res) => {
         print_confirmacao_arquivo: printConfirmacaoArquivo,
         print_confirmacao_nome: printConfirmacaoNome,
         print_confirmacao_tamanho: printConfirmacaoTamanho,
-        aprovado: 'pendente'
+        aprovado: req.user.empresa_id === 5 ? 'aprovado' : 'pendente', // Incorporadora sempre aprovado, outras empresas pendente
+        empresa_id: req.user.empresa_id // Adicionar empresa_id do usuário que está criando
       }])
       .select();
 
@@ -362,8 +373,8 @@ const updateFechamento = async (req, res) => {
     
     if (req.files?.print_confirmacao && req.files.print_confirmacao[0]) {
       try {
-        const uploadResult = await uploadToSupabase(req.files.print_confirmacao[0], 'print_confirmacao');
-        printConfirmacaoArquivo = uploadResult.fileName;
+        const uploadResult = await uploadToSupabase(req.files.print_confirmacao[0], STORAGE_BUCKET_CONTRATOS, 'fechamentos', 'print_confirmacao');
+        printConfirmacaoArquivo = uploadResult.path; // Usar o caminho completo em vez de apenas o nome
         printConfirmacaoNome = uploadResult.originalName;
         printConfirmacaoTamanho = uploadResult.size;
       } catch (uploadError) {
@@ -469,10 +480,27 @@ const getContratoUrl = async (req, res) => {
       return res.status(404).json({ error: 'Contrato não encontrado!' });
     }
 
+    // Log para debug
+    console.log('🔍 Buscando contrato:', {
+      fechamento_id: id,
+      contrato_arquivo: fechamento.contrato_arquivo,
+      bucket: STORAGE_BUCKET_CONTRATOS
+    });
+
+    // Tentar primeiro com o caminho completo, depois apenas com o nome (compatibilidade com fechamentos antigos)
+    let contratoPath = fechamento.contrato_arquivo;
+    
+    // Se o arquivo não tem pasta, adicionar a pasta fechamentos
+    if (!contratoPath.includes('/')) {
+      contratoPath = `fechamentos/${contratoPath}`;
+    }
+
+    console.log('🔍 Caminho do contrato:', contratoPath);
+
     // Gerar URL assinada com validade de 24 horas (86400 segundos)
     const { data: urlData, error: urlError } = await supabaseAdmin.storage
       .from(STORAGE_BUCKET_CONTRATOS)
-      .createSignedUrl(fechamento.contrato_arquivo, 86400);
+      .createSignedUrl(contratoPath, 86400);
 
     if (urlError) {
       console.error('Erro ao gerar URL assinada:', urlError);
@@ -509,10 +537,18 @@ const downloadContrato = async (req, res) => {
       return res.status(404).json({ error: 'Contrato não encontrado!' });
     }
 
+    // Tentar primeiro com o caminho completo, depois apenas com o nome (compatibilidade com fechamentos antigos)
+    let contratoPath = fechamento.contrato_arquivo;
+    
+    // Se o arquivo não tem pasta, adicionar a pasta fechamentos
+    if (!contratoPath.includes('/')) {
+      contratoPath = `fechamentos/${contratoPath}`;
+    }
+
     // Fazer download do arquivo do Supabase Storage
     const { data, error: downloadError } = await supabaseAdmin.storage
       .from(STORAGE_BUCKET_CONTRATOS)
-      .download(fechamento.contrato_arquivo);
+      .download(contratoPath);
 
     if (downloadError) {
       console.error('Erro ao baixar arquivo:', downloadError);
@@ -549,10 +585,18 @@ const getPrintConfirmacaoUrl = async (req, res) => {
       return res.status(404).json({ error: 'Print de confirmação não encontrado!' });
     }
 
+    // Tentar primeiro com o caminho completo, depois apenas com o nome (compatibilidade com fechamentos antigos)
+    let printPath = fechamento.print_confirmacao_arquivo;
+    
+    // Se o arquivo não tem pasta, adicionar a pasta fechamentos
+    if (!printPath.includes('/')) {
+      printPath = `fechamentos/${printPath}`;
+    }
+
     // Gerar URL assinada com validade de 24 horas (86400 segundos)
     const { data: urlData, error: urlError } = await supabaseAdmin.storage
       .from(STORAGE_BUCKET_CONTRATOS)
-      .createSignedUrl(fechamento.print_confirmacao_arquivo, 86400);
+      .createSignedUrl(printPath, 86400);
 
     if (urlError) {
       console.error('Erro ao gerar URL assinada:', urlError);
@@ -641,6 +685,216 @@ const reprovarFechamento = async (req, res) => {
   }
 };
 
+// Função para gerar senha aleatória
+const gerarSenhaAleatoria = () => {
+  const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let senha = '';
+  for (let i = 0; i < 8; i++) {
+    senha += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+  }
+  return senha;
+};
+
+// POST /api/fechamentos/:id/criar-acesso-freelancer - Criar acesso freelancer para paciente fechado
+const criarAcessoFreelancer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Verificar permissões: apenas admin ou usuário da incorporadora (empresa_id=5)
+    if (req.user.tipo !== 'admin' && req.user.empresa_id !== 5) {
+      return res.status(403).json({ error: 'Você não tem permissão para criar acessos freelancer' });
+    }
+
+    // Buscar fechamento com dados do paciente
+    const { data: fechamento, error: fechamentoError } = await supabaseAdmin
+      .from('fechamentos')
+      .select(`
+        *,
+        pacientes(
+          id,
+          nome,
+          email,
+          telefone,
+          status,
+          empresa_id
+        )
+      `)
+      .eq('id', id)
+      .single();
+
+    if (fechamentoError || !fechamento) {
+      return res.status(404).json({ error: 'Fechamento não encontrado' });
+    }
+
+    const paciente = fechamento.pacientes;
+
+    // Validar se fechamento está aprovado
+    if (fechamento.aprovado !== 'aprovado') {
+      return res.status(400).json({ error: 'Fechamento deve estar aprovado para criar acesso freelancer' });
+    }
+
+    // Validar se paciente tem status "fechado"
+    if (paciente.status !== 'fechado') {
+      return res.status(400).json({ error: 'Paciente deve ter status "fechado" para criar acesso freelancer' });
+    }
+
+    // Validar se paciente tem email
+    if (!paciente.email || paciente.email.trim() === '') {
+      return res.status(400).json({ error: 'Paciente deve ter email cadastrado para criar acesso freelancer' });
+    }
+
+    // Verificar se email já existe na tabela consultores
+    const { data: consultorExistente, error: consultorError } = await supabaseAdmin
+      .from('consultores')
+      .select('id')
+      .eq('email', paciente.email.trim())
+      .limit(1);
+
+    if (consultorError) throw consultorError;
+
+    if (consultorExistente && consultorExistente.length > 0) {
+      return res.status(400).json({ error: 'Este email já possui acesso freelancer no sistema' });
+    }
+
+    // Gerar senha aleatória
+    const senhaTemporaria = gerarSenhaAleatoria();
+    
+    // Hash da senha
+    const saltRounds = 10;
+    const senhaHash = await bcrypt.hash(senhaTemporaria, saltRounds);
+
+    // Preparar dados do consultor
+    const consultorData = {
+      nome: paciente.nome,
+      email: paciente.email.trim(),
+      senha: senhaHash,
+      telefone: paciente.telefone || null,
+      is_freelancer: true,
+      ativo: true,
+      tipo: 'consultor',
+      empresa_id: paciente.empresa_id, // Herdar do fechamento/paciente
+      podealterarstatus: false,
+      pode_ver_todas_novas_clinicas: false
+    };
+
+    // Criar consultor na tabela consultores
+    const { data: novoConsultor, error: criarError } = await supabaseAdmin
+      .from('consultores')
+      .insert([consultorData])
+      .select();
+
+    if (criarError) throw criarError;
+
+    const consultorId = novoConsultor[0].id;
+
+    // Gerar código de referência automaticamente
+    try {
+      const nomeLimpo = paciente.nome
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '')
+        .substring(0, 10);
+      
+      const codigoReferencia = `${nomeLimpo}${consultorId}`;
+      
+      // Atualizar o consultor com o código de referência
+      await supabaseAdmin
+        .from('consultores')
+        .update({ codigo_referencia: codigoReferencia })
+        .eq('id', consultorId);
+      
+      console.log('✅ Código de referência gerado:', codigoReferencia);
+    } catch (codigoError) {
+      console.error('⚠️ Erro ao gerar código de referência:', codigoError);
+    }
+
+    // Enviar email com credenciais
+    try {
+      const linkAcesso = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login`;
+      
+      const htmlEmail = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Seu Acesso ao Sistema de Indicações</title>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #f4f4f4; padding: 20px; text-align: center; border-radius: 5px; }
+            .content { padding: 20px; }
+            .credentials { background-color: #e8f4fd; padding: 15px; border-radius: 5px; margin: 20px 0; }
+            .button { display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 10px 0; }
+            .warning { background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Seu Acesso ao Sistema de Indicações</h1>
+            </div>
+            
+            <div class="content">
+              <p>Olá <strong>${paciente.nome}</strong>,</p>
+              
+              <p>Seu acesso ao sistema de indicações foi criado com sucesso! Agora você pode fazer login, indicar possíveis novos clientes e ganhar com isso!.</p>
+              
+              <div class="credentials">
+                <h3>Suas Credenciais de Acesso:</h3>
+                <p><strong>Email:</strong> ${paciente.email}</p>
+                <p><strong>Senha Temporária:</strong> ${senhaTemporaria}</p>
+              </div>
+              
+              <p>Para acessar o sistema, clique no botão abaixo:</p>
+              <a href="${linkAcesso}" class="button">Fazer Login</a>
+              
+              <div class="warning">
+                <h4>⚠️ Importante:</h4>
+                <ul>
+                  <li>Esta é uma senha temporária</li>
+                  <li>Recomendamos que você altere sua senha após o primeiro login</li>
+                  <li>Mantenha suas credenciais seguras</li>
+                </ul>
+              </div>
+              
+              <p>Se você tiver alguma dúvida, entre em contato conosco.</p>
+              
+              <p>Atenciosamente,<br>Equipe IM Solumn</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      await transporter.sendMail({
+        from: process.env.EMAIL_FROM || 'noreply@crminvest.com',
+        to: paciente.email,
+        subject: 'Seu acesso ao sistema de indicações',
+        html: htmlEmail
+      });
+
+      console.log('✅ Email enviado com sucesso para:', paciente.email);
+    } catch (emailError) {
+      console.error('❌ Erro ao enviar email:', emailError);
+      // Não falhar a operação se houver erro no email
+    }
+
+    res.json({ 
+      message: 'Acesso freelancer criado com sucesso! As credenciais foram enviadas para o email do cliente.',
+      consultor: {
+        id: consultorId,
+        nome: paciente.nome,
+        email: paciente.email
+      }
+    });
+
+  } catch (error) {
+    console.error('Erro ao criar acesso freelancer:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getAllFechamentos,
   getDashboardFechamentos,
@@ -651,6 +905,7 @@ module.exports = {
   downloadContrato,
   getPrintConfirmacaoUrl,
   aprovarFechamento,
-  reprovarFechamento
+  reprovarFechamento,
+  criarAcessoFreelancer
 };
 

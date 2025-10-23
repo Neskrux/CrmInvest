@@ -280,7 +280,7 @@ const cadastroPublico = async (req, res) => {
     console.log('📝 === NOVO CADASTRO DE CONSULTOR ===');
     console.log('📋 Dados recebidos:', req.body);
     
-    const { nome, telefone, email, senha, cpf, pix, cidade, estado } = req.body;
+    const { nome, telefone, email, senha, cpf, pix, cidade, estado, empresa_id, is_freelancer } = req.body;
     
     // Validar campos obrigatórios
     if (!nome || !telefone || !email || !senha || !cpf || !pix) {
@@ -326,7 +326,12 @@ const cadastroPublico = async (req, res) => {
     const saltRounds = 10;
     const senhaHash = await bcrypt.hash(senha, saltRounds);
     
-    console.log('🏢 Definindo empresa_id = 3 para cadastro público de consultor');
+    // Definir empresa_id e is_freelancer baseado nos dados recebidos
+    const empresaIdFinal = empresa_id || 3; // Default para empresa 3 se não especificado
+    const isFreelancerFinal = is_freelancer !== undefined ? is_freelancer : true; // Default true se não especificado
+    
+    console.log('🏢 Definindo empresa_id =', empresaIdFinal, 'para cadastro público de consultor');
+    console.log('👤 is_freelancer =', isFreelancerFinal);
     
     // Inserir consultor
     const { data, error } = await supabaseAdmin
@@ -342,8 +347,8 @@ const cadastroPublico = async (req, res) => {
         estado,
         tipo: 'consultor',
         ativo: true,
-        is_freelancer: true,
-        empresa_id: 3  // Sempre associar à empresa ID 3 para cadastros públicos
+        is_freelancer: isFreelancerFinal,
+        empresa_id: empresaIdFinal
       }])
       .select();
 
