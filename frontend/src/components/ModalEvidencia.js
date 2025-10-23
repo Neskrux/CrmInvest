@@ -10,7 +10,8 @@ const ModalEvidencia = ({
   registroId, 
   statusAnterior, 
   statusNovo,
-  nomeRegistro 
+  nomeRegistro,
+  empresaId 
 }) => {
   const { makeRequest } = useAuth();
   const { showSuccessToast, showErrorToast } = useToast();
@@ -181,7 +182,7 @@ const ModalEvidencia = ({
           {/* Informações do Registro */}
           <div style={{ marginBottom: '1.5rem' }}>
             <p style={{ color: '#374151', marginBottom: '0.5rem' }}>
-              <strong>{tipo === 'paciente' ? 'Paciente' : 'Clínica'}:</strong> {nomeRegistro}
+              <strong>{tipo === 'paciente' ? (empresaId === 5 ? 'Cliente' : 'Paciente') : 'Clínica'}:</strong> {nomeRegistro}
             </p>
             <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: 0 }}>
               {statusAnterior && (

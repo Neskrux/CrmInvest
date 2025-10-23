@@ -1,100 +1,88 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import useBranding from '../hooks/useBranding';
+import { useAuth } from '../contexts/AuthContext';
 
 const Empreendimentos = () => {
   const { t } = useBranding();
+  const { makeRequest } = useAuth();
+  const [empreendimentos, setEmpreendimentos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedEmpreendimento, setSelectedEmpreendimento] = useState(null);
   const [showModal, setShowModal] = useState(false);
 
-  // Dados dos empreendimentos (em produção viria de uma API)
-  const empreendimentos = [
-    {
-      id: 1,
-      nome: 'Residencial Jardim das Flores',
-      imagem: '/images/empreendimentos/empreendimento1.jpg',
-      localizacao: 'São Paulo - SP',
-      tipo: 'Residencial',
-      unidades: 120,
-      status: 'Em construção',
-      preco: 'R$ 350.000',
-      descricao: 'Apartamentos de 2 e 3 quartos com excelente localização e infraestrutura completa.',
-      caracteristicas: ['Piscina', 'Academia', 'Salão de festas', 'Playground', 'Portaria 24h'],
-      construtora: 'Construtora ABC',
-      entrega: 'Dezembro 2024'
-    },
-    {
-      id: 2,
-      nome: 'Condomínio Vista Mar',
-      imagem: '/images/empreendimentos/empreendimento2.jpg',
-      localizacao: 'Santos - SP',
-      tipo: 'Residencial',
-      unidades: 80,
-      status: 'Lançamento',
-      preco: 'R$ 420.000',
-      descricao: 'Apartamentos com vista para o mar, localizados na orla de Santos.',
-      caracteristicas: ['Vista para o mar', 'Piscina', 'Academia', 'Salão de festas', 'Garagem'],
-      construtora: 'Construtora XYZ',
-      entrega: 'Março 2025'
-    },
-    {
-      id: 3,
-      nome: 'Torre Executiva Business',
-      imagem: '/images/empreendimentos/empreendimento3.jpg',
-      localizacao: 'São Paulo - SP',
-      tipo: 'Comercial',
-      unidades: 50,
-      status: 'Pronto para morar',
-      preco: 'R$ 280.000',
-      descricao: 'Salas comerciais no centro financeiro de São Paulo.',
-      caracteristicas: ['Ar condicionado', 'Elevador', 'Segurança 24h', 'Estacionamento', 'Wi-Fi'],
-      construtora: 'Construtora Business',
-      entrega: 'Pronto'
-    },
-    {
-      id: 4,
-      nome: 'Residencial Parque Verde',
-      imagem: '/images/empreendimentos/empreendimento4.jpg',
-      localizacao: 'Campinas - SP',
-      tipo: 'Residencial',
-      unidades: 200,
-      status: 'Em construção',
-      preco: 'R$ 290.000',
-      descricao: 'Condomínio fechado com muito verde e área de lazer completa.',
-      caracteristicas: ['Área verde', 'Piscina', 'Quadra', 'Playground', 'Salão de festas'],
-      construtora: 'Construtora Verde',
-      entrega: 'Junho 2025'
-    },
-    {
-      id: 5,
-      nome: 'Edifício Premium Center',
-      imagem: '/images/empreendimentos/empreendimento5.jpg',
-      localizacao: 'São Paulo - SP',
-      tipo: 'Comercial',
-      unidades: 30,
-      status: 'Lançamento',
-      preco: 'R$ 450.000',
-      descricao: 'Edifício comercial de alto padrão no centro da cidade.',
-      caracteristicas: ['Alto padrão', 'Ar condicionado', 'Elevador', 'Segurança', 'Estacionamento'],
-      construtora: 'Construtora Premium',
-      entrega: 'Dezembro 2025'
-    },
-    {
-      id: 6,
-      nome: 'Residencial Família Feliz',
-      imagem: '/images/empreendimentos/empreendimento6.jpg',
-      localizacao: 'Guarulhos - SP',
-      tipo: 'Residencial',
-      unidades: 150,
-      status: 'Em construção',
-      preco: 'R$ 320.000',
-      descricao: 'Apartamentos ideais para famílias com excelente custo-benefício.',
-      caracteristicas: ['Familiar', 'Piscina', 'Playground', 'Salão de festas', 'Portaria'],
-      construtora: 'Construtora Família',
-      entrega: 'Setembro 2024'
-    }
-  ];
+  // Função para buscar empreendimentos do banco
+  const fetchEmpreendimentos = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('🔍 Buscando empreendimentos do banco...');
+      const response = await fetch('http://localhost:5001/api/empreendimentos-public');
+      
+      if (!response.ok) {
+        throw new Error('Erro ao carregar empreendimentos');
+      }
+      
+      const data = await response.json();
+      console.log('📊 Empreendimentos carregados do banco:', data);
+      
+       // Mapear dados do banco para o formato esperado
+       const empreendimentosFormatados = data.map(emp => {
+         let imagemPath = '/images/empreendimentos/default.jpg'; // Imagem padrão
 
+         switch (emp.id) {
+           case 4:
+             imagemPath = '/images/empreendimentos/laguna.png';
+             break;
+           case 5:
+             imagemPath = '/images/empreendimentos/girassol.jpg';
+             break;
+           case 6:
+             imagemPath = '/images/empreendimentos/sintropia.png';
+             break;
+           case 7:
+             imagemPath = '/images/empreendimentos/lotus.jpg';
+             break;
+           case 8:
+             imagemPath = '/images/empreendimentos/river.jpg';
+             break;
+           default:
+             imagemPath = '/images/empreendimentos/default.jpg'; // Imagem padrão para outros IDs
+             break;
+         }
+
+         return {
+           id: emp.id, // ✅ ID real do banco
+           nome: emp.nome,
+           descricao: emp.observacoes || '',
+           localizacao: `${emp.cidade} - ${emp.estado}`,
+           endereco: emp.endereco || '',
+           bairro: emp.bairro || '',
+           tipo: emp.tipo || 'Residencial', // ✅ Dados reais do banco
+           unidades: emp.unidades || 0, // ✅ Dados reais do banco
+           status: emp.status === 'ativo' ? 'Em construção' : 'Lançamento',
+           imagem: imagemPath, // ✅ Imagem local baseada no ID
+         };
+       });
+      
+      setEmpreendimentos(empreendimentosFormatados);
+    } catch (err) {
+      console.error('❌ Erro ao buscar empreendimentos:', err);
+      setError('Erro ao carregar empreendimentos. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Carregar dados ao montar o componente
+  useEffect(() => {
+    fetchEmpreendimentos();
+  }, []);
+
+  // Função para visualizar detalhes (associada ao ID real)
   const handleCardClick = (empreendimento) => {
+    console.log('🔍 Visualizando empreendimento ID:', empreendimento.id, 'Nome:', empreendimento.nome);
     setSelectedEmpreendimento(empreendimento);
     setShowModal(true);
   };
@@ -103,6 +91,136 @@ const Empreendimentos = () => {
     setShowModal(false);
     setSelectedEmpreendimento(null);
   };
+
+   // Função formatPrice removida (não mais necessária)
+
+  // Função para obter cor do status
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'pronto para morar':
+      case 'pronto':
+        return '#10b981';
+      case 'em construção':
+      case 'construção':
+        return '#f59e0b';
+      case 'lançamento':
+        return '#3b82f6';
+      default:
+        return '#6b7280';
+    }
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Gerenciar {t.clinicas}</h1>
+            <p className="page-subtitle">Explore nossos empreendimentos</p>
+          </div>
+        </div>
+        <div className="page-content">
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '300px',
+            fontSize: '1.125rem',
+            color: '#6b7280'
+          }}>
+            Carregando empreendimentos do banco...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Gerenciar {t.clinicas}</h1>
+            <p className="page-subtitle">Explore nossos empreendimentos</p>
+          </div>
+        </div>
+        <div className="page-content">
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '300px',
+            gap: '1rem'
+          }}>
+            <div style={{ color: '#ef4444', fontSize: '1.125rem' }}>
+              ❌ {error}
+            </div>
+            <button
+              onClick={fetchEmpreendimentos}
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '500'
+              }}
+            >
+              Tentar novamente
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (empreendimentos.length === 0) {
+    return (
+      <div>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Gerenciar {t.clinicas}</h1>
+            <p className="page-subtitle">Explore nossos empreendimentos</p>
+          </div>
+        </div>
+        <div className="page-content">
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '300px',
+            gap: '1rem'
+          }}>
+            <div style={{ color: '#6b7280', fontSize: '1.125rem' }}>
+              📋 Nenhum empreendimento encontrado no banco
+            </div>
+            <button
+              onClick={fetchEmpreendimentos}
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '500'
+              }}
+            >
+              Recarregar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -123,7 +241,7 @@ const Empreendimentos = () => {
         }}>
           {empreendimentos.map((empreendimento) => (
             <div
-              key={empreendimento.id}
+              key={empreendimento.id} // ✅ ID real do banco (4, 5, 6, 7, 8, 9)
               onClick={() => handleCardClick(empreendimento)}
               style={{
                 backgroundColor: 'white',
@@ -146,7 +264,7 @@ const Empreendimentos = () => {
               {/* Imagem do Empreendimento */}
               <div style={{
                 height: '200px',
-                backgroundImage: `url(${empreendimento.imagem})`,
+                backgroundImage: empreendimento.imagem ? `url(${empreendimento.imagem})` : 'none',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
@@ -158,15 +276,29 @@ const Empreendimentos = () => {
                   position: 'absolute',
                   top: '12px',
                   right: '12px',
-                  backgroundColor: empreendimento.status === 'Pronto para morar' ? '#10b981' : 
-                                  empreendimento.status === 'Em construção' ? '#f59e0b' : '#3b82f6',
+                  backgroundColor: getStatusColor(empreendimento.status),
                   color: 'white',
                   padding: '4px 12px',
                   borderRadius: '20px',
                   fontSize: '0.75rem',
                   fontWeight: '600'
                 }}>
-                  {empreendimento.status}
+                  {empreendimento.status || 'Status não informado'}
+                </div>
+
+                {/* ID do empreendimento (para debug) */}
+                <div style={{
+                  position: 'absolute',
+                  top: '12px',
+                  left: '12px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                  color: 'white',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  fontSize: '0.75rem',
+                  fontWeight: '500'
+                }}>
+                  ID: {empreendimento.id}
                 </div>
               </div>
 
@@ -179,7 +311,7 @@ const Empreendimentos = () => {
                   color: '#1f2937',
                   lineHeight: '1.3'
                 }}>
-                  {empreendimento.nome}
+                  {empreendimento.nome || 'Nome não informado'}
                 </h3>
 
                 <div style={{
@@ -194,24 +326,22 @@ const Empreendimentos = () => {
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                     <circle cx="12" cy="10" r="3"></circle>
                   </svg>
-                  {empreendimento.localizacao}
+                  {empreendimento.localizacao || 'Localização não informada'}
                 </div>
 
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '1rem'
-                }}>
-                  <div>
-                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
-                      {empreendimento.tipo} • {empreendimento.unidades} unidades
-                    </div>
-                    <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#059669' }}>
-                      {empreendimento.preco}
-                    </div>
-                  </div>
-                </div>
+                 <div style={{
+                   display: 'flex',
+                   justifyContent: 'space-between',
+                   alignItems: 'center',
+                   marginBottom: '1rem'
+                 }}>
+                   <div>
+                     <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                       {empreendimento.tipo || 'Tipo não informado'} • {empreendimento.unidades || 0} unidades
+                     </div>
+                     {/* Removido: seção de preço */}
+                   </div>
+                 </div>
 
                 <div style={{
                   display: 'flex',
@@ -264,14 +394,23 @@ const Empreendimentos = () => {
               justifyContent: 'space-between',
               alignItems: 'center'
             }}>
-              <h2 style={{
-                margin: 0,
-                fontSize: '1.5rem',
-                fontWeight: '600',
-                color: '#1f2937'
-              }}>
-                {selectedEmpreendimento.nome}
-              </h2>
+              <div>
+                <h2 style={{
+                  margin: 0,
+                  fontSize: '1.5rem',
+                  fontWeight: '600',
+                  color: '#1f2937'
+                }}>
+                  {selectedEmpreendimento.nome || 'Nome não informado'}
+                </h2>
+                <p style={{
+                  margin: '0.25rem 0 0 0',
+                  fontSize: '0.875rem',
+                  color: '#6b7280'
+                }}>
+                  ID: {selectedEmpreendimento.id}
+                </p>
+              </div>
               <button
                 onClick={closeModal}
                 style={{
@@ -300,121 +439,78 @@ const Empreendimentos = () => {
             {/* Conteúdo do Modal */}
             <div style={{ padding: '1.5rem' }}>
               {/* Imagem */}
-              <div style={{
-                height: '250px',
-                backgroundImage: `url(${selectedEmpreendimento.imagem})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                borderRadius: '8px',
-                marginBottom: '1.5rem',
-                backgroundColor: '#f3f4f6'
-              }} />
+              {selectedEmpreendimento.imagem && (
+                <div style={{
+                  height: '250px',
+                  backgroundImage: `url(${selectedEmpreendimento.imagem})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  borderRadius: '8px',
+                  marginBottom: '1.5rem',
+                  backgroundColor: '#f3f4f6'
+                }} />
+              )}
 
               {/* Informações Básicas */}
               <div style={{ marginBottom: '1.5rem' }}>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                  gap: '1rem',
-                  marginBottom: '1rem'
-                }}>
-                  <div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>
-                      Localização
-                    </div>
-                    <div style={{ fontWeight: '500' }}>{selectedEmpreendimento.localizacao}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>
-                      Tipo
-                    </div>
-                    <div style={{ fontWeight: '500' }}>{selectedEmpreendimento.tipo}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>
-                      Unidades
-                    </div>
-                    <div style={{ fontWeight: '500' }}>{selectedEmpreendimento.unidades}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>
-                      Preço
-                    </div>
-                    <div style={{ fontWeight: '500', color: '#059669' }}>{selectedEmpreendimento.preco}</div>
-                  </div>
-                </div>
+                 <div style={{
+                   display: 'grid',
+                   gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                   gap: '1rem',
+                   marginBottom: '1rem'
+                 }}>
+                   <div>
+                     <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                       Localização
+                     </div>
+                     <div style={{ fontWeight: '500' }}>
+                       {selectedEmpreendimento.localizacao || 'Não informado'}
+                     </div>
+                   </div>
+                   <div>
+                     <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                       Tipo
+                     </div>
+                     <div style={{ fontWeight: '500' }}>
+                       {selectedEmpreendimento.tipo || 'Não informado'}
+                     </div>
+                   </div>
+                   <div>
+                     <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                       Unidades
+                     </div>
+                     <div style={{ fontWeight: '500' }}>
+                       {selectedEmpreendimento.unidades || 0}
+                     </div>
+                   </div>
+                   {/* Removido: seção de preço */}
+                 </div>
 
-                <div style={{
-                  display: 'flex',
-                  gap: '1rem',
-                  marginBottom: '1rem'
-                }}>
-                  <div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>
-                      Construtora
-                    </div>
-                    <div style={{ fontWeight: '500' }}>{selectedEmpreendimento.construtora}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>
-                      Previsão de Entrega
-                    </div>
-                    <div style={{ fontWeight: '500' }}>{selectedEmpreendimento.entrega}</div>
-                  </div>
-                </div>
+                {/* Removido: seção de construtora e entrega */}
               </div>
 
               {/* Descrição */}
-              <div style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{
-                  fontSize: '1.125rem',
-                  fontWeight: '600',
-                  marginBottom: '0.75rem',
-                  color: '#1f2937'
-                }}>
-                  Descrição
-                </h3>
-                <p style={{
-                  color: '#6b7280',
-                  lineHeight: '1.6',
-                  margin: 0
-                }}>
-                  {selectedEmpreendimento.descricao}
-                </p>
-              </div>
-
-              {/* Características */}
-              <div>
-                <h3 style={{
-                  fontSize: '1.125rem',
-                  fontWeight: '600',
-                  marginBottom: '0.75rem',
-                  color: '#1f2937'
-                }}>
-                  Características
-                </h3>
-                <div style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '0.5rem'
-                }}>
-                  {selectedEmpreendimento.caracteristicas.map((caracteristica, index) => (
-                    <span
-                      key={index}
-                      style={{
-                        backgroundColor: '#eff6ff',
-                        color: '#1e40af',
-                        padding: '0.375rem 0.75rem',
-                        borderRadius: '20px',
-                        fontSize: '0.875rem',
-                        fontWeight: '500'
-                      }}
-                    >
-                      {caracteristica}
-                    </span>
-                  ))}
+              {selectedEmpreendimento.descricao && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h3 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: '600',
+                    marginBottom: '0.75rem',
+                    color: '#1f2937'
+                  }}>
+                    Descrição
+                  </h3>
+                  <p style={{
+                    color: '#6b7280',
+                    lineHeight: '1.6',
+                    margin: 0
+                  }}>
+                    {selectedEmpreendimento.descricao}
+                  </p>
                 </div>
-              </div>
+              )}
+
+               {/* Removido: seção de características */}
             </div>
 
             {/* Footer do Modal */}
@@ -422,8 +518,12 @@ const Empreendimentos = () => {
               padding: '1rem 1.5rem',
               borderTop: '1px solid #e5e7eb',
               display: 'flex',
-              justifyContent: 'flex-end'
+              justifyContent: 'space-between',
+              alignItems: 'center'
             }}>
+              <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                ID: {selectedEmpreendimento.id}
+              </div>
               <button
                 onClick={closeModal}
                 style={{
@@ -435,12 +535,6 @@ const Empreendimentos = () => {
                   cursor: 'pointer',
                   fontSize: '0.875rem',
                   fontWeight: '500'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#f9fafb';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = 'white';
                 }}
               >
                 Fechar
