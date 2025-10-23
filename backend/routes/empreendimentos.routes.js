@@ -1,9 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const { getAllEmpreendimentos, getEmpreendimentoById } = require('../controllers/empreendimentos.controller');
+const { testEmpreendimentos, getAllEmpreendimentos, getEmpreendimentoById } = require('../controllers/empreendimentos.controller');
 const { authenticateToken } = require('../middleware/auth');
 
-// Aplicar middleware de autenticação em todas as rotas
+// GET /api/empreendimentos/test - Testar conexão (sem autenticação para debug)
+router.get('/test', (req, res) => {
+  res.json({ message: 'Endpoint de teste funcionando!' });
+});
+
+// GET /api/empreendimentos/test-db - Testar conexão com banco
+router.get('/test-db', testEmpreendimentos);
+
+// Aplicar middleware de autenticação nas demais rotas
 router.use(authenticateToken);
 
 // GET /api/empreendimentos - Listar empreendimentos

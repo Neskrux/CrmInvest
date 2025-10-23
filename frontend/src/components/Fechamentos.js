@@ -3462,6 +3462,7 @@ const Fechamentos = () => {
         statusAnterior={evidenciaData.statusAnterior}
         statusNovo={evidenciaData.statusNovo}
         nomeRegistro={evidenciaData.fechamentoNome}
+        empresaId={empresaId}
       />
 
     </div>

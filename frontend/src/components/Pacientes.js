@@ -560,10 +560,10 @@ const Pacientes = () => {
         setPacientes(data);
       } else {
         console.error('Erro ao carregar pacientes:', data.error);
-        showErrorToast('Erro ao carregar pacientes: ' + data.error);
+        showErrorToast(`Erro ao carregar ${empresaId === 5 ? 'clientes' : 'pacientes'}: ` + data.error);
       }
     } catch (error) {
-      console.error('Erro ao carregar pacientes:', error);
+      console.error(`Erro ao carregar ${empresaId === 5 ? 'clientes' : 'pacientes'}:`, error);
       showErrorToast('Erro ao conectar com o servidor');
     } finally {
       setLoading(false);
@@ -867,11 +867,11 @@ const Pacientes = () => {
         });
         fetchPacientes();
       } else {
-        showErrorToast('Erro ao salvar paciente: ' + data.error);
+        showErrorToast(`Erro ao salvar ${empresaId === 5 ? 'cliente' : 'paciente'}: ` + data.error);
       }
     } catch (error) {
-      console.error('Erro ao salvar paciente:', error);
-      showErrorToast('Erro ao salvar paciente');
+      console.error(`Erro ao salvar ${empresaId === 5 ? 'cliente' : 'paciente'}:`, error);
+      showErrorToast(`Erro ao salvar ${empresaId === 5 ? 'cliente' : 'paciente'}`);
     }
   };
 
@@ -979,7 +979,7 @@ const Pacientes = () => {
 
   const calcularCarteiraExistente = (percentualAlvo = 130) => {
     if (pacientesCarteira.length === 0) {
-      showErrorToast('Adicione pelo menos um paciente antes de calcular');
+      showErrorToast(`Adicione pelo menos um ${empresaId === 5 ? 'cliente' : 'paciente'} antes de calcular`);
       return;
     }
 
@@ -1185,7 +1185,7 @@ const Pacientes = () => {
       const errors = responses.filter(response => !response.ok);
 
       if (errors.length === 0) {
-        showSuccessToast(`${pacientesCarteira.length} pacientes da carteira existente cadastrados com sucesso!`);
+        showSuccessToast(`${pacientesCarteira.length} ${empresaId === 5 ? 'clientes' : 'pacientes'} da carteira existente cadastrados com sucesso!`);
         setShowCarteiraModal(false);
         setCarteiraFormData({
           cpf: '',
@@ -1199,7 +1199,7 @@ const Pacientes = () => {
         setCarteiraCalculos(null);
         await fetchPacientes();
       } else {
-        showErrorToast(`Erro ao cadastrar ${errors.length} pacientes`);
+        showErrorToast(`Erro ao cadastrar ${errors.length} ${empresaId === 5 ? 'clientes' : 'pacientes'}`);
       }
     } catch (error) {
       console.error('Erro ao salvar carteira existente:', error);
@@ -1468,7 +1468,7 @@ const Pacientes = () => {
   const updateStatus = async (pacienteId, newStatus, evidenciaId = null) => {
     // Verificar se o usuário tem permissão para alterar status
     if (!podeAlterarStatus) {
-      showErrorToast('Você não tem permissão para alterar o status dos pacientes');
+      showErrorToast(`Você não tem permissão para alterar o status dos ${empresaId === 5 ? 'clientes' : 'pacientes'}`);
       return;
     }
 
@@ -1597,7 +1597,7 @@ const Pacientes = () => {
 
   const excluirPaciente = async (pacienteId) => {
     // Confirmar antes de excluir
-    if (!window.confirm('Tem certeza que deseja excluir este paciente? Esta ação não pode ser desfeita e removerá todos os agendamentos e fechamentos relacionados.')) {
+    if (!window.confirm(`Tem certeza que deseja excluir este ${empresaId === 5 ? 'cliente' : 'paciente'}? Esta ação não pode ser desfeita e removerá todos os agendamentos e fechamentos relacionados.`)) {
       return;
     }
 
@@ -1623,11 +1623,11 @@ const Pacientes = () => {
         window.dispatchEvent(new CustomEvent('data_updated', { detail: { timestamp } }));
       } else {
         const data = await response.json();
-        showErrorToast('Erro ao excluir paciente: ' + (data.error || 'Erro desconhecido'));
+        showErrorToast(`Erro ao excluir ${empresaId === 5 ? 'cliente' : 'paciente'}: ` + (data.error || 'Erro desconhecido'));
       }
     } catch (error) {
-      console.error('Erro ao excluir paciente:', error);
-      showErrorToast('Erro ao excluir paciente');
+      console.error(`Erro ao excluir ${empresaId === 5 ? 'cliente' : 'paciente'}:`, error);
+      showErrorToast(`Erro ao excluir ${empresaId === 5 ? 'cliente' : 'paciente'}`);
     }
   };
 
@@ -2153,8 +2153,8 @@ const Pacientes = () => {
       window.dispatchEvent(new CustomEvent('data_updated', { detail: { timestamp } }));
       
     } catch (error) {
-      console.error('Erro ao cadastrar paciente completo:', error);
-      showErrorToast('Erro ao cadastrar paciente: ' + error.message);
+      console.error(`Erro ao cadastrar ${empresaId === 5 ? 'cliente' : 'paciente'} completo:`, error);
+      showErrorToast(`Erro ao cadastrar ${empresaId === 5 ? 'cliente' : 'paciente'}: ` + error.message);
     } finally {
       setSalvandoCadastroCompleto(false);
     }
@@ -2705,7 +2705,7 @@ const Pacientes = () => {
                   <thead>
                     <tr>
                       <th>Nome</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{t.consultor}</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>CPF</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cidade</th>
@@ -2972,7 +2972,7 @@ const Pacientes = () => {
                   <thead>
                     <tr>
                       <th>Nome</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{t.consultor}</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>CPF</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cidade</th>
@@ -3565,7 +3565,7 @@ const Pacientes = () => {
                           <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
                           <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Empreendimento' : 'Tipo'}</th>
                           <th>Status</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
+                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{t.consultor}</th>
                           <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Data Agendamento</th>
                         </tr>
                       </thead>
@@ -3803,7 +3803,7 @@ const Pacientes = () => {
                         <tr>
                           <th>Nome</th>
                           <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
+                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{t.consultor}</th>
                           <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Valor</th>
                           <th>Status</th>
                           <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Documentação</th>
@@ -4127,7 +4127,7 @@ const Pacientes = () => {
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: '700px' }}>
             <div className="modal-header">
-              <h2 className="modal-title">Cadastrar Novo Paciente</h2>
+              <h2 className="modal-title">{empresaId === 5 ? 'Cadastrar Novo Cliente' : 'Cadastrar Novo Paciente'}</h2>
               <button className="close-btn" onClick={resetForm}>×</button>
             </div>
 
@@ -4402,7 +4402,7 @@ const Pacientes = () => {
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h2 className="modal-title">Novo Paciente</h2>
+              <h2 className="modal-title">{empresaId === 5 ? 'Novo Cliente' : 'Novo Paciente'}</h2>
               <button className="close-btn" onClick={resetForm}>×</button>
             </div>
 
@@ -4615,7 +4615,7 @@ const Pacientes = () => {
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h2 className="modal-title">Novo Paciente</h2>
+              <h2 className="modal-title">{empresaId === 5 ? 'Novo Cliente' : 'Novo Paciente'}</h2>
               <button className="close-btn" onClick={resetForm}>×</button>
             </div>
 
@@ -4800,7 +4800,7 @@ const Pacientes = () => {
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h2 className="modal-title">Editar Paciente</h2>
+              <h2 className="modal-title">{empresaId === 5 ? 'Editar Cliente' : 'Editar Paciente'}</h2>
               <button className="close-btn" onClick={resetForm}>×</button>
             </div>
 
@@ -4922,7 +4922,7 @@ const Pacientes = () => {
 
               <div className="grid grid-2">
                 <div className="form-group">
-                  <label className="form-label">Tipo de Tratamento *</label>
+                  <label className="form-label">{t.tipoTratamento} *</label>
                   <select
                     name="tipo_tratamento"
                     className="form-select"
@@ -4939,7 +4939,7 @@ const Pacientes = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Consultor Responsável</label>
+                <label className="form-label">{empresaId === 5 ? 'Corretor Responsável' : 'Consultor Responsável'}</label>
                 <select
                   name="consultor_id"
                   className="form-select"
@@ -5362,7 +5362,7 @@ const Pacientes = () => {
                           </div>
                           
                           <div>
-                            <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Tipo de Tratamento</label>
+                            <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>{t.tipoTratamento}</label>
                             <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
                               {fechamentoPaciente.tipo_tratamento || 'Não informado'}
                             </p>
@@ -6074,7 +6074,7 @@ const Pacientes = () => {
           <div className="modal" style={{ maxWidth: '900px', maxHeight: '90vh', overflow: 'auto' }}>
             <div className="modal-header">
               <h2 className="modal-title">
-                {editingPaciente ? 'Editar Paciente' : 'Cadastrar Novo Paciente'}
+                {editingPaciente ? (empresaId === 5 ? 'Editar Cliente' : 'Editar Paciente') : (empresaId === 5 ? 'Cadastrar Novo Cliente' : 'Cadastrar Novo Paciente')}
               </h2>
               <button className="close-btn" onClick={resetForm}>×</button>
             </div>
@@ -6194,8 +6194,8 @@ const Pacientes = () => {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem' }}>
-                    Tipo de Tratamento
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem' }}>
+                    {t.tipoTratamento}
                   </label>
                   <select
                     name="tipo_tratamento"
@@ -6485,7 +6485,7 @@ const Pacientes = () => {
                   marginBottom: '1rem',
                   lineHeight: '1.5'
                 }}>
-                  <strong>Paciente:</strong> {pacienteParaAgendar?.nome}
+                  <strong>{empresaId === 5 ? 'Cliente' : 'Paciente'}:</strong> {pacienteParaAgendar?.nome}
                 </p>
                 <p style={{ 
                   color: '#6b7280', 
@@ -6613,7 +6613,7 @@ const Pacientes = () => {
                   marginBottom: '1rem',
                   lineHeight: '1.5'
                 }}>
-                  <strong>Paciente:</strong> {pacienteParaFechar?.nome}
+                  <strong>{empresaId === 5 ? 'Cliente' : 'Paciente'}:</strong> {pacienteParaFechar?.nome}
                 </p>
                 <p style={{ 
                   color: '#6b7280', 
@@ -7052,6 +7052,7 @@ const Pacientes = () => {
         statusAnterior={evidenciaData.statusAnterior}
         statusNovo={evidenciaData.statusNovo}
         nomeRegistro={evidenciaData.pacienteNome}
+        empresaId={empresaId}
       />
 
       {/* Modal de Cadastro Completo para Clínicas */}
@@ -7277,7 +7278,7 @@ const Pacientes = () => {
 
                   <div>
                     <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
-                      Tipo de Tratamento *
+                      {t.tipoTratamento} *
                     </label>
                     <select
                       name="tipo_tratamento"

@@ -1069,7 +1069,7 @@ const Agendamentos = () => {
                           <button
                             onClick={() => handleViewPaciente(agendamento)}
                             className="btn-action"
-                            title="Visualizar informações do paciente"
+                            title={`Visualizar informações do ${t.paciente.toLowerCase()}`}
                           >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -1461,7 +1461,7 @@ const Agendamentos = () => {
               {activeDetalhesTab === 'observacoes' && !detalhesAtual.nome && (
                 <>
                   <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                    <label className="form-label">Telefone do paciente</label>
+                    <label className="form-label">Telefone do {t.paciente.toLowerCase()}</label>
                     <div className="detail-field">
                       {detalhesAtual.telefone}
                     </div>
@@ -1617,7 +1617,7 @@ const Agendamentos = () => {
                   marginBottom: '1rem',
                   lineHeight: '1.5'
                 }}>
-                  <strong>Paciente:</strong> {agendamentoParaFechar?.paciente_nome}
+                  <strong>{t.paciente}:</strong> {agendamentoParaFechar?.paciente_nome}
                 </p>
                 <p style={{ 
                   color: '#6b7280', 
@@ -1842,7 +1842,7 @@ const Agendamentos = () => {
                   <strong style={{ color: '#92400e' }}>Limitação de Permissão</strong>
                 </div>
                 <p style={{ color: '#92400e', margin: 0, lineHeight: '1.5' }}>
-                  Como consultor freelancer, você não pode alterar o status dos pacientes, aguarde que iremos atualizar o status conforme a negociação avançar.
+                  Como consultor freelancer, você não pode alterar o status dos {t.paciente.toLowerCase()+'s'}, aguarde que iremos atualizar o status conforme a negociação avançar.
                 </p>
               </div>
               
