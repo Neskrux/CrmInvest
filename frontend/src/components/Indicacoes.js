@@ -698,19 +698,8 @@ const Indicacoes = () => {
                   margin: '0 auto 1.5rem'
                 }}>
                   <strong>Você indicará pessoas interessadas em comprar imóveis nos nossos empreendimentos.</strong><br /><br />
-                  <p>Conectamos pessoas ao sonho do novo lar com condições facilitadas de pagamento.</p>
+                  <p>Preencha o formulário abaixo com as informações do cliente que você quer indicar.</p>
                 </p>
-                <div style={{
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                  color: 'white',
-                  padding: '1rem 1.5rem',
-                  borderRadius: '12px',
-                  fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem',
-                  fontWeight: '600',
-                  display: 'inline-block'
-                }}>
-                  Indique um parente, um amigo, um conhecido, ou até você mesmo!
-                </div>
               </>
             ) : (
               <>
@@ -741,15 +730,19 @@ const Indicacoes = () => {
             )}
           </div>
 
-          <h2 style={{
-            fontSize: window.innerWidth <= 768 ? '1.5rem' : '2rem',
-            fontWeight: '700',
-            color: '#1e293b',
-            marginTop: '3rem'
-          }}>
-            Como funciona?
-          </h2>
-          
+          {isIncorporadora ? (
+            <>
+            </>
+          ) : (
+            <h2 style={{
+              fontSize: window.innerWidth <= 768 ? '1.5rem' : '2rem',
+              fontWeight: '700',
+              color: '#1e293b',
+              marginTop: '3rem'
+            }}>
+              Como funciona?
+            </h2>
+          )}
           <p style={{
             fontSize: window.innerWidth <= 768 ? '1rem' : '1.1rem',
             color: '#475569',
@@ -759,10 +752,7 @@ const Indicacoes = () => {
             margin: '0 auto 1.5rem'
           }}>
             {isIncorporadora ? (
-              <>
-                Preencha o formulário abaixo com as informações do cliente que você quer indicar. 
-                Após o cadastro, nossa equipe entrará em contato para agendar a visita ao empreendimento.
-              </>
+              <></>
             ) : (
               <>
                 Preencha o formulário abaixo com as informações do paciente que você quer indicar. 
