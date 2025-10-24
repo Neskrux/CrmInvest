@@ -53,6 +53,14 @@ router.use('/', movimentacoesRoutes); // /api/movimentacoes/*
 router.use('/documents', documentsRoutes);
 router.use('/idsf', idsfRoutes);
 
+// Importar rotas de solicitações de carteira (depois das outras para evitar conflitos)
+const solicitacoesCarteiraRoutes = require('./solicitacoes-carteira.routes');
+router.use('/', solicitacoesCarteiraRoutes); // /api/solicitacoes-carteira/*
+
+// Importar rotas de contratos de carteira
+const contratosCarteiraRoutes = require('./contratos-carteira.routes');
+router.use('/', contratosCarteiraRoutes); // /api/contratos-carteira/*
+
 // ✅ TODAS AS ROTAS FORAM REFATORADAS COM SUCESSO!
 // O backend agora está completamente modularizado e organizado.
 

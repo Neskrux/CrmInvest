@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import useBranding from '../hooks/useBranding';
 import { useToast } from '../components/Toast';
 import ModalEvidencia from './ModalEvidencia';
+import * as XLSX from 'xlsx';
 import useSmartPolling from '../hooks/useSmartPolling';
 
 const Pacientes = () => {
@@ -87,6 +88,16 @@ const Pacientes = () => {
   const [pacientesCarteira, setPacientesCarteira] = useState([]);
   const [carteiraCalculos, setCarteiraCalculos] = useState(null);
   const [percentualAlvoCarteira, setPercentualAlvoCarteira] = useState(130);
+  const [solicitacoesCarteira, setSolicitacoesCarteira] = useState([]);
+  const [showSolicitacaoModal, setShowSolicitacaoModal] = useState(false);
+  const [solicitacaoSelecionada, setSolicitacaoSelecionada] = useState(null);
+  
+  // Estados para gerenciar contratos
+  const [contratos, setContratos] = useState([]);
+  const [showContratosModal, setShowContratosModal] = useState(false);
+  const [uploadingContrato, setUploadingContrato] = useState(false);
+  const [motivoReprovacao, setMotivoReprovacao] = useState('');
+  const [contratoParaReprovar, setContratoParaReprovar] = useState(null);
 
   // Função para preencher automaticamente dados de teste
   const preencherDadosTeste = () => {
@@ -324,7 +335,7 @@ const Pacientes = () => {
 
   // Estado para controlar valores temporários dos selects (quando modal está aberto)
   const [statusTemporario, setStatusTemporario] = useState({});
-  const { error: showErrorToast, success: showSuccessToast } = useToast();
+  const { error: showErrorToast, success: showSuccessToast, info: showInfoToast } = useToast();
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
 
   // Estados para modal de evidência
@@ -467,6 +478,11 @@ const Pacientes = () => {
     fetchAgendamentos();
     fetchFechamentos();
     
+    // Buscar solicitações de carteira se for admin ou clínica
+    if (isAdmin || isClinica) {
+      fetchSolicitacoesCarteira();
+    }
+    
     // Buscar novos leads apenas se pode alterar status (não freelancer) ou é consultor interno
     if (podeAlterarStatus || isConsultorInterno) {
       fetchNovosLeads();
@@ -477,7 +493,24 @@ const Pacientes = () => {
     if (deveFiltrarPorConsultor && user?.consultor_id) {
       setFiltroConsultor(String(user.consultor_id));
     }
+  }, []);
+
+  // Buscar links personalizados se for consultor
+  useEffect(() => {
+    if (isConsultor) {
+      buscarLinkPersonalizado();
+    } else {
+      setLoadingLink(false);
+    }
+    
   }, [podeAlterarStatus, isConsultorInterno, deveFiltrarPorConsultor, user?.consultor_id]);
+
+  // Carregar contratos quando modal de análise abrir
+  useEffect(() => {
+    if (showSolicitacaoModal && solicitacaoSelecionada) {
+      fetchContratos(solicitacaoSelecionada.id);
+    }
+  }, [showSolicitacaoModal, solicitacaoSelecionada]);
 
 
   // Garantir que freelancers fiquem na aba "Pacientes"
@@ -551,6 +584,167 @@ const Pacientes = () => {
     filtroDataInicio,
     filtroDataFim
   ]);
+
+  const fetchSolicitacoesCarteira = async () => {
+    try {
+      const response = await makeRequest('/solicitacoes-carteira');
+      const data = await response.json();
+      
+      if (response.ok) {
+        setSolicitacoesCarteira(data || []);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar solicitações de carteira:', error);
+    }
+  };
+
+  const deletarSolicitacao = async (solicitacaoId) => {
+    if (!window.confirm('Tem certeza que deseja excluir esta solicitação? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+
+    try {
+      const response = await makeRequest(`/solicitacoes-carteira/${solicitacaoId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        showSuccessToast('Solicitação excluída com sucesso!');
+        // Recarregar lista de solicitações
+        fetchSolicitacoesCarteira();
+      } else {
+        // Tentar fazer parse do JSON, mas tratar erro de parsing
+        let errorMessage = 'Erro desconhecido';
+        try {
+          const data = await response.json();
+          errorMessage = data.error || errorMessage;
+        } catch (parseError) {
+          console.error('Erro ao fazer parse da resposta:', parseError);
+          const text = await response.text();
+          console.error('Resposta do servidor:', text);
+          errorMessage = `Erro ${response.status}: ${response.statusText}`;
+        }
+        showErrorToast('Erro ao excluir solicitação: ' + errorMessage);
+      }
+    } catch (error) {
+      console.error('Erro ao excluir solicitação:', error);
+      showErrorToast('Erro ao excluir solicitação: ' + error.message);
+    }
+  };
+
+  // Funções para gerenciar contratos
+  const fetchContratos = async (solicitacaoId) => {
+    try {
+      const response = await makeRequest(`/contratos-carteira/${solicitacaoId}`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        setContratos(data || []);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar contratos:', error);
+    }
+  };
+
+  const handleUploadContrato = async (e, paciente) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingContrato(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('arquivo', file);
+      formData.append('solicitacao_carteira_id', solicitacaoSelecionada.id);
+      formData.append('paciente_cpf', paciente.cpf);
+      formData.append('paciente_nome', paciente.nomeCompleto);
+
+      const response = await makeRequest('/contratos-carteira/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (response.ok) {
+        showSuccessToast('Contrato enviado com sucesso!');
+        await fetchContratos(solicitacaoSelecionada.id);
+      } else {
+        showErrorToast('Erro ao enviar contrato');
+      }
+    } catch (error) {
+      console.error('Erro ao fazer upload de contrato:', error);
+      showErrorToast('Erro ao fazer upload de contrato');
+    } finally {
+      setUploadingContrato(false);
+      e.target.value = ''; // Limpar input
+    }
+  };
+
+  const handleAprovarContrato = async (contratoId) => {
+    try {
+      const response = await makeRequest(`/contratos-carteira/${contratoId}/aprovar`, {
+        method: 'POST'
+      });
+
+      if (response.ok) {
+        showSuccessToast('Contrato aprovado!');
+        await fetchContratos(solicitacaoSelecionada.id);
+      } else {
+        showErrorToast('Erro ao aprovar contrato');
+      }
+    } catch (error) {
+      console.error('Erro ao aprovar contrato:', error);
+      showErrorToast('Erro ao aprovar contrato');
+    }
+  };
+
+  const handleReprovarContrato = async () => {
+    if (!motivoReprovacao.trim()) {
+      showErrorToast('Por favor, informe o motivo da reprovação');
+      return;
+    }
+
+    try {
+      const response = await makeRequest(`/contratos-carteira/${contratoParaReprovar.id}/reprovar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ motivo: motivoReprovacao })
+      });
+
+      if (response.ok) {
+        showSuccessToast('Contrato reprovado');
+        setContratoParaReprovar(null);
+        setMotivoReprovacao('');
+        await fetchContratos(solicitacaoSelecionada.id);
+      } else {
+        showErrorToast('Erro ao reprovar contrato');
+      }
+    } catch (error) {
+      console.error('Erro ao reprovar contrato:', error);
+      showErrorToast('Erro ao reprovar contrato');
+    }
+  };
+
+  const handleDeletarContrato = async (contratoId) => {
+    if (!window.confirm('Tem certeza que deseja deletar este contrato?')) {
+      return;
+    }
+
+    try {
+      const response = await makeRequest(`/contratos-carteira/${contratoId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        showSuccessToast('Contrato deletado com sucesso!');
+        await fetchContratos(solicitacaoSelecionada.id);
+      } else {
+        showErrorToast('Erro ao deletar contrato');
+      }
+    } catch (error) {
+      console.error('Erro ao deletar contrato:', error);
+      showErrorToast('Erro ao deletar contrato');
+    }
+  };
 
   const fetchPacientes = async () => {
     try {
@@ -978,6 +1172,282 @@ const Pacientes = () => {
     setCarteiraCalculos(null); // Limpar cálculos quando remover paciente
   };
 
+  const exportarCarteiraSolicitacaoExcel = (solicitacao) => {
+    if (!solicitacao || !solicitacao.calculos) {
+      showErrorToast('Dados insuficientes para exportar');
+      return;
+    }
+
+    try {
+      // Preparar dados para exportação
+      const dadosExportacao = solicitacao.calculos.parcelasDetalhadas.map(parcela => {
+        // Verificar tanto 'categoria' quanto 'tipo' para compatibilidade
+        const tipoParcela = parcela.categoria || parcela.tipo;
+        const tipoFinal = tipoParcela === 'COL' || tipoParcela === 'colateral' ? 'COLATERAL' : 'OPERAÇÃO';
+        const isColateral = tipoParcela === 'COL' || tipoParcela === 'colateral';
+        
+        return {
+          'Paciente': parcela.paciente,
+          'Tipo': tipoFinal,
+          'Parcela': parcela.parcela,
+          'Valor Face': parcela.valorFace || parcela.valor,
+          'Deságio': isColateral ? 0 : (parcela.desagio || 0), // Colateral não tem deságio
+          'Liquidez': parcela.valorEntregue || parcela.liquidez,
+          'Vencimento': new Date(parcela.vencimento).toLocaleDateString('pt-BR')
+        };
+      });
+
+      // Adicionar linha de resumo
+      const resumo = [
+        {}, // Linha vazia
+        {
+          'Paciente': 'RESUMO GERAL',
+          'Tipo': '',
+          'Parcela': '',
+          'Valor Face': '',
+          'Deságio': '',
+          'Liquidez': '',
+          'Vencimento': ''
+        },
+        {
+          'Paciente': 'Total Face',
+          'Tipo': '',
+          'Parcela': '',
+          'Valor Face': solicitacao.calculos.valorFaceTotal,
+          'Deságio': '',
+          'Liquidez': '',
+          'Vencimento': ''
+        },
+        {
+          'Paciente': 'Total Entregue',
+          'Tipo': '',
+          'Parcela': '',
+          'Valor Face': '',
+          'Deságio': '',
+          'Liquidez': solicitacao.calculos.valorEntregueTotal,
+          'Vencimento': ''
+        },
+        {
+          'Paciente': 'Deságio Total',
+          'Tipo': '',
+          'Parcela': '',
+          'Valor Face': '',
+          'Deságio': solicitacao.calculos.desagioTotal,
+          'Liquidez': '',
+          'Vencimento': ''
+        },
+        {
+          'Paciente': 'Operação (Face)',
+          'Tipo': '',
+          'Parcela': '',
+          'Valor Face': solicitacao.calculos.valorTotalOperacao,
+          'Deságio': '',
+          'Liquidez': '',
+          'Vencimento': ''
+        },
+        {
+          'Paciente': 'Colateral (Face)',
+          'Tipo': '',
+          'Parcela': '',
+          'Valor Face': solicitacao.calculos.valorColateral,
+          'Deságio': '',
+          'Liquidez': '',
+          'Vencimento': ''
+        },
+        {
+          'Paciente': 'Percentual C/O',
+          'Tipo': '',
+          'Parcela': `${solicitacao.calculos.percentualFinal?.toFixed(2) || 0}%`,
+          'Valor Face': '',
+          'Deságio': '',
+          'Liquidez': '',
+          'Vencimento': ''
+        }
+      ];
+
+      // Combinar dados com resumo
+      const dadosCompletos = [...dadosExportacao, ...resumo];
+
+      // Criar planilha
+      const ws = XLSX.utils.json_to_sheet(dadosCompletos);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Carteira Detalhada');
+
+      // Definir larguras das colunas
+      ws['!cols'] = [
+        { wch: 30 }, // Paciente
+        { wch: 15 }, // Tipo
+        { wch: 10 }, // Parcela
+        { wch: 15 }, // Valor Face
+        { wch: 15 }, // Deságio
+        { wch: 15 }, // Liquidez
+        { wch: 15 }  // Vencimento
+      ];
+
+      // Gerar nome do arquivo
+      const nomeClinica = solicitacao.clinica_nome || 'Clinica';
+      const data = new Date().toISOString().split('T')[0];
+      const nomeArquivo = `Carteira_${nomeClinica}_${data}.xlsx`;
+
+      // Salvar arquivo
+      XLSX.writeFile(wb, nomeArquivo);
+      showSuccessToast('Planilha exportada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao exportar planilha:', error);
+      showErrorToast('Erro ao exportar planilha');
+    }
+  };
+
+  const exportarCarteiraExcel = () => {
+    if (!carteiraCalculos || !carteiraCalculos.parcelasDetalhadas) {
+      showErrorToast('Calcule a carteira antes de exportar');
+      return;
+    }
+
+    try {
+      // Preparar dados para exportação
+      const dadosExportacao = carteiraCalculos.parcelasDetalhadas.map(parcela => ({
+        'Paciente': parcela.paciente,
+        'Tipo': parcela.tipo === 'colateral' ? 'COLATERAL' : 'OPERAÇÃO',
+        'Detalhe': `Parcela ${parcela.parcela} (${parcela.tipo === 'colateral' ? 'Colateral' : 'Operação'})`,
+        'Valor': parcela.valor,
+        'Vencimento': new Date(parcela.vencimento).toLocaleDateString('pt-BR'),
+        'Dias': parcela.dias,
+        'Deságio': parcela.desagio,
+        'Liquidez': parcela.liquidez
+      }));
+
+      // Adicionar linha de resumo
+      const resumo = [
+        {}, // Linha vazia
+        {
+          'Paciente': 'RESUMO GERAL',
+          'Tipo': '',
+          'Detalhe': '',
+          'Valor': '',
+          'Vencimento': '',
+          'Dias': '',
+          'Deságio': '',
+          'Liquidez': ''
+        },
+        {
+          'Paciente': 'Total Face',
+          'Tipo': '',
+          'Detalhe': '',
+          'Valor': carteiraCalculos.valorFaceTotal,
+          'Vencimento': '',
+          'Dias': '',
+          'Deságio': '',
+          'Liquidez': ''
+        },
+        {
+          'Paciente': 'Total Entregue',
+          'Tipo': '',
+          'Detalhe': '',
+          'Valor': carteiraCalculos.valorEntregueTotal,
+          'Vencimento': '',
+          'Dias': '',
+          'Deságio': '',
+          'Liquidez': ''
+        },
+        {
+          'Paciente': 'Deságio Total',
+          'Tipo': '',
+          'Detalhe': '',
+          'Valor': carteiraCalculos.desagioTotal,
+          'Vencimento': '',
+          'Dias': '',
+          'Deságio': '',
+          'Liquidez': ''
+        },
+        {
+          'Paciente': 'Operação Face',
+          'Tipo': '',
+          'Detalhe': '',
+          'Valor': carteiraCalculos.valorTotalOperacao,
+          'Vencimento': '',
+          'Dias': '',
+          'Deságio': '',
+          'Liquidez': ''
+        },
+        {
+          'Paciente': 'Colateral Face',
+          'Tipo': '',
+          'Detalhe': '',
+          'Valor': carteiraCalculos.valorColateral,
+          'Vencimento': '',
+          'Dias': '',
+          'Deságio': '',
+          'Liquidez': ''
+        },
+        {
+          'Paciente': 'Percentual Final',
+          'Tipo': '',
+          'Detalhe': '',
+          'Valor': `${carteiraCalculos.percentualFinal.toFixed(2)}%`,
+          'Vencimento': '',
+          'Dias': '',
+          'Deságio': '',
+          'Liquidez': ''
+        },
+        {
+          'Paciente': 'Percentual Alvo',
+          'Tipo': '',
+          'Detalhe': '',
+          'Valor': `${carteiraCalculos.percentualAlvo}%`,
+          'Vencimento': '',
+          'Dias': '',
+          'Deságio': '',
+          'Liquidez': ''
+        },
+        {
+          'Paciente': 'Slack',
+          'Tipo': '',
+          'Detalhe': '',
+          'Valor': `${carteiraCalculos.slack.toFixed(2)}%`,
+          'Vencimento': '',
+          'Dias': '',
+          'Deságio': '',
+          'Liquidez': ''
+        }
+      ];
+
+      const dadosCompletos = [...dadosExportacao, ...resumo];
+
+      // Criar workbook e worksheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(dadosCompletos);
+
+      // Definir larguras das colunas
+      ws['!cols'] = [
+        { width: 20 }, // Paciente
+        { width: 12 }, // Tipo
+        { width: 25 }, // Detalhe
+        { width: 15 }, // Valor
+        { width: 12 }, // Vencimento
+        { width: 8 },  // Dias
+        { width: 15 }, // Deságio
+        { width: 15 }  // Liquidez
+      ];
+
+      // Adicionar worksheet ao workbook
+      XLSX.utils.book_append_sheet(wb, ws, 'Carteira Existente');
+
+      // Gerar nome do arquivo com data e hora
+      const agora = new Date();
+      const dataFormatada = agora.toISOString().slice(0, 19).replace(/:/g, '-');
+      const nomeArquivo = `Carteira_Existente_${dataFormatada}.xlsx`;
+
+      // Salvar arquivo
+      XLSX.writeFile(wb, nomeArquivo);
+
+      showSuccessToast('Planilha exportada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao exportar planilha:', error);
+      showErrorToast('Erro ao exportar planilha');
+    }
+  };
+
   const calcularCarteiraExistente = (percentualAlvo = 130) => {
     if (pacientesCarteira.length === 0) {
       showErrorToast(`Adicione pelo menos um ${empresaId === 5 ? 'cliente' : 'paciente'} antes de calcular`);
@@ -986,7 +1456,8 @@ const Pacientes = () => {
 
     // Valores fixos conforme especificação
     const fatorAMNum = 0.33; // Fator fixo de 0.33%
-    const dataAceite = '2025-10-15'; // Data fixa conforme testecarteira
+    const dataAceiteHoje = new Date(); // Data atual (hoje)
+    dataAceiteHoje.setHours(0, 0, 0, 0); // Zerar hora para calcular dias completos
 
     // Primeiro, calcular todas as parcelas
     const todasParcelas = [];
@@ -998,9 +1469,11 @@ const Pacientes = () => {
         const dataPrimeira = new Date(paciente.primeiraVencimento);
         const dataVencimento = new Date(dataPrimeira);
         dataVencimento.setMonth(dataVencimento.getMonth() + i);
+        dataVencimento.setHours(0, 0, 0, 0); // Zerar hora para calcular dias completos
 
-        const dataAceiteObj = new Date(dataAceite);
-        const dias = Math.ceil((dataVencimento - dataAceiteObj) / (1000 * 60 * 60 * 24));
+        // Calcular dias entre hoje e o vencimento
+        const diferencaMs = dataVencimento - dataAceiteHoje;
+        const dias = Math.ceil(diferencaMs / (1000 * 60 * 60 * 24));
 
         // Deságio calculado conforme testecarteira
         const desagio = valorParcelaNum * (fatorAMNum / 100) * dias;
@@ -1020,46 +1493,72 @@ const Pacientes = () => {
       }
     });
 
+    // AGRUPAR PARCELAS POR PACIENTE (um paciente não pode ser dividido)
+    const pacientesAgrupados = {};
+    todasParcelas.forEach(parcela => {
+      if (!pacientesAgrupados[parcela.pacienteId]) {
+        pacientesAgrupados[parcela.pacienteId] = {
+          pacienteId: parcela.pacienteId,
+          nome: parcela.paciente,
+          parcelas: [],
+          valorFaceTotal: 0,
+          desagioTotal: 0,
+          liquidezTotal: 0
+        };
+      }
+      
+      pacientesAgrupados[parcela.pacienteId].parcelas.push(parcela);
+      pacientesAgrupados[parcela.pacienteId].valorFaceTotal += parcela.valor;
+      pacientesAgrupados[parcela.pacienteId].desagioTotal += parcela.desagio;
+      pacientesAgrupados[parcela.pacienteId].liquidezTotal += parcela.liquidez;
+    });
+
+    // Converter para array e calcular score por paciente
+    const pacientesArray = Object.values(pacientesAgrupados).map(paciente => ({
+      ...paciente,
+      score: paciente.desagioTotal / paciente.valorFaceTotal // Perda relativa do paciente
+    }));
+
     // HEURÍSTICA GULOSA para atingir o percentual alvo
-    // 1. Inicializar todos como OP
-    todasParcelas.forEach(p => p.aloc = 'OP');
+    // 1. Inicializar todos os PACIENTES como OP
+    pacientesArray.forEach(p => p.aloc = 'OP');
     
-    // 2. Ordenar por score (perda relativa) decrescente
-    const parcelasOrdenadas = [...todasParcelas].sort((a, b) => b.score - a.score);
+    // 2. Ordenar PACIENTES por score (perda relativa) decrescente
+    const pacientesOrdenados = [...pacientesArray].sort((a, b) => b.score - a.score);
     
-    // 3. Mover parcelas de OP → COL até atingir o percentual alvo
+    // 3. Mover PACIENTES de OP → COL até atingir o percentual alvo
     const percentualAlvoDecimal = percentualAlvo / 100; // Ex: 130% = 1.30
     
-    let oFace = todasParcelas.reduce((sum, p) => sum + p.valor, 0);
+    let oFace = pacientesArray.reduce((sum, p) => sum + p.valorFaceTotal, 0);
     let cFace = 0;
     
-    for (const parcela of parcelasOrdenadas) {
-      if (cFace / oFace >= percentualAlvoDecimal) {
+    for (const paciente of pacientesOrdenados) {
+      if (oFace === 0 || cFace / oFace >= percentualAlvoDecimal) {
         break; // Já atingimos o percentual alvo
       }
       
-      // Mover de OP para COL
-      parcela.aloc = 'COL';
-      oFace -= parcela.valor;
-      cFace += parcela.valor;
+      // Mover PACIENTE de OP para COL
+      paciente.aloc = 'COL';
+      oFace -= paciente.valorFaceTotal;
+      cFace += paciente.valorFaceTotal;
     }
     
     // 4. AJUSTE FINO: tentar reduzir o slack sem ficar abaixo do alvo
-    let melhorSlack = cFace / oFace - percentualAlvoDecimal;
+    let melhorSlack = oFace > 0 ? (cFace / oFace - percentualAlvoDecimal) : 999;
     let houveMelhoria = true;
     
     while (houveMelhoria) {
       houveMelhoria = false;
       
-      // Tentar trocar um título de COL por um de OP
-      const parcelasCOL = todasParcelas.filter(p => p.aloc === 'COL');
-      const parcelasOP = todasParcelas.filter(p => p.aloc === 'OP');
+      // Tentar trocar um PACIENTE de COL por um de OP
+      const pacientesCOL = pacientesArray.filter(p => p.aloc === 'COL');
+      const pacientesOP = pacientesArray.filter(p => p.aloc === 'OP');
       
-      for (const pCol of parcelasCOL) {
-        for (const pOp of parcelasOP) {
+      for (const pCol of pacientesCOL) {
+        for (const pOp of pacientesOP) {
           // Simular a troca
-          const novoOFace = oFace + pCol.valor - pOp.valor;
-          const novoCFace = cFace - pCol.valor + pOp.valor;
+          const novoOFace = oFace + pCol.valorFaceTotal - pOp.valorFaceTotal;
+          const novoCFace = cFace - pCol.valorFaceTotal + pOp.valorFaceTotal;
           
           if (novoOFace > 0) {
             const novoRatio = novoCFace / novoOFace;
@@ -1081,12 +1580,25 @@ const Pacientes = () => {
         if (houveMelhoria) break;
       }
     }
+
+    // Aplicar alocação do PACIENTE para todas as suas PARCELAS
+    todasParcelas.forEach(parcela => {
+      const paciente = pacientesArray.find(p => p.pacienteId === parcela.pacienteId);
+      parcela.aloc = paciente.aloc;
+    });
     
     // Calcular valores finais usando a alocação da heurística
-    const parcelasDetalhadas = todasParcelas.map(p => ({
-      ...p,
-      tipo: p.aloc === 'COL' ? 'colateral' : 'operacao'
-    }));
+    const parcelasDetalhadas = todasParcelas.map(p => {
+      const isColateral = p.aloc === 'COL';
+      return {
+        ...p,
+        tipo: isColateral ? 'colateral' : 'operacao',
+        categoria: isColateral ? 'COL' : 'OP',
+        desagio: isColateral ? 0 : p.desagio, // Colateral não tem deságio
+        liquidez: isColateral ? p.valor : p.liquidez, // Colateral recebe valor face completo
+        valorEntregue: isColateral ? p.valor : p.liquidez // Colateral = valor face, Operação = com deságio
+      };
+    });
 
     // Calcular valores separados por tipo na base de FACE
     const valorColateralFaceCalculado = todasParcelas
@@ -1139,6 +1651,332 @@ const Pacientes = () => {
     });
   };
 
+  // Função auxiliar para gerar combinações de pacientes
+  const gerarCombinacoes = (pacientes, tamanho) => {
+    if (tamanho === 0) return [[]];
+    if (tamanho > pacientes.length) return [];
+    if (tamanho === pacientes.length) return [pacientes];
+    
+    const combinacoes = [];
+    
+    // Para evitar explosão combinatória, limitar a 10 pacientes máximo
+    if (pacientes.length > 10) {
+      // Usar heurística: pegar os primeiros pacientes ordenados por score
+      const pacientesLimitados = pacientes.slice(0, Math.min(10, pacientes.length));
+      return gerarCombinacoesRecursivo(pacientesLimitados, tamanho);
+    }
+    
+    return gerarCombinacoesRecursivo(pacientes, tamanho);
+  };
+  
+  const gerarCombinacoesRecursivo = (pacientes, tamanho, inicio = 0, combinacaoAtual = []) => {
+    if (combinacaoAtual.length === tamanho) {
+      return [combinacaoAtual.slice()];
+    }
+    
+    const combinacoes = [];
+    for (let i = inicio; i < pacientes.length; i++) {
+      combinacaoAtual.push(pacientes[i]);
+      combinacoes.push(...gerarCombinacoesRecursivo(pacientes, tamanho, i + 1, combinacaoAtual));
+      combinacaoAtual.pop();
+    }
+    
+    return combinacoes;
+  };
+
+  // Função para recalcular carteira com percentual específico (usado pelo admin)
+  const calcularCarteiraComPercentual = (pacientes, percentualAlvo = 130) => {
+    // Valores fixos conforme especificação
+    const fatorAMNum = 0.33; // Fator fixo de 0.33%
+    const dataAceiteHoje = new Date(); // Data atual (hoje)
+    dataAceiteHoje.setHours(0, 0, 0, 0); // Zerar hora para calcular dias completos
+
+    // Primeiro, calcular todas as parcelas
+    const todasParcelas = [];
+    (pacientes || []).forEach(paciente => {
+      const valorParcelaNum = paciente.valorParcela;
+      const numeroParcelasAnteciparNum = paciente.numeroParcelasAntecipar;
+
+      for (let i = 0; i < numeroParcelasAnteciparNum; i++) {
+        const dataPrimeira = new Date(paciente.primeiraVencimento);
+        const dataVencimento = new Date(dataPrimeira);
+        dataVencimento.setMonth(dataVencimento.getMonth() + i);
+        dataVencimento.setHours(0, 0, 0, 0); // Zerar hora para calcular dias completos
+
+        // Calcular dias entre hoje e o vencimento
+        const diferencaMs = dataVencimento - dataAceiteHoje;
+        const dias = Math.ceil(diferencaMs / (1000 * 60 * 60 * 24));
+
+        // Deságio calculado conforme testecarteira
+        const desagio = valorParcelaNum * (fatorAMNum / 100) * dias;
+        const liquidez = valorParcelaNum - desagio;
+
+        todasParcelas.push({
+          paciente: paciente.nomeCompleto,
+          parcela: i + 1,
+          valor: valorParcelaNum,
+          vencimento: dataVencimento.toISOString().split('T')[0],
+          dias: dias,
+          desagio: desagio,
+          liquidez: liquidez,
+          pacienteId: paciente.id,
+          score: desagio / valorParcelaNum // Perda relativa para heurística
+        });
+      }
+    });
+
+    // AGRUPAR PARCELAS POR PACIENTE (um paciente não pode ser dividido)
+    const pacientesAgrupados = {};
+    todasParcelas.forEach(parcela => {
+      if (!pacientesAgrupados[parcela.pacienteId]) {
+        pacientesAgrupados[parcela.pacienteId] = {
+          pacienteId: parcela.pacienteId,
+          nome: parcela.paciente,
+          parcelas: [],
+          valorFaceTotal: 0,
+          valorEntregueTotal: 0,
+          score: 0
+        };
+      }
+      pacientesAgrupados[parcela.pacienteId].parcelas.push(parcela);
+      pacientesAgrupados[parcela.pacienteId].valorFaceTotal += parcela.valor;
+      pacientesAgrupados[parcela.pacienteId].valorEntregueTotal += parcela.liquidez;
+      pacientesAgrupados[parcela.pacienteId].score += parcela.score;
+    });
+
+    // Converter para array e calcular score médio
+    const pacientesArray = Object.values(pacientesAgrupados).map(p => ({
+      ...p,
+      score: p.score / p.parcelas.length // Score médio das parcelas
+    }));
+
+    // Calcular valores totais
+    const valorFaceTotal = pacientesArray.reduce((sum, p) => sum + p.valorFaceTotal, 0);
+    const valorEntregueTotal = pacientesArray.reduce((sum, p) => sum + p.valorEntregueTotal, 0);
+    const desagioTotal = valorFaceTotal - valorEntregueTotal;
+
+    // Calcular valores ideais baseados no percentual alvo
+    // Se Colateral = X% da Operação, então: Colateral + Operação = Total
+    // X% * Operação + Operação = Total
+    // Operação * (1 + X/100) = Total
+    // Operação = Total / (1 + X/100)
+    const valorOperacaoFaceIdeal = valorFaceTotal / (1 + percentualAlvo / 100);
+    const valorColateralFaceIdeal = valorFaceTotal - valorOperacaoFaceIdeal;
+
+    // ALGORITMO OTIMIZADO: Tentar múltiplas combinações para atingir o percentual alvo
+    const pacientesOrdenados = [...pacientesArray].sort((a, b) => a.score - b.score);
+    
+    let melhorDistribuicao = null;
+    let menorDiferenca = Infinity;
+    
+    // Tentar diferentes números de pacientes para colateral
+    const totalPacientes = pacientesArray.length;
+    const percentualAlvoDecimal = percentualAlvo / 100;
+    
+    // ALGORITMO HÍBRIDO: Combinar busca exaustiva com heurística inteligente
+    if (totalPacientes <= 8) {
+      // Para poucos pacientes: busca exaustiva
+      for (let numColateral = 1; numColateral < totalPacientes; numColateral++) {
+        const combinacoes = gerarCombinacoes(pacientesOrdenados, numColateral);
+        
+        for (const combinacao of combinacoes) {
+          const pacientesColateral = combinacao;
+          const pacientesOperacao = pacientesOrdenados.filter(p => !combinacao.includes(p));
+          
+          const valorColateralAtual = pacientesColateral.reduce((sum, p) => sum + p.valorFaceTotal, 0);
+          const valorOperacaoAtual = pacientesOperacao.reduce((sum, p) => sum + p.valorFaceTotal, 0);
+          
+          if (valorOperacaoAtual > 0) {
+            const percentualAtual = (valorColateralAtual / valorOperacaoAtual) * 100;
+            const diferenca = Math.abs(percentualAtual - percentualAlvo);
+            
+            if (diferenca < menorDiferenca) {
+              menorDiferenca = diferenca;
+              melhorDistribuicao = {
+                pacientesColateral,
+                pacientesOperacao,
+                valorColateralAtual,
+                valorOperacaoAtual,
+                percentualAtual
+              };
+            }
+          }
+        }
+      }
+    } else {
+      // Para muitos pacientes: heurística inteligente com múltiplas tentativas
+      const tentativas = [
+        // Tentativa 1: Distribuição proporcional baseada no percentual alvo
+        () => {
+          const pacientesColateral = [];
+          const pacientesOperacao = [];
+          let valorColateralAtual = 0;
+          let valorOperacaoAtual = 0;
+          
+          // Ordenar por valor face (maiores primeiro para colateral)
+          const pacientesPorValor = [...pacientesOrdenados].sort((a, b) => b.valorFaceTotal - a.valorFaceTotal);
+          
+          for (const paciente of pacientesPorValor) {
+            const novoColateral = valorColateralAtual + paciente.valorFaceTotal;
+            const novoOperacao = valorOperacaoAtual + paciente.valorFaceTotal;
+            
+            const percentualComColateral = novoOperacao > 0 ? (novoColateral / valorOperacaoAtual) * 100 : 0;
+            const percentualComOperacao = novoOperacao > 0 ? (valorColateralAtual / novoOperacao) * 100 : 0;
+            
+            const diferencaColateral = Math.abs(percentualComColateral - percentualAlvo);
+            const diferencaOperacao = Math.abs(percentualComOperacao - percentualAlvo);
+            
+            if (diferencaColateral < diferencaOperacao) {
+              pacientesColateral.push(paciente);
+              valorColateralAtual = novoColateral;
+            } else {
+              pacientesOperacao.push(paciente);
+              valorOperacaoAtual = novoOperacao;
+            }
+          }
+          
+          return {
+            pacientesColateral,
+            pacientesOperacao,
+            valorColateralAtual,
+            valorOperacaoAtual,
+            percentualAtual: valorOperacaoAtual > 0 ? (valorColateralAtual / valorOperacaoAtual) * 100 : 0
+          };
+        },
+        
+        // Tentativa 2: Distribuição baseada em score (menor score = colateral)
+        () => {
+          const pacientesColateral = [];
+          const pacientesOperacao = [];
+          let valorColateralAtual = 0;
+          let valorOperacaoAtual = 0;
+          
+          for (const paciente of pacientesOrdenados) {
+            const novoColateral = valorColateralAtual + paciente.valorFaceTotal;
+            const novoOperacao = valorOperacaoAtual + paciente.valorFaceTotal;
+            
+            const percentualComColateral = novoOperacao > 0 ? (novoColateral / valorOperacaoAtual) * 100 : 0;
+            const percentualComOperacao = novoOperacao > 0 ? (valorColateralAtual / novoOperacao) * 100 : 0;
+            
+            const diferencaColateral = Math.abs(percentualComColateral - percentualAlvo);
+            const diferencaOperacao = Math.abs(percentualComOperacao - percentualAlvo);
+            
+            if (diferencaColateral < diferencaOperacao) {
+              pacientesColateral.push(paciente);
+              valorColateralAtual = novoColateral;
+            } else {
+              pacientesOperacao.push(paciente);
+              valorOperacaoAtual = novoOperacao;
+            }
+          }
+          
+          return {
+            pacientesColateral,
+            pacientesOperacao,
+            valorColateralAtual,
+            valorOperacaoAtual,
+            percentualAtual: valorOperacaoAtual > 0 ? (valorColateralAtual / valorOperacaoAtual) * 100 : 0
+          };
+        }
+      ];
+      
+      // Executar todas as tentativas e escolher a melhor
+      for (const tentativa of tentativas) {
+        const resultado = tentativa();
+        const diferenca = Math.abs(resultado.percentualAtual - percentualAlvo);
+        
+        if (diferenca < menorDiferenca) {
+          menorDiferenca = diferenca;
+          melhorDistribuicao = resultado;
+        }
+      }
+    }
+    
+    // Se não encontrou uma boa distribuição, usar heurística gulosa como fallback
+    if (!melhorDistribuicao) {
+      let valorColateralAtual = 0;
+      let valorOperacaoAtual = 0;
+      const pacientesColateral = [];
+      const pacientesOperacao = [];
+
+      // Atribuir pacientes para aproximar dos valores ideais
+      pacientesOrdenados.forEach(paciente => {
+        const diferencaColateral = Math.abs((valorColateralAtual + paciente.valorFaceTotal) - valorColateralFaceIdeal);
+        const diferencaOperacao = Math.abs((valorOperacaoAtual + paciente.valorFaceTotal) - valorOperacaoFaceIdeal);
+
+        if (diferencaColateral < diferencaOperacao) {
+          pacientesColateral.push(paciente);
+          valorColateralAtual += paciente.valorFaceTotal;
+        } else {
+          pacientesOperacao.push(paciente);
+          valorOperacaoAtual += paciente.valorFaceTotal;
+        }
+      });
+      
+      melhorDistribuicao = {
+        pacientesColateral,
+        pacientesOperacao,
+        valorColateralAtual,
+        valorOperacaoAtual,
+        percentualAtual: valorOperacaoAtual > 0 ? (valorColateralAtual / valorOperacaoAtual) * 100 : 0
+      };
+    }
+    
+    const { pacientesColateral, pacientesOperacao, valorColateralAtual, valorOperacaoAtual } = melhorDistribuicao;
+
+    // Calcular valores entregues
+    const valorColateralEntregue = pacientesColateral.reduce((sum, p) => sum + p.valorEntregueTotal, 0);
+    const valorOperacaoEntregue = pacientesOperacao.reduce((sum, p) => sum + p.valorEntregueTotal, 0);
+
+    // Calcular percentual final
+    const percentualFinal = (valorColateralAtual / valorOperacaoAtual) * 100;
+    const slack = percentualFinal - percentualAlvo;
+
+    // Preparar parcelas detalhadas
+    const parcelasDetalhadas = [];
+    
+    // Adicionar parcelas de colateral
+    pacientesColateral.forEach(paciente => {
+      paciente.parcelas.forEach(parcela => {
+        parcelasDetalhadas.push({
+          ...parcela,
+          categoria: 'COL',
+          valorFace: parcela.valor,
+          desagio: 0, // Colateral não tem deságio
+          valorEntregue: parcela.valor, // Colateral recebe valor face completo
+          liquidez: parcela.valor // Liquidez = valor face para colateral
+        });
+      });
+    });
+
+    // Adicionar parcelas de operação
+    pacientesOperacao.forEach(paciente => {
+      paciente.parcelas.forEach(parcela => {
+        parcelasDetalhadas.push({
+          ...parcela,
+          categoria: 'OP',
+          valorFace: parcela.valor,
+          valorEntregue: parcela.liquidez // Operação tem deságio aplicado
+        });
+      });
+    });
+
+    return {
+      parcelasDetalhadas,
+      valorEntregueTotal,
+      desagioTotal,
+      valorFaceTotal,
+      valorTotalOperacao: valorOperacaoAtual,
+      valorColateral: valorColateralAtual,
+      valorColateralEntregue,
+      valorOperacaoEntregue,
+      percentualFinal,
+      percentualAlvo,
+      slack: slack * 100, // Convertendo para porcentagem
+      pacientesCarteira: pacientes
+    };
+  };
+
   const salvarCarteiraExistente = async () => {
     if (!carteiraCalculos || pacientesCarteira.length === 0) {
       showErrorToast('Calcule os valores antes de salvar');
@@ -1146,61 +1984,120 @@ const Pacientes = () => {
     }
 
     try {
-      // Salvar cada paciente da carteira
-      const promises = (pacientesCarteira || []).map(paciente => {
-        const pacienteData = {
-          nome: paciente.nomeCompleto,
-          cpf: paciente.cpf,
-          telefone: '', // Será preenchido depois
-          cidade: '',
-          estado: '',
-          tipo_tratamento: 'Carteira Existente',
-          status: 'fechado',
-          observacoes: 'Paciente da carteira existente',
-          carteira_existente: true,
+      // Se for clínica, criar solicitação de aprovação
+      if (isClinica) {
+        const solicitacaoData = {
           clinica_id: user.id,
-          cadastrado_por_clinica: true,
-          // Dados específicos da carteira
-          valor_parcela: parseFloat(paciente.valorParcela.toString().replace(/[^\d,]/g, '').replace(',', '.')),
-          numero_parcelas_aberto: paciente.numeroParcelasAberto,
-          primeira_vencimento: paciente.primeiraVencimento,
-          numero_parcelas_antecipar: paciente.numeroParcelasAntecipar,
-          fator_am: 0.33, // Valor fixo
-          data_aceite: new Date().toISOString().split('T')[0], // Data atual
-          // Resultados do cálculo global
-          valor_entregue_total: carteiraCalculos?.valorEntregueTotal || 0,
-          desagio_total: carteiraCalculos?.desagioTotal || 0,
-          valor_face_total: carteiraCalculos?.valorFaceTotal || 0,
-          valor_total_operacao: carteiraCalculos?.valorTotalOperacao || 0,
-          valor_colateral: carteiraCalculos?.valorColateral || 0,
-          percentual_final: carteiraCalculos?.percentualFinal || 0
+          pacientes_carteira: pacientesCarteira.map(p => ({
+            id: p.id,
+            cpf: p.cpf,
+            nomeCompleto: p.nomeCompleto,
+            valorParcela: p.valorParcela,
+            numeroParcelasAberto: p.numeroParcelasAberto,
+            primeiraVencimento: p.primeiraVencimento,
+            numeroParcelasAntecipar: p.numeroParcelasAntecipar
+          })),
+          calculos: {
+            parcelasDetalhadas: carteiraCalculos.parcelasDetalhadas,
+            valorEntregueTotal: carteiraCalculos.valorEntregueTotal,
+            desagioTotal: carteiraCalculos.desagioTotal,
+            valorFaceTotal: carteiraCalculos.valorFaceTotal,
+            valorTotalOperacao: carteiraCalculos.valorTotalOperacao,
+            valorColateral: carteiraCalculos.valorColateral,
+            valorColateralEntregue: carteiraCalculos.valorColateralEntregue,
+            valorOperacaoEntregue: carteiraCalculos.valorOperacaoEntregue,
+            percentualFinal: carteiraCalculos.percentualFinal,
+            percentualAlvo: carteiraCalculos.percentualAlvo,
+            slack: carteiraCalculos.slack
+          },
+          percentual_alvo: carteiraCalculos.percentualAlvo,
+          observacoes_clinica: ''
         };
 
-        return makeRequest('/pacientes', {
+        const response = await makeRequest('/solicitacoes-carteira', {
           method: 'POST',
-          body: JSON.stringify(pacienteData)
+          body: JSON.stringify(solicitacaoData)
         });
-      });
 
-      const responses = await Promise.all(promises);
-      const errors = responses.filter(response => !response.ok);
-
-      if (errors.length === 0) {
-        showSuccessToast(`${pacientesCarteira.length} ${empresaId === 5 ? 'clientes' : 'pacientes'} da carteira existente cadastrados com sucesso!`);
-        setShowCarteiraModal(false);
-        setCarteiraFormData({
-          cpf: '',
-          nomeCompleto: '',
-          valorParcela: '',
-          numeroParcelasAberto: '',
-          primeiraVencimento: '',
-          numeroParcelasAntecipar: ''
-        });
-        setPacientesCarteira([]);
-        setCarteiraCalculos(null);
-        await fetchPacientes();
+        if (response.ok) {
+          showSuccessToast('Solicitação enviada para aprovação!');
+          showInfoToast('Aguarde a aprovação do administrador');
+          setShowCarteiraModal(false);
+          setCarteiraFormData({
+            cpf: '',
+            nomeCompleto: '',
+            valorParcela: '',
+            numeroParcelasAberto: '',
+            primeiraVencimento: '',
+            numeroParcelasAntecipar: ''
+          });
+          setPacientesCarteira([]);
+          setCarteiraCalculos(null);
+          
+          // Recarregar solicitações se houver
+          if (typeof fetchSolicitacoesCarteira === 'function') {
+            fetchSolicitacoesCarteira();
+          }
+        } else {
+          showErrorToast('Erro ao enviar solicitação');
+        }
       } else {
-        showErrorToast(`Erro ao cadastrar ${errors.length} ${empresaId === 5 ? 'clientes' : 'pacientes'}`);
+        // Admin pode salvar diretamente (lógica antiga)
+        const promises = (pacientesCarteira || []).map(paciente => {
+          const pacienteData = {
+            nome: paciente.nomeCompleto,
+            cpf: paciente.cpf,
+            telefone: '', // Será preenchido depois
+            cidade: '',
+            estado: '',
+            tipo_tratamento: 'Carteira Existente',
+            status: 'fechado',
+            observacoes: 'Paciente da carteira existente',
+            carteira_existente: true,
+            clinica_id: user.id,
+            cadastrado_por_clinica: true,
+            // Dados específicos da carteira
+            valor_parcela: parseFloat(paciente.valorParcela.toString().replace(/[^\d,]/g, '').replace(',', '.')),
+            numero_parcelas_aberto: paciente.numeroParcelasAberto,
+            primeira_vencimento: paciente.primeiraVencimento,
+            numero_parcelas_antecipar: paciente.numeroParcelasAntecipar,
+            fator_am: 0.33, // Valor fixo
+            data_aceite: new Date().toISOString().split('T')[0], // Data atual
+            // Resultados do cálculo global
+            valor_entregue_total: carteiraCalculos?.valorEntregueTotal || 0,
+            desagio_total: carteiraCalculos?.desagioTotal || 0,
+            valor_face_total: carteiraCalculos?.valorFaceTotal || 0,
+            valor_total_operacao: carteiraCalculos?.valorTotalOperacao || 0,
+            valor_colateral: carteiraCalculos?.valorColateral || 0,
+            percentual_final: carteiraCalculos?.percentualFinal || 0
+          };
+
+          return makeRequest('/pacientes', {
+            method: 'POST',
+            body: JSON.stringify(pacienteData)
+          });
+        });
+
+        const responses = await Promise.all(promises);
+        const errors = responses.filter(response => !response.ok);
+
+        if (errors.length === 0) {
+          showSuccessToast(`${pacientesCarteira.length} pacientes da carteira existente cadastrados com sucesso!`);
+          setShowCarteiraModal(false);
+          setCarteiraFormData({
+            cpf: '',
+            nomeCompleto: '',
+            valorParcela: '',
+            numeroParcelasAberto: '',
+            primeiraVencimento: '',
+            numeroParcelasAntecipar: ''
+          });
+          setPacientesCarteira([]);
+          setCarteiraCalculos(null);
+          await fetchPacientes();
+        } else {
+          showErrorToast(`Erro ao cadastrar ${errors.length} pacientes`);
+        }
       }
     } catch (error) {
       console.error('Erro ao salvar carteira existente:', error);
@@ -2289,7 +3186,7 @@ const Pacientes = () => {
       } else {
         let errorMessage = 'Erro ao criar fechamento';
         try {
-          const errorData = await fechamentoResponse.json();
+        const errorData = await fechamentoResponse.json();
           errorMessage = errorData.error || errorMessage;
         } catch (parseError) {
           // Se não conseguir fazer parse do JSON, usar o status text
@@ -2343,12 +3240,12 @@ const Pacientes = () => {
       }
     } else {
       // Para não-freelancers: lógica original
-      // Admins e consultores internos veem todos os pacientes
-      // Leads não atribuídos (sem consultor_id) NÃO devem aparecer aqui para ninguém
+    // Admins e consultores internos veem todos os pacientes
+    // Leads não atribuídos (sem consultor_id) NÃO devem aparecer aqui para ninguém
       if (!isAdmin && !isConsultorInterno && semConsultor) return false;
-      
-      // Para consultores internos e admins, também remover leads não atribuídos da aba "Geral"
-      // (eles devem aparecer apenas em "Novos Leads")
+    
+    // Para consultores internos e admins, também remover leads não atribuídos da aba "Geral"
+    // (eles devem aparecer apenas em "Novos Leads")
       if ((isAdmin || isConsultorInterno) && semConsultor) return false;
     }
     
@@ -2473,17 +3370,30 @@ const Pacientes = () => {
               </button>
             </>
           )}
-          {!isIncorporadora && (
-            <button
-              className={`tab ${activeTab === 'carteira-existente' ? 'active' : ''}`}
-              onClick={() => setActiveTab('carteira-existente')}
-            >
-              Carteira Existente
-              <span style={{ marginLeft: '0.5rem', fontSize: '0.875rem', opacity: 0.8 }}>
-                ({pacientes.filter(p => p.carteira_existente === true).length})
+        {!isIncorporadora && (
+          <button
+            className={`tab ${activeTab === 'carteira-existente' ? 'active' : ''}`}
+            onClick={() => setActiveTab('carteira-existente')}
+          >
+            Carteira Existente
+            <span style={{ marginLeft: '0.5rem', fontSize: '0.875rem', opacity: 0.8 }}>
+              ({pacientes.filter(p => p.carteira_existente === true).length})
+            </span>
+            {isAdmin && solicitacoesCarteira.filter(s => s.status === 'pendente').length > 0 && (
+              <span style={{ 
+                marginLeft: '0.5rem', 
+                backgroundColor: '#ef4444', 
+                color: 'white', 
+                padding: '0.125rem 0.5rem', 
+                borderRadius: '9999px',
+                fontSize: '0.75rem',
+                fontWeight: '600'
+              }}>
+                {solicitacoesCarteira.filter(s => s.status === 'pendente').length} pendente{solicitacoesCarteira.filter(s => s.status === 'pendente').length > 1 ? 's' : ''}
               </span>
-            </button>
-          )}
+            )}
+          </button>
+         )}
         </div>
       )}
       
@@ -2521,17 +3431,30 @@ const Pacientes = () => {
               })()})
             </span>
           </button>
-          {!isIncorporadora && (
-            <button
-              className={`tab ${activeTab === 'carteira-existente' ? 'active' : ''}`}
-              onClick={() => setActiveTab('carteira-existente')}
-            >
-              Carteira Existente
-              <span style={{ marginLeft: '0.5rem', fontSize: '0.875rem', opacity: 0.8 }}>
-                ({pacientes.filter(p => p.carteira_existente === true).length})
+        {!isIncorporadora && (
+          <button
+            className={`tab ${activeTab === 'carteira-existente' ? 'active' : ''}`}
+            onClick={() => setActiveTab('carteira-existente')}
+          >
+            Carteira Existente
+            <span style={{ marginLeft: '0.5rem', fontSize: '0.875rem', opacity: 0.8 }}>
+              ({pacientes.filter(p => p.carteira_existente === true).length + solicitacoesCarteira.length})
+            </span>
+            {isAdmin && solicitacoesCarteira.filter(s => s.status === 'pendente').length > 0 && (
+              <span style={{ 
+                marginLeft: '0.5rem', 
+                backgroundColor: '#ef4444', 
+                color: 'white', 
+                padding: '0.125rem 0.5rem', 
+                borderRadius: '9999px',
+                fontSize: '0.75rem',
+                fontWeight: '600'
+              }}>
+                {solicitacoesCarteira.filter(s => s.status === 'pendente').length} pendente{solicitacoesCarteira.filter(s => s.status === 'pendente').length > 1 ? 's' : ''}
               </span>
-            </button>
-          )}
+            )}
+          </button>
+        )}
         </div>
       )}
 
@@ -2631,8 +3554,8 @@ const Pacientes = () => {
                           ].includes(option.value);
                         })
                         .map(option => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
                     </select>
                   </div>
 
@@ -2710,7 +3633,35 @@ const Pacientes = () => {
                   {pacientesFiltrados.length} {t.paciente.toLowerCase()}(s)
                 </div>
               </div>
-
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button 
+                className="btn btn-primary" 
+                onClick={() => {
+                  if (isFreelancer) {
+                    navigate('/indicacoes');
+                    // Scroll para o topo da página após navegação
+                    setTimeout(() => {
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }, 100);
+                    return;
+                  }
+                  setShowModal(true);
+                  // Se for consultor, pré-preenche o consultor_id automaticamente
+                  if (isConsultor) {
+                    setFormData(prev => ({
+                      ...prev,
+                      consultor_id: String(user?.consultor_id || user?.id)
+                    }));
+                  }
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Novo Paciente
+              </button>
+              </div>
             </div>
 
             {loading ? (
@@ -2905,10 +3856,10 @@ const Pacientes = () => {
                                   ].includes(option.value);
                                 })
                                 .map(option => (
-                                  <option key={option.value} value={option.value} title={option.description}>
-                                    {option.label}
-                                  </option>
-                                ))}
+                                <option key={option.value} value={option.value} title={option.description}>
+                                  {option.label}
+                                </option>
+                              ))}
                             </select>
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarData(paciente.created_at)}</td>
@@ -3142,10 +4093,10 @@ const Pacientes = () => {
                                     'cpf_reprovado'
                                   ].includes(option.value))
                                   .map(option => (
-                                    <option key={option.value} value={option.value}>
-                                      {option.label}
-                                    </option>
-                                  ))}
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
                               </select>
                             ) : (
                               <span className="badge badge-warning">
@@ -3195,19 +4146,19 @@ const Pacientes = () => {
                                   {window.innerWidth <= 768 ? 'Aprovar' : 'Aprovar Lead'}
                                 </button>
                               ) : (
-                                <button
-                                  onClick={() => pegarLead(lead.id)}
-                                  className="btn btn-primary"
-                                  style={{ 
-                                    fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.8rem',
-                                    padding: window.innerWidth <= 768 ? '0.375rem 0.5rem' : '0.5rem 0.75rem',
-                                    minWidth: '80px',
-                                    height: '32px',
-                                    whiteSpace: 'nowrap'
-                                  }}
-                                >
-                                  {window.innerWidth <= 768 ? 'Atribuir' : 'Atribuir Lead'}
-                                </button>
+                              <button
+                                onClick={() => pegarLead(lead.id)}
+                                className="btn btn-primary"
+                                style={{ 
+                                  fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.8rem',
+                                  padding: window.innerWidth <= 768 ? '0.375rem 0.5rem' : '0.5rem 0.75rem',
+                                  minWidth: '80px',
+                                  height: '32px',
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                {window.innerWidth <= 768 ? 'Atribuir' : 'Atribuir Lead'}
+                              </button>
                               )}
                               {/* Botão de excluir - apenas para admin */}
                               {isAdmin && (
@@ -4162,6 +5113,253 @@ const Pacientes = () => {
               )}
             </div>
           </div>
+
+          {/* Seção de Solicitações Enviadas para Clínicas */}
+          {solicitacoesCarteira.length > 0 && (
+            <div className="card" style={{ marginTop: '1.5rem' }}>
+              <div className="card-header">
+                <div>
+                  <h2 className="card-title">Suas Solicitações</h2>
+                  <p style={{ margin: 0, color: '#6b7280', fontSize: '0.875rem' }}>
+                    Acompanhe o status das suas solicitações de carteira
+                  </p>
+                </div>
+              </div>
+              <div className="card-content">
+                <div className="table-container">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Data Solicitação</th>
+                        <th>Pacientes</th>
+                        <th>Valor Total</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {solicitacoesCarteira.map(solicitacao => (
+                        <tr key={solicitacao.id}>
+                          <td>{new Date(solicitacao.created_at).toLocaleDateString('pt-BR')}</td>
+                          <td>{solicitacao.pacientes_carteira?.length || 0}</td>
+                          <td>{formatarMoeda(solicitacao.calculos?.valorFaceTotal || 0)}</td>
+                          <td>
+                            <span style={{
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              backgroundColor: solicitacao.status === 'pendente' ? '#fef3c7' : 
+                                             solicitacao.status === 'aprovado' ? '#d1fae5' : 
+                                             solicitacao.status === 'reprovado' ? '#fee2e2' : '#f3f4f6',
+                              color: solicitacao.status === 'pendente' ? '#92400e' : 
+                                     solicitacao.status === 'aprovado' ? '#065f46' : 
+                                     solicitacao.status === 'reprovado' ? '#991b1b' : '#374151'
+                            }}>
+                              {solicitacao.status === 'pendente' ? 'Em Análise' : 
+                               solicitacao.status === 'aprovado' ? 'Aprovado' : 
+                               solicitacao.status === 'reprovado' ? 'Reprovado' : solicitacao.status}
+                            </span>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <button
+                                onClick={() => {
+                                  setSolicitacaoSelecionada(solicitacao);
+                                  setShowSolicitacaoModal(true);
+                                }}
+                                style={{
+                                  background: 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+                                  border: 'none',
+                                  color: 'white',
+                                  cursor: 'pointer',
+                                  padding: '0.5rem',
+                                  borderRadius: '6px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '600'
+                                }}
+                              >
+                                Ver Detalhes
+                              </button>
+                              {solicitacao.status === 'aprovado' && (
+                                <button
+                                  onClick={async () => {
+                                    setSolicitacaoSelecionada(solicitacao);
+                                    await fetchContratos(solicitacao.id);
+                                    setShowContratosModal(true);
+                                  }}
+                                  style={{
+                                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                                    border: 'none',
+                                    color: 'white',
+                                    cursor: 'pointer',
+                                    padding: '0.5rem',
+                                    borderRadius: '6px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600'
+                                  }}
+                                >
+                                  📄 Enviar Contratos
+                                </button>
+                              )}
+                              <button
+                                onClick={() => deletarSolicitacao(solicitacao.id)}
+                                style={{
+                                  background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+                                  border: 'none',
+                                  color: 'white',
+                                  cursor: 'pointer',
+                                  padding: '0.5rem',
+                                  borderRadius: '6px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '600'
+                                }}
+                              >
+                                🗑️ Excluir
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Conteúdo da aba Carteira Existente para Admin - Visualizar solicitações */}
+      {activeTab === 'carteira-existente' && isAdmin && (
+        <>
+          <div className="card">
+            <div className="card-header">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h2 className="card-title">Solicitações de Carteira Existente</h2>
+                  <p style={{ margin: 0, color: '#6b7280', fontSize: '0.875rem' }}>
+                    Avalie e aprove solicitações de carteira das clínicas
+                  </p>
+                </div>
+                {solicitacoesCarteira.filter(s => s.status === 'pendente').length > 0 && (
+                  <div style={{
+                    backgroundColor: '#fef2f2',
+                    color: '#dc2626',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600'
+                  }}>
+                    {solicitacoesCarteira.filter(s => s.status === 'pendente').length} solicitaç{solicitacoesCarteira.filter(s => s.status === 'pendente').length > 1 ? 'ões' : 'ão'} pendente{solicitacoesCarteira.filter(s => s.status === 'pendente').length > 1 ? 's' : ''}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="card-content">
+              {solicitacoesCarteira.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ marginBottom: '1rem', opacity: 0.5 }}>
+                    <path d="M9 11l3 3L22 4"></path>
+                    <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
+                  </svg>
+                  <p>Nenhuma solicitação de carteira encontrada</p>
+                </div>
+              ) : (
+                <div className="table-container" style={{ width: '100%' }}>
+                  <table className="table" style={{ width: '100%' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ width: '30%' }}>Clínica</th>
+                        <th style={{ width: '12%' }}>Data Solicitação</th>
+                        <th style={{ width: '8%' }}>Pacientes</th>
+                        <th style={{ width: '15%' }}>Valor Total</th>
+                        <th style={{ width: '10%' }}>Percentual</th>
+                        <th style={{ width: '10%' }}>Status</th>
+                        <th style={{ width: '15%' }}>Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {solicitacoesCarteira.map(solicitacao => (
+                        <tr key={solicitacao.id}>
+                          <td>{solicitacao.clinica_nome}</td>
+                          <td>{new Date(solicitacao.created_at).toLocaleDateString('pt-BR')}</td>
+                          <td>{solicitacao.pacientes_carteira?.length || 0}</td>
+                          <td>{formatarMoeda(solicitacao.calculos?.valorFaceTotal || 0)}</td>
+                          <td>
+                            <span style={{
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              backgroundColor: solicitacao.calculos?.percentualFinal >= 130 ? '#f0fdf4' : '#fef2f2',
+                              color: solicitacao.calculos?.percentualFinal >= 130 ? '#166534' : '#dc2626'
+                            }}>
+                              {solicitacao.calculos?.percentualFinal?.toFixed(2) || 0}%
+                            </span>
+                          </td>
+                          <td>
+                            <span style={{
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              backgroundColor: 
+                                solicitacao.status === 'pendente' ? '#fef3c7' : 
+                                solicitacao.status === 'aprovado' ? '#f0fdf4' :
+                                solicitacao.status === 'reprovado' ? '#fef2f2' : '#f3f4f6',
+                              color: 
+                                solicitacao.status === 'pendente' ? '#d97706' : 
+                                solicitacao.status === 'aprovado' ? '#166534' :
+                                solicitacao.status === 'reprovado' ? '#dc2626' : '#6b7280'
+                            }}>
+                              {solicitacao.status === 'pendente' ? 'Pendente' :
+                               solicitacao.status === 'aprovado' ? 'Aprovado' :
+                               solicitacao.status === 'reprovado' ? 'Reprovado' : 'Em Análise'}
+                            </span>
+                          </td>
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            <button
+                              onClick={() => {
+                                setSolicitacaoSelecionada(solicitacao);
+                                setShowSolicitacaoModal(true);
+                              }}
+                              style={{
+                                background: '#3b82f6',
+                                border: 'none',
+                                color: 'white',
+                                cursor: 'pointer',
+                                padding: '6px 12px',
+                                borderRadius: '4px',
+                                fontSize: '14px',
+                                marginRight: '8px'
+                              }}
+                            >
+                              Analisar
+                            </button>
+                            <button
+                              onClick={() => deletarSolicitacao(solicitacao.id)}
+                              style={{
+                                background: '#dc2626',
+                                border: 'none',
+                                color: 'white',
+                                cursor: 'pointer',
+                                padding: '6px 12px',
+                                borderRadius: '4px',
+                                fontSize: '14px'
+                              }}
+                            >
+                              Excluir
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
         </>
       )}
 
@@ -4170,7 +5368,7 @@ const Pacientes = () => {
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: '700px' }}>
             <div className="modal-header">
-              <h2 className="modal-title">{empresaId === 5 ? 'Cadastrar Novo Cliente' : 'Cadastrar Novo Paciente'}</h2>
+              <h2 className="modal-title">Cadastrar Novo Paciente</h2>
               <button className="close-btn" onClick={resetForm}>×</button>
             </div>
 
@@ -5304,7 +6502,7 @@ const Pacientes = () => {
                     <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>
                       {viewPaciente.created_at ? formatarData(viewPaciente.created_at) : '-'}
                     </p>
-                  </div>
+            </div>
                 </div>
               )}
               
@@ -5425,10 +6623,10 @@ const Pacientes = () => {
                               whiteSpace: 'pre-wrap'
                             }}>
                               {fechamentoPaciente.observacoes}
-                            </div>
-                          </div>
-                        )}
-                        
+          </div>
+        </div>
+      )}
+
                         {/* Contrato do Fechamento */}
                         <div style={{ 
                           marginTop: '1rem',
@@ -5976,19 +7174,19 @@ const Pacientes = () => {
             <div style={{ padding: '1.5rem', flex: 1, overflowY: 'auto' }}>
               {/* Aba de Observações */}
               {activeObservacoesTab === 'observacoes' && (
-                <div style={{
-                  backgroundColor: '#f9fafb',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  padding: '1rem',
-                  minHeight: '120px',
-                  fontSize: '0.875rem',
-                  lineHeight: '1.5',
-                  color: '#374151',
-                  whiteSpace: 'pre-wrap'
-                }}>
-                  {observacoesAtual}
-                </div>
+              <div style={{
+                backgroundColor: '#f9fafb',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                padding: '1rem',
+                minHeight: '120px',
+                fontSize: '0.875rem',
+                lineHeight: '1.5',
+                color: '#374151',
+                whiteSpace: 'pre-wrap'
+              }}>
+                {observacoesAtual}
+              </div>
               )}
               
               {/* Aba de Evidências */}
@@ -6095,19 +7293,19 @@ const Pacientes = () => {
               flexShrink: 0,
               textAlign: 'right'
             }}>
-              <button 
-                className="btn btn-secondary" 
+                <button 
+                  className="btn btn-secondary" 
                 onClick={() => {
                   setShowObservacoesModal(false);
                   setActiveObservacoesTab('observacoes');
                   setEvidenciasPaciente([]);
                   setPacienteObservacoes(null);
                 }}
-              >
-                Fechar
-              </button>
+                >
+                  Fechar
+                </button>
+              </div>
             </div>
-          </div>
         </div>
       )}
 
@@ -7990,36 +9188,38 @@ const Pacientes = () => {
                       </button>
                       {pacientesCarteira.length > 0 && (
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <label style={{ fontSize: '0.875rem', color: '#374151', fontWeight: '500' }}>
-                              Percentual Alvo:
-                            </label>
-                            <input
-                              type="number"
-                              value={percentualAlvoCarteira}
-                              onChange={(e) => {
-                                const valor = parseFloat(e.target.value);
-                                if (!isNaN(valor) && valor >= 100 && valor <= 200) {
-                                  setPercentualAlvoCarteira(valor);
-                                }
-                              }}
-                              style={{
-                                width: '80px',
-                                padding: '0.5rem',
-                                border: '1px solid #d1d5db',
-                                borderRadius: '6px',
-                                fontSize: '0.875rem',
-                                textAlign: 'center'
-                              }}
-                              min="100"
-                              max="200"
-                              step="1"
-                            />
-                            <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>%</span>
-                          </div>
+                          {!isClinica && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <label style={{ fontSize: '0.875rem', color: '#374151', fontWeight: '500' }}>
+                                Percentual Alvo:
+                              </label>
+                              <input
+                                type="number"
+                                value={percentualAlvoCarteira}
+                                onChange={(e) => {
+                                  const valor = parseFloat(e.target.value);
+                                  if (!isNaN(valor) && valor >= 100 && valor <= 200) {
+                                    setPercentualAlvoCarteira(valor);
+                                  }
+                                }}
+                                style={{
+                                  width: '80px',
+                                  padding: '0.5rem',
+                                  border: '1px solid #d1d5db',
+                                  borderRadius: '6px',
+                                  fontSize: '0.875rem',
+                                  textAlign: 'center'
+                                }}
+                                min="100"
+                                max="200"
+                                step="1"
+                              />
+                              <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>%</span>
+                            </div>
+                          )}
                           <button
                             type="button"
-                            onClick={() => calcularCarteiraExistente(percentualAlvoCarteira)}
+                            onClick={() => calcularCarteiraExistente(isClinica ? 130 : percentualAlvoCarteira)}
                             style={{
                               background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                               border: 'none',
@@ -8033,6 +9233,27 @@ const Pacientes = () => {
                           >
                             Calcular Carteira
                           </button>
+                          {carteiraCalculos && !isClinica && (
+                            <button
+                              type="button"
+                              onClick={exportarCarteiraExcel}
+                              style={{
+                                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                                border: 'none',
+                                color: 'white',
+                                cursor: 'pointer',
+                                padding: '0.5rem 1rem',
+                                borderRadius: '6px',
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
+                              }}
+                            >
+                              📊 Exportar Excel
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -8092,336 +9313,36 @@ const Pacientes = () => {
                   )}
 
                   {carteiraCalculos ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                      {/* Tabela de Parcelas */}
+                    <div style={{ 
+                      backgroundColor: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '12px',
+                      padding: '2rem',
+                      textAlign: 'center'
+                    }}>
                       <div style={{ 
-                        border: '1px solid #e5e7eb', 
-                        borderRadius: '8px', 
-                        overflow: 'hidden',
-                        maxHeight: '300px',
-                        overflowY: 'auto'
+                        fontSize: '1.5rem', 
+                        fontWeight: '700', 
+                        color: '#166534',
+                        marginBottom: '1rem'
                       }}>
-                        <table style={{ width: '100%', fontSize: '0.875rem' }}>
-                          <thead style={{ backgroundColor: '#f8fafc' }}>
-                            <tr>
-                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Paciente</th>
-                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Tipo</th>
-                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Detalhe</th>
-                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Valor</th>
-                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Vencimento</th>
-                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Dias</th>
-                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Deságio</th>
-                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Liquidez</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(carteiraCalculos.parcelasDetalhadas || []).map((parcela, index) => (
-                              <tr key={`${parcela.paciente}-${parcela.parcela}-${index}`}>
-                                <td style={{ padding: '0.5rem', fontWeight: '600' }}>{parcela.paciente}</td>
-                                <td style={{ padding: '0.5rem' }}>
-                                  <span style={{
-                                    backgroundColor: parcela.tipo === 'colateral' ? '#fef2f2' : '#f0f9ff',
-                                    color: parcela.tipo === 'colateral' ? '#dc2626' : '#0369a1',
-                                    padding: '0.25rem 0.5rem',
-                                    borderRadius: '4px',
-                                    fontSize: '0.75rem',
-                                    fontWeight: '600',
-                                    textTransform: 'uppercase'
-                                  }}>
-                                    {parcela.tipo}
-                                  </span>
-                                </td>
-                                <td style={{ padding: '0.5rem' }}>
-                                  {parcela.tipo === 'colateral' 
-                                    ? `Parcela ${parcela.parcela} (Colateral)`
-                                    : `Parcela ${parcela.parcela} (Operação)`
-                                  }
-                                </td>
-                                <td style={{ padding: '0.5rem' }}>{formatarMoeda(parcela.valor)}</td>
-                                <td style={{ padding: '0.5rem' }}>{new Date(parcela.vencimento).toLocaleDateString('pt-BR')}</td>
-                                <td style={{ padding: '0.5rem' }}>{parcela.dias}</td>
-                                <td style={{ padding: '0.5rem' }}>{formatarMoeda(parcela.desagio)}</td>
-                                <td style={{ padding: '0.5rem' }}>{formatarMoeda(parcela.liquidez)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                        ✅ Cálculo Realizado com Sucesso!
                       </div>
-
-                      {/* Resumo Final */}
-                      <div style={{ 
-                        backgroundColor: '#ffffff', 
-                        border: '1px solid #e5e7eb', 
-                        borderRadius: '16px',
-                        padding: '2rem',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                      <p style={{ 
+                        margin: 0, 
+                        color: '#166534',
+                        fontSize: '1rem'
                       }}>
-                        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                          <h3 style={{ 
-                            margin: '0 0 0.5rem 0', 
-                            color: '#1f2937',
-                            fontSize: '1.5rem',
-                            fontWeight: '600'
-                          }}>
-                            Resumo Financeiro
-                          </h3>
-                          <p style={{ 
-                            margin: 0, 
-                            color: '#6b7280',
-                            fontSize: '0.875rem'
-                          }}>
-                            Cálculo consolidado da carteira
-                          </p>
-                        </div>
-
-                        {/* Cards dos valores */}
-                        <div style={{ 
-                          display: 'grid', 
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                          gap: '1.5rem',
-                          marginBottom: '2rem'
-                        }}>
-                          {/* Valor Entregue */}
-                          <div style={{
-                            backgroundColor: '#f8fafc',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '12px',
-                            padding: '1.5rem',
-                            textAlign: 'center'
-                          }}>
-                            <div style={{ 
-                              fontSize: '0.75rem', 
-                              fontWeight: '600', 
-                              color: '#64748b',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.05em',
-                              marginBottom: '1rem'
-                            }}>
-                              Valor Entregue
-                            </div>
-                            <div style={{ marginBottom: '0.75rem' }}>
-                              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>
-                                Colateral (Entregue)
-                              </div>
-                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b' }}>
-                                {formatarMoeda(carteiraCalculos?.valorColateralEntregue || 0)}
-                              </div>
-                            </div>
-                            <div style={{ marginBottom: '0.75rem' }}>
-                              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>
-                                Operação (Entregue)
-                              </div>
-                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b' }}>
-                                {formatarMoeda(carteiraCalculos?.valorOperacaoEntregue || 0)}
-                              </div>
-                            </div>
-                            <div style={{ 
-                              borderTop: '1px solid #e2e8f0', 
-                              paddingTop: '0.75rem',
-                              marginTop: '0.75rem'
-                            }}>
-                              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>
-                                Total Entregue
-                              </div>
-                              <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#1e293b' }}>
-                                {formatarMoeda((carteiraCalculos?.valorColateralEntregue || 0) + (carteiraCalculos?.valorOperacaoEntregue || 0))}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Deságio */}
-                          <div style={{
-                            backgroundColor: '#fef2f2',
-                            border: '1px solid #fecaca',
-                            borderRadius: '12px',
-                            padding: '1.5rem',
-                            textAlign: 'center'
-                          }}>
-                            <div style={{ 
-                              fontSize: '0.75rem', 
-                              fontWeight: '600', 
-                              color: '#991b1b',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.05em',
-                              marginBottom: '1rem'
-                            }}>
-                              Deságio
-                            </div>
-                            <div style={{ marginBottom: '0.75rem' }}>
-                              <div style={{ fontSize: '0.875rem', color: '#991b1b', marginBottom: '0.25rem' }}>
-                                Colateral
-                              </div>
-                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#dc2626' }}>
-                                -
-                              </div>
-                            </div>
-                            <div style={{ marginBottom: '0.75rem' }}>
-                              <div style={{ fontSize: '0.875rem', color: '#991b1b', marginBottom: '0.25rem' }}>
-                                Operação
-                              </div>
-                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#dc2626' }}>
-                                {formatarMoeda(carteiraCalculos?.desagioTotal || 0)}
-                              </div>
-                            </div>
-                            <div style={{ 
-                              borderTop: '1px solid #fecaca', 
-                              paddingTop: '0.75rem',
-                              marginTop: '0.75rem'
-                            }}>
-                              <div style={{ fontSize: '0.875rem', color: '#991b1b', marginBottom: '0.25rem' }}>
-                                Total Deságio
-                              </div>
-                              <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#dc2626' }}>
-                                {formatarMoeda(carteiraCalculos?.desagioTotal || 0)}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Valor de Face */}
-                          <div style={{
-                            backgroundColor: '#f0f9ff',
-                            border: '1px solid #bae6fd',
-                            borderRadius: '12px',
-                            padding: '1.5rem',
-                            textAlign: 'center'
-                          }}>
-                            <div style={{ 
-                              fontSize: '0.75rem', 
-                              fontWeight: '600', 
-                              color: '#0369a1',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.05em',
-                              marginBottom: '1rem'
-                            }}>
-                              Valor de Face
-                            </div>
-                            <div style={{ marginBottom: '0.75rem' }}>
-                              <div style={{ fontSize: '0.875rem', color: '#0369a1', marginBottom: '0.25rem' }}>
-                                Colateral (Face)
-                              </div>
-                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0c4a6e' }}>
-                                {formatarMoeda(carteiraCalculos?.valorColateral || 0)}
-                              </div>
-                            </div>
-                            <div style={{ marginBottom: '0.75rem' }}>
-                              <div style={{ fontSize: '0.875rem', color: '#0369a1', marginBottom: '0.25rem' }}>
-                                Operação (Face)
-                              </div>
-                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0c4a6e' }}>
-                                {formatarMoeda(carteiraCalculos?.valorTotalOperacao || 0)}
-                              </div>
-                            </div>
-                            <div style={{ 
-                              borderTop: '1px solid #bae6fd', 
-                              paddingTop: '0.75rem',
-                              marginTop: '0.75rem'
-                            }}>
-                              <div style={{ fontSize: '0.875rem', color: '#0369a1', marginBottom: '0.25rem' }}>
-                                Total Face
-                              </div>
-                              <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#0c4a6e' }}>
-                                {formatarMoeda((carteiraCalculos?.valorColateral || 0) + (carteiraCalculos?.valorTotalOperacao || 0))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Status do Colateral */}
-                        {(() => {
-                          const percentual = carteiraCalculos?.percentualFinal || 0;
-                          const alvo = carteiraCalculos?.percentualAlvo || 130;
-                          const diferenca = Math.abs(percentual - alvo);
-                          
-                          // Determinar cor baseada na proximidade do alvo
-                          let backgroundColor, borderColor, textColor, icon;
-                          
-                          if (diferenca <= 0.5) {
-                            // Muito próximo do alvo (≤ 0.5% de diferença)
-                            backgroundColor = '#f0fdf4';
-                            borderColor = '#bbf7d0';
-                            textColor = '#166534';
-                            icon = '🎯';
-                          } else if (diferenca <= 1.0) {
-                            // Próximo do alvo (≤ 1% de diferença)
-                            backgroundColor = '#fef3c7';
-                            borderColor = '#fde68a';
-                            textColor = '#92400e';
-                            icon = '✅';
-                          } else if (percentual >= alvo) {
-                            // Atende ao mínimo mas não está próximo
-                            backgroundColor = '#f0fdf4';
-                            borderColor = '#bbf7d0';
-                            textColor = '#166534';
-                            icon = '✓';
-                          } else {
-                            // Abaixo do alvo
-                            backgroundColor = '#fffbeb';
-                            borderColor = '#fed7aa';
-                            textColor = '#d97706';
-                            icon = '⚠️';
-                          }
-                          
-                          return (
-                            <div style={{ 
-                              backgroundColor, 
-                              border: `1px solid ${borderColor}`,
-                              borderRadius: '12px',
-                              padding: '1.5rem',
-                              textAlign: 'center'
-                            }}>
-                              <div style={{ 
-                                fontSize: '2rem', 
-                                fontWeight: '800', 
-                                color: textColor,
-                                marginBottom: '0.5rem'
-                              }}>
-                                {percentual.toFixed(2)}% {icon}
-                              </div>
-                              <div style={{ 
-                                fontSize: '0.875rem', 
-                                color: textColor,
-                                fontWeight: '500'
-                              }}>
-                                {diferenca <= 0.5 
-                                  ? `Perfeito! Colateral muito próximo de ${alvo}%`
-                                  : diferenca <= 1.0
-                                  ? `Ótimo! Colateral próximo de ${alvo}%`
-                                  : percentual >= alvo
-                                  ? `Colateral atende ao mínimo de ${alvo}%`
-                                  : `Colateral abaixo do alvo de ${alvo}%`
-                                }
-                              </div>
-                              <div style={{ 
-                                fontSize: '0.75rem', 
-                                color: textColor,
-                                opacity: 0.7,
-                                marginTop: '0.25rem'
-                              }}>
-                                Diferença de {diferenca.toFixed(2)}% do alvo
-                              </div>
-                              {carteiraCalculos?.slack !== undefined && (
-                                <div style={{ 
-                                  fontSize: '0.75rem', 
-                                  color: textColor,
-                                  opacity: 0.7,
-                                  marginTop: '0.1rem'
-                                }}>
-                                  Slack: {carteiraCalculos.slack.toFixed(2)}%
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
-                        <div style={{ 
-                          fontSize: '0.75rem', 
-                          color: '#6b7280',
-                          marginTop: '0.25rem',
-                          fontStyle: 'italic'
-                        }}>
-                          Operação = antecipação principal | Colateral = garantia mínima
-                        </div>
-                      </div>
-
+                        A carteira foi calculada e está pronta para envio de aprovação.
+                      </p>
+                      <p style={{ 
+                        margin: '0.5rem 0 0 0', 
+                        color: '#6b7280',
+                        fontSize: '0.875rem'
+                      }}>
+                        Clique em "Salvar" para enviar para análise do administrador.
+                      </p>
+                      
                       {/* Botão Salvar */}
                       <button
                         type="button"
@@ -8431,14 +9352,14 @@ const Pacientes = () => {
                           border: 'none',
                           color: 'white',
                           cursor: 'pointer',
-                          padding: '0.875rem',
+                          padding: '0.875rem 2rem',
                           borderRadius: '8px',
                           fontSize: '1rem',
                           fontWeight: '600',
-                          marginTop: '1rem'
+                          marginTop: '1.5rem'
                         }}
                       >
-                        Salvar Paciente
+                        Enviar para Aprovação
                       </button>
                     </div>
                   ) : (
@@ -8458,6 +9379,862 @@ const Pacientes = () => {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Análise de Solicitação (Admin) */}
+      {showSolicitacaoModal && solicitacaoSelecionada && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '900px', maxHeight: '90vh' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Analisar Solicitação de Carteira</h2>
+              <button className="close-btn" onClick={() => {
+                setShowSolicitacaoModal(false);
+                setSolicitacaoSelecionada(null);
+              }}>×</button>
+            </div>
+            
+            <div style={{ padding: '2rem', overflowY: 'auto', maxHeight: 'calc(90vh - 80px)' }}>
+              {/* Informações da Clínica */}
+              <div style={{
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                padding: '1rem',
+                marginBottom: '1.5rem'
+              }}>
+                <h3 style={{ marginBottom: '0.5rem', fontSize: '1.125rem', fontWeight: '600' }}>
+                  Clínica: {solicitacaoSelecionada.clinica_nome}
+                </h3>
+                <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                  Solicitado em: {new Date(solicitacaoSelecionada.created_at).toLocaleString('pt-BR')}
+                </p>
+                {solicitacaoSelecionada.observacoes_clinica && (
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>
+                    Observações: {solicitacaoSelecionada.observacoes_clinica}
+                  </p>
+                )}
+              </div>
+
+              {/* Resumo dos Cálculos - Apenas para Admin */}
+              {isAdmin && (
+                <div style={{
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '16px',
+                  padding: '2rem',
+                  marginBottom: '1.5rem',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                }}>
+                <h3 style={{ marginBottom: '1rem', fontSize: '1.25rem', fontWeight: '700' }}>
+                  Resumo dos Cálculos
+                </h3>
+                
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: '1.5rem',
+                  marginBottom: '1.5rem'
+                }}>
+                  <div style={{
+                    backgroundColor: '#f8fafc',
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    textAlign: 'center'
+                  }}>
+                    <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Valor Face Total</p>
+                    <p style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1e293b' }}>
+                      {formatarMoeda(solicitacaoSelecionada.calculos?.valorFaceTotal || 0)}
+                    </p>
+                  </div>
+                  
+                  <div style={{
+                    backgroundColor: '#f0fdf4',
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    textAlign: 'center'
+                  }}>
+                    <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Valor Entregue</p>
+                    <p style={{ fontSize: '1.5rem', fontWeight: '700', color: '#166534' }}>
+                      {formatarMoeda(solicitacaoSelecionada.calculos?.valorEntregueTotal || 0)}
+                    </p>
+                  </div>
+                  
+                  <div style={{
+                    backgroundColor: '#fef2f2',
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    textAlign: 'center'
+                  }}>
+                    <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Deságio Total</p>
+                    <p style={{ fontSize: '1.5rem', fontWeight: '700', color: '#dc2626' }}>
+                      {formatarMoeda(solicitacaoSelecionada.calculos?.desagioTotal || 0)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Divisão Operação/Colateral */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '1rem',
+                  marginBottom: '1.5rem'
+                }}>
+                  <div style={{
+                    backgroundColor: '#eff6ff',
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    border: '1px solid #3b82f6'
+                  }}>
+                    <h4 style={{ fontSize: '1rem', fontWeight: '600', color: '#1d4ed8', marginBottom: '0.5rem' }}>
+                      Operação (Face)
+                    </h4>
+                    <p style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b' }}>
+                      {formatarMoeda(solicitacaoSelecionada.calculos?.valorTotalOperacao || 0)}
+                    </p>
+                  </div>
+                  
+                  <div style={{
+                    backgroundColor: '#fef2f2',
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    border: '1px solid #dc2626'
+                  }}>
+                    <h4 style={{ fontSize: '1rem', fontWeight: '600', color: '#dc2626', marginBottom: '0.5rem' }}>
+                      Colateral (Face)
+                    </h4>
+                    <p style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b' }}>
+                      {formatarMoeda(solicitacaoSelecionada.calculos?.valorColateral || 0)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Percentual */}
+                <div style={{
+                  backgroundColor: solicitacaoSelecionada.calculos?.percentualFinal >= 130 ? '#f0fdf4' : '#fef2f2',
+                  border: `2px solid ${solicitacaoSelecionada.calculos?.percentualFinal >= 130 ? '#166534' : '#dc2626'}`,
+                  borderRadius: '12px',
+                  padding: '1.5rem',
+                  textAlign: 'center'
+                }}>
+                  <p style={{ fontSize: '1rem', color: '#6b7280', marginBottom: '0.5rem' }}>
+                    Percentual Colateral/Operação
+                  </p>
+                  <p style={{
+                    fontSize: '2.5rem',
+                    fontWeight: '800',
+                    color: solicitacaoSelecionada.calculos?.percentualFinal >= 130 ? '#166534' : '#dc2626'
+                  }}>
+                    {solicitacaoSelecionada.calculos?.percentualFinal?.toFixed(2) || 0}%
+                  </p>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: solicitacaoSelecionada.calculos?.percentualFinal >= 130 ? '#166534' : '#dc2626',
+                    marginTop: '0.5rem'
+                  }}>
+                    {solicitacaoSelecionada.calculos?.percentualFinal >= 130 
+                      ? '✅ Atende ao mínimo de 130%' 
+                      : '❌ Abaixo do mínimo de 130%'}
+                  </p>
+                </div>
+              </div>
+              )}
+
+              {/* Lista de Pacientes */}
+              <div style={{
+                backgroundColor: '#ffffff',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                padding: '1.5rem',
+                marginBottom: '1.5rem'
+              }}>
+                <h3 style={{ marginBottom: '1rem', fontSize: '1.125rem', fontWeight: '600' }}>
+                  Pacientes da Carteira ({solicitacaoSelecionada.pacientes_carteira?.length || 0})
+                </h3>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', fontSize: '0.875rem' }}>
+                    <thead style={{ backgroundColor: '#f8fafc' }}>
+                      <tr>
+                        <th style={{ padding: '0.5rem', textAlign: 'left' }}>CPF</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'left' }}>Nome</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'left' }}>Valor Parcela</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'left' }}>Parcelas</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'left' }}>1ª Vencimento</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(solicitacaoSelecionada.pacientes_carteira || []).map((paciente, index) => (
+                        <tr key={index}>
+                          <td style={{ padding: '0.5rem' }}>{paciente.cpf}</td>
+                          <td style={{ padding: '0.5rem' }}>{paciente.nomeCompleto}</td>
+                          <td style={{ padding: '0.5rem' }}>{formatarMoeda(paciente.valorParcela)}</td>
+                          <td style={{ padding: '0.5rem' }}>{paciente.numeroParcelasAntecipar}</td>
+                          <td style={{ padding: '0.5rem' }}>
+                            {new Date(paciente.primeiraVencimento).toLocaleDateString('pt-BR')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Tabela Detalhada de Parcelas - Apenas para Admin */}
+              {isAdmin && solicitacaoSelecionada.calculos?.parcelasDetalhadas && (
+                <div style={{
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  padding: '1.5rem',
+                  marginBottom: '1.5rem'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <h3 style={{ fontSize: '1.125rem', fontWeight: '600' }}>
+                      Detalhamento de Parcelas ({solicitacaoSelecionada.calculos.parcelasDetalhadas.length})
+                    </h3>
+                    <button
+                      onClick={() => exportarCarteiraSolicitacaoExcel(solicitacaoSelecionada)}
+                      style={{
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                        border: 'none',
+                        color: 'white',
+                        cursor: 'pointer',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '6px',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      📊 Exportar Excel
+                    </button>
+                  </div>
+                  <div style={{ overflowX: 'auto', maxHeight: '400px' }}>
+                    <table style={{ width: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}>
+                      <thead style={{ backgroundColor: '#f8fafc', position: 'sticky', top: 0 }}>
+                        <tr>
+                          <th style={{ padding: '0.5rem', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Paciente</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Tipo</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Parcela</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'right', borderBottom: '2px solid #e5e7eb' }}>Valor Face</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'right', borderBottom: '2px solid #e5e7eb' }}>Deságio</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'right', borderBottom: '2px solid #e5e7eb' }}>Liquidez</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '2px solid #e5e7eb' }}>Vencimento</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {solicitacaoSelecionada.calculos.parcelasDetalhadas.map((parcela, index) => {
+                          // Verificar tanto 'categoria' quanto 'tipo' para compatibilidade
+                          const tipoParcela = parcela.categoria || parcela.tipo;
+                          const isColateral = tipoParcela === 'COL' || tipoParcela === 'colateral';
+                          const tipoTexto = isColateral ? 'COLATERAL' : 'OPERAÇÃO';
+                          
+                          return (
+                            <tr key={index} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                              <td style={{ padding: '0.5rem' }}>{parcela.paciente}</td>
+                              <td style={{ padding: '0.5rem' }}>
+                                <span style={{
+                                  padding: '0.25rem 0.5rem',
+                                  borderRadius: '4px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '600',
+                                  backgroundColor: isColateral ? '#fef2f2' : '#eff6ff',
+                                  color: isColateral ? '#dc2626' : '#1d4ed8'
+                                }}>
+                                  {tipoTexto}
+                                </span>
+                              </td>
+                              <td style={{ padding: '0.5rem' }}>{parcela.parcela}</td>
+                              <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatarMoeda(parcela.valorFace || parcela.valor)}</td>
+                              <td style={{ padding: '0.5rem', textAlign: 'right', color: '#dc2626' }}>
+                                {formatarMoeda(parcela.desagio || 0)}
+                              </td>
+                              <td style={{ padding: '0.5rem', textAlign: 'right', color: '#166534' }}>
+                                {formatarMoeda(parcela.valorEntregue || parcela.liquidez)}
+                              </td>
+                              <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                {new Date(parcela.vencimento).toLocaleDateString('pt-BR')}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Seção de Contratos Pendentes - Apenas para Admin */}
+              {isAdmin && solicitacaoSelecionada.status === 'aprovado' && contratos.length > 0 && (
+                <div style={{
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '12px',
+                  padding: '1.5rem',
+                  marginBottom: '1.5rem'
+                }}>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem' }}>
+                    📄 Contratos Enviados ({contratos.length})
+                  </h3>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {contratos.map((contrato, index) => (
+                      <div key={index} style={{
+                        backgroundColor: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        padding: '1rem',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>
+                            {contrato.paciente_nome}
+                          </div>
+                          <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                            {contrato.arquivo_nome}
+                          </div>
+                        </div>
+                        
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <span style={{
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '4px',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            backgroundColor: contrato.status === 'aprovado' ? '#d1fae5' :
+                                           contrato.status === 'reprovado' ? '#fee2e2' : '#fef3c7',
+                            color: contrato.status === 'aprovado' ? '#065f46' :
+                                  contrato.status === 'reprovado' ? '#991b1b' : '#92400e'
+                          }}>
+                            {contrato.status === 'aprovado' ? 'Aprovado' :
+                             contrato.status === 'reprovado' ? 'Reprovado' : 'Pendente'}
+                          </span>
+                          
+                          {contrato.status === 'pendente' && (
+                            <>
+                              <button
+                                onClick={() => handleAprovarContrato(contrato.id)}
+                                style={{
+                                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                  border: 'none',
+                                  color: 'white',
+                                  cursor: 'pointer',
+                                  padding: '0.4rem 0.8rem',
+                                  borderRadius: '6px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '600'
+                                }}
+                              >
+                                ✓ Aprovar
+                              </button>
+                              <button
+                                onClick={() => setContratoParaReprovar(contrato)}
+                                style={{
+                                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                  border: 'none',
+                                  color: 'white',
+                                  cursor: 'pointer',
+                                  padding: '0.4rem 0.8rem',
+                                  borderRadius: '6px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '600'
+                                }}
+                              >
+                                ✗ Reprovar
+                              </button>
+                            </>
+                          )}
+                          
+                          {contrato.status === 'reprovado' && contrato.motivo_reprovacao && (
+                            <div style={{
+                              backgroundColor: '#fef2f2',
+                              border: '1px solid #fecaca',
+                              borderRadius: '4px',
+                              padding: '0.5rem',
+                              fontSize: '0.75rem',
+                              color: '#991b1b',
+                              maxWidth: '300px'
+                            }}>
+                              <strong>Motivo:</strong> {contrato.motivo_reprovacao}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Recalcular com outro percentual - Apenas para Admin */}
+              {solicitacaoSelecionada.status === 'pendente' && isAdmin && (
+                <div style={{
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '1.5rem',
+                  marginBottom: '1.5rem'
+                }}>
+                  <h3 style={{ marginBottom: '1rem', fontSize: '1.125rem', fontWeight: '600' }}>
+                    Recalcular com outro percentual
+                  </h3>
+                  <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <input
+                      type="number"
+                      value={percentualAlvoCarteira}
+                      onChange={(e) => setPercentualAlvoCarteira(Number(e.target.value))}
+                      min="100"
+                      max="200"
+                      step="1"
+                      style={{
+                        padding: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        width: '100px'
+                      }}
+                    />
+                    <span>%</span>
+                    <button
+                      onClick={async () => {
+                        try {
+                          // Recriar a carteira com o novo percentual
+                          const pacientesRecalculados = solicitacaoSelecionada.pacientes_carteira.map(paciente => ({
+                            id: paciente.id,
+                            cpf: paciente.cpf,
+                            nomeCompleto: paciente.nomeCompleto,
+                            valorParcela: paciente.valorParcela,
+                            numeroParcelasAberto: paciente.numeroParcelasAberto,
+                            primeiraVencimento: paciente.primeiraVencimento,
+                            numeroParcelasAntecipar: paciente.numeroParcelasAntecipar
+                          }));
+
+                          // Calcular com o novo percentual
+                          const calculosRecalculados = calcularCarteiraComPercentual(pacientesRecalculados, percentualAlvoCarteira);
+
+                          // Atualizar a solicitação selecionada com os novos cálculos
+                          setSolicitacaoSelecionada({
+                            ...solicitacaoSelecionada,
+                            calculos: calculosRecalculados,
+                            percentual_alvo: percentualAlvoCarteira
+                          });
+
+                          showSuccessToast(`Recálculo realizado com ${percentualAlvoCarteira}%`);
+                        } catch (error) {
+                          console.error('Erro no recálculo:', error);
+                          showErrorToast('Erro ao recalcular');
+                        }
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                        border: 'none',
+                        color: 'white',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: '600'
+                      }}
+                    >
+                      Recalcular
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Botões de Ação - Apenas para Admin */}
+              {solicitacaoSelecionada.status === 'pendente' && isAdmin && (
+                <div style={{
+                  display: 'flex',
+                  gap: '1rem',
+                  justifyContent: 'flex-end',
+                  paddingTop: '1.5rem',
+                  borderTop: '1px solid #e5e7eb'
+                }}>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const response = await makeRequest(`/solicitacoes-carteira/${solicitacaoSelecionada.id}/status`, {
+                          method: 'PUT',
+                          body: JSON.stringify({
+                            status: 'reprovado',
+                            observacoes_admin: 'Solicitação reprovada'
+                          })
+                        });
+
+                        if (response.ok) {
+                          showSuccessToast('Solicitação reprovada');
+                          setShowSolicitacaoModal(false);
+                          setSolicitacaoSelecionada(null);
+                          fetchSolicitacoesCarteira();
+                        } else {
+                          showErrorToast('Erro ao reprovar solicitação');
+                        }
+                      } catch (error) {
+                        showErrorToast('Erro ao reprovar solicitação');
+                      }
+                    }}
+                    style={{
+                      background: '#dc2626',
+                      border: 'none',
+                      color: 'white',
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600'
+                    }}
+                  >
+                    Reprovar
+                  </button>
+                  
+                  <button
+                    onClick={async () => {
+                      try {
+                        const response = await makeRequest(`/solicitacoes-carteira/${solicitacaoSelecionada.id}/status`, {
+                          method: 'PUT',
+                          body: JSON.stringify({
+                            status: 'aprovado',
+                            observacoes_admin: 'Solicitação aprovada'
+                          })
+                        });
+
+                        if (response.ok) {
+                          showSuccessToast('Solicitação aprovada! Criando pacientes...');
+                          
+                          // Criar pacientes após aprovação
+                          const promises = (solicitacaoSelecionada.pacientes_carteira || []).map(paciente => {
+                            const pacienteData = {
+                              nome: paciente.nomeCompleto,
+                              cpf: paciente.cpf,
+                              telefone: '',
+                              cidade: '',
+                              estado: '',
+                              tipo_tratamento: 'Carteira Existente',
+                              status: 'fechado',
+                              observacoes: 'Paciente da carteira existente - Aprovado',
+                              carteira_existente: true,
+                              clinica_id: solicitacaoSelecionada.clinica_id,
+                              cadastrado_por_clinica: true,
+                              valor_parcela: paciente.valorParcela,
+                              numero_parcelas_aberto: paciente.numeroParcelasAberto,
+                              primeira_vencimento: paciente.primeiraVencimento,
+                              numero_parcelas_antecipar: paciente.numeroParcelasAntecipar,
+                              fator_am: 0.33,
+                              data_aceite: new Date().toISOString().split('T')[0],
+                              valor_entregue_total: solicitacaoSelecionada.calculos?.valorEntregueTotal || 0,
+                              desagio_total: solicitacaoSelecionada.calculos?.desagioTotal || 0,
+                              valor_face_total: solicitacaoSelecionada.calculos?.valorFaceTotal || 0,
+                              valor_total_operacao: solicitacaoSelecionada.calculos?.valorTotalOperacao || 0,
+                              valor_colateral: solicitacaoSelecionada.calculos?.valorColateral || 0,
+                              percentual_final: solicitacaoSelecionada.calculos?.percentualFinal || 0
+                            };
+
+                            return makeRequest('/pacientes', {
+                              method: 'POST',
+                              body: JSON.stringify(pacienteData)
+                            });
+                          });
+
+                          await Promise.all(promises);
+                          showSuccessToast('Pacientes criados com sucesso!');
+                          
+                          setShowSolicitacaoModal(false);
+                          setSolicitacaoSelecionada(null);
+                          fetchSolicitacoesCarteira();
+                          fetchPacientes();
+                        } else {
+                          showErrorToast('Erro ao aprovar solicitação');
+                        }
+                      } catch (error) {
+                        showErrorToast('Erro ao aprovar solicitação');
+                      }
+                    }}
+                    style={{
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      border: 'none',
+                      color: 'white',
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600'
+                    }}
+                  >
+                    Aprovar
+                  </button>
+                </div>
+              )}
+
+              {/* Mensagem para Clínicas */}
+              {isClinica && (
+                <div style={{
+                  backgroundColor: '#f0f9ff',
+                  border: '1px solid #0ea5e9',
+                  borderRadius: '8px',
+                  padding: '1.5rem',
+                  marginTop: '1.5rem',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ 
+                    fontSize: '1rem', 
+                    fontWeight: '600', 
+                    color: '#0c4a6e',
+                    marginBottom: '0.5rem'
+                  }}>
+                    📋 Solicitação Enviada
+                  </div>
+                  <p style={{ 
+                    margin: 0, 
+                    color: '#0c4a6e',
+                    fontSize: '0.875rem'
+                  }}>
+                    Sua solicitação foi enviada para análise do administrador. 
+                    Você será notificado sobre o resultado em breve.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Gerenciamento de Contratos */}
+      {showContratosModal && solicitacaoSelecionada && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '900px', maxHeight: '90vh' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Enviar Contratos</h2>
+              <button className="close-btn" onClick={() => {
+                setShowContratosModal(false);
+                setSolicitacaoSelecionada(null);
+                setContratos([]);
+              }}>×</button>
+            </div>
+            
+            <div style={{ padding: '2rem', overflowY: 'auto', maxHeight: 'calc(90vh - 80px)' }}>
+              <div style={{
+                backgroundColor: '#f0f9ff',
+                border: '1px solid #0ea5e9',
+                borderRadius: '8px',
+                padding: '1rem',
+                marginBottom: '1.5rem'
+              }}>
+                <p style={{ margin: 0, color: '#0c4a6e', fontSize: '0.875rem' }}>
+                  📋 Faça upload do contrato para cada paciente da carteira. Após o envio, o administrador revisará os documentos.
+                </p>
+              </div>
+
+              {/* Lista de Pacientes */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem' }}>
+                  Pacientes da Carteira
+                </h3>
+                
+                {(solicitacaoSelecionada.pacientes_carteira || []).map((paciente, index) => {
+                  const contratoExistente = contratos.find(c => c.paciente_cpf === paciente.cpf);
+                  
+                  return (
+                    <div key={index} style={{
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      padding: '1rem',
+                      marginBottom: '1rem',
+                      backgroundColor: '#ffffff'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>
+                            {paciente.nomeCompleto}
+                          </div>
+                          <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                            CPF: {paciente.cpf}
+                          </div>
+                        </div>
+                        
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          {contratoExistente ? (
+                            <>
+                              <span style={{
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                fontWeight: '600',
+                                backgroundColor: contratoExistente.status === 'aprovado' ? '#d1fae5' :
+                                               contratoExistente.status === 'reprovado' ? '#fee2e2' : '#fef3c7',
+                                color: contratoExistente.status === 'aprovado' ? '#065f46' :
+                                      contratoExistente.status === 'reprovado' ? '#991b1b' : '#92400e'
+                              }}>
+                                {contratoExistente.status === 'aprovado' ? 'Aprovado' :
+                                 contratoExistente.status === 'reprovado' ? 'Reprovado' : 'Pendente'}
+                              </span>
+                              {contratoExistente.status === 'reprovado' && contratoExistente.motivo_reprovacao && (
+                                <div style={{
+                                  backgroundColor: '#fef2f2',
+                                  border: '1px solid #fecaca',
+                                  borderRadius: '4px',
+                                  padding: '0.5rem',
+                                  fontSize: '0.75rem',
+                                  color: '#991b1b',
+                                  maxWidth: '300px'
+                                }}>
+                                  <strong>Motivo:</strong> {contratoExistente.motivo_reprovacao}
+                                </div>
+                              )}
+                              {isClinica && contratoExistente.status === 'pendente' && (
+                                <button
+                                  onClick={() => handleDeletarContrato(contratoExistente.id)}
+                                  style={{
+                                    background: '#ef4444',
+                                    border: 'none',
+                                    color: 'white',
+                                    cursor: 'pointer',
+                                    padding: '0.25rem 0.5rem',
+                                    borderRadius: '4px',
+                                    fontSize: '0.75rem'
+                                  }}
+                                >
+                                  Remover
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <input
+                                type="file"
+                                accept=".pdf,.jpg,.jpeg,.png"
+                                onChange={(e) => handleUploadContrato(e, paciente)}
+                                disabled={uploadingContrato}
+                                style={{ display: 'none' }}
+                                id={`file-${index}`}
+                              />
+                              <label
+                                htmlFor={`file-${index}`}
+                                style={{
+                                  background: uploadingContrato ? '#94a3b8' : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                                  border: 'none',
+                                  color: 'white',
+                                  cursor: uploadingContrato ? 'not-allowed' : 'pointer',
+                                  padding: '0.5rem 1rem',
+                                  borderRadius: '6px',
+                                  fontSize: '0.875rem',
+                                  fontWeight: '600'
+                                }}
+                              >
+                                {uploadingContrato ? 'Enviando...' : '📄 Enviar Contrato'}
+                              </label>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Botão Fechar */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                <button
+                  onClick={() => {
+                    setShowContratosModal(false);
+                    setSolicitacaoSelecionada(null);
+                    setContratos([]);
+                  }}
+                  style={{
+                    background: '#6b7280',
+                    border: 'none',
+                    color: 'white',
+                    cursor: 'pointer',
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600'
+                  }}
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Reprovação de Contrato */}
+      {contratoParaReprovar && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Reprovar Contrato</h2>
+              <button className="close-btn" onClick={() => {
+                setContratoParaReprovar(null);
+                setMotivoReprovacao('');
+              }}>×</button>
+            </div>
+            
+            <div style={{ padding: '2rem' }}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem' }}>
+                  Paciente: {contratoParaReprovar.paciente_nome}
+                </label>
+                <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem' }}>
+                  Motivo da Reprovação *
+                </label>
+                <textarea
+                  value={motivoReprovacao}
+                  onChange={(e) => setMotivoReprovacao(e.target.value)}
+                  placeholder="Informe o motivo da reprovação..."
+                  rows={4}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+              
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                <button
+                  onClick={() => {
+                    setContratoParaReprovar(null);
+                    setMotivoReprovacao('');
+                  }}
+                  style={{
+                    background: '#6b7280',
+                    border: 'none',
+                    color: 'white',
+                    cursor: 'pointer',
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600'
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleReprovarContrato}
+                  style={{
+                    background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+                    border: 'none',
+                    color: 'white',
+                    cursor: 'pointer',
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600'
+                  }}
+                >
+                  Reprovar
+                </button>
               </div>
             </div>
           </div>
