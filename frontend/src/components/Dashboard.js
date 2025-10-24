@@ -30,6 +30,8 @@ const Dashboard = () => {
   const [showConsultoresExtrasModal, setShowConsultoresExtrasModal] = useState(false); // Modal dos consultores do 4º em diante
   // Estado para controlar o modal do grupo do WhatsApp
   const [showWhatsAppGroupModal, setShowWhatsAppGroupModal] = useState(false);
+  // Estado para movimentações recentes
+  const [movimentacoesRecentes, setMovimentacoesRecentes] = useState([]);
   const [stats, setStats] = useState({
     totalPacientes: 0,
     totalAgendamentos: 0,
@@ -141,7 +143,23 @@ const Dashboard = () => {
     }
   };
   
+  // Função para carregar movimentações recentes
+  const carregarMovimentacoesRecentes = async () => {
+    try {
+      const response = await makeRequest('/movimentacoes/recentes');
+      if (response.ok) {
+        const data = await response.json();
+        setMovimentacoesRecentes(data.slice(0, 5)); // Apenas as 5 mais recentes
+      }
+    } catch (error) {
+      console.error('Erro ao carregar movimentações recentes:', error);
+    }
+  };
+
   useEffect(() => {
+    // Carregar movimentações recentes para todos os usuários
+    carregarMovimentacoesRecentes();
+    
     if (isAdmin) {
       const mes = mesSelecionadoMetas.getMonth() + 1;
       const ano = mesSelecionadoMetas.getFullYear();

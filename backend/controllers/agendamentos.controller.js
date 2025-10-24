@@ -1,5 +1,9 @@
 const { supabase, supabaseAdmin } = require('../config/database');
 const { STORAGE_BUCKET_DOCUMENTOS } = require('../config/constants');
+const { 
+  criarMovimentacaoAgendamentoCriado, 
+  criarMovimentacaoAgendamentoAtribuido 
+} = require('./movimentacoes.controller');
 
 // GET /api/agendamentos - Listar agendamentos
 const getAllAgendamentos = async (req, res) => {
@@ -9,7 +13,6 @@ const getAllAgendamentos = async (req, res) => {
       .select(`
         *,
         pacientes(nome, telefone, empreendimento_id),
-        consultores(nome),
         clinicas(nome)
       `)
       .order('data_agendamento', { ascending: false })
@@ -33,12 +36,34 @@ const getAllAgendamentos = async (req, res) => {
 
     if (error) throw error;
 
+    // Buscar nomes dos consultores separadamente
+    const consultoresIds = [...new Set(data.map(a => a.consultor_id).filter(Boolean))];
+    const sdrIds = [...new Set(data.map(a => a.sdr_id).filter(Boolean))];
+    const consultorInternoIds = [...new Set(data.map(a => a.consultor_interno_id).filter(Boolean))];
+    
+    const allConsultoresIds = [...new Set([...consultoresIds, ...sdrIds, ...consultorInternoIds])];
+    
+    let consultoresNomes = {};
+    if (allConsultoresIds.length > 0) {
+      const { data: consultoresData } = await supabaseAdmin
+        .from('consultores')
+        .select('id, nome')
+        .in('id', allConsultoresIds);
+      
+      consultoresNomes = consultoresData?.reduce((acc, c) => {
+        acc[c.id] = c.nome;
+        return acc;
+      }, {}) || {};
+    }
+
     // Reformatar dados para compatibilidade com frontend
     const formattedData = data.map(agendamento => ({
       ...agendamento,
       paciente_nome: agendamento.pacientes?.nome,
       paciente_telefone: agendamento.pacientes?.telefone,
-      consultor_nome: agendamento.consultores?.nome,
+      consultor_nome: consultoresNomes[agendamento.consultor_id] || null,
+      sdr_nome: consultoresNomes[agendamento.sdr_id] || null,
+      consultor_interno_nome: consultoresNomes[agendamento.consultor_interno_id] || null,
       clinica_nome: agendamento.clinicas?.nome,
       empreendimento_id: agendamento.pacientes?.empreendimento_id || agendamento.empreendimento_id // Usar empreendimento_id do paciente
     }));
@@ -66,7 +91,6 @@ const getDashboardAgendamentos = async (req, res) => {
       .select(`
         *,
         pacientes(nome, telefone, empreendimento_id),
-        consultores(nome),
         clinicas(nome)
       `)
       .order('data_agendamento', { ascending: false })
@@ -86,12 +110,34 @@ const getDashboardAgendamentos = async (req, res) => {
 
     if (error) throw error;
 
+    // Buscar nomes dos consultores separadamente
+    const consultoresIds = [...new Set(data.map(a => a.consultor_id).filter(Boolean))];
+    const sdrIds = [...new Set(data.map(a => a.sdr_id).filter(Boolean))];
+    const consultorInternoIds = [...new Set(data.map(a => a.consultor_interno_id).filter(Boolean))];
+    
+    const allConsultoresIds = [...new Set([...consultoresIds, ...sdrIds, ...consultorInternoIds])];
+    
+    let consultoresNomes = {};
+    if (allConsultoresIds.length > 0) {
+      const { data: consultoresData } = await supabaseAdmin
+        .from('consultores')
+        .select('id, nome')
+        .in('id', allConsultoresIds);
+      
+      consultoresNomes = consultoresData?.reduce((acc, c) => {
+        acc[c.id] = c.nome;
+        return acc;
+      }, {}) || {};
+    }
+
     // Reformatar dados para compatibilidade com frontend
     const formattedData = data.map(agendamento => ({
       ...agendamento,
       paciente_nome: agendamento.pacientes?.nome,
       paciente_telefone: agendamento.pacientes?.telefone,
-      consultor_nome: agendamento.consultores?.nome,
+      consultor_nome: consultoresNomes[agendamento.consultor_id] || null,
+      sdr_nome: consultoresNomes[agendamento.sdr_id] || null,
+      consultor_interno_nome: consultoresNomes[agendamento.consultor_interno_id] || null,
       clinica_nome: agendamento.clinicas?.nome,
       empreendimento_id: agendamento.pacientes?.empreendimento_id || agendamento.empreendimento_id // Usar empreendimento_id do paciente
     }));
@@ -105,12 +151,12 @@ const getDashboardAgendamentos = async (req, res) => {
 // POST /api/agendamentos - Criar agendamento
 const createAgendamento = async (req, res) => {
   try {
-    const { paciente_id, consultor_id, clinica_id, data_agendamento, horario, status, observacoes } = req.body;
+    const { paciente_id, consultor_id, clinica_id, data_agendamento, horario, status, observacoes, consultor_interno_id } = req.body;
     
-    // Buscar empresa_id do paciente para atribuir ao agendamento
+    // Buscar dados completos do paciente para copiar os IDs
     const { data: pacienteData, error: pacienteError } = await supabaseAdmin
       .from('pacientes')
-      .select('empresa_id')
+      .select('empresa_id, consultor_id, sdr_id, consultor_interno_id')
       .eq('id', paciente_id)
       .single();
     
@@ -121,10 +167,21 @@ const createAgendamento = async (req, res) => {
     
     const empresa_id = pacienteData?.empresa_id || req.user?.empresa_id;
     
+    // Determinar consultor_interno_id (do body ou do usuário que está criando)
+    let consultorInternoIdFinal = consultor_interno_id;
+    if (!consultorInternoIdFinal) {
+      // Se não foi fornecido, usar o ID do usuário se for consultor interno
+      if (req.user.tipo === 'consultor' && req.user.consultor_id) {
+        consultorInternoIdFinal = req.user.consultor_id;
+      }
+    }
+    
     // Para incorporadora (empresa_id = 5), não usar clinica_id
     const dadosAgendamento = {
       paciente_id,
-      consultor_id,
+      consultor_id: pacienteData.consultor_id, // freelancer que indicou
+      sdr_id: pacienteData.sdr_id, // SDR que trabalhou o lead
+      consultor_interno_id: consultorInternoIdFinal, // consultor interno que vai atender
       data_agendamento,
       horario,
       status: status || 'agendado',
@@ -168,6 +225,42 @@ const createAgendamento = async (req, res) => {
         .from('pacientes')
         .update({ status: 'agendado' })
         .eq('id', paciente_id);
+    }
+
+    // Registrar movimentação de agendamento criado
+    try {
+      const agendamentoId = data[0].id;
+      await criarMovimentacaoAgendamentoCriado(agendamentoId, {
+        consultor_id: dadosAgendamento.consultor_id,
+        sdr_id: dadosAgendamento.sdr_id,
+        consultor_interno_id: dadosAgendamento.consultor_interno_id,
+        executado_por: req.user
+      });
+      console.log('✅ Movimentação de agendamento criado registrada');
+      
+      // Se o consultor interno é diferente do SDR, registrar movimentação de atribuição
+      if (dadosAgendamento.sdr_id && dadosAgendamento.consultor_interno_id && 
+          dadosAgendamento.sdr_id !== dadosAgendamento.consultor_interno_id) {
+        
+        // Buscar nome do consultor interno
+        const { data: consultorInterno } = await supabaseAdmin
+          .from('consultores')
+          .select('nome')
+          .eq('id', dadosAgendamento.consultor_interno_id)
+          .single();
+        
+        await criarMovimentacaoAgendamentoAtribuido(agendamentoId, {
+          consultor_id: dadosAgendamento.consultor_id,
+          sdr_id: dadosAgendamento.sdr_id,
+          consultor_interno_id: dadosAgendamento.consultor_interno_id,
+          consultor_interno_nome: consultorInterno?.nome || 'Consultor',
+          executado_por: req.user
+        });
+        console.log('✅ Movimentação de agendamento atribuído registrada');
+      }
+    } catch (movimentacaoError) {
+      console.error('⚠️ Erro ao registrar movimentações:', movimentacaoError);
+      // Não falhar a operação principal se houver erro na movimentação
     }
 
     res.json({ id: data[0].id, message: 'Agendamento criado com sucesso!' });

@@ -356,7 +356,8 @@ const Pacientes = () => {
     clinica_id: '',
     data_agendamento: '',
     horario: '',
-    observacoes: ''
+    observacoes: '',
+    consultor_interno_id: ''
   });
   const [salvandoAgendamento, setSalvandoAgendamento] = useState(false);
 
@@ -2629,7 +2630,8 @@ const Pacientes = () => {
       clinica_id: '',
       data_agendamento: '',
       horario: '',
-      observacoes: ''
+      observacoes: '',
+      consultor_interno_id: ''
     });
   };
 
@@ -2650,7 +2652,8 @@ const Pacientes = () => {
           data_agendamento: agendamentoData.data_agendamento,
           horario: agendamentoData.horario,
           status: 'agendado',
-          observacoes: agendamentoData.observacoes || ''
+          observacoes: agendamentoData.observacoes || '',
+          consultor_interno_id: agendamentoData.consultor_interno_id || null
         })
       });
 
@@ -3011,10 +3014,20 @@ const Pacientes = () => {
       const fechamentoFormData = new FormData();
       fechamentoFormData.append('paciente_id', pacienteCriado.id);
       fechamentoFormData.append('consultor_id', pacienteCriado.consultor_id || '');
-      fechamentoFormData.append('clinica_id', clinicaId);
+      
+      // Para incorporadora (empresa_id = 5), usar empreendimento_id do paciente
+      if (empresaId === 5) {
+        if (pacienteCriado.empreendimento_id) {
+          fechamentoFormData.append('clinica_id', pacienteCriado.empreendimento_id); // Backend espera clinica_id mesmo para empreendimentos
+        }
+      } else {
+        // Para securitizadora, usar clinica_id
+        fechamentoFormData.append('clinica_id', clinicaId);
+        fechamentoFormData.append('tipo_tratamento', dados.tipo_tratamento || '');
+      }
+      
       fechamentoFormData.append('valor_fechado', parseFloat(dados.valor_fechado));
       fechamentoFormData.append('data_fechamento', dados.data_fechamento);
-      fechamentoFormData.append('tipo_tratamento', dados.tipo_tratamento || '');
       fechamentoFormData.append('observacoes', dados.observacoes_fechamento || 'Fechamento criado automaticamente pela clínica');
       
       // Dados do parcelamento (obrigatórios)
@@ -3094,10 +3107,20 @@ const Pacientes = () => {
       const formData = new FormData();
       formData.append('paciente_id', pacienteParaFechar.id);
       formData.append('consultor_id', pacienteParaFechar.consultor_id || '');
-      formData.append('clinica_id', clinicaFechamento);
+      
+      // Para incorporadora (empresa_id = 5), usar empreendimento_id do paciente
+      if (empresaId === 5) {
+        if (pacienteParaFechar.empreendimento_id) {
+          formData.append('clinica_id', pacienteParaFechar.empreendimento_id); // Backend espera clinica_id mesmo para empreendimentos
+        }
+      } else {
+        // Para securitizadora, usar clinica_id
+        formData.append('clinica_id', clinicaFechamento);
+        formData.append('tipo_tratamento', tipoTratamentoFechamento || '');
+      }
+      
       formData.append('valor_fechado', parseFloat(valorFechamento));
       formData.append('data_fechamento', dataFechamento);
-      formData.append('tipo_tratamento', tipoTratamentoFechamento || '');
       formData.append('observacoes', observacoesFechamento || 'Fechamento criado pelo pipeline');
       
       // Novos campos de parcelamento
@@ -3661,7 +3684,9 @@ const Pacientes = () => {
                   <thead>
                     <tr>
                       <th>Nome</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{t.consultor}</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>SDR</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor Interno</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>CPF</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cidade</th>
@@ -3743,6 +3768,20 @@ const Pacientes = () => {
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                             {paciente.consultor_nome || (
+                              <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
+                                Não atribuído
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                            {paciente.sdr_nome || (
+                              <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
+                                Não atribuído
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                            {paciente.consultor_interno_nome || (
                               <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
                                 Não atribuído
                               </span>
@@ -3928,7 +3967,9 @@ const Pacientes = () => {
                   <thead>
                     <tr>
                       <th>Nome</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{t.consultor}</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>SDR</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor Interno</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>CPF</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cidade</th>
@@ -4271,7 +4312,9 @@ const Pacientes = () => {
                   <thead>
                     <tr>
                       <th>Nome</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{t.consultor}</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>SDR</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor Interno</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>CPF</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cidade</th>
@@ -7747,6 +7790,22 @@ const Pacientes = () => {
                     onChange={(e) => setAgendamentoData({...agendamentoData, horario: e.target.value})}
                   />
                 </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">{isIncorporadora ? 'Qual corretor será responsável?' : 'Qual consultor será responsável?'}</label>
+                <select 
+                  className="form-select"
+                  value={agendamentoData.consultor_interno_id || ''}
+                  onChange={(e) => setAgendamentoData({...agendamentoData, consultor_interno_id: e.target.value})}
+                >
+                  <option value="">{isIncorporadora ? 'Selecione um corretor' : 'Selecione um consultor'}</option>
+                  {consultores.filter(consultor => !consultor.is_freelancer).map(consultor => (
+                    <option key={consultor.id} value={consultor.id}>
+                      {consultor.nome}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="form-group" style={{ marginBottom: '1.5rem' }}>

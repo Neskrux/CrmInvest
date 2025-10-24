@@ -24,6 +24,7 @@ import Empreendimentos from './components/Empreendimentos';
 import Agendamentos from './components/Agendamentos';
 import Fechamentos from './components/Fechamentos';
 import MetaAds from './components/MetaAds';
+import Movimentacoes from './components/Movimentacoes';
 // import WhatsApp from './components/WhatsApp'; // Temporariamente removido
 import Perfil from './components/Perfil';
 import Materiais from './components/Materiais';
@@ -101,6 +102,7 @@ const AppContent = () => {
     if (path.includes('/empreendimentos')) return 'empreendimentos';
     if (path.includes('/agendamentos')) return 'agendamentos';
     if (path.includes('/fechamentos')) return 'fechamentos';
+    if (path.includes('/movimentacoes')) return 'movimentacoes';
     if (path.includes('/calculo-carteira')) return 'calculo-carteira';
     if (path.includes('/meta-ads')) return 'meta-ads';
     if (path.includes('/whatsapp')) return 'whatsapp';
@@ -265,6 +267,7 @@ const AppContent = () => {
         <Route path="/empreendimentos" element={<Empreendimentos />} />
         <Route path="/agendamentos" element={<Agendamentos />} />
         <Route path="/fechamentos" element={<Fechamentos />} />
+        <Route path="/movimentacoes" element={<Movimentacoes />} />
         <Route path="/calculo-carteira" element={<Pacientes />} />
         <Route path="/meta-ads" element={<MetaAds />} />
         {/* Rota WhatsApp temporariamente removida */}
@@ -639,6 +642,23 @@ const AppContent = () => {
                   <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                 </svg>
                 {t.fechamentos}
+              </Link>
+            </div>
+          )}
+
+          {/* Movimentações - Apenas para Admin e Consultores Invest Money (NÃO para clínicas) */}
+          {(user.tipo === 'admin' || (user.tipo === 'consultor' && user.pode_ver_todas_novas_clinicas && user.podealterarstatus)) && user.tipo !== 'clinica' && (
+            <div className="nav-item">
+              <Link
+                to="/movimentacoes"
+                className={`nav-link ${activeTab === 'movimentacoes' ? 'active' : ''}`}
+                onClick={handleMobileNavigation}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 3h6l6 18 3-9h6" />
+                  <path d="M14 3h7v7" />
+                </svg>
+                Movimentações
               </Link>
             </div>
           )}

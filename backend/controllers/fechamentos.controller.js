@@ -3,6 +3,7 @@ const { STORAGE_BUCKET_CONTRATOS } = require('../config/constants');
 const { uploadToSupabase } = require('../middleware/upload');
 const bcrypt = require('bcrypt');
 const transporter = require('../config/email');
+const { criarMovimentacaoFechamentoCriado } = require('./movimentacoes.controller');
 
 // GET /api/fechamentos - Listar fechamentos
 const getAllFechamentos = async (req, res) => {
@@ -11,7 +12,6 @@ const getAllFechamentos = async (req, res) => {
     const selectQuery = `
       *,
       pacientes(nome, telefone, cpf, empreendimento_id),
-      consultores(nome),
       clinicas(nome)
     `;
 
@@ -35,6 +35,26 @@ const getAllFechamentos = async (req, res) => {
 
     if (error) throw error;
 
+    // Buscar nomes dos consultores separadamente
+    const consultoresIds = [...new Set(data.map(f => f.consultor_id).filter(Boolean))];
+    const sdrIds = [...new Set(data.map(f => f.sdr_id).filter(Boolean))];
+    const consultorInternoIds = [...new Set(data.map(f => f.consultor_interno_id).filter(Boolean))];
+    
+    const allConsultoresIds = [...new Set([...consultoresIds, ...sdrIds, ...consultorInternoIds])];
+    
+    let consultoresNomes = {};
+    if (allConsultoresIds.length > 0) {
+      const { data: consultoresData } = await supabaseAdmin
+        .from('consultores')
+        .select('id, nome')
+        .in('id', allConsultoresIds);
+      
+      consultoresNomes = consultoresData?.reduce((acc, c) => {
+        acc[c.id] = c.nome;
+        return acc;
+      }, {}) || {};
+    }
+
     // Reformatar dados para compatibilidade com frontend
     const formattedData = data.map(fechamento => {
       // NÃO gerar URL aqui - será gerada sob demanda quando o usuário clicar para baixar
@@ -44,7 +64,9 @@ const getAllFechamentos = async (req, res) => {
         paciente_telefone: fechamento.pacientes?.telefone,
         paciente_cpf: fechamento.pacientes?.cpf,
         paciente_empreendimento_id: fechamento.pacientes?.empreendimento_id,
-        consultor_nome: fechamento.consultores?.nome,
+        consultor_nome: consultoresNomes[fechamento.consultor_id] || null,
+        sdr_nome: consultoresNomes[fechamento.sdr_id] || null,
+        consultor_interno_nome: consultoresNomes[fechamento.consultor_interno_id] || null,
         clinica_nome: fechamento.clinicas?.nome
       };
     });
@@ -62,7 +84,6 @@ const getDashboardFechamentos = async (req, res) => {
     const selectQuery = `
       *,
       pacientes(nome, telefone, cpf, empreendimento_id),
-      consultores(nome),
       clinicas(nome)
     `;
 
@@ -86,6 +107,26 @@ const getDashboardFechamentos = async (req, res) => {
 
     if (error) throw error;
 
+    // Buscar nomes dos consultores separadamente
+    const consultoresIds = [...new Set(data.map(f => f.consultor_id).filter(Boolean))];
+    const sdrIds = [...new Set(data.map(f => f.sdr_id).filter(Boolean))];
+    const consultorInternoIds = [...new Set(data.map(f => f.consultor_interno_id).filter(Boolean))];
+    
+    const allConsultoresIds = [...new Set([...consultoresIds, ...sdrIds, ...consultorInternoIds])];
+    
+    let consultoresNomes = {};
+    if (allConsultoresIds.length > 0) {
+      const { data: consultoresData } = await supabaseAdmin
+        .from('consultores')
+        .select('id, nome')
+        .in('id', allConsultoresIds);
+      
+      consultoresNomes = consultoresData?.reduce((acc, c) => {
+        acc[c.id] = c.nome;
+        return acc;
+      }, {}) || {};
+    }
+
     // Reformatar dados para compatibilidade com frontend
     const formattedData = data.map(fechamento => {
       // NÃO gerar URL aqui - será gerada sob demanda quando o usuário clicar para baixar
@@ -95,7 +136,9 @@ const getDashboardFechamentos = async (req, res) => {
         paciente_telefone: fechamento.pacientes?.telefone,
         paciente_cpf: fechamento.pacientes?.cpf,
         paciente_empreendimento_id: fechamento.pacientes?.empreendimento_id,
-        consultor_nome: fechamento.consultores?.nome,
+        consultor_nome: consultoresNomes[fechamento.consultor_id] || null,
+        sdr_nome: consultoresNomes[fechamento.sdr_id] || null,
+        consultor_interno_nome: consultoresNomes[fechamento.consultor_interno_id] || null,
         clinica_nome: fechamento.clinicas?.nome
       };
     });
@@ -141,8 +184,8 @@ const createFechamento = async (req, res) => {
     const clinicaId = clinica_id && clinica_id !== '' ? 
       (typeof clinica_id === 'number' ? clinica_id : parseInt(clinica_id)) : null;
 
-    // Validar que clínica é obrigatória
-    if (!clinicaId) {
+    // Validar que clínica é obrigatória apenas para não incorporadora
+    if (!clinicaId && req.user.empresa_id !== 5) {
       return res.status(400).json({ error: 'Clínica é obrigatória para criar um fechamento!' });
     }
 
@@ -203,11 +246,27 @@ const createFechamento = async (req, res) => {
       }
     }
     
+    // Buscar dados do agendamento relacionado para copiar os IDs
+    let dadosAgendamento = null;
+    if (paciente_id) {
+      const { data: agendamentoData } = await supabaseAdmin
+        .from('agendamentos')
+        .select('consultor_id, sdr_id, consultor_interno_id')
+        .eq('paciente_id', paciente_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      dadosAgendamento = agendamentoData;
+    }
+    
     const { data, error } = await supabaseAdmin
       .from('fechamentos')
       .insert([{
         paciente_id: parseInt(paciente_id),
-        consultor_id: consultorId,
+        consultor_id: dadosAgendamento?.consultor_id || consultorId, // freelancer que indicou
+        sdr_id: dadosAgendamento?.sdr_id, // SDR que trabalhou o lead
+        consultor_interno_id: dadosAgendamento?.consultor_interno_id || consultorId, // consultor interno que fechou
         clinica_id: clinicaId,
         valor_fechado: valorFechado,
         data_fechamento,
@@ -254,24 +313,52 @@ const createFechamento = async (req, res) => {
         .eq('id', paciente_id);
     }
 
-    // Criar agendamento automaticamente com status "fechado"
-    if (paciente_id && clinicaId) {
+    // Criar agendamento automaticamente com status "fechado" apenas se não for fechamento automático
+    // (fechamentos automáticos já têm agendamento criado no fluxo agendamentos → fechamentos)
+    if (paciente_id && !isAutomaticFechamento) {
       try {
+        const agendamentoData = {
+          paciente_id: parseInt(paciente_id),
+          consultor_id: consultorId,
+          data_agendamento: data_fechamento, // Usar a mesma data do fechamento
+          horario: '00:00', // Horário padrão
+          status: 'fechado', // Status automático "fechado"
+          observacoes: 'Agendamento criado automaticamente a partir do fechamento',
+          empresa_id: req.user.empresa_id
+        };
+        
+        // Só incluir clinica_id se não for incorporadora
+        if (req.user.empresa_id !== 5) {
+          agendamentoData.clinica_id = clinicaId;
+        }
+        
         await supabaseAdmin
           .from('agendamentos')
-          .insert([{
-            paciente_id: parseInt(paciente_id),
-            consultor_id: consultorId,
-            clinica_id: clinicaId,
-            data_agendamento: data_fechamento, // Usar a mesma data do fechamento
-            horario: '00:00', // Horário padrão
-            status: 'fechado', // Status automático "fechado"
-            observacoes: 'Agendamento criado automaticamente a partir do fechamento'
-          }]);
+          .insert([agendamentoData]);
       } catch (agendamentoError) {
         console.error('Erro ao criar agendamento automático:', agendamentoError);
         // Não bloquear o fechamento se houver erro no agendamento
       }
+    }
+
+    // Registrar movimentação de fechamento criado
+    try {
+      const fechamentoId = data[0].id;
+      await criarMovimentacaoFechamentoCriado(fechamentoId, {
+        consultor_id: dadosAgendamento?.consultor_id || consultorId,
+        sdr_id: dadosAgendamento?.sdr_id,
+        consultor_interno_id: dadosAgendamento?.consultor_interno_id || consultorId,
+        executado_por: req.user,
+        dados_novos: {
+          valor_fechado: valorFechado,
+          data_fechamento,
+          tipo_tratamento: tipo_tratamento || null
+        }
+      });
+      console.log('✅ Movimentação de fechamento criado registrada');
+    } catch (movimentacaoError) {
+      console.error('⚠️ Erro ao registrar movimentação de fechamento:', movimentacaoError);
+      // Não falhar a operação principal se houver erro na movimentação
     }
 
     res.json({ 

@@ -1331,7 +1331,9 @@ const Fechamentos = () => {
                   <tr>
                     <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Data</th>
                     <th>{t.paciente}</th>
-                    <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{empresaId === 5 ? 'Corretor' : 'Consultor'}</th>
+                    <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
+                    <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>SDR</th>
+                    <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{empresaId === 5 ? 'Corretor' : 'Consultor Interno'}</th>
                     {empresaId === 5 ? (
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Empreendimento</th>
                     ) : (
@@ -1422,7 +1424,9 @@ const Fechamentos = () => {
                             )}
                           </div>
                         </td>
-                        <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{consultor?.nome || 'N/A'}</td>
+                        <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{fechamento.consultor_nome || '-'}</td>
+                        <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{fechamento.sdr_nome || '-'}</td>
+                        <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{fechamento.consultor_interno_nome || '-'}</td>
                         {empresaId === 5 ? (
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                             {(() => {

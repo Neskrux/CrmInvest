@@ -1,5 +1,6 @@
 const { supabase, supabaseAdmin } = require('../config/database');
 const { normalizarEmail } = require('../utils/helpers');
+const { criarMovimentacaoLeadAtribuido } = require('./movimentacoes.controller');
 
 // Constantes
 const STATUS_COM_EVIDENCIA = {
@@ -29,7 +30,6 @@ const getAllPacientes = async (req, res) => {
       .from('pacientes')
       .select(`
         *,
-        consultores(nome),
         empreendimentos(nome, cidade, estado)
       `);
     
@@ -131,10 +131,32 @@ const getAllPacientes = async (req, res) => {
 
     if (error) throw error;
     
+    // Buscar nomes dos consultores separadamente
+    const consultoresIds = [...new Set(data.map(p => p.consultor_id).filter(Boolean))];
+    const sdrIds = [...new Set(data.map(p => p.sdr_id).filter(Boolean))];
+    const consultorInternoIds = [...new Set(data.map(p => p.consultor_interno_id).filter(Boolean))];
+    
+    const allConsultoresIds = [...new Set([...consultoresIds, ...sdrIds, ...consultorInternoIds])];
+    
+    let consultoresNomes = {};
+    if (allConsultoresIds.length > 0) {
+      const { data: consultoresData } = await supabaseAdmin
+        .from('consultores')
+        .select('id, nome')
+        .in('id', allConsultoresIds);
+      
+      consultoresNomes = consultoresData?.reduce((acc, c) => {
+        acc[c.id] = c.nome;
+        return acc;
+      }, {}) || {};
+    }
+
     // Reformatar dados para compatibilidade com frontend
     const formattedData = data.map(paciente => ({
       ...paciente,
-      consultor_nome: paciente.consultores?.nome,
+      consultor_nome: consultoresNomes[paciente.consultor_id] || null,
+      sdr_nome: consultoresNomes[paciente.sdr_id] || null,
+      consultor_interno_nome: consultoresNomes[paciente.consultor_interno_id] || null,
       empreendimento_nome: paciente.empreendimentos?.nome,
       empreendimento_cidade: paciente.empreendimentos?.cidade,
       empreendimento_estado: paciente.empreendimentos?.estado
@@ -158,7 +180,6 @@ const getDashboardPacientes = async (req, res) => {
       .from('pacientes')
       .select(`
         *,
-        consultores(nome),
         empreendimentos(nome, cidade, estado)
       `);
     
@@ -239,10 +260,32 @@ const getDashboardPacientes = async (req, res) => {
 
     if (error) throw error;
     
+    // Buscar nomes dos consultores separadamente
+    const consultoresIds = [...new Set(data.map(p => p.consultor_id).filter(Boolean))];
+    const sdrIds = [...new Set(data.map(p => p.sdr_id).filter(Boolean))];
+    const consultorInternoIds = [...new Set(data.map(p => p.consultor_interno_id).filter(Boolean))];
+    
+    const allConsultoresIds = [...new Set([...consultoresIds, ...sdrIds, ...consultorInternoIds])];
+    
+    let consultoresNomes = {};
+    if (allConsultoresIds.length > 0) {
+      const { data: consultoresData } = await supabaseAdmin
+        .from('consultores')
+        .select('id, nome')
+        .in('id', allConsultoresIds);
+      
+      consultoresNomes = consultoresData?.reduce((acc, c) => {
+        acc[c.id] = c.nome;
+        return acc;
+      }, {}) || {};
+    }
+
     // Reformatar dados para compatibilidade com frontend
     const formattedData = data.map(paciente => ({
       ...paciente,
-      consultor_nome: paciente.consultores?.nome,
+      consultor_nome: consultoresNomes[paciente.consultor_id] || null,
+      sdr_nome: consultoresNomes[paciente.sdr_id] || null,
+      consultor_interno_nome: consultoresNomes[paciente.consultor_interno_id] || null,
       empreendimento_nome: paciente.empreendimentos?.nome,
       empreendimento_cidade: paciente.empreendimentos?.cidade,
       empreendimento_estado: paciente.empreendimentos?.estado
@@ -340,6 +383,9 @@ const createPaciente = async (req, res) => {
       .select();
 
     if (error) throw error;
+    
+    // Não registrar movimentação aqui - será registrada quando um SDR pegar o lead
+    
     res.json({ id: data[0].id, message: 'Paciente cadastrado com sucesso!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -756,15 +802,34 @@ const aprovarLead = async (req, res) => {
       return res.status(400).json({ error: 'Este lead já foi processado!' });
     }
 
-    // Mudar status de 'lead' para 'em_conversa'
+    // Mudar status de 'lead' para 'em_conversa' e atribuir ao SDR se for consultor interno
+    const updateData = { status: 'em_conversa' };
+    
+    // Se o usuário é um consultor interno (não freelancer), atribuir como SDR
+    if (req.user.tipo === 'consultor' && !req.user.is_freelancer) {
+      updateData.sdr_id = req.user.id;
+      console.log('🔍 Atribuindo lead ao SDR:', req.user.id);
+    }
+    
     const { error } = await supabaseAdmin
       .from('pacientes')
-      .update({ status: 'em_conversa' })
+      .update(updateData)
       .eq('id', id);
 
     if (error) throw error;
     
     console.log('✅ Lead aprovado com sucesso! ID:', id);
+    
+    // Registrar movimentação se foi atribuído a um SDR
+    if (req.user.tipo === 'consultor' && !req.user.is_freelancer) {
+      try {
+        await criarMovimentacaoLeadAtribuido(id, req.user.id, req.user);
+        console.log('✅ Movimentação de lead aprovado e atribuído registrada');
+      } catch (movimentacaoError) {
+        console.error('⚠️ Erro ao registrar movimentação:', movimentacaoError);
+        // Não falhar a operação principal se houver erro na movimentação
+      }
+    }
     
     // Emitir evento Socket.IO para atualizar contagem de leads
     if (req.io) {
@@ -785,40 +850,67 @@ const pegarLead = async (req, res) => {
     const { id } = req.params;
     const { consultor_id } = req.body;
     
-    // Verificar se o lead ainda está disponível
+    console.log('🔍 DEBUG pegarLead:', {
+      pacienteId: id,
+      consultor_id,
+      userId: req.user?.id,
+      userTipo: req.user?.tipo
+    });
+    
+    // Verificar se o lead ainda está disponível (sdr_id deve ser null)
     const { data: pacienteAtual, error: checkError } = await supabaseAdmin
       .from('pacientes')
-      .select('consultor_id')
+      .select('consultor_id, sdr_id')
       .eq('id', id)
       .single();
 
     if (checkError) throw checkError;
 
-    if (pacienteAtual.consultor_id !== null) {
-      return res.status(400).json({ error: 'Este lead já foi atribuído a outro consultor!' });
+    console.log('🔍 DEBUG paciente atual:', pacienteAtual);
+
+    if (pacienteAtual.sdr_id !== null) {
+      return res.status(400).json({ error: 'Este lead já foi atribuído a outro SDR!' });
     }
 
-    // Determinar qual consultor_id usar
-    let consultorIdParaAtribuir;
+    // Determinar qual ID usar para sdr_id
+    let sdrIdParaAtribuir;
     
     if (consultor_id) {
       // Se foi fornecido consultor_id no body (admin escolhendo consultor)
-      consultorIdParaAtribuir = consultor_id;
-    } else if (req.user.consultor_id) {
-      // Se o usuário tem consultor_id (consultor normal)
-      consultorIdParaAtribuir = req.user.consultor_id;
+      sdrIdParaAtribuir = consultor_id;
+    } else if (req.user.id) {
+      // Usar o ID do usuário que está pegando o lead
+      sdrIdParaAtribuir = req.user.id;
     } else {
-      // Se não tem consultor_id e não foi fornecido no body
-      return res.status(400).json({ error: 'É necessário especificar um consultor para atribuir o lead!' });
+      // Se não tem ID do usuário
+      return res.status(400).json({ error: 'Erro: ID do usuário não encontrado!' });
     }
 
-    // Atribuir o lead ao consultor
+    console.log('🔍 DEBUG sdrIdParaAtribuir:', sdrIdParaAtribuir);
+
+    // Atribuir o lead ao SDR (atualizar sdr_id)
+    console.log('🔍 DEBUG atualizando paciente:', { id, sdr_id: sdrIdParaAtribuir });
+    
     const { error } = await supabaseAdmin
       .from('pacientes')
-      .update({ consultor_id: consultorIdParaAtribuir })
+      .update({ sdr_id: sdrIdParaAtribuir })
       .eq('id', id);
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Erro ao atualizar sdr_id:', error);
+      throw error;
+    }
+    
+    console.log('✅ sdr_id atualizado com sucesso!');
+    
+    // Registrar movimentação de lead atribuído
+    try {
+      await criarMovimentacaoLeadAtribuido(id, sdrIdParaAtribuir, req.user);
+      console.log('✅ Movimentação de lead atribuído registrada');
+    } catch (movimentacaoError) {
+      console.error('⚠️ Erro ao registrar movimentação:', movimentacaoError);
+      // Não falhar a operação principal se houver erro na movimentação
+    }
     
     // Emitir evento Socket.IO para atualizar contagem de leads
     if (req.io) {
