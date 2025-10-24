@@ -150,7 +150,7 @@ const getAllPacientes = async (req, res) => {
         return acc;
       }, {}) || {};
     }
-
+    
     // Reformatar dados para compatibilidade com frontend
     const formattedData = data.map(paciente => ({
       ...paciente,
@@ -279,7 +279,7 @@ const getDashboardPacientes = async (req, res) => {
         return acc;
       }, {}) || {};
     }
-
+    
     // Reformatar dados para compatibilidade com frontend
     const formattedData = data.map(paciente => ({
       ...paciente,

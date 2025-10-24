@@ -219,11 +219,19 @@ const createAgendamento = async (req, res) => {
 
     if (error) throw error;
 
-    // Atualizar status do paciente para "agendado"
+    // Atualizar status do paciente para "agendado" e consultor_interno_id se foi atribuído
     if (paciente_id) {
+      const updateData = { status: 'agendado' };
+      
+      // Se foi atribuído um consultor interno, atualizar também na tabela pacientes
+      if (dadosAgendamento.consultor_interno_id) {
+        updateData.consultor_interno_id = dadosAgendamento.consultor_interno_id;
+        console.log('✅ Atualizando consultor_interno_id na tabela pacientes:', dadosAgendamento.consultor_interno_id);
+      }
+      
       await supabaseAdmin
         .from('pacientes')
-        .update({ status: 'agendado' })
+        .update(updateData)
         .eq('id', paciente_id);
     }
 
