@@ -68,8 +68,9 @@ const getAllPacientes = async (req, res) => {
       // Aplicar filtro OR
       query = query.or(conditions.join(','));
     }
-    // Se for admin ou parceiro, buscar pacientes da empresa (com empresa_id OU consultores da empresa)
-    else if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
+    // Se for admin, parceiro ou consultor interno, buscar pacientes da empresa (com empresa_id OU consultores da empresa)
+    else if (((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) || 
+              (req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true && req.user.empresa_id)) {
       console.log('🏢 Admin/Parceiro acessando pacientes:', {
         empresa_id: req.user.empresa_id,
         usuario_nome: req.user.nome,
@@ -191,8 +192,9 @@ const getDashboardPacientes = async (req, res) => {
     
     query = query.order('created_at', { ascending: false });
 
-    // Se for admin ou parceiro, filtrar pacientes da empresa (com empresa_id OU consultores da empresa)
-    if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
+    // Se for admin, parceiro ou consultor interno, filtrar pacientes da empresa (com empresa_id OU consultores da empresa)
+    if (((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) || 
+        (req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true && req.user.empresa_id)) {
       // Buscar consultores da empresa
       const { data: consultores, error: consultorError } = await supabaseAdmin
         .from('consultores')

@@ -21,8 +21,9 @@ const getAllFechamentos = async (req, res) => {
       .order('data_fechamento', { ascending: false })
       .order('created_at', { ascending: false });
 
-    // Se for admin ou parceiro, filtrar apenas fechamentos de consultores da empresa
-    if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
+    // Se for admin, parceiro ou consultor interno, filtrar apenas fechamentos da empresa
+    if (((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) || 
+        (req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true && req.user.empresa_id)) {
       query = query.eq('empresa_id', req.user.empresa_id);
     }
     // Se for consultor freelancer (não tem as duas permissões), filtrar apenas seus fechamentos
@@ -93,8 +94,9 @@ const getDashboardFechamentos = async (req, res) => {
       .order('data_fechamento', { ascending: false })
       .order('created_at', { ascending: false });
 
-    // Se for admin ou parceiro, filtrar apenas fechamentos de consultores da empresa
-    if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
+    // Se for admin, parceiro ou consultor interno, filtrar apenas fechamentos da empresa
+    if (((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) || 
+        (req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true && req.user.empresa_id)) {
       query = query.eq('empresa_id', req.user.empresa_id);
     }
     // Se for consultor freelancer (não tem as duas permissões), filtrar apenas seus fechamentos
