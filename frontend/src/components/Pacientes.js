@@ -10366,7 +10366,6 @@ const Pacientes = () => {
           </div>
         </div>
       )}
-
       
     </div>
   );

@@ -425,7 +425,21 @@ const CapturaClientes = () => {
         body: JSON.stringify(formDataToSend)
       });
       
-      const data = await response.json();
+      console.log('📡 Resposta do servidor:', response.status, response.statusText);
+      
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error('❌ Erro ao parsear JSON:', jsonError);
+        const text = await response.text();
+        console.error('❌ Resposta em texto:', text);
+        setErrors({ general: 'Erro ao processar resposta do servidor.' });
+        setLoading(false);
+        return;
+      }
+      
+      console.log('📦 Dados recebidos:', data);
       
       if (response.ok) {
         navigate('/captura-sucesso-clientes', { 
@@ -436,10 +450,11 @@ const CapturaClientes = () => {
           } 
         });
       } else {
+        console.error('❌ Erro na resposta:', data);
         setErrors({ general: data.error || 'Erro ao enviar cadastro' });
       }
     } catch (error) {
-      console.error('Erro no cadastro:', error);
+      console.error('❌ Erro no cadastro:', error);
       setErrors({ general: 'Erro de conexão. Tente novamente.' });
     } finally {
       setLoading(false);

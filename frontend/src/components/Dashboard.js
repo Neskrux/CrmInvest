@@ -8,6 +8,9 @@ const Dashboard = () => {
   // Hook para textos dinâmicos baseados no empresa_id
   const { t, shouldShow } = useBranding();
   
+  // Hook de autenticação - DEVE vir antes dos useEffect que dependem dele
+  const { makeRequest, user, isAdmin, isConsultorInterno, podeVerTodosDados, isClinica, isFreelancer, isIncorporadora } = useAuth();
+  
   // Estado separado para KPIs principais (dados filtrados)
   const [kpisPrincipais, setKpisPrincipais] = useState({
     totalPacientes: 0,
@@ -16,7 +19,6 @@ const Dashboard = () => {
     valorTotalFechamentos: 0,
     agendamentosHoje: 0
   });
-  const { makeRequest, user, isAdmin, isConsultorInterno, podeVerTodosDados, isClinica, isFreelancer, isIncorporadora } = useAuth();
   const [periodo, setPeriodo] = useState('total'); // total, semanal, mensal
   const [subPeriodo, setSubPeriodo] = useState(null); // para dias da semana
   const [semanaOpcao, setSemanaOpcao] = useState('atual'); // atual, proxima
@@ -1661,6 +1663,7 @@ const Dashboard = () => {
   }
 
   return (
+    <>
     <div>
       <div className="page-header" style={{padding: '1.5rem'}}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -3814,6 +3817,7 @@ const Dashboard = () => {
 
 
     </div>
+    </>
   );
 };
 

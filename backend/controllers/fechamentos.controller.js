@@ -363,6 +363,68 @@ const createFechamento = async (req, res) => {
       // Não falhar a operação principal se houver erro na movimentação
     }
 
+    // Emitir evento Socket.IO para notificar incorporadora sobre novo fechamento
+    if (req.io && consultorInternoIdFinal && req.user.empresa_id === 5) {
+      console.log('📢 [SOCKET.IO] Emitindo evento new-fechamento-incorporadora:', {
+        fechamentoId: data[0].id,
+        paciente_id: paciente_id,
+        consultorInternoId: consultorInternoIdFinal,
+        empresa_id: req.user.empresa_id,
+        valor_fechado: valorFechado,
+        data_fechamento: data_fechamento,
+        timestamp: new Date().toISOString(),
+        room: 'incorporadora-notifications'
+      });
+      
+      // Buscar dados do corretor (consultor interno)
+      const { data: corretorData } = await supabaseAdmin
+        .from('consultores')
+        .select('nome, foto_url')
+        .eq('id', consultorInternoIdFinal)
+        .single();
+
+      console.log('👤 [SOCKET.IO] Dados do corretor encontrados:', {
+        consultorInternoId: consultorInternoIdFinal,
+        nome: corretorData?.nome || 'N/A',
+        temFoto: !!corretorData?.foto_url
+      });
+
+      // Buscar dados do paciente
+      const { data: pacienteData } = await supabaseAdmin
+        .from('pacientes')
+        .select('nome, telefone')
+        .eq('id', paciente_id)
+        .single();
+
+      console.log('👤 [SOCKET.IO] Dados do paciente encontrados:', {
+        paciente_id: paciente_id,
+        nome: pacienteData?.nome || 'N/A',
+        telefone: pacienteData?.telefone || 'N/A'
+      });
+
+      req.io.to('incorporadora-notifications').emit('new-fechamento-incorporadora', {
+        fechamentoId: data[0].id,
+        paciente_nome: pacienteData?.nome || 'Cliente',
+        paciente_telefone: pacienteData?.telefone || '',
+        valor_fechado: valorFechado,
+        data_fechamento: data_fechamento,
+        corretor_nome: corretorData?.nome || 'Corretor',
+        corretor_foto: corretorData?.foto_url || null,
+        timestamp: new Date().toISOString()
+      });
+      
+      console.log('✅ [SOCKET.IO] Evento new-fechamento-incorporadora enviado para grupo incorporadora-notifications');
+    } else {
+      console.log('⚠️ [SOCKET.IO] Evento new-fechamento-incorporadora não enviado:', {
+        temSocketIO: !!req.io,
+        temConsultorInternoId: !!consultorInternoIdFinal,
+        empresaId: req.user.empresa_id,
+        motivo: !req.io ? 'Socket.IO não disponível' : 
+                !consultorInternoIdFinal ? 'Sem consultorInternoIdFinal' : 
+                req.user.empresa_id !== 5 ? 'Não é incorporadora' : 'Desconhecido'
+      });
+    }
+
     res.json({ 
       id: data[0].id, 
       message: 'Fechamento registrado com sucesso!',

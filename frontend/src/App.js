@@ -4,6 +4,7 @@ import './App.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './components/Toast';
 import useBranding from './hooks/useBranding';
+import useIncorporadoraNotifications from './hooks/useIncorporadoraNotifications';
 import { HelpCircle } from 'lucide-react';
 import CadastroConsultor from './components/CadastroConsultor';
 import CadastroSucesso from './components/CadastroSucesso';
@@ -69,6 +70,9 @@ const AppContent = () => {
   const navRef = React.useRef(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
+  
+  // Hook de notificações da incorporadora (para admins e consultores)
+  const { NewLeadModal } = useIncorporadoraNotifications();
 
   // Função para fechar sidebar ao navegar no mobile
   const handleMobileNavigation = () => {
@@ -441,6 +445,9 @@ const AppContent = () => {
         <main className="freelancer-main">
           {RenderContent()}
         </main>
+        
+        {/* Modal de novo lead - Para consultores e admins */}
+        <NewLeadModal />
 
         {/* Botão Flutuante WhatsApp - Para Freelancers */}
         <a
@@ -1114,6 +1121,9 @@ const AppContent = () => {
           {RenderContent()}
         </div>
       </main>
+      
+      {/* Modal de novo lead - Para consultores e admins */}
+      <NewLeadModal />
 
       {/* Botão Flutuante WhatsApp - Apenas para consultores */}
       {user?.tipo === 'consultor' && (

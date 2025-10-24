@@ -337,9 +337,26 @@ const getGeraisPacientes = async (req, res) => {
 
     if (error) throw error;
     
+    // Buscar nomes dos consultores manualmente para evitar erro de múltiplas relações
+    const consultorIds = [...new Set(data.map(p => p.consultor_id).filter(Boolean))];
+    const consultoresNomes = {};
+    
+    if (consultorIds.length > 0) {
+      const { data: consultores } = await supabaseAdmin
+        .from('consultores')
+        .select('id, nome')
+        .in('id', consultorIds);
+      
+      if (consultores) {
+        consultores.forEach(c => {
+          consultoresNomes[c.id] = c.nome;
+        });
+      }
+    }
+    
     const formattedData = data.map(paciente => ({
       ...paciente,
-      consultor_nome: paciente.consultores?.nome,
+      consultor_nome: consultoresNomes[paciente.consultor_id] || null,
       empreendimento_nome: paciente.empreendimentos?.nome,
       empreendimento_cidade: paciente.empreendimentos?.cidade,
       empreendimento_estado: paciente.empreendimentos?.estado
@@ -382,11 +399,28 @@ const getGeraisAgendamentos = async (req, res) => {
 
     if (error) throw error;
 
+    // Buscar nomes dos consultores manualmente para evitar erro de múltiplas relações
+    const consultorIds = [...new Set(data.map(a => a.consultor_id).filter(Boolean))];
+    const consultoresNomes = {};
+    
+    if (consultorIds.length > 0) {
+      const { data: consultores } = await supabaseAdmin
+        .from('consultores')
+        .select('id, nome')
+        .in('id', consultorIds);
+      
+      if (consultores) {
+        consultores.forEach(c => {
+          consultoresNomes[c.id] = c.nome;
+        });
+      }
+    }
+
     const formattedData = data.map(agendamento => ({
       ...agendamento,
       paciente_nome: agendamento.pacientes?.nome,
       paciente_telefone: agendamento.pacientes?.telefone,
-      consultor_nome: agendamento.consultores?.nome,
+      consultor_nome: consultoresNomes[agendamento.consultor_id] || null,
       clinica_nome: agendamento.clinicas?.nome
     }));
 
@@ -441,6 +475,21 @@ const getGeraisFechamentos = async (req, res) => {
 
     if (error) throw error;
 
+    // Buscar nomes dos consultores manualmente para evitar erro de múltiplas relações
+    const consultorIds = [...new Set(data.map(f => f.consultor_id).filter(Boolean))];
+    const consultoresNomes = {};
+    
+    if (consultorIds.length > 0) {
+      const { data: consultores } = await supabaseAdmin
+        .from('consultores')
+        .select('id, nome')
+        .in('id', consultorIds);
+      
+      if (consultores) {
+        consultores.forEach(c => {
+          consultoresNomes[c.id] = c.nome;
+        });
+      }
     // Buscar nomes dos consultores separadamente
     const consultoresIds = [...new Set(data.map(f => f.consultor_id).filter(Boolean))];
     const sdrIds = [...new Set(data.map(f => f.sdr_id).filter(Boolean))];
