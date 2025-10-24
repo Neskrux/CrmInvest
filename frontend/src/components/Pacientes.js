@@ -503,9 +503,6 @@ const Pacientes = () => {
       setLoadingLink(false);
     }
     
-    // Verificar se tutorial foi completado
-    const completed = localStorage.getItem('tutorial-pacientes-completed');
-    setTutorialCompleted(!!completed);
   }, [podeAlterarStatus, isConsultorInterno, deveFiltrarPorConsultor, user?.consultor_id]);
 
   // Carregar contratos quando modal de análise abrir
@@ -515,8 +512,6 @@ const Pacientes = () => {
     }
   }, [showSolicitacaoModal, solicitacaoSelecionada]);
 
-  // Tutorial automático desabilitado
-  // Os usuários podem acessá-lo manualmente através do botão "Ver Tutorial"
 
   // Garantir que freelancers fiquem na aba "Pacientes"
   useEffect(() => {
@@ -9390,7 +9385,6 @@ const Pacientes = () => {
         </div>
       )}
 
-      {/* Tutorial Overlay */}
       {/* Modal de Análise de Solicitação (Admin) */}
       {showSolicitacaoModal && solicitacaoSelecionada && (
         <div className="modal-overlay">
@@ -10247,11 +10241,6 @@ const Pacientes = () => {
         </div>
       )}
 
-      <TutorialPacientes
-        isOpen={showTutorial}
-        onClose={handleTutorialClose}
-        onComplete={handleTutorialComplete}
-      />
       
     </div>
   );
