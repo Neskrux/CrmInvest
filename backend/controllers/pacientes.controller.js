@@ -408,7 +408,7 @@ const createPaciente = async (req, res) => {
 const updatePaciente = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, telefone, email, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado, cadastrado_por_clinica, clinica_id, grau_parentesco, tratamento_especifico } = req.body;
+    const { nome, telefone, email, cpf, tipo_tratamento, status, observacoes, consultor_id, sdr_id, cidade, estado, cadastrado_por_clinica, clinica_id, grau_parentesco, tratamento_especifico } = req.body;
     
     // Verificar se é consultor freelancer - freelancers não podem editar pacientes completamente
     if (req.user.tipo === 'consultor' && req.user.podealterarstatus !== true) {
@@ -485,13 +485,51 @@ const updatePaciente = async (req, res) => {
       }
     }
     
-    // Converter consultor_id para null se não fornecido
-    const consultorId = consultor_id && consultor_id !== '' ? 
-      (typeof consultor_id === 'number' ? consultor_id : parseInt(consultor_id)) : null;
+    // VALIDAÇÃO: Verificar se lead já foi capturado por outro SDR
+    if (sdr_id && consultor_id === undefined) {
+      // Buscar dados atuais do paciente para verificar se já tem sdr_id
+      const { data: pacienteAtual, error: fetchError } = await supabaseAdmin
+        .from('pacientes')
+        .select('consultor_id, sdr_id')
+        .eq('id', id)
+        .single();
+        
+      if (fetchError) throw fetchError;
+      
+      // Se o lead já tem sdr_id, não permitir nova captura
+      if (pacienteAtual.sdr_id !== null) {
+        return res.status(400).json({ 
+          error: 'Este lead já foi capturado por outro SDR.',
+          message: 'O lead já foi atribuído a um SDR e não pode ser capturado novamente.'
+        });
+      }
+    }
+    
+    // Converter consultor_id para null se não fornecido, mas só se foi explicitamente fornecido
+    const consultorId = consultor_id !== undefined && consultor_id !== '' ? 
+      (typeof consultor_id === 'number' ? consultor_id : parseInt(consultor_id)) : 
+      (consultor_id === '' ? null : undefined); // Se não foi fornecido, não alterar
     
     // Lógica de diferenciação: se tem consultor = paciente, se não tem = lead
     // Mas só aplica se o status não foi explicitamente definido
-    const statusFinal = status || (consultorId ? 'paciente' : 'lead');
+    let statusFinal;
+    if (status) {
+      // Se status foi explicitamente fornecido (ex: 'em conversa' do SDR), usar ele
+      statusFinal = status;
+    } else if (consultorId) {
+      // Se tem consultor_id mas não tem status explícito, usar 'paciente'
+      statusFinal = 'paciente';
+    } else {
+      // Se não tem nem status nem consultor_id, usar 'lead'
+      statusFinal = 'lead';
+    }
+    
+    console.log('🔍 DEBUG updatePaciente - Status final:', {
+      statusRecebido: status,
+      consultorId: consultorId,
+      sdrId: sdr_id,
+      statusFinal: statusFinal
+    });
     
     // Se é clínica editando, manter os campos específicos
     const updateData = {
@@ -502,13 +540,18 @@ const updatePaciente = async (req, res) => {
       tipo_tratamento, 
       status: statusFinal, // Usar status diferenciado
       observacoes,
-      consultor_id: consultorId,
+      sdr_id: sdr_id || null, // Adicionar suporte para sdr_id
       cidade,
       estado,
       grau_parentesco,
       tratamento_especifico,
       empresa_id: req.user.empresa_id // Atualizar empresa_id do usuário que está editando
     };
+    
+    // Só incluir consultor_id se foi explicitamente fornecido
+    if (consultor_id !== undefined) {
+      updateData.consultor_id = consultorId;
+    }
     
     // Se tem informações de clínica, incluir
     if (cadastrado_por_clinica !== undefined) {
@@ -1096,7 +1139,8 @@ const cadastroPublicoLead = async (req, res) => {
     // Normalizar telefone (remover formatação)
     const telefoneNumeros = telefone.replace(/\D/g, '');
     
-    // Verificar se telefone já existe na mesma empresa
+    // Verificar se telefone já existe na mesma empresa (Incorporadora = 5)
+    const empresaId = 5; // Todos os leads do CapturaClientes.js vêm para a Incorporadora
     const { data: telefoneExistente, error: telefoneError } = await supabaseAdmin
       .from('pacientes')
       .select('id, nome, created_at, empresa_id')

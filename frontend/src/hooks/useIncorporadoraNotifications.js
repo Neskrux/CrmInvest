@@ -71,14 +71,18 @@ const useIncorporadoraNotifications = () => {
         socketId: newSocket.id
       });
       
-      // Tocar som de notificação
-      playNotificationSound();
+      // Tocar som de notificação apenas se não for freelancer
+      if (!user.is_freelancer) {
+        playNotificationSound();
+      }
       
-      // Mostrar toast
-      showInfoToast(
-        `Novo cliente: ${data.nome} - ${data.cidade}/${data.estado}`,
-        6000
-      );
+      // Mostrar toast apenas se não for freelancer
+      if (!user.is_freelancer) {
+        showInfoToast(
+          `Novo cliente: ${data.nome} - ${data.cidade}/${data.estado}`,
+          6000
+        );
+      }
       
       // Adicionar à lista de notificações
       setNotifications(prev => [...prev, {
@@ -88,23 +92,26 @@ const useIncorporadoraNotifications = () => {
         timestamp: new Date()
       }]);
       
-      // Se for SDR (consultor interno), mostrar modal para capturar lead
+      // Se for SDR (consultor interno) ou admin da incorporadora, mostrar modal para capturar lead
       // SDR = consultor interno (NÃO freelancer)
       const isSDR = user.tipo === 'consultor' && !user.is_freelancer;
+      const isAdminIncorporadora = user.tipo === 'admin' && user.empresa_id === 5;
       
       console.log('🔍 [SOCKET.IO] Verificando tipo de usuário para mostrar modal:', {
         userTipo: user.tipo,
         isFreelancer: user.is_freelancer,
-        isSDR: isSDR
+        isSDR: isSDR,
+        isAdminIncorporadora: isAdminIncorporadora,
+        empresaId: user.empresa_id
       });
       
-      if (isSDR) {
-        console.log('🎯 [SOCKET.IO] Abrindo modal de novo lead para SDR');
+      if (isSDR || isAdminIncorporadora) {
+        console.log('🎯 [SOCKET.IO] Abrindo modal de novo lead para SDR/Admin');
         setNewLeadData(data);
         setShowNewLeadModal(true);
         console.log('✅ [SOCKET.IO] Modal deve estar aberta agora');
       } else {
-        console.log('ℹ️ [SOCKET.IO] Usuário não é SDR - modal não será exibida');
+        console.log('ℹ️ [SOCKET.IO] Usuário não é SDR nem admin da incorporadora - modal não será exibida');
       }
       
       console.log('✅ [SOCKET.IO] Processamento do evento new-lead-incorporadora concluído');
@@ -123,14 +130,16 @@ const useIncorporadoraNotifications = () => {
         socketId: newSocket.id
       });
       
-      // Tocar som de notificação
-      playNotificationSound();
+      // Música removida temporariamente para agendamentos
+      // playNotificationSound();
       
-      // Mostrar toast personalizado com nome do SDR
-      showSuccessToast(
-        `📅 Novo agendamento criado por ${data.sdr_nome} - ${data.paciente_nome}`,
-        6000
-      );
+      // Mostrar toast personalizado com nome do SDR apenas se não for freelancer
+      if (!user.is_freelancer) {
+        showSuccessToast(
+          `📅 Novo agendamento criado por ${data.sdr_nome} - ${data.paciente_nome}`,
+          6000
+        );
+      }
       
       // Adicionar à lista de notificações
       setNotifications(prev => [...prev, {
@@ -156,14 +165,16 @@ const useIncorporadoraNotifications = () => {
         socketId: newSocket.id
       });
       
-      // Tocar som de notificação
-      playNotificationSound();
+      // Música removida temporariamente para fechamentos
+      // playNotificationSound();
       
-      // Mostrar toast personalizado com nome do corretor e valor
-      showSuccessToast(
-        `💰 Fechamento realizado por ${data.corretor_nome} - R$ ${data.valor_fechado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-        8000
-      );
+      // Mostrar toast personalizado com nome do corretor e valor apenas se não for freelancer
+      if (!user.is_freelancer) {
+        showSuccessToast(
+          `💰 Fechamento realizado por ${data.corretor_nome} - R$ ${data.valor_fechado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+          8000
+        );
+      }
       
       // Adicionar à lista de notificações
       setNotifications(prev => [...prev, {
@@ -297,8 +308,8 @@ const useIncorporadoraNotifications = () => {
       
       console.log('📤 [CAPTURAR LEAD] Enviando requisição:', {
         leadId: newLeadData.leadId,
-        status: 'em conversa',
-        consultor_id: user.id  // Este ID será do SDR, não do freelancer
+        status: 'em_conversa',
+        sdr_id: user.id  // Este ID será do SDR que está capturando o lead
       });
       
       const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/pacientes/${newLeadData.leadId}`, {
@@ -308,8 +319,8 @@ const useIncorporadoraNotifications = () => {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({
-          status: 'em conversa',
-          consultor_id: user.id  // Atribuir ao ID do SDR/consultor que clicou em capturar
+          status: 'em_conversa',
+          sdr_id: user.id  // Atribuir ao ID do SDR que clicou em capturar
         })
       });
       
@@ -324,7 +335,8 @@ const useIncorporadoraNotifications = () => {
           sdrNome: user.nome,
           isFreelancer: user.is_freelancer,
           isSDR: true,
-          novoStatus: 'em conversa'
+          novoStatus: 'em_conversa',
+          campoAtualizado: 'sdr_id'
         });
         
         // PARAR A MÚSICA!
@@ -404,11 +416,11 @@ const useIncorporadoraNotifications = () => {
         
         <div style={{
           background: 'white',
-          borderRadius: '24px',
-          padding: '3rem',
-          maxWidth: '650px',
+          borderRadius: '12px',
+          padding: '1.25rem',
+          maxWidth: '320px',
           width: '90%',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          boxShadow: '0 12px 24px -6px rgba(0, 0, 0, 0.25)',
           textAlign: 'center',
           position: 'relative',
           overflow: 'visible',
@@ -418,11 +430,11 @@ const useIncorporadoraNotifications = () => {
           {/* Logo no topo */}
           <div style={{
             position: 'absolute',
-            top: '-40px',
+            top: '-20px',
             left: '50%',
             transform: 'translateX(-50%)',
-            width: '80px',
-            height: '80px',
+            width: '40px',
+            height: '40px',
             background: 'white',
             borderRadius: '50%',
             display: 'flex',
@@ -435,8 +447,8 @@ const useIncorporadoraNotifications = () => {
               src={logoBrasao}
               alt="Invest Money" 
               style={{
-                width: '80px',
-                height: '80px',
+                width: '40px',
+                height: '40px',
                 objectFit: 'contain'
               }}
             />
@@ -460,24 +472,24 @@ const useIncorporadoraNotifications = () => {
           
           {/* Título */}
           <h1 style={{
-            fontSize: '3rem',
+            fontSize: '1.5rem',
             fontWeight: '800',
             background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
-            marginTop: '3rem',
-            marginBottom: '1rem',
+            marginTop: '1.5rem',
+            marginBottom: '0.25rem',
             textTransform: 'uppercase',
-            letterSpacing: '2px'
+            letterSpacing: '0.25px'
           }}>
             Novo Lead Chegou!
           </h1>
           
           <p style={{
-            fontSize: '1.5rem',
+            fontSize: '0.9rem',
             fontWeight: '600',
             color: '#10b981',
-            marginBottom: '2.5rem'
+            marginBottom: '0.75rem'
           }}>
             Captura disponível agora!
           </p>
@@ -485,9 +497,9 @@ const useIncorporadoraNotifications = () => {
           {/* Card com informações */}
           <div style={{
             background: '#f8fafc',
-            borderRadius: '16px',
-            padding: '2rem',
-            marginBottom: '2rem',
+            borderRadius: '8px',
+            padding: '0.75rem',
+            marginBottom: '0.75rem',
             border: '1px solid #e5e7eb',
             boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
           }}>
@@ -539,18 +551,18 @@ const useIncorporadoraNotifications = () => {
             style={{
               background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
               color: 'white',
-              padding: '1.5rem 4rem',
-              borderRadius: '12px',
-              fontSize: '1.5rem',
+              padding: '0.6rem 1.5rem',
+              borderRadius: '6px',
+              fontSize: '0.9rem',
               fontWeight: '700',
               border: 'none',
               cursor: 'pointer',
               textTransform: 'uppercase',
-              letterSpacing: '1px',
+              letterSpacing: '0.25px',
               boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)',
               transition: 'all 0.3s ease',
               width: '100%',
-              maxWidth: '400px',
+              maxWidth: '240px',
               position: 'relative',
               overflow: 'hidden',
               backgroundSize: '200% 100%',
@@ -573,11 +585,6 @@ const useIncorporadoraNotifications = () => {
               justifyContent: 'center',
               gap: '0.75rem'
             }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                <circle cx="12" cy="12" r="10"></circle>
-                <circle cx="12" cy="12" r="6"></circle>
-                <circle cx="12" cy="12" r="2"></circle>
-              </svg>
               CAPTURAR LEAD AGORA
             </span>
           </button>
@@ -624,7 +631,7 @@ const useIncorporadoraNotifications = () => {
               color: '#64748b',
               fontWeight: '500'
             }}>
-              Sistema CRM Invest Money
+              IM Solumn
             </span>
           </div>
         </div>

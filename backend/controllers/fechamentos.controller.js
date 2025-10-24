@@ -363,6 +363,9 @@ const createFechamento = async (req, res) => {
       // Não falhar a operação principal se houver erro na movimentação
     }
 
+    // Definir consultorInternoIdFinal para uso no Socket.IO
+    const consultorInternoIdFinal = dadosAgendamento?.consultor_interno_id || consultorId;
+
     // Emitir evento Socket.IO para notificar incorporadora sobre novo fechamento
     if (req.io && consultorInternoIdFinal && req.user.empresa_id === 5) {
       console.log('📢 [SOCKET.IO] Emitindo evento new-fechamento-incorporadora:', {
