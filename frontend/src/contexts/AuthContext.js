@@ -44,7 +44,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('geocodeCache');
     localStorage.removeItem('data_sync_trigger');
     
-    // Manter: tutorial-*-completed, tutorial-*-dismissed, welcome-completed, whatsapp-group-modal-shown
+    // Manter: whatsapp-group-modal-shown
     // Essas são preferências de UI por navegador/máquina, não por usuário
   };
 
@@ -106,15 +106,8 @@ export const AuthProvider = ({ children }) => {
 
       const { token: newToken, usuario } = data;
       
-      // Limpar flags de tutoriais e modais (importante para evitar confusion entre tipos de usuário)
-      localStorage.removeItem('welcome-completed');
-      localStorage.removeItem('tutorial-completed');
+      // Limpar flags de modais (importante para evitar confusion entre tipos de usuário)
       localStorage.removeItem('whatsapp-group-modal-shown');
-      localStorage.removeItem('tutorial-pacientes-completed');
-      localStorage.removeItem('tutorial-agendamentos-completed');
-      localStorage.removeItem('tutorial-fechamentos-completed');
-      localStorage.removeItem('tutorial-clinicas-completed');
-      localStorage.removeItem('tutorial-whatsapp-completed');
       
       // Salvar token no localStorage e no state
       localStorage.setItem('token', newToken);
@@ -243,6 +236,8 @@ export const AuthProvider = ({ children }) => {
     isEmpresa: user?.tipo === 'parceiro',
     isClinica: user?.tipo === 'clinica',
     isFreelancer: user?.is_freelancer === true,
+    // Incorporadora: empresa_id = 5 (textos específicos: clientes, corretores, empreendimentos)
+    isIncorporadora: user?.empresa_id === 5,
     // Consultor interno: tem pode_ver_todas_novas_clinicas=true E podealterarstatus=true
     isConsultorInterno: user?.tipo === 'consultor' && user?.pode_ver_todas_novas_clinicas === true && user?.podealterarstatus === true,
     podeAlterarStatus: user?.podealterarstatus === true || user?.tipo === 'admin',

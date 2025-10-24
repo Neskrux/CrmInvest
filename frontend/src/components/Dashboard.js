@@ -3,12 +3,10 @@ import { useAuth } from '../contexts/AuthContext';
 import useBranding from '../hooks/useBranding';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, Area, ReferenceLine, ComposedChart } from 'recharts';
 import { TrendingUp, Calendar, BarChart3, CheckCircle, XCircle, RotateCcw } from 'lucide-react';
-import TutorialOverlay from './TutorialOverlay';
-import WelcomeModal from './WelcomeModal';
 
 const Dashboard = () => {
   // Hook para textos dinâmicos baseados no empresa_id
-  const { t } = useBranding();
+  const { t, shouldShow } = useBranding();
   
   // Estado separado para KPIs principais (dados filtrados)
   const [kpisPrincipais, setKpisPrincipais] = useState({
@@ -18,7 +16,7 @@ const Dashboard = () => {
     valorTotalFechamentos: 0,
     agendamentosHoje: 0
   });
-  const { makeRequest, user, isAdmin, isConsultorInterno, podeVerTodosDados, isClinica, isFreelancer } = useAuth();
+  const { makeRequest, user, isAdmin, isConsultorInterno, podeVerTodosDados, isClinica, isFreelancer, isIncorporadora } = useAuth();
   const [periodo, setPeriodo] = useState('total'); // total, semanal, mensal
   const [subPeriodo, setSubPeriodo] = useState(null); // para dias da semana
   const [semanaOpcao, setSemanaOpcao] = useState('atual'); // atual, proxima
@@ -30,11 +28,6 @@ const Dashboard = () => {
   const [rankingGeral, setRankingGeral] = useState([]);
   const [loadingRanking, setLoadingRanking] = useState(true);
   const [showConsultoresExtrasModal, setShowConsultoresExtrasModal] = useState(false); // Modal dos consultores do 4º em diante
-  // Estado para controlar o tutorial
-  const [showTutorial, setShowTutorial] = useState(false);
-  const [tutorialCompleted, setTutorialCompleted] = useState(false);
-  // Estado para controlar o modal de boas-vindas
-  const [showWelcome, setShowWelcome] = useState(false);
   // Estado para controlar o modal do grupo do WhatsApp
   const [showWhatsAppGroupModal, setShowWhatsAppGroupModal] = useState(false);
   const [stats, setStats] = useState({
@@ -75,7 +68,7 @@ const Dashboard = () => {
     metas: { 
       pacientes_fechados: 120,
       clinicas_aprovadas: 30, 
-      valor_fechamentos: 500100 
+      valor_fechamentos: 500000 
     },
     progresso_semanal: {},
     totais: { 
@@ -93,7 +86,7 @@ const Dashboard = () => {
   });
   const [loadingMetas, setLoadingMetas] = useState(false);
   const [editandoMetas, setEditandoMetas] = useState(false);
-  const [metasEditadas, setMetasEditadas] = useState({ clinicas: 50, valor: 500100 });
+  const [metasEditadas, setMetasEditadas] = useState({ clinicas: 50, valor: 500000 });
   // Iniciar com outubro/2024 (mês atual - semana 40 do ano)
   const [mesSelecionadoMetas, setMesSelecionadoMetas] = useState(new Date(2024, 9, 1)); // Outubro 2024
   
@@ -114,7 +107,7 @@ const Dashboard = () => {
         setMetasData(data);
         setMetasEditadas({
           clinicas: data.metas?.clinicas_aprovadas || 30,
-          valor: data.metas?.valor_fechamentos || 500100
+          valor: data.metas?.valor_fechamentos || 500000
         });
       } else {
         const error = await response.text();
@@ -169,7 +162,7 @@ const Dashboard = () => {
           metas: {
             pacientes_fechados: metaMensalPacientes,
             clinicas_aprovadas: metaMensalClinicas,
-            valor_fechamentos: 500100
+            valor_fechamentos: 500000
           },
           progresso_semanal: {
             'S27': {
@@ -177,8 +170,8 @@ const Dashboard = () => {
               pacientesAcumulado: 3,
               clinicas: 8,   // Realizado
               clinicasAcumulado: 8,
-              valorFechamentos: 25001,
-              valorAcumulado: 25001,
+              valorFechamentos: 25000,
+              valorAcumulado: 25000,
               // Semana 27: período de estabilização (sem meta)
               metaSemanalPacientes: 0,
               metaSemanalClinicas: 0,
@@ -190,7 +183,7 @@ const Dashboard = () => {
               pacientesAcumulado: 7,
               clinicas: 10,  // Realizado
               clinicasAcumulado: 18,
-              valorFechamentos: 35001,
+              valorFechamentos: 35000,
               valorAcumulado: 60000,
               // Semana 28: período de estabilização (sem meta)
               metaSemanalPacientes: 0,
@@ -244,7 +237,7 @@ const Dashboard = () => {
           metas: {
             pacientes_fechados: 120,
             clinicas_aprovadas: 30,
-            valor_fechamentos: 500100
+            valor_fechamentos: 500000
           },
           progresso_semanal: {
             'S36': {
@@ -334,7 +327,7 @@ const Dashboard = () => {
           metas: {
             pacientes_fechados: metaMensalPacientes,
             clinicas_aprovadas: metaMensalClinicas,
-            valor_fechamentos: 500100
+            valor_fechamentos: 500000
           },
           progresso_semanal: {
             'S37': {
@@ -355,8 +348,8 @@ const Dashboard = () => {
               pacientesAcumulado: 52,
               clinicas: 7,
               clinicasAcumulado: 13,
-              valorFechamentos: 135001,
-              valorAcumulado: 255001,
+              valorFechamentos: 135000,
+              valorAcumulado: 255000,
               // Semana 38: período de estabilização (sem meta)
               metaSemanalPacientes: 0,
               metaSemanalClinicas: 0,
@@ -369,7 +362,7 @@ const Dashboard = () => {
               clinicas: 7,
               clinicasAcumulado: 20,
               valorFechamentos: 140000,
-              valorAcumulado: 395001,
+              valorAcumulado: 395000,
               // Semana 39: período de estabilização (sem meta)
               metaSemanalPacientes: 0,
               metaSemanalClinicas: 0,
@@ -381,7 +374,7 @@ const Dashboard = () => {
               pacientesAcumulado: 88,
               clinicas: 2,   
               clinicasAcumulado: 22,
-              valorFechamentos: 45001,
+              valorFechamentos: 45000,
               valorAcumulado: 440000,
               // Semana 40: sem meta ainda (período de estabilização)
               metaSemanalPacientes: 0,
@@ -509,7 +502,7 @@ const Dashboard = () => {
           metas: {
             pacientes_fechados: 120,
             clinicas_aprovadas: 30,
-            valor_fechamentos: 500100
+            valor_fechamentos: 500000
           },
           progresso_semanal: progressoSemanal,
           totais: {
@@ -575,8 +568,8 @@ const Dashboard = () => {
           });
           pacientes = pacientes.filter(p => pacientesIdsClinica.has(p.id));
         }
-        // Aplicar filtros por região se especificados (apenas para não-clínicas)
-        else if (filtroRegiao.cidade || filtroRegiao.estado) {
+        // Aplicar filtros por região se especificados (apenas para não-clínicas e não incorporadora)
+        else if ((filtroRegiao.cidade || filtroRegiao.estado) && user?.empresa_id !== 5) {
           const clinicasIds = clinicasFiltradas.map(c => c.id);
           
           // Filtrar agendamentos por região (via clínicas)
@@ -670,7 +663,7 @@ const Dashboard = () => {
         
         fechamentosParaComissao.forEach(f => {
           const valor = parseFloat(f.valor_fechado || 0);
-          const comissao = calcularComissao(valor);
+          const comissao = calcularComissao(valor, f.empreendimento_id);
           total += comissao;
           const dataFechamento = new Date(f.data_fechamento);
           if (dataFechamento.getMonth() === mesAtual && dataFechamento.getFullYear() === anoAtual) {
@@ -735,48 +728,9 @@ const Dashboard = () => {
     fetchRegioesDisponiveis();
   }, [periodo, subPeriodo, mesAno, semanaOpcao, filtroRegiao]);
 
-  // Tutoriais e modais de boas-vindas foram desabilitados
-  // Os usuários podem acessá-los manualmente através do botão "Ver Tutorial"
 
-  // Desabilitar overflow quando modal de boas-vindas estiver ativo
-  useEffect(() => {
-    if (showWelcome) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
 
-    // Cleanup: restaurar overflow quando componente for desmontado
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [showWelcome]);
 
-  const handleWelcomeComplete = () => {
-    setShowWelcome(false);
-    localStorage.setItem('welcome-completed', 'true');
-    // Após fechar o modal de boas-vindas, abrir o tutorial
-    setShowTutorial(true);
-  };
-
-  const handleWelcomeClose = () => {
-    setShowWelcome(false);
-    localStorage.setItem('welcome-completed', 'true');
-  };
-
-  const handleTutorialComplete = () => {
-    setShowTutorial(false);
-    setTutorialCompleted(true);
-    localStorage.setItem('tutorial-completed', 'true');
-  };
-
-  const handleTutorialClose = () => {
-    setShowTutorial(false);
-  };
-
-  const startTutorial = () => {
-    setShowTutorial(true);
-  };
 
   // Buscar cidades quando estado for alterado
   useEffect(() => {
@@ -833,8 +787,15 @@ const Dashboard = () => {
     fetchCidades();
   }, [filtroRegiao.estado]);
 
-  const calcularComissao = (valorFechado) => {
-    return valorFechado * 0.01; // 1% do valor total
+  const calcularComissao = (valorFechado, empreendimentoId) => {
+    // Para incorporadora (empresa_id = 5), usar comissão fixa baseada no empreendimento
+    if (user?.empresa_id === 5) {
+      // empreendimento_id = 6: R$ 3.000 (estúdios)
+      // outros empreendimentos: R$ 5.000 (apartamentos e outros)
+      return empreendimentoId === 6 ? 3000 : 5000;
+    }
+
+    return valorFechado * 0.01;
   };
 
   const fetchStats = async () => {
@@ -848,12 +809,15 @@ const Dashboard = () => {
       // Freelancers veem apenas seus dados; Admin e consultores internos veem todos
       const usarDadosFiltrados = isFreelancer;
       
+      // Para empresa_id=5 (Incorporadora), usar empreendimentos em vez de clínicas
+      const isIncorporadora = user?.empresa_id === 5;
+      
       const [pacientesRes, agendamentosRes, fechamentosRes, consultoresRes, clinicasRes] = await Promise.all([
         makeRequest('/dashboard/pacientes'),
         makeRequest(usarDadosFiltrados ? '/dashboard/agendamentos' : '/dashboard/gerais/agendamentos'),
         makeRequest('/dashboard/fechamentos'),
         makeRequest('/consultores'),
-        makeRequest(`/clinicas?${clinicasParams.toString()}`)
+        isIncorporadora ? makeRequest('/empreendimentos') : makeRequest(`/clinicas?${clinicasParams.toString()}`)
       ]);
 
       // Para gráfico de cidades e ranking, buscar dados gerais (não filtrados por consultor)
@@ -868,6 +832,9 @@ const Dashboard = () => {
       let fechamentos = await fechamentosRes.json();
       const consultores = await consultoresRes.json();
       const clinicasFiltradas = await clinicasRes.json();
+      
+      // Para incorporadora, usar empreendimentos em vez de clínicas
+      const locaisFiltrados = isIncorporadora ? clinicasFiltradas : clinicasFiltradas;
 
       // Dados gerais para gráfico de cidades e ranking
       let pacientesGerais = await pacientesGeraisRes.json();
@@ -933,8 +900,8 @@ const Dashboard = () => {
         });
         pacientes = pacientes.filter(p => pacientesIdsClinica.has(p.id));
       }
-      // Aplicar filtros por região se especificados (apenas para não-clínicas)
-      else if (filtroRegiao.cidade || filtroRegiao.estado) {
+      // Aplicar filtros por região se especificados (apenas para não-clínicas e não incorporadora)
+      else if ((filtroRegiao.cidade || filtroRegiao.estado) && user?.empresa_id !== 5) {
         const clinicasIds = clinicasFiltradas.map(c => c.id);
         
         // Filtrar agendamentos por região (via clínicas)
@@ -1133,23 +1100,24 @@ const Dashboard = () => {
       // Calcular pacientes, agendamentos e fechamentos por cidade
       const dadosPorCidade = {};
       
-      // Buscar TODAS as clínicas (sem filtro de consultor) para o gráfico de cidades
+      // Buscar TODAS as clínicas/empreendimentos (sem filtro de consultor) para o gráfico de cidades
       let todasClinicas = [];
       try {
-        // Usar endpoint específico que retorna todas as clínicas sem filtro de consultor
-        const todasClinicasRes = await makeRequest('/dashboard/gerais/clinicas');
-          if (todasClinicasRes.ok) {
-            todasClinicas = await todasClinicasRes.json();
-          }
-        } catch (error) {
+        // Para incorporadora (empresa_id=5), usar empreendimentos; para outros, usar clínicas
+        const endpointClinicas = isIncorporadora ? '/empreendimentos' : '/dashboard/gerais/clinicas';
+        const todasClinicasRes = await makeRequest(endpointClinicas);
+        if (todasClinicasRes.ok) {
+          todasClinicas = await todasClinicasRes.json();
+        }
+      } catch (error) {
         // Fallback para clínicas filtradas se houver erro
         todasClinicas = clinicasFiltradas;
       }
 
-      // Criar mapa de clínicas por ID para facilitar a busca
+      // Criar mapa de clínicas/empreendimentos por ID para facilitar a busca
       const clinicasMap = {};
-      todasClinicas.forEach(clinica => {
-        clinicasMap[clinica.id] = clinica;
+      todasClinicas.forEach(local => {
+        clinicasMap[local.id] = local;
       });
       
       // Criar mapa de consultores para pegar a cidade/região
@@ -1343,7 +1311,7 @@ const Dashboard = () => {
             consultoresMap[f.consultor_nome].totalFechamentos++;
             consultoresMap[f.consultor_nome].valorFechado += valor;
             
-            const comissao = calcularComissao(valor);
+            const comissao = calcularComissao(valor, f.empreendimento_id);
             consultoresMap[f.consultor_nome].comissaoTotal += comissao;
             comissaoTotalGeral += comissao;
 
@@ -1602,36 +1570,6 @@ const Dashboard = () => {
               )}
             </p>
           </div>
-          {!isClinica && (
-            <button
-              onClick={startTutorial}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 16px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                color: '#374151',
-                fontSize: '14px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#f9fafb';
-                e.target.style.borderColor = '#9ca3af';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = 'white';
-                e.target.style.borderColor = '#d1d5db';
-              }}
-              title="Ver tutorial do dashboard"
-            >
-              Ver Tutorial
-            </button>
-          )}
         </div>
       </div>
 
@@ -1652,7 +1590,6 @@ const Dashboard = () => {
               onClick={() => { setPeriodo('total'); setSubPeriodo(null); }}
               className={`btn ${periodo === 'total' ? 'btn-primary' : 'btn-secondary'}`}
               style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
-              data-tutorial="filter-total"
             >
               Total
             </button>
@@ -1660,7 +1597,6 @@ const Dashboard = () => {
               onClick={() => { setPeriodo('semanal'); setSubPeriodo(null); }}
               className={`btn ${periodo === 'semanal' ? 'btn-primary' : 'btn-secondary'}`}
               style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
-              data-tutorial="filter-weekly"
             >
               Semanal
             </button>
@@ -1668,7 +1604,6 @@ const Dashboard = () => {
               onClick={() => { setPeriodo('mensal'); setSubPeriodo(null); }}
               className={`btn ${periodo === 'mensal' ? 'btn-primary' : 'btn-secondary'}`}
               style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
-              data-tutorial="filter-monthly"
             >
               Mensal
             </button>
@@ -1778,70 +1713,70 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Filtros por Região - Ocultar para clínicas */}
-        {!isClinica && (
-        <div style={{ 
-          marginTop: '1rem',
-          paddingTop: '1rem',
-          borderTop: '1px solid #e5e7eb'
-        }} data-tutorial="region-filter">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '600' }}>
-              Filtrar por região:
-            </span>
-            
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <select
-                value={filtroRegiao.estado}
-                onChange={(e) => setFiltroRegiao({ ...filtroRegiao, estado: e.target.value, cidade: '' })}
-                style={{
-                  padding: '0.25rem 0.5rem',
-                  fontSize: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  minWidth: '120px'
-                }}
-              >
-                <option value="">Todos os Estados</option>
-                {estadosDisponiveis.map(estado => (
-                  <option key={estado} value={estado}>{estado}</option>
-                ))}
-              </select>
-
-              <select
-                value={filtroRegiao.cidade}
-                onChange={(e) => setFiltroRegiao({ ...filtroRegiao, cidade: e.target.value })}
-                style={{
-                  padding: '0.25rem 0.5rem',
-                  fontSize: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  minWidth: '120px'
-                }}
-                disabled={!filtroRegiao.estado && cidadesDisponiveis.length > 20} // Desabilitar se muitas cidades
-              >
-                <option value="">Todas as Cidades</option>
-                {cidadesDisponiveis.map(cidade => (
-                  <option key={cidade} value={cidade}>{cidade}</option>
-                ))}
-              </select>
-
-              {(filtroRegiao.estado || filtroRegiao.cidade) && (
-                <button
-                  onClick={() => setFiltroRegiao({ cidade: '', estado: '' })}
-                  className="btn btn-secondary"
-                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                  title="Limpar filtros regionais"
+        {/* Filtros por Região - Ocultar para clínicas e incorporadora */}
+        {!isClinica && user?.empresa_id !== 5 && (
+          <div style={{ 
+            marginTop: '1rem',
+            paddingTop: '1rem',
+            borderTop: '1px solid #e5e7eb'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '600' }}>
+                Filtrar por região:
+              </span>
+              
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <select
+                  value={filtroRegiao.estado}
+                  onChange={(e) => setFiltroRegiao({ ...filtroRegiao, estado: e.target.value, cidade: '' })}
+                  style={{
+                    padding: '0.25rem 0.5rem',
+                    fontSize: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    minWidth: '120px'
+                  }}
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
-                </button>
-              )}
+                  <option value="">Todos os Estados</option>
+                  {estadosDisponiveis.map(estado => (
+                    <option key={estado} value={estado}>{estado}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={filtroRegiao.cidade}
+                  onChange={(e) => setFiltroRegiao({ ...filtroRegiao, cidade: e.target.value })}
+                  style={{
+                    padding: '0.25rem 0.5rem',
+                    fontSize: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    minWidth: '120px'
+                  }}
+                  disabled={!filtroRegiao.estado && cidadesDisponiveis.length > 20} // Desabilitar se muitas cidades
+                >
+                  <option value="">Todas as Cidades</option>
+                  {cidadesDisponiveis.map(cidade => (
+                    <option key={cidade} value={cidade}>{cidade}</option>
+                  ))}
+                </select>
+
+                {(filtroRegiao.estado || filtroRegiao.cidade) && (
+                  <button
+                    onClick={() => setFiltroRegiao({ cidade: '', estado: '' })}
+                    className="btn btn-secondary"
+                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                    title="Limpar filtros regionais"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
         )}
       </div>
 
@@ -1952,7 +1887,7 @@ const Dashboard = () => {
       )}
 
       {/* KPIs Principais */}
-      <div style={{ marginBottom: '2rem', padding: '2rem' }} data-tutorial="main-kpis">
+      <div style={{ marginBottom: '2rem', padding: '2rem' }}>
         <h3 style={{ 
           fontSize: '1.25rem', 
           fontWeight: '700', 
@@ -2278,8 +2213,8 @@ const Dashboard = () => {
       )}
 
       {/* Gráfico de Pacientes, Agendamentos e Fechamentos por Cidade - Ocultar para clínicas */}
-      {!isClinica && stats.agendamentosPorCidade.length > 0 && (
-        <div className="card" style={{ marginTop: '2rem' }} data-tutorial="cities-chart">
+      {!isClinica && !isIncorporadora && stats.agendamentosPorCidade.length > 0 && (
+        <div className="card" style={{ marginTop: '2rem' }}>
           <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
             <h2 className="card-title" style={{ color: '#1a1d23', fontWeight: '700' }}>Análise Geográfica de Performance</h2>
             <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0, fontWeight: '500' }}>
@@ -2568,7 +2503,7 @@ const Dashboard = () => {
       {/* Pipeline de Vendas - Largura inteira para clínicas, metade para outros */}
       <div className={isClinica ? "" : "grid grid-2"} style={isClinica ? {} : { gap: '2rem' }}>
         {/* Pipeline de Vendas (dados filtrados) */}
-        <div className="card" style={{ minWidth: 0, padding: '1.5rem' }} data-tutorial="sales-pipeline">
+        <div className="card" style={{ minWidth: 0, padding: '1.5rem' }}>
           <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
             <h2 className="card-title" style={{ color: '#1a1d23', fontWeight: '700' }}>Pipeline de Vendas</h2>
           </div>
@@ -2610,7 +2545,7 @@ const Dashboard = () => {
 
         {/* Ranking dos {t.consultores} - Ocultar para clínicas */}
         {!isClinica && (
-        <div className="card" style={{ minWidth: 0, padding: '1.5rem' }} data-tutorial="ranking">
+        <div className="card" style={{ minWidth: 0, padding: '1.5rem' }}>
           <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
             <h2 className="card-title" style={{ color: '#1a1d23', fontWeight: '700' }}>Ranking de Performance</h2>
             <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0, fontWeight: '500' }}>
@@ -2972,7 +2907,7 @@ const Dashboard = () => {
       </div>
 
       {/* Gráfico de Conversão (dados filtrados) */}
-      <div className="card" style={{ marginTop: '2rem', padding: '2rem' }} data-tutorial="conversion-rate">
+      <div className="card" style={{ marginTop: '2rem', padding: '2rem' }}>
         <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
           <h2 className="card-title" style={{ color: '#1a1d23', fontWeight: '700' }}>Taxa de Conversão do Funil</h2>
         </div>
@@ -3083,7 +3018,7 @@ const Dashboard = () => {
       </div>
 
       {/* GRÁFICOS DE METAS - APENAS ADMIN */}
-      {isAdmin && (
+      {false && isAdmin && (
         <div style={{ marginTop: '3rem' }}>
           <div style={{ 
             display: 'flex', 
@@ -3761,19 +3696,7 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Welcome Modal */}
-      <WelcomeModal
-        isOpen={showWelcome}
-        onClose={handleWelcomeClose}
-        onStartTutorial={handleWelcomeComplete}
-      />
 
-      {/* Tutorial Overlay */}
-      <TutorialOverlay
-        isOpen={showTutorial}
-        onClose={handleTutorialClose}
-        onComplete={handleTutorialComplete}
-      />
 
     </div>
   );

@@ -23,6 +23,8 @@ export default function useBranding() {
     // Aliases para facilitar o uso
     t: branding, // t = texts
     texts: branding,
+    // Configurações de interface
+    interface: branding.interface || {},
     // Função helper para obter texto com fallback
     getText: (key, fallback = '') => {
       return branding[key] || fallback;
@@ -30,6 +32,10 @@ export default function useBranding() {
     // Função helper para obter mensagem
     getMessage: (key, fallback = '') => {
       return branding.mensagens?.[key] || fallback;
+    },
+    // Função helper para verificar se deve mostrar elemento da interface
+    shouldShow: (page, element, fallback = true) => {
+      return branding.interface?.[page]?.[element] ?? fallback;
     }
   };
 }

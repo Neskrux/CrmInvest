@@ -4,14 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import useBranding from '../hooks/useBranding';
 import { useToast } from '../components/Toast';
-import TutorialPacientes from './TutorialPacientes';
 import ModalEvidencia from './ModalEvidencia';
 import * as XLSX from 'xlsx';
+import useSmartPolling from '../hooks/useSmartPolling';
 
 const Pacientes = () => {
-  const { t } = useBranding();
+  const { t, empresaId, shouldShow } = useBranding();
   const location = useLocation();
-  const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isFreelancer, isClinica, deveFiltrarPorClinica } = useAuth();
+  const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isIncorporadora, isFreelancer, isClinica, deveFiltrarPorClinica } = useAuth();
   const navigate = useNavigate();
   // Verificar se usuário é consultor
   const isConsultor = user?.tipo === 'consultor';
@@ -19,6 +19,7 @@ const Pacientes = () => {
   const [novosLeads, setNovosLeads] = useState([]);
   const [leadsNegativos, setLeadsNegativos] = useState([]);
   const [consultores, setConsultores] = useState([]);
+  const [empreendimentos, setEmpreendimentos] = useState([]);
   const [agendamentos, setAgendamentos] = useState([]);
   const [fechamentos, setFechamentos] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -291,9 +292,6 @@ const Pacientes = () => {
   };
 
 
-  // Estados para controlar o tutorial
-  const [showTutorial, setShowTutorial] = useState(false);
-  const [tutorialCompleted, setTutorialCompleted] = useState(false);
 
   // Estado para modal de explicação de permissões
   const [showPermissaoModal, setShowPermissaoModal] = useState(false);
@@ -368,8 +366,6 @@ const Pacientes = () => {
   const [consultorSelecionado, setConsultorSelecionado] = useState('');
   const [salvandoAtribuicao, setSalvandoAtribuicao] = useState(false);
 
-  // Estados para links personalizados
-  const [linkPersonalizado, setLinkPersonalizado] = useState(null);
   const [linkClinicas, setLinkClinicas] = useState(null);
   const [loadingLink, setLoadingLink] = useState(true);
 
@@ -444,10 +440,10 @@ const Pacientes = () => {
     { value: 'cpf_reprovado', label: 'CPF Reprovado', color: '#ef4444', description: 'CPF foi reprovado' },
     { value: 'nao_passou_cpf', label: 'Não forneceu CPF', color: '#6366f1', description: 'Cliente não forneceu CPF' },
     { value: 'nao_tem_outro_cpf', label: 'Não tem outro CPF', color: '#a3a3a3', description: 'Cliente não tem CPF alternativo' },
-    { value: 'nao_existe', label: 'Paciente não existe', color: '#9ca3af', description: 'Cliente não existe' },
-    { value: 'nao_tem_interesse', label: 'Paciente não tem interesse', color: '#9ca3af', description: 'Cliente não tem interesse' },
-    { value: 'nao_reconhece', label: 'Paciente não reconhece', color: '#9ca3af', description: 'Cliente não reconhece' },
-    { value: 'nao_responde', label: 'Paciente não responde', color: '#9ca3af', description: 'Cliente não responde' },
+    { value: 'nao_existe', label: `${t.paciente} não existe`, color: '#17202A', description: 'Cliente não existe' },
+    { value: 'nao_tem_interesse', label: `${t.paciente} não tem interesse`, color: '#17202A', description: 'Cliente não tem interesse' },
+    { value: 'nao_reconhece', label: `${t.paciente} não reconhece`, color: '#17202A', description: 'Cliente não reconhece' },
+    { value: 'nao_responde', label: `${t.paciente} não responde`, color: '#17202A', description: 'Cliente não responde' },
     { value: 'sem_clinica', label: 'Sem clínica', color: '#fbbf24', description: 'Sem clínica' },
     // Demais status no final
     { value: 'agendado', label: 'Agendado', color: '#3b82f6', description: 'Abre modal para criar agendamento' },
@@ -528,21 +524,30 @@ const Pacientes = () => {
     }
   }, [podeAlterarStatus, isConsultorInterno, activeTab, isConsultor]);
 
-  // Atualização automática dos dados a cada 30 segundos
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchPacientes();
-      fetchAgendamentos();
-      fetchFechamentos();
+  // Função de polling inteligente
+  const pollingCallback = async () => {
+    try {
+      // Executar todas as chamadas em paralelo (mais eficiente)
+      const promises = [
+        fetchPacientes(),
+        fetchAgendamentos(),
+        fetchFechamentos()
+      ];
+
       // Buscar novos leads apenas se pode alterar status (não freelancer) ou é consultor interno
       if (podeAlterarStatus || isConsultorInterno) {
-        fetchNovosLeads();
-        fetchLeadsNegativos();
+        promises.push(fetchNovosLeads());
+        promises.push(fetchLeadsNegativos());
       }
-    }, 30000); // 30 segundos
 
-    return () => clearInterval(interval);
-  }, [podeAlterarStatus, isConsultorInterno, isConsultor]);
+      await Promise.allSettled(promises);
+    } catch (error) {
+      console.warn('⚠️ Erro no polling inteligente - Pacientes:', error);
+    }
+  };
+
+  // Polling inteligente (2 minutos em vez de 30 segundos)
+  useSmartPolling(pollingCallback, 120000, [podeAlterarStatus, isConsultorInterno, isConsultor]);
 
   // Atualizar novos leads quando mudar de aba
   useEffect(() => {
@@ -754,10 +759,10 @@ const Pacientes = () => {
         setPacientes(data);
       } else {
         console.error('Erro ao carregar pacientes:', data.error);
-        showErrorToast('Erro ao carregar pacientes: ' + data.error);
+        showErrorToast(`Erro ao carregar ${empresaId === 5 ? 'clientes' : 'pacientes'}: ` + data.error);
       }
     } catch (error) {
-      console.error('Erro ao carregar pacientes:', error);
+      console.error(`Erro ao carregar ${empresaId === 5 ? 'clientes' : 'pacientes'}:`, error);
       showErrorToast('Erro ao conectar com o servidor');
     } finally {
       setLoading(false);
@@ -826,46 +831,6 @@ const Pacientes = () => {
     }
   };
 
-  const buscarLinkPersonalizado = async () => {
-    try {
-      // Usar a rota de perfil que o consultor pode acessar
-      const consultorResponse = await makeRequest('/consultores/perfil');
-      const responseData = await consultorResponse.json();
-      
-      if (consultorResponse.ok && responseData.consultor) {
-        const consultorData = responseData.consultor;
-        
-        // Verificar se é consultor interno (tem as duas permissões)
-        const isConsultorInterno = consultorData.pode_ver_todas_novas_clinicas === true && consultorData.podealterarstatus === true;
-        
-        if (!isConsultorInterno) {
-          // Freelancer: buscar link personalizado baseado no código de referência
-          if (consultorData.codigo_referencia) {
-            setLinkPersonalizado(`https://solumn.com.br/captura-lead?ref=${consultorData.codigo_referencia}`);
-            setLinkClinicas(`https://solumn.com.br/captura-clinica?ref=${consultorData.codigo_referencia}`);
-          } else {
-            // Se não tem código de referência, mostrar mensagem
-            setLinkPersonalizado(null);
-            setLinkClinicas(null);
-          }
-        } else {
-          // Interno: usar link geral
-          setLinkPersonalizado('https://solumn.com.br/captura-lead');
-          setLinkClinicas('https://solumn.com.br/captura-clinica');
-        }
-      } else {
-        console.error('Erro ao buscar dados do consultor:', responseData);
-        setLinkPersonalizado(null);
-        setLinkClinicas(null);
-      }
-    } catch (error) {
-      console.error('Erro ao buscar link personalizado:', error);
-      setLinkPersonalizado(null);
-      setLinkClinicas(null);
-    } finally {
-      setLoadingLink(false);
-    }
-  };
 
   const fetchNovosLeads = async () => {
     try {
@@ -1101,11 +1066,11 @@ const Pacientes = () => {
         });
         fetchPacientes();
       } else {
-        showErrorToast('Erro ao salvar paciente: ' + data.error);
+        showErrorToast(`Erro ao salvar ${empresaId === 5 ? 'cliente' : 'paciente'}: ` + data.error);
       }
     } catch (error) {
-      console.error('Erro ao salvar paciente:', error);
-      showErrorToast('Erro ao salvar paciente');
+      console.error(`Erro ao salvar ${empresaId === 5 ? 'cliente' : 'paciente'}:`, error);
+      showErrorToast(`Erro ao salvar ${empresaId === 5 ? 'cliente' : 'paciente'}`);
     }
   };
 
@@ -1489,7 +1454,7 @@ const Pacientes = () => {
 
   const calcularCarteiraExistente = (percentualAlvo = 130) => {
     if (pacientesCarteira.length === 0) {
-      showErrorToast('Adicione pelo menos um paciente antes de calcular');
+      showErrorToast(`Adicione pelo menos um ${empresaId === 5 ? 'cliente' : 'paciente'} antes de calcular`);
       return;
     }
 
@@ -2405,7 +2370,7 @@ const Pacientes = () => {
   const updateStatus = async (pacienteId, newStatus, evidenciaId = null) => {
     // Verificar se o usuário tem permissão para alterar status
     if (!podeAlterarStatus) {
-      showErrorToast('Você não tem permissão para alterar o status dos pacientes');
+      showErrorToast(`Você não tem permissão para alterar o status dos ${empresaId === 5 ? 'clientes' : 'pacientes'}`);
       return;
     }
 
@@ -2534,7 +2499,7 @@ const Pacientes = () => {
 
   const excluirPaciente = async (pacienteId) => {
     // Confirmar antes de excluir
-    if (!window.confirm('Tem certeza que deseja excluir este paciente? Esta ação não pode ser desfeita e removerá todos os agendamentos e fechamentos relacionados.')) {
+    if (!window.confirm(`Tem certeza que deseja excluir este ${empresaId === 5 ? 'cliente' : 'paciente'}? Esta ação não pode ser desfeita e removerá todos os agendamentos e fechamentos relacionados.`)) {
       return;
     }
 
@@ -2560,11 +2525,11 @@ const Pacientes = () => {
         window.dispatchEvent(new CustomEvent('data_updated', { detail: { timestamp } }));
       } else {
         const data = await response.json();
-        showErrorToast('Erro ao excluir paciente: ' + (data.error || 'Erro desconhecido'));
+        showErrorToast(`Erro ao excluir ${empresaId === 5 ? 'cliente' : 'paciente'}: ` + (data.error || 'Erro desconhecido'));
       }
     } catch (error) {
-      console.error('Erro ao excluir paciente:', error);
-      showErrorToast('Erro ao excluir paciente');
+      console.error(`Erro ao excluir ${empresaId === 5 ? 'cliente' : 'paciente'}:`, error);
+      showErrorToast(`Erro ao excluir ${empresaId === 5 ? 'cliente' : 'paciente'}`);
     }
   };
 
@@ -3090,8 +3055,8 @@ const Pacientes = () => {
       window.dispatchEvent(new CustomEvent('data_updated', { detail: { timestamp } }));
       
     } catch (error) {
-      console.error('Erro ao cadastrar paciente completo:', error);
-      showErrorToast('Erro ao cadastrar paciente: ' + error.message);
+      console.error(`Erro ao cadastrar ${empresaId === 5 ? 'cliente' : 'paciente'} completo:`, error);
+      showErrorToast(`Erro ao cadastrar ${empresaId === 5 ? 'cliente' : 'paciente'}: ` + error.message);
     } finally {
       setSalvandoCadastroCompleto(false);
     }
@@ -3269,7 +3234,25 @@ const Pacientes = () => {
     const matchNome = !filtroNome || p.nome.toLowerCase().includes(filtroNome.toLowerCase());
     const matchTelefone = !filtroTelefone || (p.telefone || '').includes(filtroTelefone);
     const matchCPF = !filtroCPF || (p.cpf || '').includes(filtroCPF);
-    const matchTipo = !filtroTipo || p.tipo_tratamento === filtroTipo;
+    const matchTipo = !filtroTipo || (
+      isIncorporadora ? (
+        // Para incorporadora, comparar nome do empreendimento
+        (() => {
+          const empreendimentoMap = {
+            4: 'Laguna Sky Garden',
+            5: 'Residencial Girassol',
+            6: 'Sintropia Sky Garden',
+            7: 'Residencial Lotus',
+            8: 'River Sky Garden',
+            9: 'Condomínio Figueira Garcia'
+          };
+          return empreendimentoMap[p.empreendimento_id] === filtroTipo;
+        })()
+      ) : (
+        // Para outras empresas, comparar tipo de tratamento
+        p.tipo_tratamento === filtroTipo
+      )
+    );
     const matchStatus = !filtroStatus || p.status === filtroStatus;
 
     const matchConsultor = !filtroConsultor || String(p.consultor_id) === filtroConsultor;
@@ -3312,37 +3295,7 @@ const Pacientes = () => {
     return matchNome && matchStatus && matchConsultor;
   });
 
-  const handleTutorialComplete = () => {
-    setShowTutorial(false);
-    setTutorialCompleted(true);
-    localStorage.setItem('tutorial-pacientes-completed', 'true');
-  };
 
-  const handleTutorialClose = () => {
-    setShowTutorial(false);
-    localStorage.setItem('tutorial-pacientes-dismissed', 'true');
-  };
-
-  const startTutorial = () => {
-    setShowTutorial(true);
-  };
-
-  // Função para copiar link personalizado
-  const copiarLink = async (link) => {
-    try {
-      await navigator.clipboard.writeText(link);
-      showSuccessToast('Link copiado para a área de transferência!');
-    } catch (error) {
-      // Fallback para navegadores mais antigos
-      const textArea = document.createElement('textarea');
-      textArea.value = link;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      showSuccessToast('Link copiado para a área de transferência!');
-    }
-  };
 
   // Paginação em memória
   const totalPages = Math.max(1, Math.ceil(pacientesFiltrados.length / PAGE_SIZE));
@@ -3355,39 +3308,9 @@ const Pacientes = () => {
       <div className="page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h1 className="page-title">Meus Pacientes</h1>
-            <p className="page-subtitle">Acompanhe o status de seus pacientes indicados</p>
+            <h1 className="page-title">Meus {t.pacientes.toLowerCase()}</h1>
+            <p className="page-subtitle">Acompanhe o status de seus {t.paciente.toLowerCase()+'s'}</p>
           </div>
-          {!isClinica && (
-            <button
-              onClick={startTutorial}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 16px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                color: '#374151',
-                fontSize: '14px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#f9fafb';
-                e.target.style.borderColor = '#9ca3af';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = 'white';
-                e.target.style.borderColor = '#d1d5db';
-              }}
-              title="Ver tutorial da tela de pacientes"
-            >
-              Ver Tutorial
-            </button>
-          )}
         </div>
         
         <div style={{
@@ -3396,106 +3319,6 @@ const Pacientes = () => {
           fontSize: '0.875rem'
         }}>
           
-          {/* Links personalizados para consultores freelancers (não internos) */}
-          {isConsultor && !isConsultorInterno && (
-            <div style={{ 
-              marginTop: '1rem', 
-              padding: '0.75rem', 
-              borderRadius: '6px' 
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#16a34a' }}>
-                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                </svg>
-                <strong style={{ color: '#16a34a' }}>Meu Link de Indicação</strong>
-              </div>
-              
-              {loadingLink ? (
-                <div style={{ textAlign: 'center', padding: '1rem', color: '#6b7280' }}>
-                  <div style={{ 
-                    width: '1.5rem', 
-                    height: '1.5rem', 
-                    border: '2px solid #e5e7eb', 
-                    borderTop: '2px solid #3b82f6', 
-                    borderRadius: '50%', 
-                    animation: 'spin 1s linear infinite', 
-                    margin: '0 auto 0.5rem' 
-                  }}></div>
-                  Carregando links...
-                </div>
-              ) : (linkPersonalizado || linkClinicas) ? (
-                <div>
-                  {/* Link para Pacientes */}
-                  {linkPersonalizado && (
-                    <div style={{ 
-                      backgroundColor: '#f0fdf4', 
-                      border: '1px solid #86efac', 
-                      borderRadius: '8px', 
-                      padding: '1rem', 
-                      marginBottom: '0.75rem'
-                    }}>
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'space-between',
-                        marginBottom: '0.5rem'
-                      }}>
-                        <span style={{ 
-                          color: '#166534', 
-                          fontWeight: '600',
-                          fontSize: '0.9rem'
-                        }}>
-                          Link para Pacientes:
-                        </span>
-                        <button
-                          onClick={() => copiarLink(linkPersonalizado)}
-                          style={{
-                            background: '#16a34a',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            padding: '6px 10px',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                            fontWeight: '500'
-                          }}
-                        >
-                          Copiar
-                        </button>
-                      </div>
-                      <div style={{ 
-                        color: '#166534', 
-                        fontSize: '12px',
-                        fontFamily: 'monospace',
-                        wordBreak: 'break-all',
-                        lineHeight: '1.4',
-                        backgroundColor: 'rgba(255,255,255,0.7)',
-                        padding: '8px',
-                        borderRadius: '6px'
-                      }}>
-                        {linkPersonalizado}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div style={{ 
-                  backgroundColor: '#fef2f2', 
-                  border: '1px solid #fecaca', 
-                  borderRadius: '6px', 
-                  padding: '1rem',
-                  textAlign: 'center'
-                }}>
-                  <div style={{ color: '#dc2626', fontSize: '14px', marginBottom: '4px' }}>
-                    Links personalizados não encontrados
-                  </div>
-                  <div style={{ color: '#6b7280', fontSize: '12px' }}>
-                    Entre em contato com o administrador para gerar seus links.
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
@@ -3505,18 +3328,18 @@ const Pacientes = () => {
         <div className="tabs">
           {!isCalculoCarteira && (
             <>
-          <button
-            className={`tab ${activeTab === 'pacientes' ? 'active' : ''}`}
-            onClick={() => setActiveTab('pacientes')}
-          >
-            Pacientes
-          </button>
-          <button
-            className={`tab ${activeTab === 'novos-leads' ? 'active' : ''}`}
-            onClick={() => setActiveTab('novos-leads')}
-            style={{ position: 'relative' }}
-          >
-            Novos Leads
+              <button
+                className={`tab ${activeTab === 'pacientes' ? 'active' : ''}`}
+                onClick={() => setActiveTab('pacientes')}
+              >
+                {t.pacientes}
+              </button>
+              <button
+                className={`tab ${activeTab === 'novos-leads' ? 'active' : ''}`}
+                onClick={() => setActiveTab('novos-leads')}
+                style={{ position: 'relative' }}
+              >
+                Novos Leads
                 {novosLeads.filter(l => l.status === 'lead').length > 0 && (
                   <span className="tab-badge">{novosLeads.filter(l => l.status === 'lead').length}</span>
                 )}
@@ -3529,6 +3352,7 @@ const Pacientes = () => {
               </button>
             </>
           )}
+        {!isIncorporadora && (
           <button
             className={`tab ${activeTab === 'carteira-existente' ? 'active' : ''}`}
             onClick={() => setActiveTab('carteira-existente')}
@@ -3551,6 +3375,7 @@ const Pacientes = () => {
               </span>
             )}
           </button>
+         )}
         </div>
       )}
       
@@ -3588,6 +3413,7 @@ const Pacientes = () => {
               })()})
             </span>
           </button>
+        {!isIncorporadora && (
           <button
             className={`tab ${activeTab === 'carteira-existente' ? 'active' : ''}`}
             onClick={() => setActiveTab('carteira-existente')}
@@ -3610,6 +3436,7 @@ const Pacientes = () => {
               </span>
             )}
           </button>
+        )}
         </div>
       )}
 
@@ -3664,11 +3491,26 @@ const Pacientes = () => {
                 </div>
                 <div className="grid grid-4" style={{ gap: '1rem' }}>
                   <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Tipo de Tratamento</label>
+                    <label className="form-label">{t.tipoTratamento}</label>
                     <select className="form-select" value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}>
                       <option value="">Todos</option>
-                      <option value="Estético">Estético</option>
-                      <option value="Odontológico">Odontológico</option>
+                      {isIncorporadora? (
+                        // Para incorporadora, mostrar empreendimentos hardcoded
+                        <>
+                          <option value="Laguna Sky Garden">Laguna Sky Garden</option>
+                          <option value="Residencial Girassol">Residencial Girassol</option>
+                          <option value="Sintropia Sky Garden">Sintropia Sky Garden</option>
+                          <option value="Residencial Lotus">Residencial Lotus</option>
+                          <option value="River Sky Garden">River Sky Garden</option>
+                          <option value="Condomínio Figueira Garcia">Condomínio Figueira Garcia</option>
+                        </>
+                      ) : (
+                        // Para outras empresas, mostrar tipos fixos
+                        <>
+                          <option value="Estético">Estético</option>
+                          <option value="Odontológico">Odontológico</option>
+                        </>
+                      )}
                     </select>
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
@@ -3700,7 +3542,7 @@ const Pacientes = () => {
                   </div>
 
                    <div className="form-group" style={{ margin: 0 }}>
-                     <label className="form-label">Consultor</label>
+                     <label className="form-label">{t.consultor}</label>
                      <select 
                        className="form-select" 
                        value={filtroConsultor} 
@@ -3768,9 +3610,9 @@ const Pacientes = () => {
           <div className="card">
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-              <h2 className="card-title">Lista de Pacientes</h2>
+                <h2 className="card-title">Lista de {t.paciente.toLowerCase()+'s'}</h2>
                 <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                  {pacientesFiltrados.length} paciente(s)
+                  {pacientesFiltrados.length} {t.paciente.toLowerCase()}(s)
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -3810,7 +3652,7 @@ const Pacientes = () => {
               </div>
             ) : pacientesFiltrados.length === 0 ? (
               <div style={{ textAlign: 'center', color: '#6b7280', padding: '3rem' }}>
-                Nenhum paciente cadastrado ainda.
+                Nenhum {t.paciente.toLowerCase()} cadastrado ainda.
               </div>
             ) : (
               <>
@@ -3819,11 +3661,11 @@ const Pacientes = () => {
                   <thead>
                     <tr>
                       <th>Nome</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{t.consultor}</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>CPF</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cidade</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Tipo</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Empreendimento' : 'Tipo'}</th>
                       <th>
                         Status
                         {!podeAlterarStatus && (
@@ -3917,10 +3759,31 @@ const Pacientes = () => {
                             ) : '-'}
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                            {paciente.tipo_tratamento && (
-                              <span className={`badge badge-${paciente.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
-                                {paciente.tipo_tratamento}
-                              </span>
+                            {isIncorporadora ? (
+                              // Para incorporadora, mostrar empreendimento
+                              paciente.empreendimento_id ? (
+                                (() => {
+                                  const empreendimentoMap = {
+                                    4: 'Laguna Sky Garden',
+                                    5: 'Residencial Girassol',
+                                    6: 'Sintropia Sky Garden',
+                                    7: 'Residencial Lotus',
+                                    8: 'River Sky Garden',
+                                    9: 'Condomínio Figueira Garcia'
+                                  };
+                                  return empreendimentoMap[paciente.empreendimento_id] || '-';
+                                })()
+                              ) : '-'
+                            ) : (
+                              // Para clínicas, mostrar tipo de tratamento
+                              paciente.tipo_tratamento && (
+                                <span className={`badge badge-${paciente.tipo_tratamento === 'estetico' ? 'info' : 'warning'}`}>
+                                  {paciente.tipo_tratamento === 'estetico' ? 'Estético' : 
+                                   paciente.tipo_tratamento === 'odontologico' ? 'Odontológico' : 
+                                   paciente.tipo_tratamento === 'ambos' ? 'Ambos' :
+                                   paciente.tipo_tratamento}
+                                </span>
+                              )
                             )}
                           </td>
                           <td>
@@ -4065,11 +3928,11 @@ const Pacientes = () => {
                   <thead>
                     <tr>
                       <th>Nome</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{t.consultor}</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>CPF</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cidade</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Tipo</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Empreendimento' : 'Tipo'}</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Status</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
                       <th style={{ width: isConsultor || isClinica ? '80px' : '200px', minWidth: isConsultor || isClinica ? '80px' : '200px' }}>Ações</th>
@@ -4138,10 +4001,31 @@ const Pacientes = () => {
                             ) : '-'}
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                            {lead.tipo_tratamento && (
-                              <span className={`badge badge-${lead.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
-                                {lead.tipo_tratamento}
-                              </span>
+                            {isIncorporadora ? (
+                              // Para incorporadora, mostrar empreendimento
+                              lead.empreendimento_id ? (
+                                (() => {
+                                  const empreendimentoMap = {
+                                    4: 'Laguna Sky Garden',
+                                    5: 'Residencial Girassol',
+                                    6: 'Sintrop點 Sky Garden',
+                                    7: 'Residencial Lotus',
+                                    8: 'River Sky Garden',
+                                    9: 'Condomínio Figueira Garcia'
+                                  };
+                                  return empreendimentoMap[lead.empreendimento_id] || '-';
+                                })()
+                              ) : '-'
+                            ) : (
+                              // Para clínicas, mostrar tipo de tratamento
+                              lead.tipo_tratamento && (
+                                <span className={`badge badge-${lead.tipo_tratamento === 'estetico' ? 'info' : 'warning'}`}>
+                                  {lead.tipo_tratamento === 'estetico' ? 'Estético' : 
+                                   lead.tipo_tratamento === 'odontologico' ? 'Odontológico' : 
+                                   lead.tipo_tratamento === 'ambos' ? 'Ambos' :
+                                   lead.tipo_tratamento}
+                                </span>
+                              )
                             )}
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
@@ -4282,23 +4166,25 @@ const Pacientes = () => {
 
       {activeTab === 'negativas' && (
         <>
-          {/* Resumo de Estatísticas */}
-          <div className="stats-grid" style={{ marginBottom: '2rem' }}>
-            <div className="stat-card">
-              <div className="stat-label">CPF Reprovado</div>
-              <div className="stat-value">{leadsNegativos.filter(l => l.status === 'cpf_reprovado').length}</div>
+          {/* Resumo de Estatísticas - Ocultar para incorporadora */}
+          {shouldShow('leadsNegativos', 'mostrarResumoEstatisticas') && (
+            <div className="stats-grid" style={{ marginBottom: '2rem' }}>
+              <div className="stat-card">
+                <div className="stat-label">CPF Reprovado</div>
+                <div className="stat-value">{leadsNegativos.filter(l => l.status === 'cpf_reprovado').length}</div>
+              </div>
+              
+              <div className="stat-card">
+                <div className="stat-label">Sem Clínica</div>
+                <div className="stat-value">{leadsNegativos.filter(l => l.status === 'sem_clinica').length}</div>
+              </div>
+              
+              <div className="stat-card">
+                <div className="stat-label">Paciente não responde</div>
+                <div className="stat-value">{leadsNegativos.filter(l => l.status === 'nao_responde').length}</div>
+              </div>
             </div>
-            
-            <div className="stat-card">
-              <div className="stat-label">Sem Clínica</div>
-              <div className="stat-value">{leadsNegativos.filter(l => l.status === 'sem_clinica').length}</div>
-            </div>
-            
-            <div className="stat-card">
-              <div className="stat-label">Paciente não responde</div>
-              <div className="stat-value">{leadsNegativos.filter(l => l.status === 'nao_responde').length}</div>
-            </div>
-          </div>
+          )}
 
           <div className="card" style={{ marginBottom: '1.5rem' }}>
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -4346,7 +4232,7 @@ const Pacientes = () => {
                     </select>
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Consultor</label>
+                    <label className="form-label">{t.consultor}</label>
                     <select 
                       className="form-select" 
                       value={filtroConsultorNegativos} 
@@ -4385,11 +4271,11 @@ const Pacientes = () => {
                   <thead>
                     <tr>
                       <th>Nome</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{t.consultor}</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>CPF</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cidade</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Tipo</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Empreendimento' : 'Tipo'}</th>
                       <th>Status</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
                       <th style={{ width: '80px' }}>Ações</th>
@@ -4456,10 +4342,31 @@ const Pacientes = () => {
                             ) : '-'}
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                            {lead.tipo_tratamento && (
-                              <span className={`badge badge-${lead.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
-                                {lead.tipo_tratamento}
-                              </span>
+                            {isIncorporadora ? (
+                              // Para incorporadora, mostrar empreendimento
+                              lead.empreendimento_id ? (
+                                (() => {
+                                  const empreendimentoMap = {
+                                    4: 'Laguna Sky Garden',
+                                    5: 'Residencial Girassol',
+                                    6: 'Sintropia Sky Garden',
+                                    7: 'Residencial Lotus',
+                                    8: 'River Sky Garden',
+                                    9: 'Condomínio Figueira Garcia'
+                                  };
+                                  return empreendimentoMap[lead.empreendimento_id] || '-';
+                                })()
+                              ) : '-'
+                            ) : (
+                              // Para clínicas, mostrar tipo de tratamento
+                              lead.tipo_tratamento && (
+                                <span className={`badge badge-${lead.tipo_tratamento === 'estetico' ? 'info' : 'warning'}`}>
+                                  {lead.tipo_tratamento === 'estetico' ? 'Estético' : 
+                                   lead.tipo_tratamento === 'odontologico' ? 'Odontológico' : 
+                                   lead.tipo_tratamento === 'ambos' ? 'Ambos' :
+                                   lead.tipo_tratamento}
+                                </span>
+                              )
                             )}
                           </td>
                           <td>
@@ -4612,9 +4519,9 @@ const Pacientes = () => {
                         <tr>
                           <th>Nome</th>
                           <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Tipo</th>
+                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Empreendimento' : 'Tipo'}</th>
                           <th>Status</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
+                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{t.consultor}</th>
                           <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Data Agendamento</th>
                         </tr>
                       </thead>
@@ -4658,10 +4565,31 @@ const Pacientes = () => {
                                 </td>
                                 <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarTelefone(paciente.telefone)}</td>
                                 <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                  {paciente.tipo_tratamento && (
-                                    <span className={`badge badge-${paciente.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
-                                      {paciente.tipo_tratamento}
-                                    </span>
+                                  {isIncorporadora ? (
+                                    // Para incorporadora, mostrar empreendimento
+                                    paciente.empreendimento_id ? (
+                                      (() => {
+                                        const empreendimentoMap = {
+                                          4: 'Laguna Sky Garden',
+                                          5: 'Residencial Girassol',
+                                          6: 'Sintropia Sky Garden',
+                                          7: 'Residencial Lotus',
+                                          8: 'River Sky Garden',
+                                          9: 'Condomínio Figueira Garcia'
+                                        };
+                                        return empreendimentoMap[paciente.empreendimento_id] || '-';
+                                      })()
+                                    ) : '-'
+                                  ) : (
+                                    // Para clínicas, mostrar tipo de tratamento
+                                    paciente.tipo_tratamento && (
+                                      <span className={`badge badge-${paciente.tipo_tratamento === 'estetico' ? 'info' : 'warning'}`}>
+                                        {paciente.tipo_tratamento === 'estetico' ? 'Estético' : 
+                                         paciente.tipo_tratamento === 'odontologico' ? 'Odontológico' : 
+                                         paciente.tipo_tratamento === 'ambos' ? 'Ambos' :
+                                         paciente.tipo_tratamento}
+                                      </span>
+                                    )
                                   )}
                                 </td>
                                 <td>
@@ -4770,7 +4698,7 @@ const Pacientes = () => {
           <div className="card">
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
               <div>
-                <h2 className="card-title" style={{ marginBottom: '0.5rem' }}>Lista de Pacientes com Fechamento</h2>
+                <h2 className="card-title" style={{ marginBottom: '0.5rem' }}>Lista de {t.paciente.toLowerCase()+'s'} com Fechamento</h2>
                 <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                   Upload de documentos é necessário para aprovação final.
                 </div>
@@ -4790,7 +4718,7 @@ const Pacientes = () => {
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
                   </svg>
-                  Cadastrar Paciente
+                  Cadastrar {t.paciente}
                 </button>
               </div>
             </div>
@@ -4818,7 +4746,7 @@ const Pacientes = () => {
                       <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                     </svg>
                     <p style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                      Nenhum paciente com fechamento
+                      Nenhum {t.paciente.toLowerCase()} com fechamento
                     </p>
                     <p style={{ fontSize: '0.875rem', color: '#9ca3af' }}>
                       Os pacientes aparecerão aqui quando tiverem um fechamento registrado na sua clínica.
@@ -4831,7 +4759,7 @@ const Pacientes = () => {
                         <tr>
                           <th>Nome</th>
                           <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
+                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{t.consultor}</th>
                           <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Valor</th>
                           <th>Status</th>
                           <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Documentação</th>
@@ -5033,8 +4961,8 @@ const Pacientes = () => {
         </>
       )}
 
-      {/* Conteúdo da aba Carteira Existente (apenas para clínicas) */}
-      {activeTab === 'carteira-existente' && isClinica && (
+      {/* Conteúdo da aba Carteira Existente (apenas para clínicas, não para incorporadora) */}
+      {activeTab === 'carteira-existente' && isClinica && !isIncorporadora && (
         <>
           <div className="card">
             <div className="card-header">
@@ -5075,7 +5003,7 @@ const Pacientes = () => {
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
                   </svg>
-                  Cadastrar Paciente
+                  Cadastrar {t.paciente}
                 </button>
               </div>
             </div>
@@ -5086,9 +5014,9 @@ const Pacientes = () => {
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                     <path d="M9 9h6v6H9z"></path>
                   </svg>
-                  <p>Nenhum paciente da carteira existente cadastrado</p>
+                  <p>Nenhum {t.paciente.toLowerCase()} da carteira existente cadastrado</p>
                   <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
-                    Clique em "Cadastrar Paciente" para começar
+                    Clique em "Cadastrar {t.paciente}" para começar
                   </p>
                 </div>
               ) : (
@@ -5664,7 +5592,7 @@ const Pacientes = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  Cadastrar Paciente
+                  Cadastrar {t.paciente}
                 </button>
               </div>
             </form>
@@ -5677,7 +5605,7 @@ const Pacientes = () => {
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h2 className="modal-title">Novo Paciente</h2>
+              <h2 className="modal-title">{empresaId === 5 ? 'Novo Cliente' : 'Novo Paciente'}</h2>
               <button className="close-btn" onClick={resetForm}>×</button>
             </div>
 
@@ -5859,7 +5787,7 @@ const Pacientes = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  Cadastrar Paciente
+                  Cadastrar {t.paciente}
                 </button>
               </div>
 
@@ -5890,7 +5818,7 @@ const Pacientes = () => {
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h2 className="modal-title">Novo Paciente</h2>
+              <h2 className="modal-title">{empresaId === 5 ? 'Novo Cliente' : 'Novo Paciente'}</h2>
               <button className="close-btn" onClick={resetForm}>×</button>
             </div>
 
@@ -6012,7 +5940,7 @@ const Pacientes = () => {
 
               <div className="grid grid-2">
                 <div className="form-group">
-                  <label className="form-label">Tipo de Tratamento *</label>
+                  <label className="form-label">{empresaId === 5 ? 'Empreendimento *' : 'Tipo de Tratamento *'}</label>
                   <select
                     name="tipo_tratamento"
                     className="form-select"
@@ -6029,7 +5957,7 @@ const Pacientes = () => {
                 </div>
 
               <div className="form-group">
-                <label className="form-label">Consultor Responsável</label>
+                <label className="form-label">{empresaId === 5 ? 'Corretor Responsável' : 'Consultor Responsável'}</label>
                 <select
                   name="consultor_id"
                   className="form-select"
@@ -6075,7 +6003,7 @@ const Pacientes = () => {
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h2 className="modal-title">Editar Paciente</h2>
+              <h2 className="modal-title">{empresaId === 5 ? 'Editar Cliente' : 'Editar Paciente'}</h2>
               <button className="close-btn" onClick={resetForm}>×</button>
             </div>
 
@@ -6197,7 +6125,7 @@ const Pacientes = () => {
 
               <div className="grid grid-2">
                 <div className="form-group">
-                  <label className="form-label">Tipo de Tratamento *</label>
+                  <label className="form-label">{t.tipoTratamento} *</label>
                   <select
                     name="tipo_tratamento"
                     className="form-select"
@@ -6214,7 +6142,7 @@ const Pacientes = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Consultor Responsável</label>
+                <label className="form-label">{empresaId === 5 ? 'Corretor Responsável' : 'Consultor Responsável'}</label>
                 <select
                   name="consultor_id"
                   className="form-select"
@@ -6261,7 +6189,7 @@ const Pacientes = () => {
           <div className="modal" style={{ maxWidth: '1000px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="modal-header">
               <h2 className="modal-title">
-                {viewPaciente.nome}
+                {isIncorporadora ? 'Cliente' : 'Paciente'}: {viewPaciente.nome}
               </h2>
               <button className="close-btn" onClick={closeViewModal}>×</button>
             </div>
@@ -6293,7 +6221,7 @@ const Pacientes = () => {
                     whiteSpace: 'nowrap'
                   }}
                 >
-                  Informações do Paciente
+                  {isIncorporadora ? 'Informações do Cliente' : 'Informações do Paciente'}
                 </button>
                 
                 {isClinica && (
@@ -6429,18 +6357,43 @@ const Pacientes = () => {
 
               <div className="grid grid-2">
                     <div>
-                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Tipo de Tratamento</label>
+                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>
+                        {isIncorporadora ? 'Empreendimento Desejado' : 'Tipo de Tratamento'}
+                      </label>
                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
-                        {viewPaciente.tipo_tratamento ? (
-                          <span className={`badge badge-${viewPaciente.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
-                            {viewPaciente.tipo_tratamento}
-                          </span>
-                        ) : '-'}
+        {isIncorporadora ? (
+          // Para incorporadora, mostrar empreendimento (mapeamento hardcoded)
+          viewPaciente.empreendimento_id ? (
+            (() => {
+              const empreendimentoMap = {
+                4: 'Laguna Sky Garden',
+                5: 'Residencial Girassol',
+                6: 'Sintropia Sky Garden',
+                7: 'Residencial Lotus',
+                8: 'River Sky Garden',
+                9: 'Condomínio Figueira Garcia'
+              };
+              return empreendimentoMap[viewPaciente.empreendimento_id] || '-';
+            })()
+          ) : '-'
+        ) : (
+                          // Para clínicas, mostrar tipo de tratamento
+                          viewPaciente.tipo_tratamento ? (
+                            <span className={`badge badge-${viewPaciente.tipo_tratamento === 'Estético' ? 'info' : 'warning'}`}>
+                              {viewPaciente.tipo_tratamento === 'estetico' ? 'Estético' : 
+                               viewPaciente.tipo_tratamento === 'odontologico' ? 'Odontológico' : 
+                               viewPaciente.tipo_tratamento === 'ambos' ? 'Ambos' :
+                               viewPaciente.tipo_tratamento}
+                            </span>
+                          ) : '-'
+                        )}
                       </p>
                 </div>
                     
                     <div>
-                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Status do Paciente</label>
+                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>
+                        {isIncorporadora ? 'Status do Cliente' : 'Status do Paciente'}
+                      </label>
                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
                         {viewPaciente.status && (
                           <span 
@@ -6458,9 +6411,30 @@ const Pacientes = () => {
                       </p>
                 </div>
               </div>
+
+              {!isIncorporadora && (
+                <div className="grid grid-2">
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Tratamento Específico</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewPaciente.tratamento_especifico || '-'}</p>
+                  </div>
                   
                   <div>
-                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Consultor Responsável</label>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Grau de Parentesco de Quem Indicou</label>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewPaciente.grau_parentesco || '-'}</p>
+                  </div>
+                </div>
+              )}
+              
+              {isIncorporadora && (
+                <div>
+                  <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Grau de Parentesco de Quem Indicou</label>
+                  <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewPaciente.grau_parentesco || '-'}</p>
+                </div>
+              )}
+                  
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Responsável</label>
                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
                       {consultores.find(c => String(c.id) === String(viewPaciente.consultor_id))?.nome || (
                         <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>Não atribuído</span>
@@ -6591,7 +6565,7 @@ const Pacientes = () => {
                           </div>
                           
                           <div>
-                            <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Tipo de Tratamento</label>
+                            <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>{t.tipoTratamento}</label>
                             <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
                               {fechamentoPaciente.tipo_tratamento || 'Não informado'}
                             </p>
@@ -7092,7 +7066,7 @@ const Pacientes = () => {
           <div className="modal" style={{ maxWidth: '700px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <div className="modal-header">
               <h2 className="modal-title">
-                {pacienteObservacoes?.nome || 'Detalhes'}
+                {isIncorporadora ? 'Cliente' : 'Paciente'}: {pacienteObservacoes?.nome || 'Detalhes'}
               </h2>
               <button className="close-btn" onClick={() => setShowObservacoesModal(false)}>×</button>
             </div>
@@ -7303,7 +7277,7 @@ const Pacientes = () => {
           <div className="modal" style={{ maxWidth: '900px', maxHeight: '90vh', overflow: 'auto' }}>
             <div className="modal-header">
               <h2 className="modal-title">
-                {editingPaciente ? 'Editar Paciente' : 'Cadastrar Novo Paciente'}
+                {editingPaciente ? (empresaId === 5 ? 'Editar Cliente' : 'Editar Paciente') : (empresaId === 5 ? 'Cadastrar Novo Cliente' : 'Cadastrar Novo Paciente')}
               </h2>
               <button className="close-btn" onClick={resetForm}>×</button>
             </div>
@@ -7423,8 +7397,8 @@ const Pacientes = () => {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem' }}>
-                    Tipo de Tratamento
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem' }}>
+                    {t.tipoTratamento}
                   </label>
                   <select
                     name="tipo_tratamento"
@@ -7688,7 +7662,7 @@ const Pacientes = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  {editingPaciente ? 'Salvar Alterações' : 'Cadastrar Paciente'}
+                  {editingPaciente ? 'Salvar Alterações' : `Cadastrar ${t.paciente}`}
                 </button>
               </div>
             </form>
@@ -7714,7 +7688,7 @@ const Pacientes = () => {
                   marginBottom: '1rem',
                   lineHeight: '1.5'
                 }}>
-                  <strong>Paciente:</strong> {pacienteParaAgendar?.nome}
+                  <strong>{empresaId === 5 ? 'Cliente' : 'Paciente'}:</strong> {pacienteParaAgendar?.nome}
                 </p>
                 <p style={{ 
                   color: '#6b7280', 
@@ -7726,16 +7700,29 @@ const Pacientes = () => {
               </div>
 
               <div className="form-group" style={{ marginBottom: '1rem' }}>
-                <label className="form-label">Clínica *</label>
+                <label className="form-label">{isIncorporadora ? 'Empreendimento *' : 'Clínica *'}</label>
                 <select 
                   className="form-select"
                   value={agendamentoData.clinica_id}
                   onChange={(e) => setAgendamentoData({...agendamentoData, clinica_id: e.target.value})}
                 >
-                  <option value="">Selecione uma clínica</option>
-                  {clinicas.map(c => (
-                    <option key={c.id} value={c.id}>{c.nome}</option>
-                  ))}
+                  <option value="">{isIncorporadora ? 'Selecione um empreendimento' : 'Selecione uma clínica'}</option>
+                  {isIncorporadora ? (
+                    // Para incorporadora, mostrar empreendimentos hardcoded
+                    <>
+                      <option value="4">Laguna Sky Garden</option>
+                      <option value="5">Residencial Girassol</option>
+                      <option value="6">Sintropia Sky Garden</option>
+                      <option value="7">Residencial Lotus</option>
+                      <option value="8">River Sky Garden</option>
+                      <option value="9">Condomínio Figueira Garcia</option>
+                    </>
+                  ) : (
+                    // Para outras empresas, mostrar clínicas
+                    clinicas.map(c => (
+                      <option key={c.id} value={c.id}>{c.nome}</option>
+                    ))
+                  )}
                 </select>
               </div>
 
@@ -7829,7 +7816,7 @@ const Pacientes = () => {
                   marginBottom: '1rem',
                   lineHeight: '1.5'
                 }}>
-                  <strong>Paciente:</strong> {pacienteParaFechar?.nome}
+                  <strong>{empresaId === 5 ? 'Cliente' : 'Paciente'}:</strong> {pacienteParaFechar?.nome}
                 </p>
                 <p style={{ 
                   color: '#6b7280', 
@@ -7841,16 +7828,29 @@ const Pacientes = () => {
               </div>
 
               <div className="form-group" style={{ marginBottom: '1rem' }}>
-                <label className="form-label">Clínica *</label>
+                <label className="form-label">{user?.empresa_id === 5 ? 'Empreendimento *' : 'Clínica *'}</label>
                 <select 
                   className="form-select"
                   value={clinicaFechamento}
                   onChange={(e) => setClinicaFechamento(e.target.value)}
                 >
-                  <option value="">Selecione uma clínica</option>
-                  {clinicas.map(c => (
-                    <option key={c.id} value={c.id}>{c.nome}</option>
-                  ))}
+                  <option value="">{user?.empresa_id === 5 ? 'Selecione um empreendimento' : 'Selecione uma clínica'}</option>
+                  {user?.empresa_id === 5 ? (
+                    // Para incorporadora, mostrar empreendimentos hardcoded
+                    <>
+                      <option value="4">Laguna Sky Garden</option>
+                      <option value="5">Residencial Girassol</option>
+                      <option value="6">Sintropia Sky Garden</option>
+                      <option value="7">Residencial Lotus</option>
+                      <option value="8">River Sky Garden</option>
+                      <option value="9">Condomínio Figueira Garcia</option>
+                    </>
+                  ) : (
+                    // Para outras empresas, mostrar clínicas
+                    clinicas.map(c => (
+                      <option key={c.id} value={c.id}>{c.nome}</option>
+                    ))
+                  )}
                 </select>
               </div>
 
@@ -7885,18 +7885,20 @@ const Pacientes = () => {
               </div>
 
               <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
-                <div className="form-group">
-                  <label className="form-label">Tipo de Tratamento</label>
-                  <select 
-                    className="form-select"
-                    value={tipoTratamentoFechamento}
-                    onChange={(e) => setTipoTratamentoFechamento(e.target.value)}
-                  >
-                    <option value="">Selecione</option>
-                    <option value="Estético">Estético</option>
-                    <option value="Odontológico">Odontológico</option>
-                  </select>
-                </div>
+                {user?.empresa_id !== 5 && (
+                  <div className="form-group">
+                    <label className="form-label">Tipo de Tratamento</label>
+                    <select 
+                      className="form-select"
+                      value={tipoTratamentoFechamento}
+                      onChange={(e) => setTipoTratamentoFechamento(e.target.value)}
+                    >
+                      <option value="">Selecione</option>
+                      <option value="Estético">Estético</option>
+                      <option value="Odontológico">Odontológico</option>
+                    </select>
+                  </div>
+                )}
 
                 <div className="form-group">
                   <label className="form-label">Data do Fechamento</label>
@@ -7909,75 +7911,77 @@ const Pacientes = () => {
                 </div>
               </div>
 
-              {/* Seção de Parcelamento */}
-              <div style={{ 
-                border: '1px solid #e5e7eb', 
-                borderRadius: '8px', 
-                padding: '1rem', 
-                marginBottom: '1rem',
-                backgroundColor: '#f9fafb'
-              }}>
-                <h4 style={{ 
-                  margin: '0 0 1rem 0', 
-                  fontSize: '1rem', 
-                  fontWeight: '600', 
-                  color: '#374151' 
+              {/* Seção de Parcelamento - Apenas para não incorporadora */}
+              {user?.empresa_id !== 5 && (
+                <div style={{ 
+                  border: '1px solid #e5e7eb', 
+                  borderRadius: '8px', 
+                  padding: '1rem', 
+                  marginBottom: '1rem',
+                  backgroundColor: '#f9fafb'
                 }}>
-                  Dados de Parcelamento
-                </h4>
-                
-                <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
-                  <div className="form-group">
-                    <label className="form-label">Valor da Parcela (R$)</label>
-                    <input 
-                      type="text"
-                      className="form-input"
-                      value={valorParcelaFormatado}
-                      onChange={handleValorParcelaChange}
-                      placeholder="R$ 0,00"
-                    />
+                  <h4 style={{ 
+                    margin: '0 0 1rem 0', 
+                    fontSize: '1rem', 
+                    fontWeight: '600', 
+                    color: '#374151' 
+                  }}>
+                    Dados de Parcelamento
+                  </h4>
+                  
+                  <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
+                    <div className="form-group">
+                      <label className="form-label">Valor da Parcela (R$)</label>
+                      <input 
+                        type="text"
+                        className="form-input"
+                        value={valorParcelaFormatado}
+                        onChange={handleValorParcelaChange}
+                        placeholder="R$ 0,00"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Nº de Parcelas</label>
+                      <input 
+                        type="number"
+                        className="form-input"
+                        value={numeroParcelasFechamento}
+                        onChange={(e) => setNumeroParcelasFechamento(e.target.value)}
+                        placeholder="Ex: 12"
+                        min="1"
+                      />
+                    </div>
                   </div>
 
-                  <div className="form-group">
-                    <label className="form-label">Nº de Parcelas</label>
-                    <input 
-                      type="number"
-                      className="form-input"
-                      value={numeroParcelasFechamento}
-                      onChange={(e) => setNumeroParcelasFechamento(e.target.value)}
-                      placeholder="Ex: 12"
-                      min="1"
-                    />
+                  <div className="grid grid-2" style={{ gap: '1rem' }}>
+                    <div className="form-group">
+                      <label className="form-label">Dia do Vencimento</label>
+                      <input 
+                        type="date"
+                        className="form-input"
+                        value={vencimentoFechamento}
+                        onChange={(e) => setVencimentoFechamento(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Antecipação (em meses)</label>
+                      <input 
+                        type="number"
+                        className="form-input"
+                        value={antecipacaoFechamento}
+                        onChange={(e) => setAntecipacaoFechamento(e.target.value)}
+                        placeholder="Ex: 3"
+                        min="1"
+                      />
+                    </div>
                   </div>
                 </div>
+              )}
 
-                <div className="grid grid-2" style={{ gap: '1rem' }}>
-                  <div className="form-group">
-                    <label className="form-label">Dia do Vencimento</label>
-                    <input 
-                      type="date"
-                      className="form-input"
-                      value={vencimentoFechamento}
-                      onChange={(e) => setVencimentoFechamento(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Antecipação (em meses)</label>
-                    <input 
-                      type="number"
-                      className="form-input"
-                      value={antecipacaoFechamento}
-                      onChange={(e) => setAntecipacaoFechamento(e.target.value)}
-                      placeholder="Ex: 3"
-                      min="1"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Seção de Dados Administrativos - Apenas Admin/Consultor Interno */}
-              {(isAdmin || isConsultorInterno) && (
+              {/* Seção de Dados Administrativos - Apenas Admin/Consultor Interno e não incorporadora */}
+              {(isAdmin || isConsultorInterno) && user?.empresa_id !== 5 && (
                 <div style={{ 
                   border: '1px solid #3b82f6', 
                   borderRadius: '8px', 
@@ -8251,6 +8255,7 @@ const Pacientes = () => {
         statusAnterior={evidenciaData.statusAnterior}
         statusNovo={evidenciaData.statusNovo}
         nomeRegistro={evidenciaData.pacienteNome}
+        empresaId={empresaId}
       />
 
       {/* Modal de Cadastro Completo para Clínicas */}
@@ -8264,7 +8269,7 @@ const Pacientes = () => {
             margin: window.innerWidth <= 768 ? '10px' : 'auto'
           }}>
             <div className="modal-header">
-              <h2 className="modal-title">Cadastrar Paciente</h2>
+              <h2 className="modal-title">Cadastrar {t.paciente}</h2>
               <button className="close-btn" onClick={resetCadastroCompleto}>×</button>
             </div>
 
@@ -8476,7 +8481,7 @@ const Pacientes = () => {
 
                   <div>
                     <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
-                      Tipo de Tratamento *
+                      {t.tipoTratamento} *
                     </label>
                     <select
                       name="tipo_tratamento"
@@ -8859,7 +8864,7 @@ const Pacientes = () => {
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <polyline points="20 6 9 17 4 12"></polyline>
                       </svg>
-                      Cadastrar Paciente
+                      Cadastrar {t.paciente}
                     </>
                   )}
                 </button>
@@ -8911,7 +8916,7 @@ const Pacientes = () => {
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: '900px', maxHeight: '90vh' }}>
             <div className="modal-header">
-              <h2 className="modal-title">Cadastrar Paciente - Carteira Existente</h2>
+              <h2 className="modal-title">Cadastrar {t.paciente} - Carteira Existente</h2>
               <button className="close-btn" onClick={() => setShowCarteiraModal(false)}>×</button>
             </div>
             
@@ -9213,7 +9218,7 @@ const Pacientes = () => {
                         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                         <path d="M9 9h6v6H9z"></path>
                       </svg>
-                      <p style={{ margin: 0, fontSize: '0.875rem' }}>Nenhum paciente adicionado</p>
+                      <p style={{ margin: 0, fontSize: '0.875rem' }}>Nenhum {t.paciente.toLowerCase()} adicionado</p>
                     </div>
                   ) : (
                     <div style={{ marginBottom: '1.5rem' }}>

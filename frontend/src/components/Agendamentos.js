@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import useBranding from '../hooks/useBranding';
 import { useToast } from '../components/Toast';
-import TutorialAgendamentos from './TutorialAgendamentos';
 import ModalEvidencia from './ModalEvidencia';
+import useSmartPolling from '../hooks/useSmartPolling';
 
 const Agendamentos = () => {
   const { t } = useBranding();
@@ -58,9 +58,6 @@ const Agendamentos = () => {
   const [vencimentoFechamento, setVencimentoFechamento] = useState('');
   const [antecipacaoFechamento, setAntecipacaoFechamento] = useState('');
 
-  // Estados para controlar o tutorial
-  const [showTutorial, setShowTutorial] = useState(false);
-  const [tutorialCompleted, setTutorialCompleted] = useState(false);
 
   // Estado para modal de explicação de permissões
   const [showPermissaoModal, setShowPermissaoModal] = useState(false);
@@ -110,19 +107,26 @@ const Agendamentos = () => {
       setFiltroConsultor(String(user.consultor_id));
     }
     
-    // Tutorial automático desabilitado
-    // Os usuários podem acessá-lo manualmente através do botão "Ver Tutorial"
   }, [deveFiltrarPorConsultor, user?.consultor_id]);
 
-  // Atualização automática dos dados a cada 30 segundos
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchAgendamentos();
-      fetchPacientes();
-    }, 30000); // 30 segundos
+  // Função de polling inteligente
+  const pollingCallback = async () => {
+    console.log('🔄 Executando polling inteligente - Agendamentos...');
+    
+    try {
+      // Executar chamadas em paralelo (mais eficiente)
+      await Promise.allSettled([
+        fetchAgendamentos(),
+        fetchPacientes()
+      ]);
+      console.log('✅ Polling inteligente concluído - Agendamentos');
+    } catch (error) {
+      console.warn('⚠️ Erro no polling inteligente - Agendamentos:', error);
+    }
+  };
 
-    return () => clearInterval(interval);
-  }, []);
+  // Polling inteligente (2 minutos em vez de 30 segundos)
+  useSmartPolling(pollingCallback, 120000, []);
 
   // Listener para sincronização entre telas
   useEffect(() => {
@@ -307,6 +311,7 @@ const Agendamentos = () => {
       cidade: paciente?.cidade || 'Cidade não informada',
       estado: paciente?.estado || 'Estado não informado',
       tipo_tratamento: paciente?.tipo_tratamento || 'Tipo de tratamento não informado',
+      empreendimento_id: paciente?.empreendimento_id || agendamento.empreendimento_id, // Incluir empreendimento_id
       status: paciente?.status || 'Status não informado',
       observacoes: agendamento.observacoes || paciente?.observacoes || 'Nenhuma observação cadastrada',
       data_agendamento: agendamento.data_agendamento || 'Data não informada',
@@ -517,10 +522,21 @@ const Agendamentos = () => {
         const formData = new FormData();
         formData.append('paciente_id', agendamentoParaFechar.paciente_id);
         formData.append('consultor_id', agendamentoParaFechar.consultor_id || '');
-        formData.append('clinica_id', agendamentoParaFechar.clinica_id || '');
+        
+        // Para incorporadora (empresa_id = 5), não enviar clinica_id e usar empreendimento_id
+        if (user?.empresa_id === 5) {
+          // Buscar empreendimento_id do paciente
+          const paciente = pacientes.find(p => p.id === agendamentoParaFechar.paciente_id);
+          if (paciente?.empreendimento_id) {
+            formData.append('clinica_id', paciente.empreendimento_id); // Backend espera clinica_id mesmo para empreendimentos
+          }
+        } else {
+          formData.append('clinica_id', agendamentoParaFechar.clinica_id || '');
+          formData.append('tipo_tratamento', tipoTratamentoFechamento || '');
+        }
+        
         formData.append('valor_fechado', parseFloat(valorFechamento));
         formData.append('data_fechamento', dataFechamento);
-        formData.append('tipo_tratamento', tipoTratamentoFechamento || '');
         formData.append('observacoes', observacoesFechamento || 'Fechamento criado automaticamente pelo pipeline');
         
         // Novos campos de parcelamento
@@ -666,8 +682,27 @@ const Agendamentos = () => {
     // Filtro por consultor
     const matchConsultor = !filtroConsultor || agendamento.consultor_id.toString() === filtroConsultor;
     
-    // Filtro por clínica
-    const matchClinica = !filtroClinica || agendamento.clinica_id.toString() === filtroClinica;
+    // Filtro por clínica/empreendimento
+    const matchClinica = !filtroClinica || (
+      user?.empresa_id === 5 ? (
+        // Para incorporadora, comparar empreendimento (igual Pacientes.js)
+        (() => {
+          const empreendimentoMap = {
+            4: 'Laguna Sky Garden',
+            5: 'Residencial Girassol',
+            6: 'Sintropia Sky Garden',
+            7: 'Residencial Lotus',
+            8: 'River Sky Garden',
+            9: 'Condomínio Figueira Garcia'
+          };
+          const empreendimentoId = agendamento.empreendimento_id || agendamento.clinica_id;
+          return empreendimentoMap[empreendimentoId] === filtroClinica;
+        })()
+      ) : (
+        // Para outras empresas, comparar clínica
+        agendamento.clinica_id.toString() === filtroClinica
+      )
+    );
     
     // Filtro por status
     const matchStatus = !filtroStatus || agendamento.status === filtroStatus;
@@ -692,19 +727,6 @@ const Agendamentos = () => {
   // Verificar se há filtros ativos
   const temFiltrosAtivos = filtroConsultor || filtroClinica || filtroDataInicio || filtroDataFim || filtroStatus;
 
-  const handleTutorialComplete = () => {
-    setShowTutorial(false);
-    setTutorialCompleted(true);
-    localStorage.setItem('tutorial-agendamentos-completed', 'true');
-  };
-
-  const handleTutorialClose = () => {
-    setShowTutorial(false);
-  };
-
-  const startTutorial = () => {
-    setShowTutorial(true);
-  };
 
   // Função chamada quando evidência é enviada com sucesso
   const handleEvidenciaSuccess = async (evidenciaId) => {
@@ -730,38 +752,8 @@ const Agendamentos = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h1 className="page-title">{isConsultor ? 'Visualizar Agendamentos' : 'Gerenciar Agendamentos'}</h1>
-            <p className="page-subtitle">{isConsultor ? 'Visualize os agendamentos dos seus pacientes' : 'Gerencie os agendamentos dos pacientes'}</p>
+            <p className="page-subtitle">{isConsultor ? `Visualize os agendamentos dos seus ${t.paciente.toLowerCase()+'s'}` : `Gerencie os agendamentos dos ${t.paciente.toLowerCase()+'s'}`}</p>
           </div>
-          {!isClinica && (
-            <button
-              onClick={startTutorial}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 16px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                color: '#374151',
-                fontSize: '14px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#f9fafb';
-                e.target.style.borderColor = '#9ca3af';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = 'white';
-                e.target.style.borderColor = '#d1d5db';
-              }}
-              title="Ver tutorial da tela de agendamentos"
-            >
-              Ver Tutorial
-            </button>
-          )}
         </div>
       </div>
       {/* Dashboard de Agendamentos */}
@@ -792,7 +784,7 @@ const Agendamentos = () => {
           <div style={{ padding: '1.5rem', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
             <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Consultor</label>
+                <label className="form-label">{t.consultor}</label>
                 <select
                   value={filtroConsultor}
                   onChange={(e) => setFiltroConsultor(e.target.value)}
@@ -823,18 +815,31 @@ const Agendamentos = () => {
               </div>
 
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Clínica</label>
+                <label className="form-label">{user?.empresa_id === 5 ? 'Empreendimento' : t.clinica}</label>
                 <select
                   value={filtroClinica}
                   onChange={(e) => setFiltroClinica(e.target.value)}
                   className="form-select"
                 >
-                  <option value="">Todas as clínicas</option>
-                  {clinicas.map(clinica => (
-                    <option key={clinica.id} value={clinica.id}>
-                      {clinica.nome}
-                    </option>
-                  ))}
+                  <option value="">{user?.empresa_id === 5 ? 'Todos os empreendimentos' : `Todas as ${t.clinica.toLowerCase()}s`}</option>
+                  {user?.empresa_id === 5 ? (
+                    // Para incorporadora, mostrar empreendimentos hardcoded (igual Pacientes.js)
+                    <>
+                      <option value="Laguna Sky Garden">Laguna Sky Garden</option>
+                      <option value="Residencial Girassol">Residencial Girassol</option>
+                      <option value="Sintropia Sky Garden">Sintropia Sky Garden</option>
+                      <option value="Residencial Lotus">Residencial Lotus</option>
+                      <option value="River Sky Garden">River Sky Garden</option>
+                      <option value="Condomínio Figueira Garcia">Condomínio Figueira Garcia</option>
+                    </>
+                  ) : (
+                    // Para outras empresas, mostrar clínicas
+                    clinicas.map(clinica => (
+                      <option key={clinica.id} value={clinica.id}>
+                        {clinica.nome}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
             </div>
@@ -912,9 +917,9 @@ const Agendamentos = () => {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Paciente</th>
-                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
-                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Clínica</th>
+                  <th>{t.paciente}</th>
+                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{t.consultor}</th>
+                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{user?.empresa_id === 5 ? 'Empreendimento' : 'Clínica'}</th>
                   <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Data</th>
                   <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Horário</th>
                   <th>
@@ -994,7 +999,28 @@ const Agendamentos = () => {
                         </div>
                       </td>
                       <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{agendamento.consultor_nome}</td>
-                      <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{agendamento.clinica_nome}</td>
+                      <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                        {user?.empresa_id === 5 ? (
+                          // Para incorporadora, mostrar empreendimento baseado no empreendimento_id ou clinica_id
+                          (agendamento.empreendimento_id || agendamento.clinica_id) ? (
+                            (() => {
+                              const empreendimentoMap = {
+                                4: 'Laguna Sky Garden',
+                                5: 'Residencial Girassol',
+                                6: 'Sintropia Sky Garden',
+                                7: 'Residencial Lotus',
+                                8: 'River Sky Garden',
+                                9: 'Condomínio Figueira Garcia'
+                              };
+                              const empreendimentoId = agendamento.empreendimento_id || agendamento.clinica_id;
+                              return empreendimentoMap[empreendimentoId] || '-';
+                            })()
+                          ) : '-'
+                        ) : (
+                          // Para outras empresas, mostrar nome da clínica
+                          agendamento.clinica_nome
+                        )}
+                      </td>
                       <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                         <span style={{
                           fontWeight: ehHoje(agendamento.data_agendamento) ? 'bold' : 'normal',
@@ -1043,7 +1069,7 @@ const Agendamentos = () => {
                           <button
                             onClick={() => handleViewPaciente(agendamento)}
                             className="btn-action"
-                            title="Visualizar informações do paciente"
+                            title={`Visualizar informações do ${t.paciente.toLowerCase()}`}
                           >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -1107,7 +1133,7 @@ const Agendamentos = () => {
 
             <form onSubmit={handleSubmit} autoComplete="off">
               <div className="form-group">
-                <label className="form-label">Paciente *</label>
+                <label className="form-label">{t.paciente} *</label>
                 <select
                   name="paciente_id"
                   className="form-select"
@@ -1115,7 +1141,7 @@ const Agendamentos = () => {
                   onChange={handleInputChange}
                   required
                 >
-                  <option value="">Selecione um paciente</option>
+                  <option value="">Selecione um {t.paciente.toLowerCase()}</option>
                   {pacientes.filter(paciente => 
                     // Mostrar apenas pacientes com status apropriados para agendamento
                     ['lead', 'em_conversa', 'cpf_aprovado', 'sem_cedente', 'agendado', 'compareceu', 'nao_compareceu', 'reagendado'].includes(paciente.status)
@@ -1127,14 +1153,14 @@ const Agendamentos = () => {
                 </select>
                 {pacientes.length === 0 && (
                   <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                    Nenhum paciente cadastrado. Cadastre um paciente primeiro.
+                    Nenhum {t.paciente.toLowerCase()} cadastrado. Cadastre um {t.paciente.toLowerCase()} primeiro.
                   </p>
                 )}
               </div>
 
               <div className="grid grid-2">
                 <div className="form-group">
-                  <label className="form-label">Consultor *</label>
+                  <label className="form-label">{t.consultor} *</label>
                   <select
                     name="consultor_id"
                     className="form-select"
@@ -1142,7 +1168,7 @@ const Agendamentos = () => {
                     onChange={handleInputChange}
                     required
                   >
-                    <option value="">Selecione um consultor</option>
+                    <option value="">Selecione um {t.consultor.toLowerCase()}</option>
                     {consultores.map(consultor => (
                       <option key={consultor.id} value={consultor.id}>
                         {consultor.nome}
@@ -1152,19 +1178,32 @@ const Agendamentos = () => {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Clínica</label>
+                  <label className="form-label">{user?.empresa_id === 5 ? 'Empreendimento' : t.clinica}</label>
                   <select
                     name="clinica_id"
                     className="form-select"
                     value={formData.clinica_id}
                     onChange={handleInputChange}
                   >
-                    <option value="">Selecione uma clínica</option>
-                    {clinicas.map(clinica => (
-                      <option key={clinica.id} value={clinica.id}>
-                        {clinica.nome}
-                      </option>
-                    ))}
+                    <option value="">{user?.empresa_id === 5 ? 'Selecione um empreendimento' : `Selecione um ${t.clinica.toLowerCase()}`}</option>
+                    {user?.empresa_id === 5 ? (
+                      // Para incorporadora, mostrar empreendimentos hardcoded (igual Pacientes.js)
+                      <>
+                        <option value="4">Laguna Sky Garden</option>
+                        <option value="5">Residencial Girassol</option>
+                        <option value="6">Sintropia Sky Garden</option>
+                        <option value="7">Residencial Lotus</option>
+                        <option value="8">River Sky Garden</option>
+                        <option value="9">Condomínio Figueira Garcia</option>
+                      </>
+                    ) : (
+                      // Para outras empresas, mostrar clínicas
+                      clinicas.map(clinica => (
+                        <option key={clinica.id} value={clinica.id}>
+                          {clinica.nome}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
               </div>
@@ -1382,9 +1421,27 @@ const Agendamentos = () => {
                   </div>
                   
                   <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                    <label className="form-label">Tipo de Tratamento</label>
+                    <label className="form-label">{user?.empresa_id === 5 ? 'Empreendimento' : 'Tipo de Tratamento'}</label>
                     <div className="detail-field">
-                      {detalhesAtual.tipo_tratamento}
+                      {user?.empresa_id === 5 ? (
+                        // Para incorporadora, mostrar empreendimento baseado no empreendimento_id
+                        detalhesAtual.empreendimento_id ? (
+                          (() => {
+                            const empreendimentoMap = {
+                              4: 'Laguna Sky Garden',
+                              5: 'Residencial Girassol',
+                              6: 'Sintropia Sky Garden',
+                              7: 'Residencial Lotus',
+                              8: 'River Sky Garden',
+                              9: 'Condomínio Figueira Garcia'
+                            };
+                            return empreendimentoMap[detalhesAtual.empreendimento_id] || '-';
+                          })()
+                        ) : '-'
+                      ) : (
+                        // Para outras empresas, mostrar tipo de tratamento
+                        detalhesAtual.tipo_tratamento
+                      )}
                     </div>
                   </div>
                   
@@ -1404,7 +1461,7 @@ const Agendamentos = () => {
               {activeDetalhesTab === 'observacoes' && !detalhesAtual.nome && (
                 <>
                   <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                    <label className="form-label">Telefone do paciente</label>
+                    <label className="form-label">Telefone do {t.paciente.toLowerCase()}</label>
                     <div className="detail-field">
                       {detalhesAtual.telefone}
                     </div>
@@ -1560,7 +1617,7 @@ const Agendamentos = () => {
                   marginBottom: '1rem',
                   lineHeight: '1.5'
                 }}>
-                  <strong>Paciente:</strong> {agendamentoParaFechar?.paciente_nome}
+                  <strong>{t.paciente}:</strong> {agendamentoParaFechar?.paciente_nome}
                 </p>
                 <p style={{ 
                   color: '#6b7280', 
@@ -1596,18 +1653,39 @@ const Agendamentos = () => {
                 </div>
               </div>
 
-              <div className="form-group" style={{ marginBottom: '1rem' }}>
-                <label className="form-label">Tipo de Tratamento</label>
-                <select 
-                  className="form-select"
-                  value={tipoTratamentoFechamento}
-                  onChange={(e) => setTipoTratamentoFechamento(e.target.value)}
-                >
-                  <option value="">Selecione</option>
-                  <option value="Estético">Estético</option>
-                  <option value="Odontológico">Odontológico</option>
-                </select>
-              </div>
+              {user?.empresa_id !== 5 && (
+                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                  <label className="form-label">Tipo de Tratamento</label>
+                  <select 
+                    className="form-select"
+                    value={tipoTratamentoFechamento}
+                    onChange={(e) => setTipoTratamentoFechamento(e.target.value)}
+                  >
+                    <option value="">Selecione</option>
+                    <option value="Estético">Estético</option>
+                    <option value="Odontológico">Odontológico</option>
+                  </select>
+                </div>
+              )}
+
+              {user?.empresa_id === 5 && (
+                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                  <label className="form-label">Empreendimento</label>
+                  <select 
+                    className="form-select"
+                    value={tipoTratamentoFechamento}
+                    onChange={(e) => setTipoTratamentoFechamento(e.target.value)}
+                  >
+                    <option value="">Selecione</option>
+                    <option value="4">Laguna Sky Garden</option>
+                    <option value="5">Residencial Girassol</option>
+                    <option value="6">Sintropia Sky Garden</option>
+                    <option value="7">Residencial Lotus</option>
+                    <option value="8">River Sky Garden</option>
+                    <option value="9">Condomínio Figueira Garcia</option>
+                  </select>
+                </div>
+              )}
 
               <div className="form-group" style={{ marginBottom: '1rem' }}>
                 <label className="form-label">Contrato (PDF) *</label>
@@ -1622,72 +1700,74 @@ const Agendamentos = () => {
                 </p>
               </div>
 
-              {/* Seção de Parcelamento */}
-              <div style={{ 
-                border: '1px solid #e5e7eb', 
-                borderRadius: '8px', 
-                padding: '1rem', 
-                marginBottom: '1rem',
-                backgroundColor: '#f9fafb'
-              }}>
-                <h4 style={{ 
-                  margin: '0 0 1rem 0', 
-                  fontSize: '1rem', 
-                  fontWeight: '600', 
-                  color: '#374151' 
+              {/* Seção de Parcelamento - Apenas para não incorporadora */}
+              {user?.empresa_id !== 5 && (
+                <div style={{ 
+                  border: '1px solid #e5e7eb', 
+                  borderRadius: '8px', 
+                  padding: '1rem', 
+                  marginBottom: '1rem',
+                  backgroundColor: '#f9fafb'
                 }}>
-                  Dados de Parcelamento
-                </h4>
-                
-                <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
-                  <div className="form-group">
-                    <label className="form-label">Valor da Parcela (R$)</label>
-                    <input 
-                      type="text"
-                      className="form-input"
-                      value={valorParcelaFormatado}
-                      onChange={handleValorParcelaChange}
-                      placeholder="R$ 0,00"
-                    />
+                  <h4 style={{ 
+                    margin: '0 0 1rem 0', 
+                    fontSize: '1rem', 
+                    fontWeight: '600', 
+                    color: '#374151' 
+                  }}>
+                    Dados de Parcelamento
+                  </h4>
+                  
+                  <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
+                    <div className="form-group">
+                      <label className="form-label">Valor da Parcela (R$)</label>
+                      <input 
+                        type="text"
+                        className="form-input"
+                        value={valorParcelaFormatado}
+                        onChange={handleValorParcelaChange}
+                        placeholder="R$ 0,00"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Nº de Parcelas</label>
+                      <input 
+                        type="number"
+                        className="form-input"
+                        value={numeroParcelasFechamento}
+                        onChange={(e) => setNumeroParcelasFechamento(e.target.value)}
+                        placeholder="Ex: 12"
+                        min="1"
+                      />
+                    </div>
                   </div>
 
-                  <div className="form-group">
-                    <label className="form-label">Nº de Parcelas</label>
-                    <input 
-                      type="number"
-                      className="form-input"
-                      value={numeroParcelasFechamento}
-                      onChange={(e) => setNumeroParcelasFechamento(e.target.value)}
-                      placeholder="Ex: 12"
-                      min="1"
-                    />
+                  <div className="grid grid-2" style={{ gap: '1rem' }}>
+                    <div className="form-group">
+                      <label className="form-label">Dia do Vencimento</label>
+                      <input 
+                        type="date"
+                        className="form-input"
+                        value={vencimentoFechamento}
+                        onChange={(e) => setVencimentoFechamento(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Antecipação (em meses)</label>
+                      <input 
+                        type="number"
+                        className="form-input"
+                        value={antecipacaoFechamento}
+                        onChange={(e) => setAntecipacaoFechamento(e.target.value)}
+                        placeholder="Ex: 3"
+                        min="1"
+                      />
+                    </div>
                   </div>
                 </div>
-
-                <div className="grid grid-2" style={{ gap: '1rem' }}>
-                  <div className="form-group">
-                    <label className="form-label">Dia do Vencimento</label>
-                    <input 
-                      type="date"
-                      className="form-input"
-                      value={vencimentoFechamento}
-                      onChange={(e) => setVencimentoFechamento(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Antecipação (em meses)</label>
-                    <input 
-                      type="number"
-                      className="form-input"
-                      value={antecipacaoFechamento}
-                      onChange={(e) => setAntecipacaoFechamento(e.target.value)}
-                      placeholder="Ex: 3"
-                      min="1"
-                    />
-                  </div>
-                </div>
-              </div>
+              )}
 
 
               <div className="form-group" style={{ marginBottom: '1.5rem' }}>
@@ -1762,7 +1842,7 @@ const Agendamentos = () => {
                   <strong style={{ color: '#92400e' }}>Limitação de Permissão</strong>
                 </div>
                 <p style={{ color: '#92400e', margin: 0, lineHeight: '1.5' }}>
-                  Como consultor freelancer, você não pode alterar o status dos pacientes, aguarde que iremos atualizar o status conforme a negociação avançar.
+                  Como consultor freelancer, você não pode alterar o status dos {t.paciente.toLowerCase()+'s'}, aguarde que iremos atualizar o status conforme a negociação avançar.
                 </p>
               </div>
               
@@ -1800,12 +1880,6 @@ const Agendamentos = () => {
         nomeRegistro={evidenciaData.agendamentoNome}
       />
 
-      {/* Tutorial Overlay */}
-      <TutorialAgendamentos
-        isOpen={showTutorial}
-        onClose={handleTutorialClose}
-        onComplete={handleTutorialComplete}
-      />
     </div>
   );
 };

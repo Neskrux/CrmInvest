@@ -160,9 +160,9 @@ const getAllConsultores = async (req, res) => {
       .select('*')
       .order('nome');
     
-    // Se for parceiro, filtrar apenas consultores vinculados a ela
-    if (req.user.tipo === 'parceiro') {
-      query = query.eq('empresa_id', req.user.id);
+    // Se for admin ou parceiro, filtrar apenas consultores da empresa
+    if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
+      query = query.eq('empresa_id', req.user.empresa_id);
     }
 
     const { data, error } = await query;
@@ -280,7 +280,7 @@ const cadastroPublico = async (req, res) => {
     console.log('📝 === NOVO CADASTRO DE CONSULTOR ===');
     console.log('📋 Dados recebidos:', req.body);
     
-    const { nome, telefone, email, senha, cpf, pix, cidade, estado } = req.body;
+    const { nome, telefone, email, senha, cpf, pix, cidade, estado, empresa_id, is_freelancer } = req.body;
     
     // Validar campos obrigatórios
     if (!nome || !telefone || !email || !senha || !cpf || !pix) {
@@ -326,6 +326,13 @@ const cadastroPublico = async (req, res) => {
     const saltRounds = 10;
     const senhaHash = await bcrypt.hash(senha, saltRounds);
     
+    // Definir empresa_id e is_freelancer baseado nos dados recebidos
+    const empresaIdFinal = empresa_id || 3; // Default para empresa 3 se não especificado
+    const isFreelancerFinal = is_freelancer !== undefined ? is_freelancer : true; // Default true se não especificado
+    
+    console.log('🏢 Definindo empresa_id =', empresaIdFinal, 'para cadastro público de consultor');
+    console.log('👤 is_freelancer =', isFreelancerFinal);
+    
     // Inserir consultor
     const { data, error } = await supabaseAdmin
       .from('consultores')
@@ -340,7 +347,8 @@ const cadastroPublico = async (req, res) => {
         estado,
         tipo: 'consultor',
         ativo: true,
-        is_freelancer: true
+        is_freelancer: isFreelancerFinal,
+        empresa_id: empresaIdFinal
       }])
       .select();
 

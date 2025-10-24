@@ -3,8 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Link, us
 import './App.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './components/Toast';
-import { LeadNotificationProvider, useLeadNotification } from './components/LeadNotificationProvider';
-import { AudioProvider } from './contexts/AudioContext';
+import useBranding from './hooks/useBranding';
 import { HelpCircle } from 'lucide-react';
 import CadastroConsultor from './components/CadastroConsultor';
 import CadastroSucesso from './components/CadastroSucesso';
@@ -15,13 +14,13 @@ import CapturaClinicaSucesso from './components/CapturaClinicaSucesso';
 import CapturaClientes from './components/CapturaClientes';
 import CapturaSucessoClientes from './components/CapturaSucessoClientes';
 import CapturaIndicadorClientes from './components/CapturaIndicadorClientes';
-import TesteBranding from './components/TesteBranding';
 import Login from './components/Login';
 import ResetPassword from './components/ResetPassword';
 import Dashboard from './components/Dashboard';
 import Pacientes from './components/Pacientes';
 import Consultores from './components/Consultores';
 import Clinicas from './components/Clinicas';
+import Empreendimentos from './components/Empreendimentos';
 import Agendamentos from './components/Agendamentos';
 import Fechamentos from './components/Fechamentos';
 import MetaAds from './components/MetaAds';
@@ -57,9 +56,10 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
-// Componente interno que usa o hook de notificação
-const AppContentWithNotifications = () => {
-  const { user, logout, loading, isAdmin, isParceiro }	 = useAuth();
+// Componente interno principal
+const AppContent = () => {
+  const { user, logout, loading, isAdmin, isParceiro, isIncorporadora }	 = useAuth();
+  const { t } = useBranding();
   const location = useLocation();
   const navigate = useNavigate();
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -98,6 +98,7 @@ const AppContentWithNotifications = () => {
     if (path.includes('/pacientes')) return 'pacientes';
     if (path.includes('/consultores')) return 'consultores';
     if (path.includes('/clinicas')) return 'clinicas';
+    if (path.includes('/empreendimentos')) return 'empreendimentos';
     if (path.includes('/agendamentos')) return 'agendamentos';
     if (path.includes('/fechamentos')) return 'fechamentos';
     if (path.includes('/calculo-carteira')) return 'calculo-carteira';
@@ -166,6 +167,7 @@ const AppContentWithNotifications = () => {
     return (
       <Routes>
         <Route path="/cadastro" element={<CadastroConsultor />} />
+        <Route path="/cadastro-consultor" element={<CadastroConsultor />} />
         <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
@@ -187,8 +189,7 @@ const AppContentWithNotifications = () => {
           <Route path="/como-fazer" element={<ComoFazer />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/pacientes" element={<Pacientes />} />
-          <Route path="/clinicas" element={<Clinicas />} />
-          <Route path="/materiais" element={<Materiais />} />
+          {!isIncorporadora && <Route path="/materiais" element={<Materiais />} />}
           <Route path="/perfil" element={<Perfil />} />
           <Route path="/" element={<Navigate to="/indicacoes" replace />} />
           <Route path="*" element={<Navigate to="/indicacoes" replace />} />
@@ -229,11 +230,12 @@ const AppContentWithNotifications = () => {
         <Routes>
           <Route path="/consultores" element={<Consultores />} />
           <Route path="/clinicas" element={<Clinicas />} />
-          <Route path="/materiais" element={<Materiais />} />
+          <Route path="/empreendimentos" element={<Empreendimentos />} />
+          {!isIncorporadora && <Route path="/materiais" element={<Materiais />} />}
           <Route path="/perfil" element={<Perfil />} />
-          {/* Redirecionar qualquer outra rota para clínicas */}
-          <Route path="/" element={<Navigate to="/clinicas" replace />} />
-          <Route path="*" element={<Navigate to="/clinicas" replace />} />
+          {/* Redirecionar qualquer outra rota para clínicas (ou empreendimentos se for incorporadora) */}
+          <Route path="/" element={<Navigate to={isIncorporadora ? "/empreendimentos" : "/clinicas"} replace />} />
+          <Route path="*" element={<Navigate to={isIncorporadora ? "/empreendimentos" : "/clinicas"} replace />} />
         </Routes>
       );
     }
@@ -260,6 +262,7 @@ const AppContentWithNotifications = () => {
         <Route path="/pacientes" element={<Pacientes />} />
         <Route path="/consultores" element={<Consultores />} />
         <Route path="/clinicas" element={<Clinicas />} />
+        <Route path="/empreendimentos" element={<Empreendimentos />} />
         <Route path="/agendamentos" element={<Agendamentos />} />
         <Route path="/fechamentos" element={<Fechamentos />} />
         <Route path="/calculo-carteira" element={<Pacientes />} />
@@ -353,20 +356,10 @@ const AppContentWithNotifications = () => {
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                   <circle cx="9" cy="7" r="4"/>
                 </svg>
-                <span>Pacientes</span>
+                <span>{isIncorporadora ? 'Clientes' : 'Pacientes'}</span>
               </Link>
 
-              <Link
-                to="/clinicas"
-                className={`freelancer-nav-item ${activeTab === 'clinicas' ? 'active' : ''}`}
-              >
-                <svg className="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                  <polyline points="9 22 9 12 15 12 15 22"/>
-                </svg>
-                <span>Clínicas</span>
-              </Link>
-
+              {!isIncorporadora && (
               <Link
                 to="/materiais"
                 className={`freelancer-nav-item ${activeTab === 'materiais' ? 'active' : ''}`}
@@ -380,9 +373,10 @@ const AppContentWithNotifications = () => {
                 </svg>
                 <span>Materiais</span>
               </Link>
+              )}
 
               <a
-                href="https://chat.whatsapp.com/H58PhHmVQpj1mRSj7wlZgs"
+                href={user?.empresa_id === 5 ? "https://chat.whatsapp.com/CvVrPfTD5uo0b2kltK99vE" : "https://chat.whatsapp.com/H58PhHmVQpj1mRSj7wlZgs"}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="freelancer-nav-item"
@@ -608,7 +602,7 @@ const AppContentWithNotifications = () => {
                   <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                   <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
-                {user.tipo === 'clinica' ? 'Meus Pacientes' : 'Pacientes'}
+                {user.tipo === 'clinica' ? 'Meus Pacientes' : (isIncorporadora ? 'Clientes' : t.pacientes)}
               </Link>
             </div>
           ) : null}
@@ -627,7 +621,7 @@ const AppContentWithNotifications = () => {
                   <line x1="8" y1="2" x2="8" y2="6" />
                   <line x1="3" y1="10" x2="21" y2="10" />
                 </svg>
-                Agendamentos
+                {t.agendamentos}
               </Link>
             </div>
           ) : null}
@@ -644,13 +638,13 @@ const AppContentWithNotifications = () => {
                   <line x1="12" y1="1" x2="12" y2="23" />
                   <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                 </svg>
-                Fechamentos
+                {t.fechamentos}
               </Link>
             </div>
           )}
 
-          {/* Cálculo de Carteira - Apenas para Admin e Consultores Invest Money (NÃO para clínicas) */}
-          {(user.tipo === 'admin' || (user.tipo === 'consultor' && user.pode_ver_todas_novas_clinicas && user.podealterarstatus)) && user.tipo !== 'clinica' && (
+          {/* Cálculo de Carteira - Apenas para Admin e Consultores Invest Money (NÃO para clínicas e NÃO para incorporadora) */}
+          {(user.tipo === 'admin' || (user.tipo === 'consultor' && user.pode_ver_todas_novas_clinicas && user.podealterarstatus)) && user.tipo !== 'clinica' && !isIncorporadora && (
             <div className="nav-item">
               <Link
                 to="/calculo-carteira"
@@ -669,19 +663,19 @@ const AppContentWithNotifications = () => {
           )}
 
 
-          {/* Clínicas - Não mostrar para usuários tipo clínica */}
+          {/* Clínicas/Empreendimentos - Não mostrar para usuários tipo clínica */}
           {user.tipo !== 'clinica' && (
             <div className="nav-item">
               <Link
-                to="/clinicas"
-                className={`nav-link ${activeTab === 'clinicas' ? 'active' : ''}`}
+                to={isIncorporadora ? "/empreendimentos" : "/clinicas"}
+                className={`nav-link ${(activeTab === 'clinicas' || activeTab === 'empreendimentos') ? 'active' : ''}`}
                 onClick={handleMobileNavigation}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                   <polyline points="9 22 9 12 15 12 15 22" />
                 </svg>
-                Clínicas
+                {t.clinicas}
               </Link>
             </div>
           )}
@@ -730,8 +724,8 @@ const AppContentWithNotifications = () => {
             </div>
           )}
 
-          {/* Materiais de Apoio - Não mostrar para clínicas */}
-          {user.tipo !== 'clinica' && (
+          {/* Materiais de Apoio - Não mostrar para clínicas e incorporadora */}
+          {user.tipo !== 'clinica' && !isIncorporadora && (
             <div className="nav-item">
               <Link
                 to="/materiais"
@@ -768,8 +762,8 @@ const AppContentWithNotifications = () => {
             </div>
           )}
 
-          {/* Integração IDSF - Não mostrar para clínicas */}
-          {user.tipo !== 'clinica' && (
+          {/* Integração IDSF - Não mostrar para clínicas e incorporadora */}
+          {user.tipo !== 'clinica' && !isIncorporadora && (
             <div className="nav-item">
               <Link
                 to="/idsf"
@@ -797,7 +791,7 @@ const AppContentWithNotifications = () => {
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                   <circle cx="12" cy="7" r="4" />
                 </svg>
-                Consultores
+                {t.consultores}
               </Link>
             </div>
           )}
@@ -849,7 +843,7 @@ const AppContentWithNotifications = () => {
           {user.is_freelancer && (
             <div className="nav-item">
               <Link
-                to="https://chat.whatsapp.com/H58PhHmVQpj1mRSj7wlZgs"
+                to={user?.empresa_id === 5 ? "https://chat.whatsapp.com/CvVrPfTD5uo0b2kltK99vE" : "https://chat.whatsapp.com/H58PhHmVQpj1mRSj7wlZgs"}
                 className={`nav-link`}
                 target="_blank"
                 onClick={handleMobileNavigation}
@@ -1175,29 +1169,25 @@ function App() {
   return (
     <ToastProvider>
       <AuthProvider>
-        <AudioProvider>
-          <LeadNotificationProvider>
-            <Router>
-              <Routes>
-                {/* Rotas públicas - Captura de leads */}
-                <Route path="/captura-lead" element={<CapturaLead />} />
-                <Route path="/captura-sucesso" element={<CapturaSucesso />} />
-                
-                {/* Rotas públicas - Captura de clínicas */}
-                <Route path="/captura-clinica" element={<CapturaClinica />} />
-                <Route path="/captura-clinica-sucesso" element={<CapturaClinicaSucesso />} />
-                
-                {/* Rotas públicas - Captura de clientes */}
-                <Route path="/captura-clientes" element={<CapturaClientes />} />
-                <Route path="/captura-sucesso-clientes" element={<CapturaSucessoClientes />} />
-                <Route path="/captura-indicador-cliente" element={<CapturaIndicadorClientes />} />
+        <Router>
+            <Routes>
+              {/* Rotas públicas - Captura de leads */}
+              <Route path="/captura-lead" element={<CapturaLead />} />
+              <Route path="/captura-sucesso" element={<CapturaSucesso />} />
+              
+              {/* Rotas públicas - Captura de clínicas */}
+              <Route path="/captura-clinica" element={<CapturaClinica />} />
+              <Route path="/captura-clinica-sucesso" element={<CapturaClinicaSucesso />} />
+              
+              {/* Rotas públicas - Captura de clientes */}
+              <Route path="/captura-clientes" element={<CapturaClientes />} />
+              <Route path="/captura-sucesso-clientes" element={<CapturaSucessoClientes />} />
+              <Route path="/captura-indicador-cliente" element={<CapturaIndicadorClientes />} />
 
-                {/* Rotas da aplicação principal */}
-                <Route path="/*" element={<AppContentWithNotifications />} />
-              </Routes>
-            </Router>
-          </LeadNotificationProvider>
-        </AudioProvider>
+              {/* Rotas da aplicação principal */}
+              <Route path="/*" element={<AppContent />} />
+            </Routes>
+          </Router>
       </AuthProvider>
     </ToastProvider>
   );

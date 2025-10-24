@@ -9,8 +9,9 @@ const CapturaClientes = () => {
   const location = useLocation();
   const [formData, setFormData] = useState({
     nome: '',
+    email: '',
     telefone: '',
-    tipo_tratamento: '',
+    empreendimento_id: '',
     cpf: '',
     cidade: '',
     estado: '',
@@ -427,7 +428,7 @@ const CapturaClientes = () => {
       const data = await response.json();
       
       if (response.ok) {
-        navigate('/captura-sucesso', { 
+        navigate('/captura-sucesso-clientes', { 
           state: { 
             nome: data.nome,
             message: data.message,
@@ -495,16 +496,15 @@ const CapturaClientes = () => {
               <div className="form-group">
                 <label className="form-label">Email *</label>   
                 <input
-                  type="text"
-                  name="nome"
-                  className={`form-input ${errors.nome ? 'error' : ''}`}
-                  value={formData.nome}
+                  type="email"
+                  name="email"
+                  className={`form-input ${errors.email ? 'error' : ''}`}
+                  value={formData.email}
                   onChange={handleInputChange}
-                  onBlur={handleNomeBlur}
                   placeholder="Digite um email válido"
                   disabled={loading}
                 />
-                {errors.nome && <span className="field-error">{errors.nome}</span>}
+                {errors.email && <span className="field-error">{errors.email}</span>}
               </div>
 
               <div className="form-group">
@@ -524,16 +524,19 @@ const CapturaClientes = () => {
               <div className="form-group">
                 <label className="form-label">Escolha um empreendimento de interesse</label>
                 <select
-                  name="tipo_tratamento"  //vai ter que mudar para o nome do empreendimento??
+                  name="empreendimento_id"
                   className="form-select"
-                  value={formData.tipo_tratamento}
+                  value={formData.empreendimento_id}
                   onChange={handleInputChange}
                   disabled={loading}
                 >
                   <option value="">Selecione (opcional)</option>
-                  <option value="Estético">Laguna Sky Garden</option>
-                  <option value="Odontológico">Sintropia Sky Garden</option>
-                  <option value="Residencial Girassol">Residencial Girassol</option>    //verificar mudançasde value
+                  <option value="4">Laguna Sky Garden</option>
+                  <option value="5">Residencial Girassol</option>
+                  <option value="6">Sintropia Sky Garden</option>
+                  <option value="7">Residencial Lotus</option>
+                  <option value="8">River Sky Garden</option>
+                  <option value="9">Condomínio Figueira Garcia</option>
                 </select>
               </div>
 
@@ -740,7 +743,7 @@ const CapturaClientes = () => {
                   <div className="loading-spinner"></div>
                 ) : (
                   <>
-                    <span>Agendar Agendamento Gratuita</span>
+                    <span>Agendar gratuitamente</span>
                   </>
                 )}
               </button>

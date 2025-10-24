@@ -42,5 +42,8 @@ router.put('/fechamentos/:id/aprovar', authenticateToken, requireAdmin, fechamen
 // PUT /api/fechamentos/:id/reprovar - Reprovar fechamento (apenas admin)
 router.put('/fechamentos/:id/reprovar', authenticateToken, requireAdmin, fechamentosController.reprovarFechamento);
 
+// POST /api/fechamentos/:id/criar-acesso-freelancer - Criar acesso freelancer para paciente fechado
+router.post('/fechamentos/:id/criar-acesso-freelancer', authenticateToken, fechamentosController.criarAcessoFreelancer);
+
 module.exports = router;
 

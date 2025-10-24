@@ -56,6 +56,105 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// Test endpoint for empreendimentos
+app.get('/test-empreendimentos', (req, res) => {
+  res.json({ message: 'Endpoint de teste funcionando!' });
+});
+
+// Test endpoint for empreendimentos with database
+app.get('/test-db', async (req, res) => {
+  try {
+    const { supabaseAdmin } = require('./config/database');
+    
+    console.log('🧪 Testando conexão com banco...');
+    
+    const { data, error } = await supabaseAdmin
+      .from('empreendimentos')
+      .select('*');
+
+    if (error) {
+      console.error('❌ Erro ao acessar tabela empreendimentos:', error);
+      return res.status(500).json({ 
+        error: 'Tabela empreendimentos não existe ou não é acessível',
+        details: error.message
+      });
+    }
+
+    console.log('✅ Tabela empreendimentos acessível');
+    res.json({ 
+      success: true, 
+      message: 'Tabela empreendimentos acessível',
+      data: data 
+    });
+  } catch (error) {
+    console.error('❌ Erro no teste:', error);
+    res.status(500).json({ 
+      error: error.message,
+      details: 'Erro ao testar conexão com empreendimentos'
+    });
+  }
+});
+
+// Test endpoint for empreendimentos API (without auth)
+app.get('/empreendimentos-test', async (req, res) => {
+  try {
+    const { supabaseAdmin } = require('./config/database');
+    
+    console.log('🧪 Testando API de empreendimentos...');
+    
+    const { data, error } = await supabaseAdmin
+      .from('empreendimentos')
+      .select('*');
+
+    if (error) {
+      console.error('❌ Erro ao acessar tabela empreendimentos:', error);
+      return res.status(500).json({ 
+        error: 'Tabela empreendimentos não existe ou não é acessível',
+        details: error.message
+      });
+    }
+
+    console.log('✅ API de empreendimentos funcionando');
+    res.json(data);
+  } catch (error) {
+    console.error('❌ Erro no teste da API:', error);
+    res.status(500).json({ 
+      error: error.message,
+      details: 'Erro ao testar API de empreendimentos'
+    });
+  }
+});
+
+// Endpoint público para empreendimentos (dados não sensíveis)
+app.get('/api/empreendimentos-public', async (req, res) => {
+  try {
+    const { supabaseAdmin } = require('./config/database');
+    
+    console.log('🔍 [Backend] Buscando empreendimentos (endpoint público)...');
+    
+        const { data, error } = await supabaseAdmin
+          .from('empreendimentos')
+          .select('id, nome, endereco, bairro, cidade, estado, status, created_at, unidades, tipo')
+          .eq('status', 'ativo'); // Apenas empreendimentos ativos
+
+    if (error) {
+      console.error('❌ [Backend] Erro na query:', error);
+      return res.status(500).json({ 
+        error: 'Erro ao buscar empreendimentos',
+        details: error.message
+      });
+    }
+
+    console.log('✅ [Backend] Empreendimentos carregados:', data.length);
+    res.json(data);
+  } catch (error) {
+    console.error('❌ [Backend] Erro completo:', error);
+    res.status(500).json({ 
+      error: error.message,
+      details: 'Erro interno do servidor'
+    });
+  }
+});
 
 // Rota raiz
 app.get('/', (req, res) => {

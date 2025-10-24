@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logoBrasaoPreto from '../images/logohorizontalpreto.png';
 
@@ -16,9 +16,197 @@ const CadastroConsultor = () => {
     estado: '',
     aceitaTermos: false
   });
+  
+  // Verificar se é cliente da incorporadora (empresa_id = 5)
+  const [isClienteIncorporadora, setIsClienteIncorporadora] = useState(() => {
+    // Inicializar com o valor correto desde o início
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('cliente') === 'incorporadora';
+  });
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  
+  // Modal de vídeo obrigatório
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  const [videoTimeWatched, setVideoTimeWatched] = useState(0);
+  const [canCloseModal, setCanCloseModal] = useState(false);
+  const [videoPlaying, setVideoPlaying] = useState(false);
+  const [showPlayButton, setShowPlayButton] = useState(false);
+  const [showControlButton, setShowControlButton] = useState(false);
+  const videoRef = React.useRef(null);
+
+
+  // Meta Pixel - Carregar script do Facebook
+  useEffect(() => {
+    // Carregar o script do Meta Pixel
+    const script = document.createElement('script');
+    script.innerHTML = `
+      !function(f,b,e,v,n,t,s)
+      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', '1981637492627156');
+      fbq('track', 'PageView');
+    `;
+    document.head.appendChild(script);
+
+    // Cleanup function
+    return () => {
+      const existingScript = document.querySelector('script[src="https://connect.facebook.net/en_US/fbevents.js"]');
+      if (existingScript) {
+        document.head.removeChild(existingScript);
+      }
+    };
+  }, []);
+
+  // Modal de vídeo - Abrir na primeira visualização (apenas para consultores normais)
+  useEffect(() => {
+    // Não mostrar vídeo para clientes da incorporadora
+    if (isClienteIncorporadora) {
+      return;
+    }
+    
+    // Verificar se já foi mostrado antes (usando localStorage)
+    const hasSeenVideo = localStorage.getItem('cadastro-consultor-video-seen');
+    
+    if (!hasSeenVideo) {
+      setShowVideoModal(true);
+      setShowControlButton(true); // Mostrar botão inicial
+    }
+  }, [isClienteIncorporadora]);
+
+  // Bloquear scroll quando modal estiver aberto (apenas para consultores normais)
+  useEffect(() => {
+    // Não aplicar bloqueio de scroll para clientes da incorporadora
+    if (isClienteIncorporadora) {
+      return;
+    }
+    
+    if (showVideoModal) {
+      // Bloquear scroll
+      document.body.style.overflow = 'hidden';
+    } else {
+      // Liberar scroll
+      document.body.style.overflow = 'unset';
+    }
+
+    // Cleanup - sempre liberar scroll quando componente desmontar
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showVideoModal, isClienteIncorporadora]);
+
+  // Forçar play do vídeo quando modal abrir (apenas para consultores normais)
+  useEffect(() => {
+    // Não aplicar para clientes da incorporadora
+    if (isClienteIncorporadora) {
+      return;
+    }
+    
+    if (showVideoModal && videoRef.current) {
+      // Pequeno delay para garantir que o vídeo esteja carregado
+      const timer = setTimeout(() => {
+        if (videoRef.current) {
+          // Garantir que o áudio esteja ativado
+          videoRef.current.muted = false;
+          videoRef.current.volume = 1;
+          
+          // Tentar tocar o vídeo
+          videoRef.current.play().then(() => {
+            setVideoPlaying(true);
+            setShowPlayButton(false);
+          }).catch(error => {
+            console.log('Autoplay bloqueado pelo navegador:', error);
+            setShowPlayButton(true);
+            setVideoPlaying(false);
+          });
+        }
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [showVideoModal, isClienteIncorporadora]);
+
+  // Função para tocar o vídeo manualmente
+  const handlePlayVideo = async () => {
+    if (videoRef.current) {
+      try {
+        videoRef.current.muted = false;
+        videoRef.current.volume = 1;
+        await videoRef.current.play();
+        setVideoPlaying(true);
+        setShowPlayButton(false);
+        setShowControlButton(true);
+        
+        // Esconder botão após 2 segundos
+        setTimeout(() => {
+          setShowControlButton(false);
+        }, 2000);
+      } catch (error) {
+        console.log('Erro ao tocar vídeo:', error);
+      }
+    }
+  };
+
+  // Função para pausar o vídeo
+  const handlePauseVideo = () => {
+    if (videoRef.current) {
+      videoRef.current.pause();
+      setVideoPlaying(false);
+      setShowControlButton(true);
+      
+      // Esconder botão após 2 segundos
+      setTimeout(() => {
+        setShowControlButton(false);
+      }, 2000);
+    }
+  };
+
+  // Função para alternar play/pause ao clicar no vídeo
+  const handleVideoClick = () => {
+    if (videoRef.current) {
+      if (videoPlaying) {
+        // Se está tocando, pausar
+        videoRef.current.pause();
+        setVideoPlaying(false);
+      } else {
+        // Se está pausado, tocar
+        videoRef.current.play();
+        setVideoPlaying(true);
+      }
+      
+      // Mostrar botão e esconder após 2 segundos
+      setShowControlButton(true);
+      setTimeout(() => {
+        setShowControlButton(false);
+      }, 2000);
+    }
+  };
+
+  // Função para controlar o tempo assistido do vídeo
+  const handleVideoTimeUpdate = (e) => {
+    const currentTime = e.target.currentTime;
+    setVideoTimeWatched(currentTime);
+    
+    // Permitir fechar após 20 segundos
+    if (currentTime >= 20 && !canCloseModal) {
+      setCanCloseModal(true);
+    }
+  };
+
+  // Função para fechar o modal
+  const handleCloseModal = () => {
+    if (canCloseModal) {
+      setShowVideoModal(false);
+      // Marcar como visto no localStorage
+      localStorage.setItem('cadastro-consultor-video-seen', 'true');
+    }
+  };
 
   const validateCPF = (cpf) => {
     cpf = cpf.replace(/[^\d]/g, '');
@@ -216,6 +404,14 @@ const CadastroConsultor = () => {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     
+    // Meta Pixel - Tracking quando usuário inicia preenchimento do formulário
+    if (window.fbq && formData.nome === '' && name === 'nome' && value.trim()) {
+      window.fbq('track', 'InitiateCheckout', {
+        content_name: 'Formulário de Cadastro',
+        content_category: 'Lead Generation'
+      });
+    }
+    
     let formattedValue = value;
     
     if (name === 'cpf') {
@@ -346,15 +542,39 @@ const CadastroConsultor = () => {
           pix: formData.pix.replace(/\D/g, ''),
           cidade: formData.cidade,
           estado: formData.estado,
-          tipo: 'consultor'
+          tipo: 'consultor',
+          empresa_id: isClienteIncorporadora ? 5 : null, // Incorporadora
+          is_freelancer: isClienteIncorporadora ? true : false
         })
       });
       
       const data = await response.json();
       
       if (response.ok) {
-        navigate('/cadastro-sucesso');
+        // Meta Pixel - Evento de cadastro bem-sucedido
+        if (window.fbq) {
+          window.fbq('track', 'CompleteRegistration', {
+            content_name: 'Cadastro de Consultor',
+            content_category: 'Lead Generation',
+            value: 50, // Valor da comissão
+            currency: 'BRL'
+          });
+        }
+        
+        if (isClienteIncorporadora) {
+          navigate('/indicacoes');
+        } else {
+          navigate('/cadastro-sucesso');
+        }
       } else {
+        // Meta Pixel - Evento de erro no cadastro
+        if (window.fbq) {
+          window.fbq('track', 'Lead', {
+            content_name: 'Tentativa de Cadastro - Erro',
+            content_category: 'Lead Generation'
+          });
+        }
+        
         let errorMsg = data.error || 'Erro ao cadastrar consultor';
         if (errorMsg && errorMsg.toLowerCase().includes('consultores_email_key')) {
           errorMsg = 'Já existe um consultor cadastrado com este e-mail. Por favor, utilize outro e-mail.';
@@ -371,7 +591,7 @@ const CadastroConsultor = () => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#f9fafb',
+      background: 'linear-gradient(135deg, #1a1d23 0%, #2d3748 100%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -380,7 +600,7 @@ const CadastroConsultor = () => {
       <div style={{
         background: 'white',
         borderRadius: '8px',
-        padding: '3rem',
+        padding: '2rem',
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)',
         border: '1px solid #e5e7eb',
         width: '100%',
@@ -404,7 +624,7 @@ const CadastroConsultor = () => {
             marginBottom: '0.75rem',
             letterSpacing: '-0.025em'
           }}>
-            Cadastro de Consultor
+            Faça seu cadastro
           </h1>
           <p style={{
             fontSize: '1rem',
@@ -412,7 +632,10 @@ const CadastroConsultor = () => {
             lineHeight: '1.5',
             marginBottom: '1rem'
           }}>
-            Preencha os dados abaixo para criar sua conta
+            {isClienteIncorporadora 
+              ? 'Preencha os dados abaixo para acessar o sistema de indicações'
+              : 'Preencha os dados abaixo para criar sua conta'
+            }
           </p>
           <div style={{
             display: 'inline-flex',
@@ -421,7 +644,7 @@ const CadastroConsultor = () => {
             fontSize: '0.875rem',
             color: '#6b7280'
           }}>
-            <span>Já possui uma conta?</span>
+            <span>{isClienteIncorporadora ? 'Já possui acesso?' : 'Já possui uma conta?'}</span>
             <button
               type="button"
               onClick={() => navigate('/login')}
@@ -439,7 +662,7 @@ const CadastroConsultor = () => {
               onMouseOver={(e) => e.target.style.color = '#0f1114'}
               onMouseOut={(e) => e.target.style.color = '#1a1d23'}
             >
-              Fazer login
+              {isClienteIncorporadora ? 'Fazer login' : 'Fazer login'}
             </button>
           </div>
         </div>
@@ -717,13 +940,10 @@ const CadastroConsultor = () => {
                 />
                 <span style={{ fontSize: '0.875rem', color: '#374151' }}>
                   Aceito os{' '}
-                  <a href="#" style={{ color: '#1a1d23', textDecoration: 'underline' }}>
+                  <a href="https://idicuetpukxjqripbpwa.supabase.co/storage/v1/object/public/materiais-apoio/documento_1761076690439_294882875.docx" style={{ color: '#1a1d23', textDecoration: 'underline' }}>
                     termos de uso
                   </a>{' '}
-                  e{' '}
-                  <a href="#" style={{ color: '#1a1d23', textDecoration: 'underline' }}>
-                    política de privacidade
-                  </a>
+                  para utilizar o sistema
                 </span>
               </label>
               {errors.aceitaTermos && (
@@ -801,7 +1021,7 @@ const CadastroConsultor = () => {
                   }
                 }}
               >
-                {loading ? 'Cadastrando...' : 'Cadastrar'}
+                {loading ? 'Cadastrando...' : (isClienteIncorporadora ? 'Acessar Sistema' : 'Cadastrar')}
               </button>
             </div>
           </div>
@@ -830,12 +1050,263 @@ const CadastroConsultor = () => {
             paddingLeft: '1rem',
             lineHeight: '1.4'
           }}>
-            <li>Seu PIX deve ser o mesmo CPF informado</li>
-            <li>Você receberá R$ 10 de comissão a cada R$ 1.000 fechados</li>
-            <li>Seu login será feito com o e-mail informado</li>
+            {isClienteIncorporadora ? (
+              <>
+                <li>Seu PIX deve ser o mesmo CPF informado</li>
+                <li>Você receberá R$ 3.000 para estúdios e R$ 5.000 para apartamentos</li>
+                <li>Seu login será feito com o e-mail informado</li>
+                <li>Acesso direto ao sistema de indicações</li>
+              </>
+            ) : (
+              <>
+                <li>Seu PIX deve ser o mesmo CPF informado</li>
+                <li>Você receberá R$ 50 de comissão a cada R$ 5.000 fechados</li>
+                <li>Seu login será feito com o e-mail informado</li>
+              </>
+            )}
           </ul>
         </div>
       </div>
+
+      {/* Modal de Vídeo Obrigatório */}
+      {showVideoModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.9)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '2rem'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '2rem',
+            maxWidth: '400px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'hidden',
+            position: 'relative'
+          }}>
+            {/* Header do Modal */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem'
+            }}>
+              <h2 style={{
+                fontSize: '1.2rem',
+                fontWeight: '700',
+                color: '#1a1d23',
+                margin: 0
+              }}>
+                Boas vindas ao Solumn
+              </h2>
+              {canCloseModal ? (
+                <button
+                  onClick={handleCloseModal}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '1.2rem',
+                    color: '#6b7280',
+                    cursor: 'pointer',
+                    padding: '0.5rem',
+                    borderRadius: '50%',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                    e.target.style.color = '#374151';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                    e.target.style.color = '#6b7280';
+                  }}
+                >
+                  ✕
+                </button>
+              ) : (
+                <div style={{
+                  position: 'relative',
+                  width: '40px',
+                  height: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {/* Círculo de fundo */}
+                  <div style={{
+                    position: 'absolute',
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    border: '3px solid #e5e7eb',
+                    background: 'transparent'
+                  }} />
+                  
+                  {/* Círculo de progresso - preenchimento */}
+                  <div style={{
+                    position: 'absolute',
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    background: `conic-gradient(#1a1d23 0deg, #1a1d23 ${(videoTimeWatched / 20) * 360}deg, transparent ${(videoTimeWatched / 20) * 360}deg)`,
+                    transition: 'background 0.3s ease'
+                  }} />
+                  
+                  {/* Máscara interna para criar o efeito de anel */}
+                  <div style={{
+                    position: 'absolute',
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: '50%',
+                    background: 'white',
+                    top: '3px',
+                    left: '3px'
+                  }} />
+                  
+                  {/* Texto do tempo */}
+                  <span style={{
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    color: '#1a1d23',
+                    zIndex: 1
+                  }}>
+                    {Math.ceil(20 - videoTimeWatched)}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Vídeo */}
+            <div style={{
+              borderRadius: '8px',
+              overflow: 'hidden',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              position: 'relative'
+            }}>
+               <video
+                 ref={videoRef}
+                 src="/video-produto.mp4" // Substitua pelo nome do seu vídeo
+                 controls={false} // Controles sempre desabilitados
+                 autoPlay
+                 muted={false} // Sempre com áudio
+                 onTimeUpdate={handleVideoTimeUpdate}
+                 onPlay={() => setVideoPlaying(true)}
+                 onPause={() => setVideoPlaying(false)}
+                 onClick={handleVideoClick}
+                onSeeked={(e) => {
+                  // Bloquear avanço - voltar para posição atual se tentar pular
+                  if (!canCloseModal && e.target.currentTime > videoTimeWatched) {
+                    e.target.currentTime = videoTimeWatched;
+                  }
+                }}
+                onSeeking={(e) => {
+                  // Bloquear navegação temporal se ainda não pode fechar
+                  if (!canCloseModal) {
+                    e.target.currentTime = videoTimeWatched;
+                  }
+                }}
+                style={{
+                  width: '80%',
+                  objectFit: 'cover',
+                  cursor: 'pointer' // Cursor de clique
+                }}
+              >
+                Seu navegador não suporta vídeos.
+              </video>
+
+              {/* Botão de Play - quando vídeo está pausado */}
+              {!videoPlaying && showControlButton && (
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  zIndex: 10
+                }}>
+                  <button
+                    onClick={handlePlayVideo}
+                    style={{
+                      width: '80px',
+                      height: '80px',
+                      borderRadius: '50%',
+                      background: 'rgba(0, 0, 0, 0.8)',
+                      border: 'none',
+                      color: 'white',
+                      fontSize: '2rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.target.style.background = 'rgba(0, 0, 0, 0.9)';
+                      e.target.style.transform = 'scale(1.1)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.target.style.background = 'rgba(0, 0, 0, 0.8)';
+                      e.target.style.transform = 'scale(1)';
+                    }}
+                  >
+                    ▶
+                  </button>
+                </div>
+              )}
+
+              {/* Botão de Pause - quando vídeo está tocando */}
+              {videoPlaying && showControlButton && (
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  zIndex: 10
+                }}>
+                  <button
+                    onClick={handlePauseVideo}
+                    style={{
+                      width: '80px',
+                      height: '80px',
+                      borderRadius: '50%',
+                      background: 'rgba(0, 0, 0, 0.8)',
+                      border: 'none',
+                      color: 'white',
+                      fontSize: '2rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.target.style.background = 'rgba(0, 0, 0, 0.9)';
+                      e.target.style.transform = 'scale(1.1)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.target.style.background = 'rgba(0, 0, 0, 0.8)';
+                      e.target.style.transform = 'scale(1)';
+                    }}
+                  >
+                    ⏸
+                  </button>
+                </div>
+              )}
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

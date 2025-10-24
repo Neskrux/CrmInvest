@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
+import useSmartPolling from '../hooks/useSmartPolling';
 import '../App.css';
 
 function MetaAds() {
@@ -180,14 +181,24 @@ function MetaAds() {
     }
   };
 
-  // Auto refresh a cada 5 minutos
-  useEffect(() => {
-    let interval;
-    if (autoRefresh) {
-      interval = setInterval(fetchAdvancedMetrics, 5 * 60 * 1000); // 5 minutos
+  // Função de polling inteligente para Meta Ads
+  const pollingCallback = async () => {
+    console.log('🔄 Executando polling inteligente - Meta Ads...');
+    
+    try {
+      await fetchAdvancedMetrics();
+      console.log('✅ Polling inteligente concluído - Meta Ads');
+    } catch (error) {
+      console.warn('⚠️ Erro no polling inteligente - Meta Ads:', error);
     }
-    return () => clearInterval(interval);
-  }, [autoRefresh, dateRange]);
+  };
+
+  // Polling inteligente (5 minutos quando autoRefresh estiver ativo)
+  useSmartPolling(
+    pollingCallback, 
+    300000, // 5 minutos
+    [autoRefresh, dateRange]
+  );
 
   // Verificar cache local primeiro
   const loadCachedData = () => {

@@ -12,8 +12,11 @@ const getDashboard = async (req, res) => {
     // Configurar filtros baseados no tipo de usuário
     const isConsultor = req.user.tipo === 'consultor';
     const isClinica = req.user.tipo === 'clinica';
+    const isAdmin = req.user.tipo === 'admin';
+    const isParceiro = req.user.tipo === 'parceiro';
     const consultorId = req.user.id;
     const clinicaId = req.user.clinica_id;
+    const empresaId = req.user.empresa_id;
 
     // Buscar agendamentos de hoje
     let agendamentosQuery = supabase
@@ -25,6 +28,9 @@ const getDashboard = async (req, res) => {
       agendamentosQuery = agendamentosQuery.eq('clinica_id', clinicaId);
     } else if (isConsultor) {
       agendamentosQuery = agendamentosQuery.eq('consultor_id', consultorId);
+    } else if ((isAdmin || isParceiro) && empresaId) {
+      // Para admin ou parceiro, filtrar agendamentos de consultores da empresa
+      agendamentosQuery = agendamentosQuery.eq('empresa_id', empresaId);
     }
 
     const { data: agendamentosHoje, error: error1 } = await agendamentosQuery;
@@ -41,6 +47,9 @@ const getDashboard = async (req, res) => {
       lembradosQuery = lembradosQuery.eq('clinica_id', clinicaId);
     } else if (isConsultor) {
       lembradosQuery = lembradosQuery.eq('consultor_id', consultorId);
+    } else if ((isAdmin || isParceiro) && empresaId) {
+      // Para admin ou parceiro, filtrar lembrados de consultores da empresa
+      lembradosQuery = lembradosQuery.eq('empresa_id', empresaId);
     }
 
     const { data: lembradosHoje, error: error2 } = await lembradosQuery;
@@ -85,6 +94,24 @@ const getDashboard = async (req, res) => {
         pacientesQuery = pacientesQuery.eq('id', 0); // Força resultado vazio
       }
     }
+    // Para admin ou parceiro, contar apenas pacientes dos consultores da empresa
+    else if ((isAdmin || isParceiro) && empresaId) {
+      // Buscar consultores da empresa
+      const { data: consultores, error: consultorError } = await supabaseAdmin
+        .from('consultores')
+        .select('id')
+        .eq('empresa_id', empresaId);
+
+      if (consultorError) throw consultorError;
+
+      const consultorIds = consultores ? consultores.map(c => c.id) : [];
+      
+      if (consultorIds.length > 0) {
+        pacientesQuery = pacientesQuery.in('consultor_id', consultorIds);
+      } else {
+        pacientesQuery = pacientesQuery.eq('id', 0); // Força resultado vazio
+      }
+    }
 
     const { count: totalPacientes, error: error3 } = await pacientesQuery;
     if (error3) throw error3;
@@ -112,6 +139,9 @@ const getDashboard = async (req, res) => {
       }
     } else if (isConsultor) {
       fechamentosQuery = fechamentosQuery.eq('consultor_id', consultorId);
+    } else if ((isAdmin || isParceiro) && empresaId) {
+      // Para admin ou parceiro, buscar fechamentos de consultores da empresa
+      fechamentosQuery = fechamentosQuery.eq('empresa_id', empresaId);
     }
 
     const { data: fechamentos, error: error5 } = await fechamentosQuery;
@@ -138,6 +168,9 @@ const getDashboard = async (req, res) => {
     // Se for consultor, buscar apenas dados dele
     if (isConsultor) {
       consultoresQuery = consultoresQuery.eq('id', consultorId);
+    } else if ((isAdmin || isParceiro) && empresaId) {
+      // Para admin ou parceiro, buscar apenas consultores da empresa
+      consultoresQuery = consultoresQuery.eq('empresa_id', empresaId);
     }
 
     const { data: consultores, error: error4 } = await consultoresQuery;
@@ -152,6 +185,8 @@ const getDashboard = async (req, res) => {
       agendamentosConsultorQuery = agendamentosConsultorQuery.eq('clinica_id', clinicaId);
     } else if (isConsultor) {
       agendamentosConsultorQuery = agendamentosConsultorQuery.eq('consultor_id', consultorId);
+    } else if ((isAdmin || isParceiro) && empresaId) {
+      agendamentosConsultorQuery = agendamentosConsultorQuery.eq('empresa_id', empresaId);
     }
 
     const { data: todosAgendamentos, error: agendError } = await agendamentosConsultorQuery;
@@ -180,6 +215,8 @@ const getDashboard = async (req, res) => {
       }
     } else if (isConsultor) {
       fechamentosConsultorQuery = fechamentosConsultorQuery.eq('consultor_id', consultorId);
+    } else if ((isAdmin || isParceiro) && empresaId) {
+      fechamentosConsultorQuery = fechamentosConsultorQuery.eq('empresa_id', empresaId);
     }
 
     const { data: todosFechamentos, error: fechError } = await fechamentosConsultorQuery;
@@ -231,19 +268,77 @@ const getDashboard = async (req, res) => {
 // GET /api/dashboard/gerais/pacientes - Dados gerais de pacientes (para gráficos)
 const getGeraisPacientes = async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('pacientes')
       .select(`
         *,
-        consultores(nome)
+        consultores(nome),
+        empreendimentos(nome, cidade, estado)
       `)
       .order('created_at', { ascending: false });
+
+    // Aplicar filtros baseados no tipo de usuário
+    const isAdmin = req.user.tipo === 'admin';
+    const isParceiro = req.user.tipo === 'parceiro';
+    const isConsultor = req.user.tipo === 'consultor';
+    const isClinica = req.user.tipo === 'clinica';
+    const empresaId = req.user.empresa_id;
+
+    if (isClinica) {
+      // Para clínica, buscar pacientes com agendamentos nesta clínica
+      const { data: agendamentos, error: agendError } = await supabaseAdmin
+        .from('agendamentos')
+        .select('paciente_id')
+        .eq('clinica_id', req.user.clinica_id);
+
+      if (agendError) throw agendError;
+
+      const pacienteIds = agendamentos ? agendamentos.map(a => a.paciente_id).filter(id => id !== null) : [];
+      
+      if (pacienteIds.length > 0) {
+        query = query.in('id', pacienteIds);
+      } else {
+        query = query.eq('id', 0); // Força resultado vazio
+      }
+    } else if ((isAdmin || isParceiro || isConsultor) && empresaId) {
+      // Para admin/parceiro/consultor, buscar pacientes da empresa (com empresa_id OU consultores da empresa)
+      const { data: consultores, error: consultorError } = await supabaseAdmin
+        .from('consultores')
+        .select('id')
+        .eq('empresa_id', empresaId);
+
+      if (consultorError) throw consultorError;
+
+      const consultorIds = consultores ? consultores.map(c => c.id) : [];
+      
+      // Criar condições: pacientes com empresa_id da empresa OU pacientes dos consultores da empresa
+      const conditions = [];
+      
+      // Condição 1: Pacientes com empresa_id da empresa (leads diretos)
+      conditions.push(`empresa_id.eq.${empresaId}`);
+      
+      // Condição 2: Pacientes dos consultores da empresa (se houver consultores)
+      if (consultorIds.length > 0) {
+        conditions.push(`consultor_id.in.(${consultorIds.join(',')})`);
+      }
+      
+      if (conditions.length > 0) {
+        query = query.or(conditions.join(','));
+      } else {
+        query = query.eq('id', 0); // Força resultado vazio
+      }
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     
     const formattedData = data.map(paciente => ({
       ...paciente,
-      consultor_nome: paciente.consultores?.nome
+      consultor_nome: paciente.consultores?.nome,
+      empreendimento_nome: paciente.empreendimentos?.nome,
+      empreendimento_cidade: paciente.empreendimentos?.cidade,
+      empreendimento_estado: paciente.empreendimentos?.estado
     }));
 
     res.json(formattedData);
@@ -255,7 +350,7 @@ const getGeraisPacientes = async (req, res) => {
 // GET /api/dashboard/gerais/agendamentos - Dados gerais de agendamentos (para gráficos)
 const getGeraisAgendamentos = async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('agendamentos')
       .select(`
         *,
@@ -265,6 +360,21 @@ const getGeraisAgendamentos = async (req, res) => {
       `)
       .order('data_agendamento', { ascending: false })
       .order('horario');
+
+    // Aplicar filtros baseados no tipo de usuário
+    const isAdmin = req.user.tipo === 'admin';
+    const isParceiro = req.user.tipo === 'parceiro';
+    const isConsultor = req.user.tipo === 'consultor';
+    const isClinica = req.user.tipo === 'clinica';
+    const empresaId = req.user.empresa_id;
+
+    if (isClinica) {
+      query = query.eq('clinica_id', req.user.clinica_id);
+    } else if ((isAdmin || isParceiro || isConsultor) && empresaId) {
+      query = query.eq('empresa_id', empresaId);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 
@@ -285,7 +395,7 @@ const getGeraisAgendamentos = async (req, res) => {
 // GET /api/dashboard/gerais/fechamentos - Dados gerais de fechamentos (para gráficos)
 const getGeraisFechamentos = async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('fechamentos')
       .select(`
         *,
@@ -295,6 +405,35 @@ const getGeraisFechamentos = async (req, res) => {
       `)
       .order('data_fechamento', { ascending: false })
       .order('created_at', { ascending: false });
+
+    // Aplicar filtros baseados no tipo de usuário
+    const isAdmin = req.user.tipo === 'admin';
+    const isParceiro = req.user.tipo === 'parceiro';
+    const isConsultor = req.user.tipo === 'consultor';
+    const isClinica = req.user.tipo === 'clinica';
+    const empresaId = req.user.empresa_id;
+
+    if (isClinica) {
+      // Para clínica, buscar fechamentos de pacientes com agendamentos nesta clínica
+      const { data: agendamentos, error: agendError } = await supabaseAdmin
+        .from('agendamentos')
+        .select('paciente_id')
+        .eq('clinica_id', req.user.clinica_id);
+
+      if (agendError) throw agendError;
+
+      const pacienteIds = agendamentos ? agendamentos.map(a => a.paciente_id).filter(id => id !== null) : [];
+      
+      if (pacienteIds.length > 0) {
+        query = query.in('paciente_id', pacienteIds);
+      } else {
+        query = query.eq('id', 0); // Força resultado vazio
+      }
+    } else if ((isAdmin || isParceiro || isConsultor) && empresaId) {
+      query = query.eq('empresa_id', empresaId);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 
@@ -316,10 +455,23 @@ const getGeraisFechamentos = async (req, res) => {
 // GET /api/dashboard/gerais/clinicas - Dados gerais de clínicas (para gráficos)
 const getGeraisClinicas = async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('clinicas')
       .select('*')
       .order('created_at', { ascending: false });
+
+    // Aplicar filtros baseados no tipo de usuário
+    const isAdmin = req.user.tipo === 'admin';
+    const isParceiro = req.user.tipo === 'parceiro';
+    const isConsultor = req.user.tipo === 'consultor';
+    const empresaId = req.user.empresa_id;
+
+    if ((isAdmin || isParceiro || isConsultor) && empresaId) {
+      // Para admin/parceiro/consultor, buscar clínicas da empresa
+      query = query.eq('empresa_id', empresaId);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     res.json(data);
