@@ -27,8 +27,23 @@ const PORT = process.env.PORT || 5000;
 // Middlewares globais de segurança
 app.use(helmet()); // Proteção de headers HTTP
 app.use(cors(corsConfig));
-app.use(bodyParser.json({ limit: '250mb' }));
-app.use(bodyParser.urlencoded({ extended: true, limit: '250mb' }));
+
+// Middleware JSON para outras rotas (exceto uploads)
+app.use((req, res, next) => {
+  // Pular body parser para rotas de upload
+  if (req.path.includes('/contratos-carteira/upload')) {
+    return next();
+  }
+  bodyParser.json({ limit: '250mb' })(req, res, next);
+});
+
+app.use((req, res, next) => {
+  // Pular body parser para rotas de upload
+  if (req.path.includes('/contratos-carteira/upload')) {
+    return next();
+  }
+  bodyParser.urlencoded({ extended: true, limit: '250mb' })(req, res, next);
+});
 
 // Rate limiting global (aplicado a todas as rotas)
 app.use('/api', generalLimiter);
@@ -40,6 +55,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
+
 
 // Rota raiz
 app.get('/', (req, res) => {

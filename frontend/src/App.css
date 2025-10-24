@@ -4331,3 +4331,21 @@ select::placeholder {
     max-width: 120px;
   }
 }
+
+/* Fix para garantir que os botões não sejam cortados na tabela de solicitações */
+.table-container {
+  overflow: visible !important;
+}
+
+.table-container table {
+  table-layout: fixed !important;
+}
+
+.table-container td {
+  overflow: visible !important;
+  white-space: nowrap !important;
+}
+
+.table-container button {
+  flex-shrink: 0 !important;
+}
