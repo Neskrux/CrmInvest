@@ -92,23 +92,26 @@ const useIncorporadoraNotifications = () => {
         timestamp: new Date()
       }]);
       
-      // Se for SDR (consultor interno), mostrar modal para capturar lead
+      // Se for SDR (consultor interno) ou admin da incorporadora, mostrar modal para capturar lead
       // SDR = consultor interno (NÃO freelancer)
       const isSDR = user.tipo === 'consultor' && !user.is_freelancer;
+      const isAdminIncorporadora = user.tipo === 'admin' && user.empresa_id === 5;
       
       console.log('🔍 [SOCKET.IO] Verificando tipo de usuário para mostrar modal:', {
         userTipo: user.tipo,
         isFreelancer: user.is_freelancer,
-        isSDR: isSDR
+        isSDR: isSDR,
+        isAdminIncorporadora: isAdminIncorporadora,
+        empresaId: user.empresa_id
       });
       
-      if (isSDR) {
-        console.log('🎯 [SOCKET.IO] Abrindo modal de novo lead para SDR');
+      if (isSDR || isAdminIncorporadora) {
+        console.log('🎯 [SOCKET.IO] Abrindo modal de novo lead para SDR/Admin');
         setNewLeadData(data);
         setShowNewLeadModal(true);
         console.log('✅ [SOCKET.IO] Modal deve estar aberta agora');
       } else {
-        console.log('ℹ️ [SOCKET.IO] Usuário não é SDR - modal não será exibida');
+        console.log('ℹ️ [SOCKET.IO] Usuário não é SDR nem admin da incorporadora - modal não será exibida');
       }
       
       console.log('✅ [SOCKET.IO] Processamento do evento new-lead-incorporadora concluído');
