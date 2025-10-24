@@ -28,6 +28,7 @@ const Agendamentos = () => {
   const [formData, setFormData] = useState({
     paciente_id: '',
     consultor_id: '',
+    consultor_interno_id: '',
     clinica_id: '',
     data_agendamento: '',
     horario: '',
@@ -523,7 +524,7 @@ const Agendamentos = () => {
         formData.append('paciente_id', agendamentoParaFechar.paciente_id);
         formData.append('consultor_id', agendamentoParaFechar.consultor_id || '');
         
-        // Para incorporadora (empresa_id = 5), não enviar clinica_id e usar empreendimento_id
+        // Para incorporadora (empresa_id = 5), usar empreendimento_id do paciente
         if (user?.empresa_id === 5) {
           // Buscar empreendimento_id do paciente
           const paciente = pacientes.find(p => p.id === agendamentoParaFechar.paciente_id);
@@ -531,6 +532,7 @@ const Agendamentos = () => {
             formData.append('clinica_id', paciente.empreendimento_id); // Backend espera clinica_id mesmo para empreendimentos
           }
         } else {
+          // Para securitizadora, usar clinica_id e não enviar empreendimento_id
           formData.append('clinica_id', agendamentoParaFechar.clinica_id || '');
           formData.append('tipo_tratamento', tipoTratamentoFechamento || '');
         }
@@ -918,7 +920,9 @@ const Agendamentos = () => {
               <thead>
                 <tr>
                   <th>{t.paciente}</th>
-                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{t.consultor}</th>
+                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
+                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>SDR</th>
+                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor Interno</th>
                   <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{user?.empresa_id === 5 ? 'Empreendimento' : 'Clínica'}</th>
                   <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Data</th>
                   <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Horário</th>
@@ -998,7 +1002,9 @@ const Agendamentos = () => {
                           )}
                         </div>
                       </td>
-                      <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{agendamento.consultor_nome}</td>
+                      <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{agendamento.consultor_nome || '-'}</td>
+                      <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{agendamento.sdr_nome || '-'}</td>
+                      <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{agendamento.consultor_interno_nome || '-'}</td>
                       <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                         {user?.empresa_id === 5 ? (
                           // Para incorporadora, mostrar empreendimento baseado no empreendimento_id ou clinica_id
@@ -1170,6 +1176,23 @@ const Agendamentos = () => {
                   >
                     <option value="">Selecione um {t.consultor.toLowerCase()}</option>
                     {consultores.map(consultor => (
+                      <option key={consultor.id} value={consultor.id}>
+                        {consultor.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Consultor Interno</label>
+                  <select
+                    name="consultor_interno_id"
+                    className="form-select"
+                    value={formData.consultor_interno_id || ''}
+                    onChange={handleInputChange}
+                  >
+                    <option value="">Selecione um consultor interno</option>
+                    {consultores.filter(consultor => !consultor.is_freelancer).map(consultor => (
                       <option key={consultor.id} value={consultor.id}>
                         {consultor.nome}
                       </option>

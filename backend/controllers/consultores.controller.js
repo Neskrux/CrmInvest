@@ -105,7 +105,7 @@ const getPerfil = async (req, res) => {
     // Buscar dados completos do consultor
     const { data: consultor, error } = await supabaseAdmin
       .from('consultores')
-      .select('id, nome, email, telefone, pix, ativo, created_at, codigo_referencia, pode_ver_todas_novas_clinicas, podealterarstatus, is_freelancer, empresa_id')
+      .select('id, nome, email, telefone, pix, ativo, created_at, codigo_referencia, pode_ver_todas_novas_clinicas, podealterarstatus, is_freelancer, tipo_consultor, empresa_id')
       .eq('id', userId)
       .single();
 
@@ -177,7 +177,7 @@ const getAllConsultores = async (req, res) => {
 // Criar consultor
 const createConsultor = async (req, res) => {
   try {
-    const { nome, telefone, email, senha, pix, cidade, estado, is_freelancer } = req.body;
+    const { nome, telefone, email, senha, pix, cidade, estado, is_freelancer, tipo_consultor } = req.body;
     
     // Validar campos obrigatórios
     if (!senha || senha.trim() === '') {
@@ -208,6 +208,18 @@ const createConsultor = async (req, res) => {
     const saltRounds = 10;
     const senhaHash = await bcrypt.hash(senha, saltRounds);
     
+    // Determinar tipo_consultor e is_freelancer
+    let tipoConsultorFinal = tipo_consultor || 'freelancer';
+    let isFreelancerFinal = is_freelancer !== undefined ? is_freelancer : true;
+    
+    // Sincronizar campos: se tipo_consultor for fornecido, calcular is_freelancer
+    if (tipo_consultor) {
+      isFreelancerFinal = tipo_consultor === 'freelancer';
+    } else if (is_freelancer !== undefined) {
+      // Se apenas is_freelancer for fornecido, determinar tipo_consultor
+      tipoConsultorFinal = is_freelancer ? 'freelancer' : 'corretor';
+    }
+    
     // Preparar dados do consultor
     const consultorData = { 
       nome, 
@@ -217,7 +229,8 @@ const createConsultor = async (req, res) => {
       pix,
       cidade,
       estado,
-      is_freelancer
+      is_freelancer: isFreelancerFinal,
+      tipo_consultor: tipoConsultorFinal
     };
     
     // Se for parceiro criando, vincular o consultor à parceiro
@@ -280,7 +293,7 @@ const cadastroPublico = async (req, res) => {
     console.log('📝 === NOVO CADASTRO DE CONSULTOR ===');
     console.log('📋 Dados recebidos:', req.body);
     
-    const { nome, telefone, email, senha, cpf, pix, cidade, estado, empresa_id, is_freelancer } = req.body;
+    const { nome, telefone, email, senha, cpf, pix, cidade, estado, empresa_id, is_freelancer, tipo_consultor } = req.body;
     
     // Validar campos obrigatórios
     if (!nome || !telefone || !email || !senha || !cpf || !pix) {
@@ -326,12 +339,23 @@ const cadastroPublico = async (req, res) => {
     const saltRounds = 10;
     const senhaHash = await bcrypt.hash(senha, saltRounds);
     
-    // Definir empresa_id e is_freelancer baseado nos dados recebidos
+    // Definir empresa_id, is_freelancer e tipo_consultor baseado nos dados recebidos
     const empresaIdFinal = empresa_id || 3; // Default para empresa 3 se não especificado
-    const isFreelancerFinal = is_freelancer !== undefined ? is_freelancer : true; // Default true se não especificado
+    
+    // Determinar tipo_consultor e is_freelancer
+    let tipoConsultorFinal = tipo_consultor || 'freelancer';
+    let isFreelancerFinal = is_freelancer !== undefined ? is_freelancer : true;
+    
+    // Sincronizar campos: se tipo_consultor for fornecido, calcular is_freelancer
+    if (tipo_consultor) {
+      isFreelancerFinal = tipo_consultor === 'freelancer';
+    } else if (is_freelancer !== undefined) {
+      // Se apenas is_freelancer for fornecido, determinar tipo_consultor
+      tipoConsultorFinal = is_freelancer ? 'freelancer' : 'corretor';
+    }
     
     console.log('🏢 Definindo empresa_id =', empresaIdFinal, 'para cadastro público de consultor');
-    console.log('👤 is_freelancer =', isFreelancerFinal);
+    console.log('👤 is_freelancer =', isFreelancerFinal, 'tipo_consultor =', tipoConsultorFinal);
     
     // Inserir consultor
     const { data, error } = await supabaseAdmin
@@ -348,6 +372,7 @@ const cadastroPublico = async (req, res) => {
         tipo: 'consultor',
         ativo: true,
         is_freelancer: isFreelancerFinal,
+        tipo_consultor: tipoConsultorFinal,
         empresa_id: empresaIdFinal
       }])
       .select();
@@ -409,7 +434,7 @@ const cadastroPublico = async (req, res) => {
 const updateConsultor = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, telefone, email, senha, pix, cidade, estado, is_freelancer } = req.body;
+    const { nome, telefone, email, senha, pix, cidade, estado, is_freelancer, tipo_consultor } = req.body;
     
     // Se for parceiro, verificar se o consultor pertence a ela
     if (req.user.tipo === 'parceiro') {
@@ -436,6 +461,15 @@ const updateConsultor = async (req, res) => {
     if (cidade) updateData.cidade = cidade;
     if (estado) updateData.estado = estado;
     if (is_freelancer !== undefined) updateData.is_freelancer = is_freelancer;
+    if (tipo_consultor !== undefined) updateData.tipo_consultor = tipo_consultor;
+    
+    // Sincronizar campos: se tipo_consultor for fornecido, calcular is_freelancer
+    if (tipo_consultor !== undefined) {
+      updateData.is_freelancer = tipo_consultor === 'freelancer';
+    } else if (is_freelancer !== undefined) {
+      // Se apenas is_freelancer for fornecido, determinar tipo_consultor
+      updateData.tipo_consultor = is_freelancer ? 'freelancer' : 'corretor';
+    }
     
     if (senha) {
       const saltRounds = 10;
