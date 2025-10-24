@@ -5,14 +5,14 @@ import useBranding from '../hooks/useBranding';
 import { FileImage, Calendar, User, Filter, Search, Eye, X, Download } from 'lucide-react';
 
 const Evidencias = () => {
-  const { makeRequest, isAdmin } = useAuth();
+  const { makeRequest, isAdmin, isIncorporadora } = useAuth();
   const { showErrorToast, showSuccessToast } = useToast();
   const { t } = useBranding();
   
   const [evidencias, setEvidencias] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtros, setFiltros] = useState({
-    tipo: 'todos',
+    tipo: isIncorporadora ? 'paciente' : 'todos',
     usuario: 'todos',
     dataInicio: '',
     dataFim: '',
@@ -224,20 +224,22 @@ const Evidencias = () => {
             />
           </div>
 
-          {/* Tipo */}
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Tipo</label>
-            <select
-              className="form-select"
-              value={filtros.tipo}
-              onChange={(e) => setFiltros({ ...filtros, tipo: e.target.value })}
-            >
-              <option value="todos">Todos</option>
-              <option value="paciente">Pacientes</option>
-              <option value="clinica">Clínicas</option>
-              <option value="nova_clinica">Novas Clínicas</option>
-            </select>
-          </div>
+          {/* Tipo - Ocultar para incorporadora */}
+          {!isIncorporadora && (
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Tipo</label>
+              <select
+                className="form-select"
+                value={filtros.tipo}
+                onChange={(e) => setFiltros({ ...filtros, tipo: e.target.value })}
+              >
+                <option value="todos">Todos</option>
+                <option value="paciente">Pacientes</option>
+                <option value="clinica">Clínicas</option>
+                <option value="nova_clinica">Novas Clínicas</option>
+              </select>
+            </div>
+          )}
 
           {/* Usuário */}
           <div className="form-group" style={{ marginBottom: 0 }}>
@@ -287,10 +289,16 @@ const Evidencias = () => {
         </div>
 
         {/* Botão Limpar Filtros */}
-        {(filtros.busca || filtros.tipo !== 'todos' || filtros.usuario !== 'todos' || filtros.dataInicio || filtros.dataFim) && (
+        {(filtros.busca || (filtros.tipo !== 'todos' && !isIncorporadora) || filtros.usuario !== 'todos' || filtros.dataInicio || filtros.dataFim) && (
           <button
             className="btn btn-secondary"
-            onClick={() => setFiltros({ tipo: 'todos', usuario: 'todos', dataInicio: '', dataFim: '', busca: '' })}
+            onClick={() => setFiltros({ 
+              tipo: isIncorporadora ? 'paciente' : 'todos', 
+              usuario: 'todos', 
+              dataInicio: '', 
+              dataFim: '', 
+              busca: '' 
+            })}
             style={{ marginTop: '1rem' }}
           >
             Limpar Filtros
@@ -312,7 +320,7 @@ const Evidencias = () => {
           <FileImage size={64} style={{ color: '#cbd5e1', margin: '0 auto 1rem' }} />
           <h3 style={{ color: '#6b7280', marginBottom: '0.5rem' }}>Nenhuma evidência encontrada</h3>
           <p style={{ color: '#9ca3af' }}>
-            {filtros.busca || filtros.tipo !== 'todos' || filtros.usuario !== 'todos' || filtros.dataInicio || filtros.dataFim
+            {filtros.busca || (filtros.tipo !== 'todos' && !isIncorporadora) || filtros.usuario !== 'todos' || filtros.dataInicio || filtros.dataFim
               ? 'Tente ajustar os filtros'
               : `Evidências aparecerão aqui quando os ${t.consultores.toLowerCase()} alterarem status`}
           </p>

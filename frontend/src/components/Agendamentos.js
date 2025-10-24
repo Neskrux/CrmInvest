@@ -7,7 +7,7 @@ import useSmartPolling from '../hooks/useSmartPolling';
 
 const Agendamentos = () => {
   const { t } = useBranding();
-  const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isClinica } = useAuth();
+  const { makeRequest, user, isAdmin, podeAlterarStatus, isIncorporadora, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isClinica } = useAuth();
   const { showSuccessToast, showErrorToast } = useToast();
   const [agendamentos, setAgendamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
@@ -316,7 +316,10 @@ const Agendamentos = () => {
       status: paciente?.status || 'Status não informado',
       observacoes: agendamento.observacoes || paciente?.observacoes || 'Nenhuma observação cadastrada',
       data_agendamento: agendamento.data_agendamento || 'Data não informada',
-      horario: agendamento.horario || 'Horário não informado'
+      horario: agendamento.horario || 'Horário não informado',
+      freelancer_nome: agendamento.consultor_nome || 'Não informado',
+      sdr_nome: agendamento.sdr_nome || 'Não informado',
+      corretor_nome: agendamento.consultor_interno_nome || 'Não informado'
     });
     setAgendamentoDetalhes(agendamento);
     setActiveDetalhesTab('observacoes');
@@ -798,7 +801,7 @@ const Agendamentos = () => {
                   }}
                 >
                   <option value="">Todos os consultores</option>
-                  {consultores.map(consultor => (
+                  {consultores.filter(consultor => consultor.empresa_id === user?.empresa_id).map(consultor => (
                     <option key={consultor.id} value={consultor.id}>
                       {consultor.nome}
                     </option>
@@ -920,9 +923,11 @@ const Agendamentos = () => {
               <thead>
                 <tr>
                   <th>{t.paciente}</th>
-                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
+                  {user?.empresa_id !== 5 && (
+                    <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
+                  )}
                   <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>SDR</th>
-                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor Interno</th>
+                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Corretor' : 'Consultor'}</th>
                   <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{user?.empresa_id === 5 ? 'Empreendimento' : 'Clínica'}</th>
                   <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Data</th>
                   <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Horário</th>
@@ -1002,7 +1007,9 @@ const Agendamentos = () => {
                           )}
                         </div>
                       </td>
-                      <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{agendamento.consultor_nome || '-'}</td>
+                      {user?.empresa_id !== 5 && (
+                        <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{agendamento.consultor_nome || '-'}</td>
+                      )}
                       <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{agendamento.sdr_nome || '-'}</td>
                       <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{agendamento.consultor_interno_nome || '-'}</td>
                       <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
@@ -1175,7 +1182,7 @@ const Agendamentos = () => {
                     required
                   >
                     <option value="">Selecione um {t.consultor.toLowerCase()}</option>
-                    {consultores.map(consultor => (
+                    {consultores.filter(consultor => consultor.empresa_id === user?.empresa_id).map(consultor => (
                       <option key={consultor.id} value={consultor.id}>
                         {consultor.nome}
                       </option>
@@ -1192,7 +1199,7 @@ const Agendamentos = () => {
                     onChange={handleInputChange}
                   >
                     <option value="">Selecione um consultor interno</option>
-                    {consultores.filter(consultor => !consultor.is_freelancer).map(consultor => (
+                    {consultores.filter(consultor => !consultor.is_freelancer && consultor.empresa_id === user?.empresa_id).map(consultor => (
                       <option key={consultor.id} value={consultor.id}>
                         {consultor.nome}
                       </option>
@@ -1466,6 +1473,41 @@ const Agendamentos = () => {
                         detalhesAtual.tipo_tratamento
                       )}
                     </div>
+                  </div>
+                  
+                  {/* Informações de equipe */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                    {!isIncorporadora && (
+                      <div className="form-group">
+                        <label className="form-label">Freelancer que Indicou</label>
+                        <div className="detail-field">
+                          {detalhesAtual.freelancer_nome}
+                        </div>
+                      </div>
+                    )}
+                    <div className="form-group">
+                      <label className="form-label">SDR</label>
+                      <div className="detail-field">
+                        {detalhesAtual.sdr_nome}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div className="form-group">
+                      <label className="form-label">{isIncorporadora ? 'Corretor' : 'Consultor Interno'}</label>
+                      <div className="detail-field">
+                        {detalhesAtual.corretor_nome}
+                      </div>
+                    </div>
+                    {!isIncorporadora && (
+                      <div className="form-group">
+                        <label className="form-label">Status do Agendamento</label>
+                        <div className="detail-field">
+                          {agendamentoDetalhes?.status || 'Não informado'}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="form-group" style={{ marginBottom: '1.5rem' }}>
