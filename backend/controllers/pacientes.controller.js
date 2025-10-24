@@ -308,12 +308,13 @@ const createPaciente = async (req, res) => {
     const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
     const cpfNumeros = cpf ? cpf.replace(/\D/g, '') : '';
     
-    // Verificar se telefone já existe
+    // Verificar se telefone já existe na mesma empresa
     if (telefoneNumeros) {
       const { data: telefoneExistente, error: telefoneError } = await supabaseAdmin
         .from('pacientes')
-        .select('id, nome, created_at')
+        .select('id, nome, created_at, empresa_id')
         .eq('telefone', telefoneNumeros)
+        .eq('empresa_id', req.user.empresa_id)
         .limit(1);
 
       if (telefoneError) throw telefoneError;
@@ -322,17 +323,22 @@ const createPaciente = async (req, res) => {
         const pacienteExistente = telefoneExistente[0];
         const dataCadastro = new Date(pacienteExistente.created_at).toLocaleDateString('pt-BR');
         return res.status(400).json({ 
-          error: `Este número de telefone já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}).` 
+          error: 'Telefone já cadastrado',
+          message: `Este número de telefone já está cadastrado para ${pacienteExistente.nome} nesta empresa (cadastrado em ${dataCadastro}). Verifique se o número está correto ou entre em contato com o administrador.`,
+          field: 'telefone',
+          existingPatient: pacienteExistente.nome,
+          registrationDate: dataCadastro
         });
       }
     }
     
-    // Verificar se CPF já existe
+    // Verificar se CPF já existe na mesma empresa
     if (cpfNumeros) {
       const { data: cpfExistente, error: cpfError } = await supabaseAdmin
         .from('pacientes')
-        .select('id, nome, created_at')
+        .select('id, nome, created_at, empresa_id')
         .eq('cpf', cpfNumeros)
+        .eq('empresa_id', req.user.empresa_id)
         .limit(1);
 
       if (cpfError) throw cpfError;
@@ -341,7 +347,11 @@ const createPaciente = async (req, res) => {
         const pacienteExistente = cpfExistente[0];
         const dataCadastro = new Date(pacienteExistente.created_at).toLocaleDateString('pt-BR');
         return res.status(400).json({ 
-          error: `Este CPF já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}).` 
+          error: 'CPF já cadastrado',
+          message: `Este CPF já está cadastrado para ${pacienteExistente.nome} nesta empresa (cadastrado em ${dataCadastro}). Verifique se o CPF está correto ou entre em contato com o administrador.`,
+          field: 'cpf',
+          existingPatient: pacienteExistente.nome,
+          registrationDate: dataCadastro
         });
       }
     }
@@ -425,12 +435,13 @@ const updatePaciente = async (req, res) => {
     const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
     const cpfNumeros = cpf ? cpf.replace(/\D/g, '') : '';
     
-    // Verificar se telefone já existe em outro paciente
+    // Verificar se telefone já existe em outro paciente da mesma empresa
     if (telefoneNumeros) {
       const { data: telefoneExistente, error: telefoneError } = await supabaseAdmin
         .from('pacientes')
-        .select('id, nome, created_at')
+        .select('id, nome, created_at, empresa_id')
         .eq('telefone', telefoneNumeros)
+        .eq('empresa_id', req.user.empresa_id)
         .neq('id', id) // Excluir o paciente atual
         .limit(1);
 
@@ -440,17 +451,22 @@ const updatePaciente = async (req, res) => {
         const pacienteExistente = telefoneExistente[0];
         const dataCadastro = new Date(pacienteExistente.created_at).toLocaleDateString('pt-BR');
         return res.status(400).json({ 
-          error: `Este número de telefone já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}).` 
+          error: 'Telefone já cadastrado',
+          message: `Este número de telefone já está cadastrado para ${pacienteExistente.nome} nesta empresa (cadastrado em ${dataCadastro}). Verifique se o número está correto ou entre em contato com o administrador.`,
+          field: 'telefone',
+          existingPatient: pacienteExistente.nome,
+          registrationDate: dataCadastro
         });
       }
     }
     
-    // Verificar se CPF já existe em outro paciente
+    // Verificar se CPF já existe em outro paciente da mesma empresa
     if (cpfNumeros) {
       const { data: cpfExistente, error: cpfError } = await supabaseAdmin
         .from('pacientes')
-        .select('id, nome, created_at')
+        .select('id, nome, created_at, empresa_id')
         .eq('cpf', cpfNumeros)
+        .eq('empresa_id', req.user.empresa_id)
         .neq('id', id) // Excluir o paciente atual
         .limit(1);
 
@@ -460,7 +476,11 @@ const updatePaciente = async (req, res) => {
         const pacienteExistente = cpfExistente[0];
         const dataCadastro = new Date(pacienteExistente.created_at).toLocaleDateString('pt-BR');
         return res.status(400).json({ 
-          error: `Este CPF já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}).` 
+          error: 'CPF já cadastrado',
+          message: `Este CPF já está cadastrado para ${pacienteExistente.nome} nesta empresa (cadastrado em ${dataCadastro}). Verifique se o CPF está correto ou entre em contato com o administrador.`,
+          field: 'cpf',
+          existingPatient: pacienteExistente.nome,
+          registrationDate: dataCadastro
         });
       }
     }
@@ -1076,11 +1096,12 @@ const cadastroPublicoLead = async (req, res) => {
     // Normalizar telefone (remover formatação)
     const telefoneNumeros = telefone.replace(/\D/g, '');
     
-    // Verificar se telefone já existe
+    // Verificar se telefone já existe na mesma empresa
     const { data: telefoneExistente, error: telefoneError } = await supabaseAdmin
       .from('pacientes')
-      .select('id, nome, created_at')
+      .select('id, nome, created_at, empresa_id')
       .eq('telefone', telefoneNumeros)
+      .eq('empresa_id', empresaId)
       .limit(1);
 
     if (telefoneError) {
@@ -1097,19 +1118,24 @@ const cadastroPublicoLead = async (req, res) => {
         dataCadastro: dataCadastro 
       });
       return res.status(400).json({ 
-        error: `Este número de telefone já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}). Por favor, verifique os dados.` 
+        error: 'Telefone já cadastrado',
+        message: `Este número de telefone já está cadastrado para ${pacienteExistente.nome} nesta empresa (cadastrado em ${dataCadastro}). Verifique se o número está correto ou entre em contato com o administrador.`,
+        field: 'telefone',
+        existingPatient: pacienteExistente.nome,
+        registrationDate: dataCadastro
       });
     }
     
     // Normalizar CPF (remover formatação)
     const cpfNumeros = cpf ? cpf.replace(/\D/g, '') : '';
     
-    // Verificar se CPF já existe
+    // Verificar se CPF já existe na mesma empresa
     if (cpfNumeros) {
       const { data: cpfExistente, error: cpfError } = await supabaseAdmin
         .from('pacientes')
-        .select('id, nome, created_at')
+        .select('id, nome, created_at, empresa_id')
         .eq('cpf', cpfNumeros)
+        .eq('empresa_id', empresaId)
         .limit(1);
 
       if (cpfError) {
@@ -1126,7 +1152,11 @@ const cadastroPublicoLead = async (req, res) => {
           dataCadastro: dataCadastro 
         });
         return res.status(400).json({ 
-          error: `Este CPF já está cadastrado para ${pacienteExistente.nome} (cadastrado em ${dataCadastro}). Por favor, verifique os dados.` 
+          error: 'CPF já cadastrado',
+          message: `Este CPF já está cadastrado para ${pacienteExistente.nome} nesta empresa (cadastrado em ${dataCadastro}). Verifique se o CPF está correto ou entre em contato com o administrador.`,
+          field: 'cpf',
+          existingPatient: pacienteExistente.nome,
+          registrationDate: dataCadastro
         });
       }
     }

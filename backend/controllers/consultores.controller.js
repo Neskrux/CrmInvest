@@ -191,17 +191,22 @@ const createConsultor = async (req, res) => {
     // Normalizar email
     const emailNormalizado = normalizarEmail(email);
     
-    // Verificar se email já existe
+    // Verificar se email já existe na mesma empresa
     const { data: emailExistente, error: emailError } = await supabaseAdmin
       .from('consultores')
-      .select('id')
+      .select('id, empresa_id')
       .eq('email', emailNormalizado)
+      .eq('empresa_id', consultorData.empresa_id || req.user.empresa_id)
       .limit(1);
 
     if (emailError) throw emailError;
     
     if (emailExistente && emailExistente.length > 0) {
-      return res.status(400).json({ error: 'Este email já está cadastrado!' });
+      return res.status(400).json({ 
+        error: 'Email já cadastrado', 
+        message: 'Este email já está sendo usado por outro consultor nesta empresa. Por favor, use um email diferente ou entre em contato com o administrador.',
+        field: 'email'
+      });
     }
     
     // Hash da senha antes de salvar
@@ -309,30 +314,40 @@ const cadastroPublico = async (req, res) => {
     // Normalizar email antes de salvar
     const emailNormalizado = normalizarEmail(email);
     
-    // Validar se email já existe
+    // Validar se email já existe na mesma empresa
     const { data: emailExistente, error: emailError } = await supabaseAdmin
       .from('consultores')
-      .select('id')
+      .select('id, empresa_id')
       .eq('email', emailNormalizado)
+      .eq('empresa_id', empresaIdFinal)
       .limit(1);
 
     if (emailError) throw emailError;
     
     if (emailExistente && emailExistente.length > 0) {
-      return res.status(400).json({ error: 'Este email já está cadastrado!' });
+      return res.status(400).json({ 
+        error: 'Email já cadastrado', 
+        message: 'Este email já está sendo usado por outro consultor nesta empresa. Por favor, use um email diferente ou entre em contato com o administrador.',
+        field: 'email'
+      });
     }
     
-    // Validar se CPF já existe
+    // Validar se CPF já existe na mesma empresa
     const { data: cpfExistente, error: cpfError } = await supabaseAdmin
       .from('consultores')
-      .select('id')
+      .select('id, empresa_id')
       .eq('cpf', cpf)
+      .eq('empresa_id', empresaIdFinal)
       .limit(1);
 
     if (cpfError) throw cpfError;
     
     if (cpfExistente && cpfExistente.length > 0) {
-      return res.status(400).json({ error: 'Este CPF já está cadastrado!' });
+      return res.status(400).json({ 
+        error: 'CPF já cadastrado', 
+        message: 'Este CPF já está sendo usado por outro consultor nesta empresa. Verifique se o CPF está correto ou entre em contato com o administrador.',
+        field: 'cpf'
+      });
     }
     
     // Hash da senha

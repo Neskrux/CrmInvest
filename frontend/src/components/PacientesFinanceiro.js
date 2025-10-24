@@ -80,9 +80,6 @@ const PacientesFinanceiro = () => {
       setLoading(true);
       // Buscar pacientes normais atrelados à clínica
       // O backend já filtra automaticamente por clinica_id quando o usuário é clínica
-      console.log('🔍 Buscando leads para clínica:', {
-        user_id: user?.id,
-        user_tipo: user?.tipo,
         token: user?.token ? 'Token presente' : 'Token ausente',
         url: `${config.API_BASE_URL}/pacientes`
       });

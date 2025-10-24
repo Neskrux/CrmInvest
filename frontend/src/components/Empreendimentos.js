@@ -17,7 +17,6 @@ const Empreendimentos = () => {
       setLoading(true);
       setError(null);
       
-      console.log('🔍 Buscando empreendimentos do banco...');
       const config = await import('../config');
       const response = await fetch(`${config.default.API_BASE_URL}/empreendimentos-public`);
       
@@ -26,7 +25,6 @@ const Empreendimentos = () => {
       }
       
       const data = await response.json();
-      console.log('📊 Empreendimentos carregados do banco:', data);
       
        // Mapear dados do banco para o formato esperado
        const empreendimentosFormatados = data.map(emp => {
@@ -83,7 +81,6 @@ const Empreendimentos = () => {
 
   // Função para visualizar detalhes (associada ao ID real)
   const handleCardClick = (empreendimento) => {
-    console.log('🔍 Visualizando empreendimento ID:', empreendimento.id, 'Nome:', empreendimento.nome);
     setSelectedEmpreendimento(empreendimento);
     setShowModal(true);
   };

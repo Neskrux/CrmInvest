@@ -1348,25 +1348,8 @@ const Dashboard = () => {
       });
 
       // Debug: verificar se os dados estão sendo carregados
-      console.log('🔍 Debug Ranking - Dados carregados:');
-      console.log('Pacientes gerais:', pacientesGerais.length);
-      console.log('Agendamentos gerais:', agendamentosGerais.length);
-      console.log('Fechamentos gerais:', fechamentosGerais.length);
-      console.log('Consultores no mapa:', Object.keys(todosConsultoresMap).length);
       
       // Verificar alguns exemplos de dados
-      if (pacientesGerais.length > 0) {
-        console.log('Exemplo paciente:', pacientesGerais[0]);
-        console.log('Campos do paciente:', Object.keys(pacientesGerais[0]));
-      }
-      if (agendamentosGerais.length > 0) {
-        console.log('Exemplo agendamento:', agendamentosGerais[0]);
-        console.log('Campos do agendamento:', Object.keys(agendamentosGerais[0]));
-      }
-      
-      // Verificar consultores
-      console.log('Exemplo consultor:', consultores[0]);
-      console.log('Campos do consultor:', Object.keys(consultores[0]));
 
       // Atualizar estatísticas dos consultores internos (quem realmente fechou)
       fechamentosGerais
@@ -1409,12 +1392,6 @@ const Dashboard = () => {
       const todosConsultoresStats = Object.values(todosConsultoresMap);
       
       // Debug: verificar estatísticas dos consultores
-      console.log('🔍 Debug Ranking - Estatísticas dos consultores:');
-      todosConsultoresStats.forEach(c => {
-        if (c.totalPacientes > 0 || c.totalAgendamentos > 0 || c.totalFechamentos > 0) {
-          console.log(`${c.nome}: P=${c.totalPacientes}, A=${c.totalAgendamentos}, F=${c.totalFechamentos}`);
-        }
-      });
       
       const rankingGeralFinal = todosConsultoresStats
         .filter(c => c.totalFechamentos > 0 || c.totalPacientes > 0 || c.totalAgendamentos > 0)
@@ -1434,7 +1411,6 @@ const Dashboard = () => {
         }));
         
       // Debug: verificar ranking final
-      console.log('🔍 Debug Ranking - Ranking final:', rankingGeralFinal.slice(0, 3));
         
       // Dados específicos para clínicas
       let evolucaoMensal = [];
