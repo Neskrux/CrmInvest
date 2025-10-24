@@ -271,6 +271,69 @@ const createAgendamento = async (req, res) => {
       // Não falhar a operação principal se houver erro na movimentação
     }
 
+    // Emitir evento Socket.IO para notificar incorporadora sobre novo agendamento
+    if (req.io && dadosAgendamento.sdr_id && empresa_id === 5) {
+      console.log('📢 [SOCKET.IO] Emitindo evento new-agendamento-incorporadora:', {
+        agendamentoId: data[0].id,
+        paciente_id: paciente_id,
+        sdr_id: dadosAgendamento.sdr_id,
+        empresa_id: empresa_id,
+        data_agendamento: data_agendamento,
+        horario: horario,
+        timestamp: new Date().toISOString(),
+        room: 'incorporadora-notifications'
+      });
+      
+      // Buscar dados do SDR
+      const { data: sdrData } = await supabaseAdmin
+        .from('consultores')
+        .select('nome, foto_url')
+        .eq('id', dadosAgendamento.sdr_id)
+        .single();
+
+      console.log('👤 [SOCKET.IO] Dados do SDR encontrados:', {
+        sdr_id: dadosAgendamento.sdr_id,
+        nome: sdrData?.nome || 'N/A',
+        temFoto: !!sdrData?.foto_url
+      });
+
+      // Buscar dados do paciente
+      const { data: pacienteData } = await supabaseAdmin
+        .from('pacientes')
+        .select('nome, telefone')
+        .eq('id', paciente_id)
+        .single();
+
+      console.log('👤 [SOCKET.IO] Dados do paciente encontrados:', {
+        paciente_id: paciente_id,
+        nome: pacienteData?.nome || 'N/A',
+        telefone: pacienteData?.telefone || 'N/A'
+      });
+
+      req.io.to('incorporadora-notifications').emit('new-agendamento-incorporadora', {
+        agendamentoId: data[0].id,
+        paciente_nome: pacienteData?.nome || 'Cliente',
+        paciente_telefone: pacienteData?.telefone || '',
+        data_agendamento: data_agendamento,
+        horario: horario,
+        sdr_nome: sdrData?.nome || 'SDR',
+        sdr_foto: sdrData?.foto_url || null,
+        consultor_interno_id: dadosAgendamento.consultor_interno_id,
+        timestamp: new Date().toISOString()
+      });
+      
+      console.log('✅ [SOCKET.IO] Evento new-agendamento-incorporadora enviado para grupo incorporadora-notifications');
+    } else {
+      console.log('⚠️ [SOCKET.IO] Evento new-agendamento-incorporadora não enviado:', {
+        temSocketIO: !!req.io,
+        temSdrId: !!dadosAgendamento.sdr_id,
+        empresaId: empresa_id,
+        motivo: !req.io ? 'Socket.IO não disponível' : 
+                !dadosAgendamento.sdr_id ? 'Sem sdr_id' : 
+                empresa_id !== 5 ? 'Não é incorporadora' : 'Desconhecido'
+      });
+    }
+
     res.json({ id: data[0].id, message: 'Agendamento criado com sucesso!' });
   } catch (error) {
     console.error('Erro ao criar agendamento:', error);

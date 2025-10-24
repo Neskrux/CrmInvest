@@ -367,8 +367,6 @@ const Pacientes = () => {
   const [consultorSelecionado, setConsultorSelecionado] = useState('');
   const [salvandoAtribuicao, setSalvandoAtribuicao] = useState(false);
 
-  const [linkClinicas, setLinkClinicas] = useState(null);
-  const [loadingLink, setLoadingLink] = useState(true);
 
   // Estados brasileiros
   const estadosBrasileiros = [
@@ -495,15 +493,6 @@ const Pacientes = () => {
     }
   }, []);
 
-  // Buscar links personalizados se for consultor
-  useEffect(() => {
-    if (isConsultor) {
-      buscarLinkPersonalizado();
-    } else {
-      setLoadingLink(false);
-    }
-    
-  }, [podeAlterarStatus, isConsultorInterno, deveFiltrarPorConsultor, user?.consultor_id]);
 
   // Carregar contratos quando modal de análise abrir
   useEffect(() => {
@@ -10240,7 +10229,6 @@ const Pacientes = () => {
           </div>
         </div>
       )}
-
       
     </div>
   );

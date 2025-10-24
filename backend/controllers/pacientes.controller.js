@@ -1199,7 +1199,16 @@ const cadastroPublicoLead = async (req, res) => {
     
     // Emitir evento Socket.IO para notificar admins sobre novo lead
     if (req.io) {
-      console.log('📢 Emitindo evento new-lead via Socket.IO');
+      console.log('📢 [SOCKET.IO] Emitindo evento new-lead para admins:', {
+        leadId: data[0].id,
+        nome: data[0].nome,
+        telefone: data[0].telefone,
+        cidade: data[0].cidade,
+        estado: data[0].estado,
+        timestamp: new Date().toISOString(),
+        room: 'lead-notifications'
+      });
+      
       req.io.to('lead-notifications').emit('new-lead', {
         leadId: data[0].id,
         nome: data[0].nome,
@@ -1210,8 +1219,66 @@ const cadastroPublicoLead = async (req, res) => {
         timestamp: new Date().toISOString()
       });
       
+      console.log('✅ [SOCKET.IO] Evento new-lead enviado para grupo lead-notifications');
+      
       // Atualizar contagem de leads para admins
       // Função updateLeadCount será chamada pelo server.js
+    } else {
+      console.log('⚠️ [SOCKET.IO] Socket.IO não disponível - evento new-lead não enviado');
+    }
+    
+    // Emitir evento Socket.IO para notificar incorporadora sobre novo lead
+    if (req.io && data[0].empresa_id === 5) {
+      console.log('📢 [SOCKET.IO] Emitindo evento new-lead-incorporadora:', {
+        leadId: data[0].id,
+        nome: data[0].nome,
+        cidade: data[0].cidade,
+        estado: data[0].estado,
+        consultorId: consultorId,
+        empresa_id: data[0].empresa_id,
+        timestamp: new Date().toISOString(),
+        room: 'incorporadora-notifications'
+      });
+      
+      // Buscar dados do consultor/SDR se existir
+      let consultorData = null;
+      if (consultorId) {
+        const { data: consultorResult } = await supabaseAdmin
+          .from('consultores')
+          .select('nome, foto_url')
+          .eq('id', consultorId)
+          .single();
+        
+        consultorData = consultorResult;
+        console.log('👤 [SOCKET.IO] Dados do consultor/SDR encontrados:', {
+          consultorId: consultorId,
+          nome: consultorData?.nome || 'N/A',
+          temFoto: !!consultorData?.foto_url
+        });
+      } else {
+        console.log('ℹ️ [SOCKET.IO] Lead sem consultor atribuído - notificação será enviada mesmo assim');
+      }
+
+      req.io.to('incorporadora-notifications').emit('new-lead-incorporadora', {
+        leadId: data[0].id,
+        nome: data[0].nome,
+        telefone: data[0].telefone,
+        cidade: data[0].cidade,
+        estado: data[0].estado,
+        empreendimento_id: data[0].empreendimento_id,
+        consultor_nome: consultorData?.nome || 'Sem consultor',
+        consultor_foto: consultorData?.foto_url || null,
+        timestamp: new Date().toISOString()
+      });
+      
+      console.log('✅ [SOCKET.IO] Evento new-lead-incorporadora enviado para grupo incorporadora-notifications');
+    } else {
+      console.log('⚠️ [SOCKET.IO] Evento new-lead-incorporadora não enviado:', {
+        temSocketIO: !!req.io,
+        empresaId: data[0].empresa_id,
+        motivo: !req.io ? 'Socket.IO não disponível' : 
+                data[0].empresa_id !== 5 ? 'Não é incorporadora' : 'Desconhecido'
+      });
     }
     
     res.json({ 
@@ -1220,8 +1287,18 @@ const cadastroPublicoLead = async (req, res) => {
       nome: nome.trim()
     });
   } catch (error) {
-    console.error('Erro no cadastro de lead:', error);
-    res.status(500).json({ error: 'Erro interno do servidor. Tente novamente.' });
+    console.error('❌ Erro no cadastro de lead:', error);
+    console.error('❌ Stack trace:', error.stack);
+    console.error('❌ Error details:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint
+    });
+    res.status(500).json({ 
+      error: 'Erro interno do servidor. Tente novamente.',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 

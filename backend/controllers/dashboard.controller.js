@@ -272,7 +272,6 @@ const getGeraisPacientes = async (req, res) => {
       .from('pacientes')
       .select(`
         *,
-        consultores(nome),
         empreendimentos(nome, cidade, estado)
       `)
       .order('created_at', { ascending: false });
@@ -333,9 +332,26 @@ const getGeraisPacientes = async (req, res) => {
 
     if (error) throw error;
     
+    // Buscar nomes dos consultores manualmente para evitar erro de múltiplas relações
+    const consultorIds = [...new Set(data.map(p => p.consultor_id).filter(Boolean))];
+    const consultoresNomes = {};
+    
+    if (consultorIds.length > 0) {
+      const { data: consultores } = await supabaseAdmin
+        .from('consultores')
+        .select('id, nome')
+        .in('id', consultorIds);
+      
+      if (consultores) {
+        consultores.forEach(c => {
+          consultoresNomes[c.id] = c.nome;
+        });
+      }
+    }
+    
     const formattedData = data.map(paciente => ({
       ...paciente,
-      consultor_nome: paciente.consultores?.nome,
+      consultor_nome: consultoresNomes[paciente.consultor_id] || null,
       empreendimento_nome: paciente.empreendimentos?.nome,
       empreendimento_cidade: paciente.empreendimentos?.cidade,
       empreendimento_estado: paciente.empreendimentos?.estado
@@ -355,7 +371,6 @@ const getGeraisAgendamentos = async (req, res) => {
       .select(`
         *,
         pacientes(nome, telefone),
-        consultores(nome),
         clinicas(nome)
       `)
       .order('data_agendamento', { ascending: false })
@@ -378,11 +393,28 @@ const getGeraisAgendamentos = async (req, res) => {
 
     if (error) throw error;
 
+    // Buscar nomes dos consultores manualmente para evitar erro de múltiplas relações
+    const consultorIds = [...new Set(data.map(a => a.consultor_id).filter(Boolean))];
+    const consultoresNomes = {};
+    
+    if (consultorIds.length > 0) {
+      const { data: consultores } = await supabaseAdmin
+        .from('consultores')
+        .select('id, nome')
+        .in('id', consultorIds);
+      
+      if (consultores) {
+        consultores.forEach(c => {
+          consultoresNomes[c.id] = c.nome;
+        });
+      }
+    }
+
     const formattedData = data.map(agendamento => ({
       ...agendamento,
       paciente_nome: agendamento.pacientes?.nome,
       paciente_telefone: agendamento.pacientes?.telefone,
-      consultor_nome: agendamento.consultores?.nome,
+      consultor_nome: consultoresNomes[agendamento.consultor_id] || null,
       clinica_nome: agendamento.clinicas?.nome
     }));
 
@@ -400,7 +432,6 @@ const getGeraisFechamentos = async (req, res) => {
       .select(`
         *,
         pacientes(nome, telefone, cpf),
-        consultores(nome),
         clinicas(nome)
       `)
       .order('data_fechamento', { ascending: false })
@@ -437,12 +468,29 @@ const getGeraisFechamentos = async (req, res) => {
 
     if (error) throw error;
 
+    // Buscar nomes dos consultores manualmente para evitar erro de múltiplas relações
+    const consultorIds = [...new Set(data.map(f => f.consultor_id).filter(Boolean))];
+    const consultoresNomes = {};
+    
+    if (consultorIds.length > 0) {
+      const { data: consultores } = await supabaseAdmin
+        .from('consultores')
+        .select('id, nome')
+        .in('id', consultorIds);
+      
+      if (consultores) {
+        consultores.forEach(c => {
+          consultoresNomes[c.id] = c.nome;
+        });
+      }
+    }
+
     const formattedData = data.map(fechamento => ({
       ...fechamento,
       paciente_nome: fechamento.pacientes?.nome,
       paciente_telefone: fechamento.pacientes?.telefone,
       paciente_cpf: fechamento.pacientes?.cpf,
-      consultor_nome: fechamento.consultores?.nome,
+      consultor_nome: consultoresNomes[fechamento.consultor_id] || null,
       clinica_nome: fechamento.clinicas?.nome
     }));
 

@@ -211,25 +211,43 @@ if (!process.env.VERCEL && !process.env.DISABLE_WEBSOCKET) {
 // Socket.IO connection handling
 if (io) {
   io.on('connection', (socket) => {
-    console.log('🔌 Cliente conectado:', socket.id);
+    console.log('🔌 [SOCKET.IO] Cliente conectado:', {
+      socketId: socket.id,
+      timestamp: new Date().toISOString(),
+      userAgent: socket.handshake.headers['user-agent'] || 'N/A',
+      ip: socket.handshake.address || 'N/A'
+    });
     
     // Handler para join-lead-notifications
     socket.on('join-lead-notifications', (data) => {
-      console.log('📢 Cliente entrou no grupo de notificações de leads:', data);
+      console.log('📢 [SOCKET.IO] Cliente entrou no grupo de notificações de leads:', {
+        socketId: socket.id,
+        userType: data.userType,
+        userId: data.userId,
+        timestamp: new Date().toISOString()
+      });
       socket.join('lead-notifications');
+      console.log('✅ [SOCKET.IO] Cliente adicionado ao grupo: lead-notifications');
       
       // Enviar contagem atual de leads para admins
       if (data.userType === 'admin') {
         socket.emit('lead-count-update', { count: 0 }); // Será atualizado pela requisição
+        console.log('📊 [SOCKET.IO] Contagem inicial de leads enviada para admin');
       }
     });
     
     // Handler para request-lead-count
     socket.on('request-lead-count', async (data) => {
-      console.log('📊 Solicitação de contagem de leads:', data);
+      console.log('📊 [SOCKET.IO] Solicitação de contagem de leads:', {
+        socketId: socket.id,
+        userType: data.userType,
+        userId: data.userId,
+        timestamp: new Date().toISOString()
+      });
       
       if (data.userType === 'admin') {
         try {
+          console.log('🔍 [SOCKET.IO] Buscando contagem de leads não atribuídos...');
           // Contar leads não atribuídos
           const { count, error } = await supabaseAdmin
             .from('pacientes')
@@ -239,31 +257,50 @@ if (io) {
             
           if (!error) {
             socket.emit('lead-count-update', { count: count || 0 });
-            console.log(`📊 Contagem de leads enviada: ${count || 0}`);
+            console.log(`📊 [SOCKET.IO] Contagem de leads enviada para admin:`, {
+              socketId: socket.id,
+              count: count || 0,
+              timestamp: new Date().toISOString()
+            });
+          } else {
+            console.error('❌ [SOCKET.IO] Erro ao contar leads:', error);
           }
         } catch (error) {
-          console.error('❌ Erro ao contar leads:', error);
+          console.error('❌ [SOCKET.IO] Erro ao contar leads:', error);
         }
       }
     });
     
     // Handler para join-clinicas-notifications
     socket.on('join-clinicas-notifications', (data) => {
-      console.log('📢 Cliente entrou no grupo de notificações de clínicas:', data);
+      console.log('📢 [SOCKET.IO] Cliente entrou no grupo de notificações de clínicas:', {
+        socketId: socket.id,
+        userType: data.userType,
+        userId: data.userId,
+        timestamp: new Date().toISOString()
+      });
       socket.join('clinicas-notifications');
+      console.log('✅ [SOCKET.IO] Cliente adicionado ao grupo: clinicas-notifications');
       
       // Enviar contagem atual de clínicas para admins
       if (data.userType === 'admin') {
         socket.emit('clinicas-count-update', { count: 0 }); // Será atualizado pela requisição
+        console.log('📊 [SOCKET.IO] Contagem inicial de clínicas enviada para admin');
       }
     });
     
     // Handler para request-clinicas-count
     socket.on('request-clinicas-count', async (data) => {
-      console.log('📊 Solicitação de contagem de novas clínicas:', data);
+      console.log('📊 [SOCKET.IO] Solicitação de contagem de novas clínicas:', {
+        socketId: socket.id,
+        userType: data.userType,
+        userId: data.userId,
+        timestamp: new Date().toISOString()
+      });
       
       if (data.userType === 'admin') {
         try {
+          console.log('🔍 [SOCKET.IO] Buscando contagem de novas clínicas...');
           // Contar novas clínicas
           const { count, error } = await supabaseAdmin
             .from('novas_clinicas')
@@ -271,16 +308,52 @@ if (io) {
             
           if (!error) {
             socket.emit('clinicas-count-update', { count: count || 0 });
-            console.log(`📊 Contagem de novas clínicas enviada: ${count || 0}`);
+            console.log(`📊 [SOCKET.IO] Contagem de novas clínicas enviada para admin:`, {
+              socketId: socket.id,
+              count: count || 0,
+              timestamp: new Date().toISOString()
+            });
+          } else {
+            console.error('❌ [SOCKET.IO] Erro ao contar novas clínicas:', error);
           }
         } catch (error) {
-          console.error('❌ Erro ao contar novas clínicas:', error);
+          console.error('❌ [SOCKET.IO] Erro ao contar novas clínicas:', error);
         }
       }
     });
     
+    // Handler para join-incorporadora-notifications
+    socket.on('join-incorporadora-notifications', (data) => {
+      console.log('📢 [SOCKET.IO] Tentativa de entrada no grupo de notificações da incorporadora:', {
+        socketId: socket.id,
+        userType: data.userType,
+        userId: data.userId,
+        empresaId: data.empresaId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Permitir apenas admin ou consultor
+      if (data.userType === 'admin' || data.userType === 'consultor') {
+        socket.join('incorporadora-notifications');
+        console.log('✅ [SOCKET.IO] Cliente adicionado ao grupo: incorporadora-notifications');
+        console.log('🏢 [SOCKET.IO] Incorporadora conectada - Notificações ativas para:', {
+          empresaId: data.empresaId,
+          socketId: socket.id,
+          userType: data.userType
+        });
+      } else {
+        console.log('⚠️ [SOCKET.IO] Acesso negado ao grupo incorporadora-notifications:', {
+          userType: data.userType,
+          motivo: 'Apenas admin e consultor podem receber notificações'
+        });
+      }
+    });
+    
     socket.on('disconnect', () => {
-      console.log('🔌 Cliente desconectado:', socket.id);
+      console.log('🔌 [SOCKET.IO] Cliente desconectado:', {
+        socketId: socket.id,
+        timestamp: new Date().toISOString()
+      });
     });
   });
 }
