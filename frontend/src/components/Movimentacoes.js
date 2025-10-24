@@ -164,7 +164,7 @@ const Movimentacoes = () => {
                   onChange={(e) => setFiltros({ ...filtros, consultor_id: e.target.value })}
                 >
                   <option value="">Todos os consultores</option>
-                  {consultores.map(consultor => (
+                  {consultores.filter(consultor => consultor.empresa_id === user?.empresa_id).map(consultor => (
                     <option key={consultor.id} value={consultor.id}>
                       {consultor.nome}
                     </option>

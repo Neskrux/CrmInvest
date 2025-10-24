@@ -6,7 +6,7 @@ import ModalEvidencia from './ModalEvidencia';
 
 const Fechamentos = () => {
   const { t, shouldShow, empresaId } = useBranding();
-  const { makeRequest, isAdmin, user, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isClinica } = useAuth();
+  const { makeRequest, isAdmin, user, podeAlterarStatus, isIncorporadora, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isClinica } = useAuth();
   const [fechamentos, setFechamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [consultores, setConsultores] = useState([]);
@@ -1084,7 +1084,7 @@ const Fechamentos = () => {
                   }}
                 >
                   <option value="">Todos</option>
-                  {consultores.map(c => (
+                  {consultores.filter(c => c.empresa_id === user?.empresa_id).map(c => (
                     <option key={c.id} value={c.id}>{c.nome}</option>
                   ))}
                 </select>
@@ -1331,7 +1331,9 @@ const Fechamentos = () => {
                   <tr>
                     <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Data</th>
                     <th>{t.paciente}</th>
-                    <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
+                    {empresaId !== 5 && (
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
+                    )}
                     <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>SDR</th>
                     <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{empresaId === 5 ? 'Corretor' : 'Consultor Interno'}</th>
                     {empresaId === 5 ? (
@@ -1424,7 +1426,9 @@ const Fechamentos = () => {
                             )}
                           </div>
                         </td>
-                        <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{fechamento.consultor_nome || '-'}</td>
+                        {empresaId !== 5 && (
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{fechamento.consultor_nome || '-'}</td>
+                        )}
                         <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{fechamento.sdr_nome || '-'}</td>
                         <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{fechamento.consultor_interno_nome || '-'}</td>
                         {empresaId === 5 ? (
@@ -1727,7 +1731,7 @@ const Fechamentos = () => {
                     disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                   >
                     <option value="">Selecione um {t.consultor.toLowerCase()}</option>
-                    {consultores.map(c => (
+                    {consultores.filter(c => c.empresa_id === user?.empresa_id).map(c => (
                       <option key={c.id} value={c.id}>{c.nome}</option>
                     ))}
                   </select>
@@ -2236,7 +2240,7 @@ const Fechamentos = () => {
                   </div>
 
                   <div>
-                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>{t.consultor}	</label>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Freelancer</label>
                     <div style={{ 
                       padding: '0.75rem', 
                       backgroundColor: '#f9fafb', 
@@ -2244,6 +2248,30 @@ const Fechamentos = () => {
                       border: '1px solid #e5e7eb'
                     }}>
                       {viewingFechamento.consultor_nome || 'Não informado'}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>SDR</label>
+                    <div style={{ 
+                      padding: '0.75rem', 
+                      backgroundColor: '#f9fafb', 
+                      borderRadius: '6px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      {viewingFechamento.sdr_nome || 'Não informado'}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>{empresaId === 5 ? 'Corretor' : 'Consultor Interno'}</label>
+                    <div style={{ 
+                      padding: '0.75rem', 
+                      backgroundColor: '#f9fafb', 
+                      borderRadius: '6px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      {viewingFechamento.consultor_interno_nome || 'Não informado'}
                     </div>
                   </div>
                   
