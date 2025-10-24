@@ -1121,20 +1121,9 @@ Digite o número da opção desejada:`;
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                       {consultor.empresa_id ? (
                         // Consultor de parceiro (mostra se é freelancer ou funcionário)
-                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <span className={`status-badge ${consultor.is_freelancer !== false ? 'freelancer' : 'interno'}`}>
-                            {consultor.is_freelancer !== false ? 'Freelancer' : 'Funcionário'}
-                          </span>
-                          <span className="badge" style={{ 
-                            backgroundColor: '#8b5cf6', 
-                            color: 'white',
-                            fontSize: '0.75rem',
-                            padding: '2px 8px',
-                            borderRadius: '4px'
-                          }}>
-                            Empresa
-                          </span>
-                        </div>
+                        <span className={`status-badge ${consultor.is_freelancer !== false ? 'freelancer' : 'interno'}`}>
+                          {consultor.is_freelancer !== false ? 'Freelancer' : 'Funcionário'}
+                        </span>
                       ) : (
                         // Consultor sem parceiro (Invest Money)
                       <span className={`status-badge ${consultor.is_freelancer !== false ? 'freelancer' : 'interno'}`}>
@@ -1331,20 +1320,9 @@ Digite o número da opção desejada:`;
                   <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
                     {viewingConsultor.empresa_id ? (
                       // Consultor de parceiro
-                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <span className={`status-badge ${viewingConsultor.is_freelancer !== false ? 'freelancer' : 'interno'}`}>
-                          {viewingConsultor.is_freelancer !== false ? 'Freelancer (terceirizado)' : 'Funcionário (fixo)'}
-                        </span>
-                        <span className="badge" style={{ 
-                          backgroundColor: '#8b5cf6', 
-                          color: 'white',
-                          fontSize: '0.75rem',
-                          padding: '4px 10px',
-                          borderRadius: '4px'
-                        }}>
-                          Empresa
-                        </span>
-                      </div>
+                      <span className={`status-badge ${viewingConsultor.is_freelancer !== false ? 'freelancer' : 'interno'}`}>
+                        {viewingConsultor.is_freelancer !== false ? 'Freelancer (terceirizado)' : 'Funcionário (fixo)'}
+                      </span>
                     ) : (
                       // Consultor Invest Money
                       <span className={`status-badge ${viewingConsultor.is_freelancer !== false ? 'freelancer' : 'interno'}`}>

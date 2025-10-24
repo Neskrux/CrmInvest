@@ -22,8 +22,9 @@ const getAllAgendamentos = async (req, res) => {
     if (req.user.tipo === 'clinica') {
       query = query.eq('clinica_id', req.user.clinica_id);
     }
-    // Se for admin ou parceiro, filtrar apenas agendamentos de consultores da empresa
-    else if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
+    // Se for admin, parceiro ou consultor interno, filtrar apenas agendamentos da empresa
+    else if (((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) || 
+              (req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true && req.user.empresa_id)) {
       query = query.eq('empresa_id', req.user.empresa_id);
     }
     // Se for consultor freelancer (não tem as duas permissões), filtrar apenas seus agendamentos
@@ -96,8 +97,9 @@ const getDashboardAgendamentos = async (req, res) => {
       .order('data_agendamento', { ascending: false })
       .order('horario');
 
-    // Se for admin ou parceiro, filtrar apenas agendamentos de consultores da empresa
-    if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
+    // Se for admin, parceiro ou consultor interno, filtrar apenas agendamentos da empresa
+    if (((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) || 
+        (req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true && req.user.empresa_id)) {
       query = query.eq('empresa_id', req.user.empresa_id);
     }
     // Se for consultor freelancer (não tem as duas permissões), filtrar apenas seus agendamentos
