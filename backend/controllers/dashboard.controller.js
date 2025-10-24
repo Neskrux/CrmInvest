@@ -490,6 +490,8 @@ const getGeraisFechamentos = async (req, res) => {
           consultoresNomes[c.id] = c.nome;
         });
       }
+    }
+    
     // Buscar nomes dos consultores separadamente
     const consultoresIds = [...new Set(data.map(f => f.consultor_id).filter(Boolean))];
     const sdrIds = [...new Set(data.map(f => f.sdr_id).filter(Boolean))];
@@ -497,17 +499,17 @@ const getGeraisFechamentos = async (req, res) => {
     
     const allConsultoresIds = [...new Set([...consultoresIds, ...sdrIds, ...consultorInternoIds])];
     
-    let consultoresNomes = {};
     if (allConsultoresIds.length > 0) {
       const { data: consultoresData } = await supabaseAdmin
         .from('consultores')
         .select('id, nome')
         .in('id', allConsultoresIds);
       
-      consultoresNomes = consultoresData?.reduce((acc, c) => {
-        acc[c.id] = c.nome;
-        return acc;
-      }, {}) || {};
+      if (consultoresData) {
+        consultoresData.forEach(c => {
+          consultoresNomes[c.id] = c.nome;
+        });
+      }
     }
 
     const formattedData = data.map(fechamento => ({
