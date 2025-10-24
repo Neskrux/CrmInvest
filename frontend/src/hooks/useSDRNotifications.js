@@ -115,11 +115,13 @@ const useSDRNotifications = () => {
       
       console.log('🎭 [SDR NOTIFICATIONS] Dados do SDR para personalização:', sdrData);
       
-      // Tocar som personalizado do SDR
-      playPersonalizedNotificationSound(sdrData.som, sdrData.nome);
+      // Música removida temporariamente para agendamentos
+      // Se reativar, adicionar verificação: if (!user.is_freelancer) playPersonalizedNotificationSound(sdrData.som, sdrData.nome);
       
-      // Mostrar toast personalizado com foto do SDR
-      showPersonalizedToast(sdrData, data);
+      // Mostrar toast personalizado com foto do SDR apenas se não for freelancer
+      if (!user.is_freelancer) {
+        showPersonalizedToast(sdrData, data);
+      }
       
       // Adicionar à lista de notificações
       setNotifications(prev => [...prev, {

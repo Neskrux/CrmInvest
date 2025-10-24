@@ -3217,6 +3217,9 @@ const Pacientes = () => {
     // Verificar se é um paciente sem consultor
     const semConsultor = !p.consultor_id || p.consultor_id === '' || p.consultor_id === null || p.consultor_id === undefined || Number(p.consultor_id) === 0;
     
+    // Verificar se é um lead capturado por SDR (tem sdr_id mas não consultor_id)
+    const capturadoPorSDR = p.sdr_id && semConsultor;
+    
     // Pacientes com status 'fechado' sempre aparecem (cadastrados por clínicas)
     if (p.status === 'fechado' && semConsultor) {
       return true; // Sempre mostrar pacientes fechados, mesmo sem consultor
@@ -3237,9 +3240,9 @@ const Pacientes = () => {
     // Leads não atribuídos (sem consultor_id) NÃO devem aparecer aqui para ninguém
       if (!isAdmin && !isConsultorInterno && semConsultor) return false;
     
-    // Para consultores internos e admins, também remover leads não atribuídos da aba "Geral"
-    // (eles devem aparecer apenas em "Novos Leads")
-      if ((isAdmin || isConsultorInterno) && semConsultor) return false;
+    // Para consultores internos e admins, remover leads não atribuídos da aba "Geral"
+    // EXCETO se foram capturados por SDR (têm sdr_id)
+      if ((isAdmin || isConsultorInterno) && semConsultor && !capturadoPorSDR) return false;
     }
     
     const matchNome = !filtroNome || p.nome.toLowerCase().includes(filtroNome.toLowerCase());
@@ -3934,7 +3937,9 @@ const Pacientes = () => {
                     }).map(lead => {
                       const statusInfo = getStatusInfo(lead.status);
                       const consultorAtribuido = consultores.find(c => c.id === lead.consultor_id);
+                      const sdrAtribuido = consultores.find(c => c.id === lead.sdr_id);
                       const temConsultor = lead.consultor_id && lead.consultor_id !== null;
+                      const temSDR = lead.sdr_id && lead.sdr_id !== null;
                       
                       return (
                         <tr key={lead.id}>
@@ -3972,9 +3977,27 @@ const Pacientes = () => {
                               <span style={{ 
                                 display: 'inline-flex', 
                                 alignItems: 'center', 
-                                gap: '0.25rem'
+                                gap: '0.25rem',
+                                maxWidth: '100%',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
                               }}>
                                 {consultorAtribuido?.nome || 'Consultor atribuído'}
+                              </span>
+                            ) : temSDR ? (
+                              <span style={{ 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '0.25rem',
+                                color: '#3b82f6',
+                                fontWeight: '600',
+                                maxWidth: '100%',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {sdrAtribuido?.nome || 'SDR'} (SDR)
                               </span>
                             ) : (
                               <span style={{ color: '#6b7280', fontStyle: 'italic' }}>Sem consultor</span>
@@ -4291,7 +4314,9 @@ const Pacientes = () => {
                     }).map(lead => {
                       const statusInfo = getStatusInfo(lead.status);
                       const consultorAtribuido = consultores.find(c => c.id === lead.consultor_id);
+                      const sdrAtribuido = consultores.find(c => c.id === lead.sdr_id);
                       const temConsultor = lead.consultor_id && lead.consultor_id !== null;
+                      const temSDR = lead.sdr_id && lead.sdr_id !== null;
                       
                       return (
                         <tr key={lead.id}>
@@ -4329,9 +4354,27 @@ const Pacientes = () => {
                               <span style={{ 
                                 display: 'inline-flex', 
                                 alignItems: 'center', 
-                                gap: '0.25rem'
+                                gap: '0.25rem',
+                                maxWidth: '100%',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
                               }}>
                                 {consultorAtribuido?.nome || 'Consultor atribuído'}
+                              </span>
+                            ) : temSDR ? (
+                              <span style={{ 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '0.25rem',
+                                color: '#3b82f6',
+                                fontWeight: '600',
+                                maxWidth: '100%',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {sdrAtribuido?.nome || 'SDR'} (SDR)
                               </span>
                             ) : (
                               <span style={{ color: '#6b7280', fontStyle: 'italic' }}>Sem consultor</span>
@@ -6442,9 +6485,23 @@ const Pacientes = () => {
                   <div>
                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Responsável</label>
                     <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
-                      {consultores.find(c => String(c.id) === String(viewPaciente.consultor_id))?.nome || (
-                        <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>Não atribuído</span>
-                      )}
+                      {(() => {
+                        // Primeiro, tentar encontrar por consultor_id (freelancer)
+                        const consultorResponsavel = consultores.find(c => String(c.id) === String(viewPaciente.consultor_id));
+                        if (consultorResponsavel) {
+                          return consultorResponsavel.nome;
+                        }
+                        
+                        // Se não tem consultor_id, verificar se tem sdr_id (SDR)
+                        if (viewPaciente.sdr_id) {
+                          const sdrResponsavel = consultores.find(c => String(c.id) === String(viewPaciente.sdr_id));
+                          if (sdrResponsavel) {
+                            return `${sdrResponsavel.nome} (SDR)`;
+                          }
+                        }
+                        
+                        return <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>Não atribuído</span>;
+                      })()}
                     </p>
               </div>
                   
