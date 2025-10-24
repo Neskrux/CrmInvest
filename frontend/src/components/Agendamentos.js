@@ -112,15 +112,12 @@ const Agendamentos = () => {
 
   // Função de polling inteligente
   const pollingCallback = async () => {
-    console.log('🔄 Executando polling inteligente - Agendamentos...');
-    
     try {
       // Executar chamadas em paralelo (mais eficiente)
       await Promise.allSettled([
         fetchAgendamentos(),
         fetchPacientes()
       ]);
-      console.log('✅ Polling inteligente concluído - Agendamentos');
     } catch (error) {
       console.warn('⚠️ Erro no polling inteligente - Agendamentos:', error);
     }

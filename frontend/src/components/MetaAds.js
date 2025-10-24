@@ -183,11 +183,8 @@ function MetaAds() {
 
   // Função de polling inteligente para Meta Ads
   const pollingCallback = async () => {
-    console.log('🔄 Executando polling inteligente - Meta Ads...');
-    
     try {
       await fetchAdvancedMetrics();
-      console.log('✅ Polling inteligente concluído - Meta Ads');
     } catch (error) {
       console.warn('⚠️ Erro no polling inteligente - Meta Ads:', error);
     }

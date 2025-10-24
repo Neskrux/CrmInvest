@@ -2997,7 +2997,6 @@ const Pacientes = () => {
       }
       
       const pacienteCriado = await pacienteResponse.json();
-      console.log('Paciente criado:', pacienteCriado);
       
       // 2. Criar o fechamento com contrato (sem agendamento automático)
       const fechamentoFormData = new FormData();
@@ -3644,26 +3643,11 @@ const Pacientes = () => {
                   <thead>
                     <tr>
                       <th>Nome</th>
-                      {isIncorporadora ? (
-                        <>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>SDR</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Corretor</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Empreendimento</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
-                        </>
-                      ) : (
-                        <>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>SDR</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>CPF</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cidade</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Tipo</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
-                        </>
-                      )}
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>SDR</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Corretor' : 'Consultor'}</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Empreendimento' : 'Tipo'}</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
                       <th>
                         Status
                         {!podeAlterarStatus && (
@@ -3738,96 +3722,58 @@ const Pacientes = () => {
                               )}
                             </div>
                           </td>
-                          {isIncorporadora ? (
-                            <>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {paciente.consultor_nome || (
-                                  <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
-                                    Não atribuído
-                                  </span>
-                                )}
-                              </td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {paciente.sdr_nome || (
-                                  <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
-                                    Não atribuído
-                                  </span>
-                                )}
-                              </td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {paciente.consultor_interno_nome || (
-                                  <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
-                                    Não atribuído
-                                  </span>
-                                )}
-                              </td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {paciente.empreendimento_id ? (
-                                  (() => {
-                                    const empreendimentoMap = {
-                                      4: 'Laguna Sky Garden',
-                                      5: 'Residencial Girassol',
-                                      6: 'Sintropia Sky Garden',
-                                      7: 'Residencial Lotus',
-                                      8: 'River Sky Garden',
-                                      9: 'Condomínio Figueira Garcia'
-                                    };
-                                    return empreendimentoMap[paciente.empreendimento_id] || '-';
-                                  })()
-                                ) : '-'}
-                              </td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {formatarData(paciente.created_at)}
-                              </td>
-                            </>
-                          ) : (
-                            <>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {paciente.consultor_nome || (
-                                  <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
-                                    Não atribuído
-                                  </span>
-                                )}
-                              </td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {paciente.sdr_nome || (
-                                  <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
-                                    Não atribuído
-                                  </span>
-                                )}
-                              </td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {paciente.consultor_interno_nome || (
-                                  <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
-                                    Não atribuído
-                                  </span>
-                                )}
-                              </td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarTelefone(paciente.telefone)}</td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarCPF(paciente.cpf)}</td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {paciente.cidade || paciente.estado ? (
-                                  <>
-                                    {paciente.cidade && <div>{paciente.cidade}</div>}
-                                    {paciente.estado && <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{paciente.estado}</div>}
-                                  </>
-                                ) : '-'}
-                              </td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {paciente.tipo_tratamento && (
-                                  <span className={`badge badge-${paciente.tipo_tratamento === 'estetico' ? 'info' : 'warning'}`}>
-                                    {paciente.tipo_tratamento === 'estetico' ? 'Estético' : 
-                                     paciente.tipo_tratamento === 'odontologico' ? 'Odontológico' : 
-                                     paciente.tipo_tratamento === 'ambos' ? 'Ambos' :
-                                     paciente.tipo_tratamento}
-                                  </span>
-                                )}
-                              </td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {formatarData(paciente.created_at)}
-                              </td>
-                            </>
-                          )}
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                            {paciente.consultor_nome || (
+                              <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
+                                Não atribuído
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                            {paciente.sdr_nome || (
+                              <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
+                                Não atribuído
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                            {paciente.consultor_interno_nome || (
+                              <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
+                                Não atribuído
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                            {isIncorporadora ? (
+                              // Para incorporadora, mostrar empreendimento
+                              paciente.empreendimento_id ? (
+                                (() => {
+                                  const empreendimentoMap = {
+                                    4: 'Laguna Sky Garden',
+                                    5: 'Residencial Girassol',
+                                    6: 'Sintropia Sky Garden',
+                                    7: 'Residencial Lotus',
+                                    8: 'River Sky Garden',
+                                    9: 'Condomínio Figueira Garcia'
+                                  };
+                                  return empreendimentoMap[paciente.empreendimento_id] || '-';
+                                })()
+                              ) : '-'
+                            ) : (
+                              // Para clínicas, mostrar tipo de tratamento
+                              paciente.tipo_tratamento && (
+                                <span className={`badge badge-${paciente.tipo_tratamento === 'estetico' ? 'info' : 'warning'}`}>
+                                  {paciente.tipo_tratamento === 'estetico' ? 'Estético' : 
+                                   paciente.tipo_tratamento === 'odontologico' ? 'Odontológico' : 
+                                   paciente.tipo_tratamento === 'ambos' ? 'Ambos' :
+                                   paciente.tipo_tratamento}
+                                </span>
+                              )
+                            )}
+                          </td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                            {formatarData(paciente.created_at)}
+                          </td>
                           <td>
                             <select
                               value={statusTemporario[paciente.id] || paciente.status}
@@ -3969,28 +3915,12 @@ const Pacientes = () => {
                   <thead>
                     <tr>
                       <th>Nome</th>
-                      {isIncorporadora ? (
-                        <>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cidade</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Empreendimento</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Status</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
-                        </>
-                      ) : (
-                        <>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>SDR</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>CPF</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cidade</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Tipo</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Status</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
-                        </>
-                      )}
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>SDR</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Corretor' : 'Consultor'}</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Empreendimento' : 'Tipo'}</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Status</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
                       <th style={{ width: isConsultor || isClinica ? '80px' : '200px', minWidth: isConsultor || isClinica ? '80px' : '200px' }}>Ações</th>
                     </tr>
                   </thead>
@@ -4037,85 +3967,49 @@ const Pacientes = () => {
                               )}
                             </div>
                           </td>
-                          {isIncorporadora ? (
-                            <>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {temConsultor ? (
-                                  <span style={{ 
-                                    display: 'inline-flex', 
-                                    alignItems: 'center', 
-                                    gap: '0.25rem'
-                                  }}>
-                                    {consultorAtribuido?.nome || 'Consultor atribuído'}
-                                  </span>
-                                ) : (
-                                  <span style={{ color: '#6b7280', fontStyle: 'italic' }}>Sem consultor</span>
-                                )}
-                              </td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarTelefone(lead.telefone)}</td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {lead.cidade || lead.estado ? (
-                                  <>
-                                    {lead.cidade && <div>{lead.cidade}</div>}
-                                    {lead.estado && <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{lead.estado}</div>}
-                                  </>
-                                ) : '-'}
-                              </td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {lead.empreendimento_id ? (
-                                  (() => {
-                                    const empreendimentoMap = {
-                                      4: 'Laguna Sky Garden',
-                                      5: 'Residencial Girassol',
-                                      6: 'Sintropia Sky Garden',
-                                      7: 'Residencial Lotus',
-                                      8: 'River Sky Garden',
-                                      9: 'Condomínio Figueira Garcia'
-                                    };
-                                    return empreendimentoMap[lead.empreendimento_id] || '-';
-                                  })()
-                                ) : '-'}
-                              </td>
-                            </>
-                          ) : (
-                            <>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {temConsultor ? (
-                                  <span style={{ 
-                                    display: 'inline-flex', 
-                                    alignItems: 'center', 
-                                    gap: '0.25rem'
-                                  }}>
-                                    {consultorAtribuido?.nome || 'Consultor atribuído'}
-                                  </span>
-                                ) : (
-                                  <span style={{ color: '#6b7280', fontStyle: 'italic' }}>Sem consultor</span>
-                                )}
-                              </td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{lead.sdr_nome || '-'}</td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{lead.consultor_interno_nome || '-'}</td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarTelefone(lead.telefone)}</td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarCPF(lead.cpf)}</td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {lead.cidade || lead.estado ? (
-                                  <>
-                                    {lead.cidade && <div>{lead.cidade}</div>}
-                                    {lead.estado && <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{lead.estado}</div>}
-                                  </>
-                                ) : '-'}
-                              </td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {lead.tipo_tratamento && (
-                                  <span className={`badge badge-${lead.tipo_tratamento === 'estetico' ? 'info' : 'warning'}`}>
-                                    {lead.tipo_tratamento === 'estetico' ? 'Estético' : 
-                                     lead.tipo_tratamento === 'odontologico' ? 'Odontológico' : 
-                                     lead.tipo_tratamento === 'ambos' ? 'Ambos' :
-                                     lead.tipo_tratamento}
-                                  </span>
-                                )}
-                              </td>
-                            </>
-                          )}
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                            {temConsultor ? (
+                              <span style={{ 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '0.25rem'
+                              }}>
+                                {consultorAtribuido?.nome || 'Consultor atribuído'}
+                              </span>
+                            ) : (
+                              <span style={{ color: '#6b7280', fontStyle: 'italic' }}>Sem consultor</span>
+                            )}
+                          </td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{lead.sdr_nome || '-'}</td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{lead.consultor_interno_nome || '-'}</td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                            {isIncorporadora ? (
+                              // Para incorporadora, mostrar empreendimento
+                              lead.empreendimento_id ? (
+                                (() => {
+                                  const empreendimentoMap = {
+                                    4: 'Laguna Sky Garden',
+                                    5: 'Residencial Girassol',
+                                    6: 'Sintropia Sky Garden',
+                                    7: 'Residencial Lotus',
+                                    8: 'River Sky Garden',
+                                    9: 'Condomínio Figueira Garcia'
+                                  };
+                                  return empreendimentoMap[lead.empreendimento_id] || '-';
+                                })()
+                              ) : '-'
+                            ) : (
+                              // Para clínicas, mostrar tipo de tratamento
+                              lead.tipo_tratamento && (
+                                <span className={`badge badge-${lead.tipo_tratamento === 'estetico' ? 'info' : 'warning'}`}>
+                                  {lead.tipo_tratamento === 'estetico' ? 'Estético' : 
+                                   lead.tipo_tratamento === 'odontologico' ? 'Odontológico' : 
+                                   lead.tipo_tratamento === 'ambos' ? 'Ambos' :
+                                   lead.tipo_tratamento}
+                                </span>
+                              )
+                            )}
+                          </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                             {(isAdmin || podeAlterarStatus) ? (
                               <select
@@ -4378,28 +4272,12 @@ const Pacientes = () => {
                   <thead>
                     <tr>
                       <th>Nome</th>
-                      {isIncorporadora ? (
-                        <>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cidade</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Empreendimento</th>
-                          <th>Status</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
-                        </>
-                      ) : (
-                        <>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>SDR</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Consultor</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Telefone</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>CPF</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cidade</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Tipo</th>
-                          <th>Status</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
-                        </>
-                      )}
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>SDR</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Corretor' : 'Consultor'}</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Empreendimento' : 'Tipo'}</th>
+                      <th>Status</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
                       <th style={{ width: '80px' }}>Ações</th>
                     </tr>
                   </thead>
@@ -4446,85 +4324,49 @@ const Pacientes = () => {
                               )}
                             </div>
                           </td>
-                          {isIncorporadora ? (
-                            <>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {temConsultor ? (
-                                  <span style={{ 
-                                    display: 'inline-flex', 
-                                    alignItems: 'center', 
-                                    gap: '0.25rem'
-                                  }}>
-                                    {consultorAtribuido?.nome || 'Consultor atribuído'}
-                                  </span>
-                                ) : (
-                                  <span style={{ color: '#6b7280', fontStyle: 'italic' }}>Sem consultor</span>
-                                )}
-                              </td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarTelefone(lead.telefone)}</td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {lead.cidade || lead.estado ? (
-                                  <>
-                                    {lead.cidade && <div>{lead.cidade}</div>}
-                                    {lead.estado && <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{lead.estado}</div>}
-                                  </>
-                                ) : '-'}
-                              </td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {lead.empreendimento_id ? (
-                                  (() => {
-                                    const empreendimentoMap = {
-                                      4: 'Laguna Sky Garden',
-                                      5: 'Residencial Girassol',
-                                      6: 'Sintropia Sky Garden',
-                                      7: 'Residencial Lotus',
-                                      8: 'River Sky Garden',
-                                      9: 'Condomínio Figueira Garcia'
-                                    };
-                                    return empreendimentoMap[lead.empreendimento_id] || '-';
-                                  })()
-                                ) : '-'}
-                              </td>
-                            </>
-                          ) : (
-                            <>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {temConsultor ? (
-                                  <span style={{ 
-                                    display: 'inline-flex', 
-                                    alignItems: 'center', 
-                                    gap: '0.25rem'
-                                  }}>
-                                    {consultorAtribuido?.nome || 'Consultor atribuído'}
-                                  </span>
-                                ) : (
-                                  <span style={{ color: '#6b7280', fontStyle: 'italic' }}>Sem consultor</span>
-                                )}
-                              </td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{lead.sdr_nome || '-'}</td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{lead.consultor_interno_nome || '-'}</td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarTelefone(lead.telefone)}</td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarCPF(lead.cpf)}</td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {lead.cidade || lead.estado ? (
-                                  <>
-                                    {lead.cidade && <div>{lead.cidade}</div>}
-                                    {lead.estado && <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{lead.estado}</div>}
-                                  </>
-                                ) : '-'}
-                              </td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                                {lead.tipo_tratamento && (
-                                  <span className={`badge badge-${lead.tipo_tratamento === 'estetico' ? 'info' : 'warning'}`}>
-                                    {lead.tipo_tratamento === 'estetico' ? 'Estético' : 
-                                     lead.tipo_tratamento === 'odontologico' ? 'Odontológico' : 
-                                     lead.tipo_tratamento === 'ambos' ? 'Ambos' :
-                                     lead.tipo_tratamento}
-                                  </span>
-                                )}
-                              </td>
-                            </>
-                          )}
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                            {temConsultor ? (
+                              <span style={{ 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '0.25rem'
+                              }}>
+                                {consultorAtribuido?.nome || 'Consultor atribuído'}
+                              </span>
+                            ) : (
+                              <span style={{ color: '#6b7280', fontStyle: 'italic' }}>Sem consultor</span>
+                            )}
+                          </td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{lead.sdr_nome || '-'}</td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{lead.consultor_interno_nome || '-'}</td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                            {isIncorporadora ? (
+                              // Para incorporadora, mostrar empreendimento
+                              lead.empreendimento_id ? (
+                                (() => {
+                                  const empreendimentoMap = {
+                                    4: 'Laguna Sky Garden',
+                                    5: 'Residencial Girassol',
+                                    6: 'Sintropia Sky Garden',
+                                    7: 'Residencial Lotus',
+                                    8: 'River Sky Garden',
+                                    9: 'Condomínio Figueira Garcia'
+                                  };
+                                  return empreendimentoMap[lead.empreendimento_id] || '-';
+                                })()
+                              ) : '-'
+                            ) : (
+                              // Para clínicas, mostrar tipo de tratamento
+                              lead.tipo_tratamento && (
+                                <span className={`badge badge-${lead.tipo_tratamento === 'estetico' ? 'info' : 'warning'}`}>
+                                  {lead.tipo_tratamento === 'estetico' ? 'Estético' : 
+                                   lead.tipo_tratamento === 'odontologico' ? 'Odontológico' : 
+                                   lead.tipo_tratamento === 'ambos' ? 'Ambos' :
+                                   lead.tipo_tratamento}
+                                </span>
+                              )
+                            )}
+                          </td>
                           <td>
                             {(isAdmin || podeAlterarStatus) ? (
                               <select
@@ -7772,7 +7614,6 @@ const Pacientes = () => {
                             const file = e.target.files[0];
                             if (file) {
                               // Aqui você implementaria o upload
-                              console.log(`Upload de ${doc.label}:`, file);
                             showSuccessToast(`${doc.label} selecionado: ${file.name}`);
                             }
                           }}

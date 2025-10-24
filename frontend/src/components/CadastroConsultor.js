@@ -121,7 +121,6 @@ const CadastroConsultor = () => {
             setVideoPlaying(true);
             setShowPlayButton(false);
           }).catch(error => {
-            console.log('Autoplay bloqueado pelo navegador:', error);
             setShowPlayButton(true);
             setVideoPlaying(false);
           });
@@ -148,7 +147,7 @@ const CadastroConsultor = () => {
           setShowControlButton(false);
         }, 2000);
       } catch (error) {
-        console.log('Erro ao tocar vídeo:', error);
+        // Erro ao tocar vídeo
       }
     }
   };
