@@ -43,9 +43,14 @@ const getAllEmpreendimentos = async (req, res) => {
       .from('empreendimentos')
       .select('*');
 
-    // Se não for admin, filtrar por empresa_id
+    // Se não for admin, filtrar por empresa_id (incluindo consultores internos)
     if (req.user.tipo !== 'admin') {
-      query = query.eq('empresa_id', req.user.empresa_id);
+      if (req.user.empresa_id) {
+        query = query.eq('empresa_id', req.user.empresa_id);
+      } else {
+        // Se não tem empresa_id, retornar vazio
+        query = query.eq('id', 0);
+      }
     }
 
     const { data, error } = await query;

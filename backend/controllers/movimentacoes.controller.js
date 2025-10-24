@@ -191,10 +191,9 @@ const getMovimentacoesRecentes = async (req, res) => {
       .limit(parseInt(limit));
     
     // Filtrar por empresa do usuário se necessário
-    if (req.user.tipo === 'admin' || req.user.tipo === 'parceiro') {
-      if (req.user.empresa_id) {
-        query = query.eq('empresa_id', req.user.empresa_id);
-      }
+    if (((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) || 
+        (req.user.tipo === 'consultor' && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true && req.user.empresa_id)) {
+      query = query.eq('empresa_id', req.user.empresa_id);
     }
     
     const { data, error } = await query;

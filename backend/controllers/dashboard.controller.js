@@ -26,10 +26,12 @@ const getDashboard = async (req, res) => {
     
     if (isClinica) {
       agendamentosQuery = agendamentosQuery.eq('clinica_id', clinicaId);
-    } else if (isConsultor) {
+    } else if (isConsultor && !(req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true)) {
+      // Para consultores freelancers, filtrar apenas seus agendamentos
       agendamentosQuery = agendamentosQuery.eq('consultor_id', consultorId);
-    } else if ((isAdmin || isParceiro) && empresaId) {
-      // Para admin ou parceiro, filtrar agendamentos de consultores da empresa
+    } else if (((isAdmin || isParceiro) && empresaId) || 
+               (isConsultor && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true && empresaId)) {
+      // Para admin, parceiro ou consultor interno, filtrar agendamentos da empresa
       agendamentosQuery = agendamentosQuery.eq('empresa_id', empresaId);
     }
 
@@ -45,10 +47,12 @@ const getDashboard = async (req, res) => {
     
     if (isClinica) {
       lembradosQuery = lembradosQuery.eq('clinica_id', clinicaId);
-    } else if (isConsultor) {
+    } else if (isConsultor && !(req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true)) {
+      // Para consultores freelancers, filtrar apenas seus lembrados
       lembradosQuery = lembradosQuery.eq('consultor_id', consultorId);
-    } else if ((isAdmin || isParceiro) && empresaId) {
-      // Para admin ou parceiro, filtrar lembrados de consultores da empresa
+    } else if (((isAdmin || isParceiro) && empresaId) || 
+               (isConsultor && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true && empresaId)) {
+      // Para admin, parceiro ou consultor interno, filtrar lembrados da empresa
       lembradosQuery = lembradosQuery.eq('empresa_id', empresaId);
     }
 
@@ -272,7 +276,6 @@ const getGeraisPacientes = async (req, res) => {
       .from('pacientes')
       .select(`
         *,
-        consultores(nome),
         empreendimentos(nome, cidade, estado)
       `)
       .order('created_at', { ascending: false });
@@ -300,8 +303,9 @@ const getGeraisPacientes = async (req, res) => {
       } else {
         query = query.eq('id', 0); // Força resultado vazio
       }
-    } else if ((isAdmin || isParceiro || isConsultor) && empresaId) {
-      // Para admin/parceiro/consultor, buscar pacientes da empresa (com empresa_id OU consultores da empresa)
+    } else if (((isAdmin || isParceiro) && empresaId) || 
+               (isConsultor && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true && empresaId)) {
+      // Para admin/parceiro/consultor interno, buscar pacientes da empresa (com empresa_id OU consultores da empresa)
       const { data: consultores, error: consultorError } = await supabaseAdmin
         .from('consultores')
         .select('id')
@@ -355,7 +359,6 @@ const getGeraisAgendamentos = async (req, res) => {
       .select(`
         *,
         pacientes(nome, telefone),
-        consultores(nome),
         clinicas(nome)
       `)
       .order('data_agendamento', { ascending: false })
@@ -370,7 +373,8 @@ const getGeraisAgendamentos = async (req, res) => {
 
     if (isClinica) {
       query = query.eq('clinica_id', req.user.clinica_id);
-    } else if ((isAdmin || isParceiro || isConsultor) && empresaId) {
+    } else if (((isAdmin || isParceiro) && empresaId) || 
+               (isConsultor && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true && empresaId)) {
       query = query.eq('empresa_id', empresaId);
     }
 
@@ -400,7 +404,6 @@ const getGeraisFechamentos = async (req, res) => {
       .select(`
         *,
         pacientes(nome, telefone, cpf),
-        consultores(nome),
         clinicas(nome)
       `)
       .order('data_fechamento', { ascending: false })
@@ -429,7 +432,8 @@ const getGeraisFechamentos = async (req, res) => {
       } else {
         query = query.eq('id', 0); // Força resultado vazio
       }
-    } else if ((isAdmin || isParceiro || isConsultor) && empresaId) {
+    } else if (((isAdmin || isParceiro) && empresaId) || 
+               (isConsultor && req.user.pode_ver_todas_novas_clinicas === true && req.user.podealterarstatus === true && empresaId)) {
       query = query.eq('empresa_id', empresaId);
     }
 
@@ -437,12 +441,34 @@ const getGeraisFechamentos = async (req, res) => {
 
     if (error) throw error;
 
+    // Buscar nomes dos consultores separadamente
+    const consultoresIds = [...new Set(data.map(f => f.consultor_id).filter(Boolean))];
+    const sdrIds = [...new Set(data.map(f => f.sdr_id).filter(Boolean))];
+    const consultorInternoIds = [...new Set(data.map(f => f.consultor_interno_id).filter(Boolean))];
+    
+    const allConsultoresIds = [...new Set([...consultoresIds, ...sdrIds, ...consultorInternoIds])];
+    
+    let consultoresNomes = {};
+    if (allConsultoresIds.length > 0) {
+      const { data: consultoresData } = await supabaseAdmin
+        .from('consultores')
+        .select('id, nome')
+        .in('id', allConsultoresIds);
+      
+      consultoresNomes = consultoresData?.reduce((acc, c) => {
+        acc[c.id] = c.nome;
+        return acc;
+      }, {}) || {};
+    }
+
     const formattedData = data.map(fechamento => ({
       ...fechamento,
       paciente_nome: fechamento.pacientes?.nome,
       paciente_telefone: fechamento.pacientes?.telefone,
       paciente_cpf: fechamento.pacientes?.cpf,
-      consultor_nome: fechamento.consultores?.nome,
+      consultor_nome: consultoresNomes[fechamento.consultor_id] || null,
+      sdr_nome: consultoresNomes[fechamento.sdr_id] || null,
+      consultor_interno_nome: consultoresNomes[fechamento.consultor_interno_id] || null,
       clinica_nome: fechamento.clinicas?.nome
     }));
 

@@ -26,6 +26,8 @@ const Dashboard = () => {
   const [cidadesDisponiveis, setCidadesDisponiveis] = useState([]);
   const [estadosDisponiveis, setEstadosDisponiveis] = useState([]);
   const [rankingGeral, setRankingGeral] = useState([]);
+  const [rankingFreelancers, setRankingFreelancers] = useState([]);
+  const [rankingConsultoresInternos, setRankingConsultoresInternos] = useState([]);
   const [loadingRanking, setLoadingRanking] = useState(true);
   const [showConsultoresExtrasModal, setShowConsultoresExtrasModal] = useState(false); // Modal dos consultores do 4º em diante
   // Estado para controlar o modal do grupo do WhatsApp
@@ -653,21 +655,21 @@ const Dashboard = () => {
         }, {});
         
         // Corrigir o número de fechados para usar a mesma fonte de dados (fechamentos aprovados)
-        const fechadosReais = fechamentos.filter(f => f.aprovado !== 'reprovado').length;
+        const fechadosReais = fechamentos.length;
         pipeline.fechado = fechadosReais;
         
         setKpisPrincipais({
           totalPacientes: pacientes.length,
           totalAgendamentos: agendamentos.length, // Total de agendamentos (registros na tabela)
           totalFechamentos: fechadosReais,
-          valorTotalFechamentos: fechamentos.filter(f => f.aprovado !== 'reprovado').reduce((acc, f) => acc + parseFloat(f.valor_fechado || 0), 0),
+          valorTotalFechamentos: fechamentos.reduce((acc, f) => acc + parseFloat(f.valor_fechado || 0), 0),
           agendamentosHoje: agendamentos.filter(a => a.data_agendamento === new Date().toISOString().split('T')[0]).length
         });
         
         // Calcular comissões filtradas
         // Para consultores (não-admin), filtrar apenas seus fechamentos
         // Para admin, mostrar comissão geral de todos os consultores
-        let fechamentosParaComissao = fechamentos.filter(f => f.aprovado !== 'reprovado');
+        let fechamentosParaComissao = fechamentos;
         
         if (!isAdmin && user?.consultor_id) {
           // Filtrar apenas fechamentos deste consultor
@@ -712,18 +714,18 @@ const Dashboard = () => {
           : pacientesNoMesAtual > 0 ? 100 : 0;
 
         // Calcular crescimento de fechamentos filtrados
-        const fechamentosNoMesAtual = fechamentos.filter(f => f.aprovado !== 'reprovado' && isNoMesAtual(f.data_fechamento)).length;
-        const fechamentosNoMesAnterior = fechamentos.filter(f => f.aprovado !== 'reprovado' && isNoMesAnterior(f.data_fechamento)).length;
+        const fechamentosNoMesAtual = fechamentos.filter(f => isNoMesAtual(f.data_fechamento)).length;
+        const fechamentosNoMesAnterior = fechamentos.filter(f => isNoMesAnterior(f.data_fechamento)).length;
         const crescimentoFechamentos = fechamentosNoMesAnterior > 0 
           ? ((fechamentosNoMesAtual - fechamentosNoMesAnterior) / fechamentosNoMesAnterior * 100)
           : fechamentosNoMesAtual > 0 ? 100 : 0;
 
         // Calcular crescimento de valor filtrado
         const valorNoMesAtual = fechamentos
-          .filter(f => f.aprovado !== 'reprovado' && isNoMesAtual(f.data_fechamento))
+          .filter(f => isNoMesAtual(f.data_fechamento))
           .reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0);
         const valorNoMesAnterior = fechamentos
-          .filter(f => f.aprovado !== 'reprovado' && isNoMesAnterior(f.data_fechamento))
+          .filter(f => isNoMesAnterior(f.data_fechamento))
           .reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0);
         const crescimentoValor = valorNoMesAnterior > 0 
           ? ((valorNoMesAtual - valorNoMesAnterior) / valorNoMesAnterior * 100)
@@ -859,7 +861,7 @@ const Dashboard = () => {
       let agendamentosGerais = await agendamentosGeraisRes.json();
       let fechamentosGerais = await fechamentosGeraisRes.json();
       
-      // Se for clínica, filtrar também os dados gerais
+      // Filtrar dados gerais baseado no tipo de usuário
       if (isClinica && user?.clinica_id) {
         const clinicaId = user.clinica_id;
         
@@ -874,7 +876,13 @@ const Dashboard = () => {
           if (f.paciente_id) pacientesIdsGerais.add(f.paciente_id);
         });
         pacientesGerais = pacientesGerais.filter(p => pacientesIdsGerais.has(p.id));
+      } else if (!isAdmin && user?.empresa_id) {
+        // Para usuários não-admin (consultores, etc.), filtrar por empresa_id
+        pacientesGerais = pacientesGerais.filter(p => p.empresa_id === user.empresa_id);
+        agendamentosGerais = agendamentosGerais.filter(a => a.empresa_id === user.empresa_id);
+        fechamentosGerais = fechamentosGerais.filter(f => f.empresa_id === user.empresa_id);
       }
+      // Para admins, usar todos os dados sem filtro adicional
 
 
       // Calcular períodos para comparação de crescimento
@@ -986,17 +994,17 @@ const Dashboard = () => {
         ? ((pacientesNoMesAtual - pacientesNoMesAnterior) / pacientesNoMesAnterior * 100)
         : pacientesNoMesAtual > 0 ? 100 : 0;
 
-      const fechamentosNoMesAtual = fechamentos.filter(f => f.aprovado !== 'reprovado' && isNoMesAtual(f.data_fechamento)).length;
-      const fechamentosNoMesAnterior = fechamentos.filter(f => f.aprovado !== 'reprovado' && isNoMesAnterior(f.data_fechamento)).length;
+      const fechamentosNoMesAtual = fechamentos.filter(f => isNoMesAtual(f.data_fechamento)).length;
+      const fechamentosNoMesAnterior = fechamentos.filter(f => isNoMesAnterior(f.data_fechamento)).length;
       const crescimentoFechamentos = fechamentosNoMesAnterior > 0 
         ? ((fechamentosNoMesAtual - fechamentosNoMesAnterior) / fechamentosNoMesAnterior * 100)
         : fechamentosNoMesAtual > 0 ? 100 : 0;
 
       const valorNoMesAtual = fechamentos
-        .filter(f => f.aprovado !== 'reprovado' && isNoMesAtual(f.data_fechamento))
+        .filter(f => isNoMesAtual(f.data_fechamento))
         .reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0);
       const valorNoMesAnterior = fechamentos
-        .filter(f => f.aprovado !== 'reprovado' && isNoMesAnterior(f.data_fechamento))
+        .filter(f => isNoMesAnterior(f.data_fechamento))
         .reduce((sum, f) => sum + parseFloat(f.valor_fechado || 0), 0);
       const crescimentoValor = valorNoMesAnterior > 0 
         ? ((valorNoMesAtual - valorNoMesAnterior) / valorNoMesAnterior * 100)
@@ -1067,7 +1075,7 @@ const Dashboard = () => {
           const [ano, mes, dia] = f.data_fechamento.split('-');
           const data = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
           return data >= dataInicio && data <= dataFim;
-        }) : fechamentos.filter(f => f.aprovado !== 'reprovado');
+        }) : fechamentos;
 
       const valorPeriodo = fechamentosPeriodo.reduce((sum, f) => 
         sum + parseFloat(f.valor_fechado || 0), 0
@@ -1308,43 +1316,126 @@ const Dashboard = () => {
         };
       });
 
-      // Atualizar estatísticas dos consultores usando dados gerais para ranking
+
+      // Inicializar mapa com todos os consultores (usando ID como chave)
+      const todosConsultoresMap = {};
+      consultores.forEach(consultor => {
+        todosConsultoresMap[consultor.id] = {
+          id: consultor.id,
+          nome: consultor.nome,
+          tipo: consultor.is_freelancer ? 'freelancer' : 'consultor_interno',
+          totalPacientes: 0,
+          totalAgendamentos: 0,
+          totalFechamentos: 0,
+          valorFechado: 0,
+          valorFechadoMes: 0,
+          comissaoTotal: 0,
+          comissaoMes: 0
+        };
+      });
+
+      // Atualizar estatísticas dos consultores (quem indicou os leads)
       pacientesGerais.forEach(p => {
-        if (p.consultor_nome && consultoresMap[p.consultor_nome]) {
-          consultoresMap[p.consultor_nome].totalPacientes++;
+        if (p.consultor_id && todosConsultoresMap[p.consultor_id]) {
+          todosConsultoresMap[p.consultor_id].totalPacientes++;
         }
       });
 
       agendamentosGerais.forEach(a => {
-        if (a.consultor_nome && consultoresMap[a.consultor_nome]) {
-          consultoresMap[a.consultor_nome].totalAgendamentos++;
+        if (a.consultor_id && todosConsultoresMap[a.consultor_id]) {
+          todosConsultoresMap[a.consultor_id].totalAgendamentos++;
         }
       });
 
+      // Debug: verificar se os dados estão sendo carregados
+      console.log('🔍 Debug Ranking - Dados carregados:');
+      console.log('Pacientes gerais:', pacientesGerais.length);
+      console.log('Agendamentos gerais:', agendamentosGerais.length);
+      console.log('Fechamentos gerais:', fechamentosGerais.length);
+      console.log('Consultores no mapa:', Object.keys(todosConsultoresMap).length);
+      
+      // Verificar alguns exemplos de dados
+      if (pacientesGerais.length > 0) {
+        console.log('Exemplo paciente:', pacientesGerais[0]);
+        console.log('Campos do paciente:', Object.keys(pacientesGerais[0]));
+      }
+      if (agendamentosGerais.length > 0) {
+        console.log('Exemplo agendamento:', agendamentosGerais[0]);
+        console.log('Campos do agendamento:', Object.keys(agendamentosGerais[0]));
+      }
+      
+      // Verificar consultores
+      console.log('Exemplo consultor:', consultores[0]);
+      console.log('Campos do consultor:', Object.keys(consultores[0]));
+
+      // Atualizar estatísticas dos consultores internos (quem realmente fechou)
       fechamentosGerais
-        .filter(f => f.aprovado !== 'reprovado')
         .forEach(f => {
-          if (f.consultor_nome && consultoresMap[f.consultor_nome]) {
-            const valor = parseFloat(f.valor_fechado || 0);
-            consultoresMap[f.consultor_nome].totalFechamentos++;
-            consultoresMap[f.consultor_nome].valorFechado += valor;
-            
-            const comissao = calcularComissao(valor, f.empreendimento_id);
-            consultoresMap[f.consultor_nome].comissaoTotal += comissao;
+          const valor = parseFloat(f.valor_fechado || 0);
+          const comissao = calcularComissao(valor, f.empreendimento_id);
+          const dataFechamento = new Date(f.data_fechamento);
+          const isMesAtual = dataFechamento.getMonth() === mesAtual && dataFechamento.getFullYear() === anoAtual;
+          
+          // Para consultores internos: usar consultor_interno_id (quem fechou)
+          if (f.consultor_interno_id && todosConsultoresMap[f.consultor_interno_id]) {
+            todosConsultoresMap[f.consultor_interno_id].totalFechamentos++;
+            todosConsultoresMap[f.consultor_interno_id].valorFechado += valor;
+            todosConsultoresMap[f.consultor_interno_id].comissaoTotal += comissao;
             comissaoTotalGeral += comissao;
 
-            // Verificar se é do mês atual
-            const dataFechamento = new Date(f.data_fechamento);
-            if (dataFechamento.getMonth() === mesAtual && dataFechamento.getFullYear() === anoAtual) {
-              consultoresMap[f.consultor_nome].valorFechadoMes += valor;
-              consultoresMap[f.consultor_nome].comissaoMes += comissao;
+            if (isMesAtual) {
+              todosConsultoresMap[f.consultor_interno_id].valorFechadoMes += valor;
+              todosConsultoresMap[f.consultor_interno_id].comissaoMes += comissao;
               comissaoTotalMes += comissao;
             }
           }
+
+          // Para consultores: usar consultor_id (quem indicou)
+          if (f.consultor_id && todosConsultoresMap[f.consultor_id]) {
+            todosConsultoresMap[f.consultor_id].totalFechamentos++;
+            todosConsultoresMap[f.consultor_id].valorFechado += valor;
+            todosConsultoresMap[f.consultor_id].comissaoTotal += comissao;
+
+            if (isMesAtual) {
+              todosConsultoresMap[f.consultor_id].valorFechadoMes += valor;
+              todosConsultoresMap[f.consultor_id].comissaoMes += comissao;
+            }
+          }
+          
+          
         });
 
-      const consultoresStats = Object.values(consultoresMap);
+      // Ranking geral (todos os consultores)
+      const todosConsultoresStats = Object.values(todosConsultoresMap);
       
+      // Debug: verificar estatísticas dos consultores
+      console.log('🔍 Debug Ranking - Estatísticas dos consultores:');
+      todosConsultoresStats.forEach(c => {
+        if (c.totalPacientes > 0 || c.totalAgendamentos > 0 || c.totalFechamentos > 0) {
+          console.log(`${c.nome}: P=${c.totalPacientes}, A=${c.totalAgendamentos}, F=${c.totalFechamentos}`);
+        }
+      });
+      
+      const rankingGeralFinal = todosConsultoresStats
+        .filter(c => c.totalFechamentos > 0 || c.totalPacientes > 0 || c.totalAgendamentos > 0)
+        .sort((a, b) => {
+          // Priorizar por fechamentos primeiro, depois por pacientes, depois por agendamentos
+          if (a.totalFechamentos !== b.totalFechamentos) {
+            return b.totalFechamentos - a.totalFechamentos;
+          }
+          if (a.totalPacientes !== b.totalPacientes) {
+            return b.totalPacientes - a.totalPacientes;
+          }
+          return b.totalAgendamentos - a.totalAgendamentos;
+        })
+        .map((consultor, index) => ({
+          ...consultor,
+          posicao: index + 1
+        }));
+        
+      // Debug: verificar ranking final
+      console.log('🔍 Debug Ranking - Ranking final:', rankingGeralFinal.slice(0, 3));
+        
       // Dados específicos para clínicas
       let evolucaoMensal = [];
       let proximosAgendamentos = [];
@@ -1418,7 +1509,7 @@ const Dashboard = () => {
             ? ((pacientes.filter(p => p.status === 'compareceu').length / agendadosPassados.length) * 100).toFixed(1)
             : 0,
           taxaConversao: agendamentos.length > 0
-            ? ((fechamentos.filter(f => f.aprovado !== 'reprovado').length / agendamentos.length) * 100).toFixed(1)
+            ? ((fechamentos.length / agendamentos.length) * 100).toFixed(1)
             : 0
         };
       }
@@ -1426,11 +1517,11 @@ const Dashboard = () => {
       setStats({
         totalPacientes: pacientes.length,
         totalAgendamentos: agendamentos.length,
-        totalFechamentos: fechamentos.filter(f => f.aprovado !== 'reprovado').length,
+        totalFechamentos: fechamentos.length,
         valorTotalFechamentos: valorTotal,
         agendamentosHoje,
         leadsPorStatus,
-        consultoresStats,
+        consultoresStats: rankingGeralFinal, // Usar ranking apropriado baseado no tipo de usuário
         comissaoTotalMes,
         comissaoTotalGeral,
         agendamentosPeriodo,
@@ -1449,6 +1540,10 @@ const Dashboard = () => {
         proximosAgendamentos,
         taxasComparecimento
       });
+      
+      // Atualizar ranking geral
+      setRankingGeral(rankingGeralFinal);
+      setLoadingRanking(false);
       setLoading(false);
     } catch (error) {
       setLoading(false);
@@ -2565,7 +2660,9 @@ const Dashboard = () => {
         {!isClinica && (
         <div className="card" style={{ minWidth: 0, padding: '1.5rem' }}>
           <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
-            <h2 className="card-title" style={{ color: '#1a1d23', fontWeight: '700' }}>Ranking de Performance</h2>
+            <h2 className="card-title" style={{ color: '#1a1d23', fontWeight: '700' }}>
+              Ranking de Performance
+            </h2>
             <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0, fontWeight: '500' }}>
               Classificação por valor fechado
             </p>
