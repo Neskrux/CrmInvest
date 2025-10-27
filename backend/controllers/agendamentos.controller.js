@@ -286,17 +286,18 @@ const createAgendamento = async (req, res) => {
         room: 'incorporadora-notifications'
       });
       
-      // Buscar dados do SDR
+      // Buscar dados do SDR com foto e música
       const { data: sdrData } = await supabaseAdmin
         .from('consultores')
-        .select('nome, foto_url')
+        .select('nome, foto_url, musica_url')
         .eq('id', dadosAgendamento.sdr_id)
         .single();
 
       console.log('👤 [SOCKET.IO] Dados do SDR encontrados:', {
         sdr_id: dadosAgendamento.sdr_id,
         nome: sdrData?.nome || 'N/A',
-        temFoto: !!sdrData?.foto_url
+        temFoto: !!sdrData?.foto_url,
+        temMusica: !!sdrData?.musica_url
       });
 
       // Buscar dados do paciente
@@ -318,8 +319,10 @@ const createAgendamento = async (req, res) => {
         paciente_telefone: pacienteData?.telefone || '',
         data_agendamento: data_agendamento,
         horario: horario,
+        sdr_id: dadosAgendamento.sdr_id,
         sdr_nome: sdrData?.nome || 'SDR',
         sdr_foto: sdrData?.foto_url || null,
+        sdr_musica: sdrData?.musica_url || null,
         consultor_interno_id: dadosAgendamento.consultor_interno_id,
         timestamp: new Date().toISOString()
       });

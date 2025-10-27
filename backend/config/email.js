@@ -14,6 +14,9 @@ const getEmailTransporter = () => {
         auth: {
           user: 'apikey',
           pass: process.env.EMAIL_PASS
+        },
+        tls: {
+          rejectUnauthorized: false
         }
       });
     
