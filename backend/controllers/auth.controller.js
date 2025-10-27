@@ -495,7 +495,8 @@ const forgotPassword = async (req, res) => {
       const isEmailConfigured = process.env.EMAIL_USER && 
                                 process.env.EMAIL_USER !== 'your-email@gmail.com' && 
                                 process.env.EMAIL_PASS && 
-                                process.env.EMAIL_PASS !== 'your-app-password';
+                                process.env.EMAIL_PASS !== 'your-app-password' &&
+                                process.env.EMAIL_SERVICE;
 
       if (isDevelopment) {
         console.log('🔧 Verificação de configuração de email:', {
@@ -527,8 +528,10 @@ const forgotPassword = async (req, res) => {
           console.log('✅ Email enviado com sucesso!', result);
           console.log('✅ Email de redefinição enviado');
         }
+        console.log(`📧 Email de redefinição enviado para: ${email}`);
       }
     } catch (emailError) {
+      console.error('❌ Erro ao enviar email:', emailError);
       logError(emailError, 'Erro ao enviar email');
       
       // Em desenvolvimento, mostrar o link mesmo se o email falhar
@@ -540,6 +543,9 @@ const forgotPassword = async (req, res) => {
         console.log('📧 ========================================');
         console.log('📧 Copie o link acima e cole no navegador para redefinir a senha');
       }
+      
+      // Em produção, ainda retornar sucesso para não revelar problemas internos
+      console.log('⚠️ Email falhou, mas retornando sucesso para segurança');
     }
     
     res.json({ 

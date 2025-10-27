@@ -382,14 +382,15 @@ const createFechamento = async (req, res) => {
       // Buscar dados do corretor (consultor interno)
       const { data: corretorData } = await supabaseAdmin
         .from('consultores')
-        .select('nome, foto_url')
+        .select('nome, foto_url, musica_url')
         .eq('id', consultorInternoIdFinal)
         .single();
 
       console.log('👤 [SOCKET.IO] Dados do corretor encontrados:', {
         consultorInternoId: consultorInternoIdFinal,
         nome: corretorData?.nome || 'N/A',
-        temFoto: !!corretorData?.foto_url
+        temFoto: !!corretorData?.foto_url,
+        temMusica: !!corretorData?.musica_url
       });
 
       // Buscar dados do paciente
@@ -411,8 +412,10 @@ const createFechamento = async (req, res) => {
         paciente_telefone: pacienteData?.telefone || '',
         valor_fechado: valorFechado,
         data_fechamento: data_fechamento,
+        consultor_interno_id: consultorInternoIdFinal,
         corretor_nome: corretorData?.nome || 'Corretor',
         corretor_foto: corretorData?.foto_url || null,
+        corretor_musica: corretorData?.musica_url || null,
         timestamp: new Date().toISOString()
       });
       
