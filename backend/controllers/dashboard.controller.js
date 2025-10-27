@@ -557,11 +557,207 @@ const getGeraisClinicas = async (req, res) => {
   }
 };
 
+// GET /api/dashboard/ranking/sdrs - Ranking de SDRs por agendamentos
+const getRankingSDRs = async (req, res) => {
+  try {
+    const empresaId = req.user.empresa_id;
+    
+    // Buscar SDRs (tipo_consultor = 'sdr' AND empresa_id = 5)
+    const { data: sdrs, error: sdrsError } = await supabaseAdmin
+      .from('consultores')
+      .select('id, nome, foto_url, musica_url, tipo_consultor')
+      .eq('tipo_consultor', 'sdr')
+      .eq('empresa_id', 5)
+      .eq('ativo', true);
+
+    if (sdrsError) throw sdrsError;
+
+    // Buscar agendamentos para calcular totais por SDR
+    const { data: agendamentos, error: agendError } = await supabaseAdmin
+      .from('agendamentos')
+      .select('id, sdr_id, data_agendamento')
+      .eq('empresa_id', empresaId);
+
+    if (agendError) throw agendError;
+
+    // Calcular totais por SDR
+    const sdrStats = sdrs.map(sdr => {
+      const agendamentosSDR = agendamentos.filter(a => a.sdr_id === sdr.id);
+      
+      // Agendamentos do mês atual
+      const hoje = new Date();
+      const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      const agendamentosMes = agendamentosSDR.filter(a => {
+        const dataAgendamento = new Date(a.data_agendamento);
+        return dataAgendamento >= primeiroDiaMes;
+      });
+
+      return {
+        id: sdr.id,
+        nome: sdr.nome,
+        foto_url: sdr.foto_url,
+        musica_url: sdr.musica_url,
+        total_agendamentos: agendamentosSDR.length,
+        mes_atual: agendamentosMes.length,
+        total_geral: agendamentosSDR.length
+      };
+    });
+
+    // Ordenar por maior número de agendamentos
+    sdrStats.sort((a, b) => b.total_agendamentos - a.total_agendamentos);
+
+    res.json(sdrStats);
+  } catch (error) {
+    console.error('Erro ao buscar ranking de SDRs:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// GET /api/dashboard/ranking/internos - Ranking de consultores internos por fechamentos
+const getRankingInternos = async (req, res) => {
+  try {
+    const empresaId = req.user.empresa_id;
+    
+    // Buscar consultores internos (pode_ver_todas_novas_clinicas=true AND podealterarstatus=true AND tipo_consultor != 'sdr')
+    const { data: internos, error: internosError } = await supabaseAdmin
+      .from('consultores')
+      .select('id, nome, foto_url, musica_url, tipo_consultor')
+      .eq('pode_ver_todas_novas_clinicas', true)
+      .eq('podealterarstatus', true)
+      .neq('tipo_consultor', 'sdr')
+      .eq('empresa_id', 5)
+      .eq('ativo', true);
+
+    if (internosError) throw internosError;
+
+    // Buscar fechamentos
+    const { data: fechamentos, error: fechError } = await supabaseAdmin
+      .from('fechamentos')
+      .select('id, consultor_interno_id, valor_fechado, data_fechamento')
+      .eq('aprovado', 'aprovado')
+      .eq('empresa_id', empresaId);
+
+    if (fechError) throw fechError;
+
+    // Calcular totais por consultor interno
+    const internoStats = internos.map(interno => {
+      const fechamentosInterno = fechamentos.filter(f => f.consultor_interno_id === interno.id);
+      
+      // Fechamentos do mês atual
+      const hoje = new Date();
+      const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      const fechamentosMes = fechamentosInterno.filter(f => {
+        const dataFechamento = new Date(f.data_fechamento);
+        return dataFechamento >= primeiroDiaMes;
+      });
+
+      const valorTotalGeral = fechamentosInterno.reduce((acc, f) => acc + parseFloat(f.valor_fechado || 0), 0);
+      const valorTotalMes = fechamentosMes.reduce((acc, f) => acc + parseFloat(f.valor_fechado || 0), 0);
+
+      return {
+        id: interno.id,
+        nome: interno.nome,
+        foto_url: interno.foto_url,
+        musica_url: interno.musica_url,
+        total_fechamentos: fechamentosInterno.length,
+        valor_fechado: valorTotalGeral,
+        mes_atual: fechamentosMes.length,
+        valor_mes: valorTotalMes
+      };
+    });
+
+    // Ordenar por: 1) Maior valor fechado, 2) Maior quantidade
+    internoStats.sort((a, b) => {
+      if (b.valor_fechado !== a.valor_fechado) return b.valor_fechado - a.valor_fechado;
+      return b.total_fechamentos - a.total_fechamentos;
+    });
+
+    res.json(internoStats);
+  } catch (error) {
+    console.error('Erro ao buscar ranking de internos:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// GET /api/dashboard/ranking/freelancers - Ranking de freelancers por comissões
+const getRankingFreelancers = async (req, res) => {
+  try {
+    const empresaId = req.user.empresa_id;
+    
+    // Buscar freelancers
+    const { data: freelancers, error: freelancersError } = await supabaseAdmin
+      .from('consultores')
+      .select('id, nome, tipo_consultor')
+      .eq('is_freelancer', true)
+      .eq('empresa_id', 5)
+      .eq('ativo', true);
+
+    if (freelancersError) throw freelancersError;
+
+    // Buscar fechamentos aprovados
+    const { data: fechamentos, error: fechError } = await supabaseAdmin
+      .from('fechamentos')
+      .select('id, consultor_id, valor_fechado, data_fechamento')
+      .eq('aprovado', 'aprovado')
+      .eq('empresa_id', empresaId);
+
+    if (fechError) throw fechError;
+
+    // Taxa de comissão fixa (exemplo: 10% - ajustar conforme necessário)
+    const TAXA_COMISSAO = 0.10;
+
+    // Calcular estatísticas por freelancer
+    const freelancerStats = freelancers.map(freelancer => {
+      const fechamentosFreelancer = fechamentos.filter(f => f.consultor_id === freelancer.id);
+      
+      // Fechamentos do mês atual
+      const hoje = new Date();
+      const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      const fechamentosMes = fechamentosFreelancer.filter(f => {
+        const dataFechamento = new Date(f.data_fechamento);
+        return dataFechamento >= primeiroDiaMes;
+      });
+
+      // Calcular comissões
+      const totalComissoes = fechamentosFreelancer.reduce((acc, f) => {
+        const valorFechado = parseFloat(f.valor_fechado || 0);
+        return acc + (valorFechado * TAXA_COMISSAO);
+      }, 0);
+
+      const comissoesMes = fechamentosMes.reduce((acc, f) => {
+        const valorFechado = parseFloat(f.valor_fechado || 0);
+        return acc + (valorFechado * TAXA_COMISSAO);
+      }, 0);
+
+      return {
+        id: freelancer.id,
+        nome: freelancer.nome,
+        total_comissoes: totalComissoes,
+        comissoes_mes: comissoesMes,
+        total_indicacoes: fechamentosFreelancer.length,
+        fechamentos_convertidos: fechamentosFreelancer.length,
+        indicacoes_mes: fechamentosMes.length
+      };
+    });
+
+    // Ordenar por maior valor de comissões
+    freelancerStats.sort((a, b) => b.total_comissoes - a.total_comissoes);
+
+    res.json(freelancerStats);
+  } catch (error) {
+    console.error('Erro ao buscar ranking de freelancers:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getDashboard,
   getGeraisPacientes,
   getGeraisAgendamentos,
   getGeraisFechamentos,
-  getGeraisClinicas
+  getGeraisClinicas,
+  getRankingSDRs,
+  getRankingInternos,
+  getRankingFreelancers
 };
 
