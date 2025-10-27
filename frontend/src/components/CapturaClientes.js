@@ -510,14 +510,14 @@ const CapturaClientes = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Email *</label>   
+                <label className="form-label">Email (opcional)</label>   
                 <input
                   type="email"
                   name="email"
                   className={`form-input ${errors.email ? 'error' : ''}`}
                   value={formData.email}
                   onChange={handleInputChange}
-                  placeholder="Digite um email válido"
+                  placeholder="Digite um email válido (opcional)"
                   disabled={loading}
                 />
                 {errors.email && <span className="field-error">{errors.email}</span>}
