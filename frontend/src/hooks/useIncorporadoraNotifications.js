@@ -13,9 +13,16 @@ const useIncorporadoraNotifications = () => {
   const [newLeadData, setNewLeadData] = useState(null);
 
   useEffect(() => {
-    if (!isIncorporadora) {
-      console.log('⚠️ [SOCKET.IO] Hook não inicializado - usuário não é incorporadora:', {
-        isIncorporadora,
+    // Inicializar hook para incorporadora OU para SDRs/corretores (consultores internos)
+    const isIncorporadoraUser = isIncorporadora;
+    const isSDR = user?.tipo === 'consultor' && !user?.is_freelancer;
+    
+    if (!isIncorporadoraUser && !isSDR) {
+      console.log('⚠️ [SOCKET.IO] Hook não inicializado - usuário não é incorporadora nem SDR:', {
+        isIncorporadora: isIncorporadoraUser,
+        isSDR: isSDR,
+        userTipo: user?.tipo,
+        isFreelancer: user?.is_freelancer,
         userId: user?.id,
         empresaId: user?.empresa_id,
         timestamp: new Date().toISOString()
@@ -23,10 +30,12 @@ const useIncorporadoraNotifications = () => {
       return;
     }
 
-    console.log('🚀 [SOCKET.IO] Inicializando hook de notificações da incorporadora:', {
+    console.log('🚀 [SOCKET.IO] Inicializando hook de notificações:', {
       userId: user.id,
       userType: user.tipo,
       empresaId: user.empresa_id,
+      isIncorporadora: isIncorporadoraUser,
+      isSDR: isSDR,
       timestamp: new Date().toISOString()
     });
 
@@ -57,7 +66,7 @@ const useIncorporadoraNotifications = () => {
       empresaId: user.empresa_id
     });
 
-    console.log('🔔 [SOCKET.IO] Conectado às notificações da incorporadora');
+    console.log('🔔 [SOCKET.IO] Conectado às notificações');
 
     // Listener para novos leads/clientes
     newSocket.on('new-lead-incorporadora', (data) => {
@@ -326,22 +335,19 @@ const useIncorporadoraNotifications = () => {
         empresaId: user.empresa_id
       });
       
-      console.log('📤 [CAPTURAR LEAD] Enviando requisição:', {
+      console.log('📤 [CAPTURAR LEAD] Enviando requisição para endpoint pegarLead:', {
         leadId: newLeadData.leadId,
-        status: 'em_conversa',
-        sdr_id: user.id  // Este ID será do SDR que está capturando o lead
+        endpoint: `/novos-leads/${newLeadData.leadId}/pegar`,
+        sdrId: user.id  // Este ID será usado automaticamente pelo endpoint
       });
       
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/pacientes/${newLeadData.leadId}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/novos-leads/${newLeadData.leadId}/pegar`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          status: 'em_conversa',
-          sdr_id: user.id  // Atribuir ao ID do SDR que clicou em capturar
-        })
+        }
+        // Não enviar body - o endpoint pegarLead usa o ID do usuário logado automaticamente
       });
       
       console.log('📤 [CAPTURAR LEAD] Resposta recebida:', response.status, response.statusText);
@@ -349,14 +355,15 @@ const useIncorporadoraNotifications = () => {
       if (response.ok) {
         const result = await response.json();
         console.log('✅ [SOCKET.IO] Lead capturado com sucesso:', result);
-        console.log('✅ [CAPTURAR LEAD] Lead atribuído ao SDR:', {
+        console.log('✅ [CAPTURAR LEAD] Lead atribuído ao SDR via endpoint pegarLead:', {
           leadId: newLeadData.leadId,
           sdrId: user.id,
           sdrNome: user.nome,
           isFreelancer: user.is_freelancer,
           isSDR: true,
           novoStatus: 'em_conversa',
-          campoAtualizado: 'sdr_id'
+          campoAtualizado: 'sdr_id',
+          endpoint: 'pegarLead'
         });
         
         // PARAR A MÚSICA!
