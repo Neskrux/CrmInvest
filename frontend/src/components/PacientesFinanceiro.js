@@ -8,6 +8,13 @@ const PacientesFinanceiro = () => {
   const { user } = useAuth();
   const { error: showErrorToast, success: showSuccessToast } = useToast();
   
+  // Função para limitar caracteres e evitar sobreposição
+  const limitarCaracteres = (texto, limite = 18) => {
+    if (!texto) return '';
+    if (texto.length <= limite) return texto;
+    return texto.substring(0, limite) + '...';
+  };
+  
   // Verificar se é clínica
   const isClinica = user?.tipo === 'clinica';
   
@@ -445,7 +452,7 @@ const PacientesFinanceiro = () => {
                     const statusInfo = statusOptions.find(s => s.value === lead.status) || { label: lead.status, color: '#6b7280' };
                     return (
                       <tr key={lead.id}>
-                        <td><strong>{lead.nome}</strong></td>
+                        <td><strong title={lead.nome}>{limitarCaracteres(lead.nome, 18)}</strong></td>
                         <td>{formatarTelefone(lead.telefone)}</td>
                         <td>{formatarCPF(lead.cpf)}</td>
                         <td>{lead.cidade || '-'}</td>
@@ -499,7 +506,7 @@ const PacientesFinanceiro = () => {
                         </td>
                         <td>{formatarCPF(paciente.cpf)}</td>
                         <td>
-                          <strong>{paciente.nome}</strong>
+                          <strong title={paciente.nome}>{limitarCaracteres(paciente.nome, 18)}</strong>
                           {paciente.observacoes_financeiras && (
                             <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
                               {paciente.observacoes_financeiras}

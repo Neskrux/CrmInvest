@@ -10,6 +10,13 @@ import useSmartPolling from '../hooks/useSmartPolling';
 
 const Pacientes = () => {
   const { t, empresaId, shouldShow } = useBranding();
+  
+  // Função para limitar caracteres e evitar sobreposição
+  const limitarCaracteres = (texto, limite = 20) => {
+    if (!texto) return '';
+    if (texto.length <= limite) return texto;
+    return texto.substring(0, limite) + '...';
+  };
   const location = useLocation();
   const { makeRequest, user, isAdmin, podeAlterarStatus, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isIncorporadora, isFreelancer, isClinica, deveFiltrarPorClinica } = useAuth();
   const navigate = useNavigate();
@@ -3698,7 +3705,7 @@ const Pacientes = () => {
                         <tr key={paciente.id}>
                           <td>
                             <div>
-                              <strong>{paciente.nome}</strong>
+                              <strong title={paciente.nome}>{limitarCaracteres(paciente.nome, 18)}</strong>
                               {paciente.observacoes && (
                                 <div style={{ marginTop: '0.25rem' }}>
                                   <button
@@ -3726,21 +3733,27 @@ const Pacientes = () => {
                             </div>
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                            {paciente.consultor_nome || (
+                            {paciente.consultor_nome ? (
+                              <span title={paciente.consultor_nome}>{limitarCaracteres(paciente.consultor_nome, 20)}</span>
+                            ) : (
                               <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
                                 Não atribuído
                               </span>
                             )}
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                            {paciente.sdr_nome || (
+                            {paciente.sdr_nome ? (
+                              <span title={paciente.sdr_nome}>{limitarCaracteres(paciente.sdr_nome, 20)}</span>
+                            ) : (
                               <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
                                 Não atribuído
                               </span>
                             )}
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                            {paciente.consultor_interno_nome || (
+                            {paciente.consultor_interno_nome ? (
+                              <span title={paciente.consultor_interno_nome}>{limitarCaracteres(paciente.consultor_interno_nome, 20)}</span>
+                            ) : (
                               <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
                                 Não atribuído
                               </span>
@@ -3759,7 +3772,12 @@ const Pacientes = () => {
                                     8: 'River Sky Garden',
                                     9: 'Condomínio Figueira Garcia'
                                   };
-                                  return empreendimentoMap[paciente.empreendimento_id] || '-';
+                                  const nomeEmpreendimento = empreendimentoMap[paciente.empreendimento_id] || '-';
+                                  return (
+                                    <span title={nomeEmpreendimento}>
+                                      {limitarCaracteres(nomeEmpreendimento, 18)}
+                                    </span>
+                                  );
                                 })()
                               ) : '-'
                             ) : (
@@ -4589,7 +4607,7 @@ const Pacientes = () => {
                             return (
                               <tr key={paciente.id}>
                                 <td>
-                                  <strong>{paciente.nome}</strong>
+                                  <strong title={paciente.nome}>{limitarCaracteres(paciente.nome, 18)}</strong>
                                   {paciente.observacoes && (
                                     <div style={{ marginTop: '0.25rem' }}>
                                       <button
@@ -4852,7 +4870,7 @@ const Pacientes = () => {
                               return (
                             <tr key={paciente.id}>
                                 <td>
-                                  <strong>{paciente.nome}</strong>
+                                  <strong title={paciente.nome}>{limitarCaracteres(paciente.nome, 18)}</strong>
                                 </td>
                                 <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarTelefone(paciente.telefone)}</td>
                                 <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
@@ -5089,7 +5107,7 @@ const Pacientes = () => {
                     <tbody>
                       {pacientes.filter(p => p.carteira_existente === true).map(paciente => (
                         <tr key={paciente.id}>
-                          <td><strong>{paciente.nome}</strong></td>
+                          <td><strong title={paciente.nome}>{limitarCaracteres(paciente.nome, 18)}</strong></td>
                           <td>{paciente.cpf}</td>
                           <td>{formatarMoeda(paciente.valor_parcela || 0)}</td>
                           <td>{paciente.numero_parcelas_aberto || 0}</td>

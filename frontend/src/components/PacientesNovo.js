@@ -9,6 +9,13 @@ const Pacientes = () => {
   const { user } = useContext(AuthContext);
   const { error: showErrorToast, success: showSuccessToast } = useToast();
   
+  // Função para limitar caracteres e evitar sobreposição
+  const limitarCaracteres = (texto, limite = 18) => {
+    if (!texto) return '';
+    if (texto.length <= limite) return texto;
+    return texto.substring(0, limite) + '...';
+  };
+  
   const isConsultor = user?.tipo === 'consultor';
   const isAdmin = user?.tipo === 'admin';
   
@@ -528,7 +535,7 @@ const Pacientes = () => {
                       const statusInfo = leadStatusOptions.find(s => s.value === lead.status) || leadStatusOptions[0];
                       return (
                         <tr key={lead.id}>
-                          <td><strong>{lead.nome}</strong></td>
+                          <td><strong title={lead.nome}>{limitarCaracteres(lead.nome, 18)}</strong></td>
                           <td>{formatarTelefone(lead.telefone)}</td>
                           <td>{formatarCPF(lead.cpf)}</td>
                           <td>{lead.cidade ? `${lead.cidade}/${lead.estado}` : '-'}</td>
@@ -633,7 +640,7 @@ const Pacientes = () => {
                           </td>
                           <td>{formatarCPF(paciente.cpf)}</td>
                           <td>
-                            <strong>{paciente.nome}</strong>
+                            <strong title={paciente.nome}>{limitarCaracteres(paciente.nome, 18)}</strong>
                             {paciente.observacoes_financeiras && (
                               <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>
                                 {paciente.observacoes_financeiras}
