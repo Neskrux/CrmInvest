@@ -481,9 +481,7 @@ const Indicacoes = () => {
       newErrors.nome = 'Nome deve ter pelo menos 2 caracteres';
     }
     
-    if (!formCliente.email.trim()) {
-      newErrors.email = 'Email é obrigatório';
-    } else if (!/\S+@\S+\.\S+/.test(formCliente.email)) {
+    if (formCliente.email.trim() && !/\S+@\S+\.\S+/.test(formCliente.email)) {
       newErrors.email = 'Email deve ter formato válido';
     }
     
@@ -803,14 +801,14 @@ const Indicacoes = () => {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Email *</label>   
+                  <label className="form-label">Email (opcional)</label>   
                   <input
                     type="email"
                     name="email"
                     className={`form-input ${formErrors.email ? 'error' : ''}`}
                     value={formCliente.email}
                     onChange={handleClienteInputChange}
-                    placeholder="Digite um email válido"
+                    placeholder="Digite um email válido (opcional)"
                     disabled={submittingCliente}
                   />
                   {formErrors.email && <span className="field-error">{formErrors.email}</span>}
