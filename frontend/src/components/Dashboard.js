@@ -30,6 +30,10 @@ const Dashboard = () => {
   const [rankingGeral, setRankingGeral] = useState([]);
   const [rankingFreelancers, setRankingFreelancers] = useState([]);
   const [rankingConsultoresInternos, setRankingConsultoresInternos] = useState([]);
+  const [rankingSDRs, setRankingSDRs] = useState([]);
+  const [rankingInternosNovos, setRankingInternosNovos] = useState([]);
+  const [rankingFreelancersNovos, setRankingFreelancersNovos] = useState([]);
+  const [rankingTab, setRankingTab] = useState('sdrs');
   const [loadingRanking, setLoadingRanking] = useState(true);
   const [showConsultoresExtrasModal, setShowConsultoresExtrasModal] = useState(false); // Modal dos consultores do 4º em diante
   // Estado para controlar o modal do grupo do WhatsApp
@@ -1527,6 +1531,50 @@ const Dashboard = () => {
       setLoading(false);
     }
   };
+
+  // Buscar rankings diferenciados (apenas para incorporadora)
+  const fetchRankings = async () => {
+    if (!isIncorporadora) return;
+    
+    try {
+      const [sdrsRes, internosRes, freelancersRes] = await Promise.all([
+        makeRequest('/dashboard/ranking/sdrs'),
+        makeRequest('/dashboard/ranking/internos'),
+        makeRequest('/dashboard/ranking/freelancers')
+      ]);
+
+      if (sdrsRes.ok) {
+        const sdrsData = await sdrsRes.json();
+        setRankingSDRs(sdrsData);
+      }
+
+      if (internosRes.ok) {
+        const internosData = await internosRes.json();
+        setRankingInternosNovos(internosData);
+      }
+
+      if (freelancersRes.ok) {
+        const freelancersData = await freelancersRes.json();
+        setRankingFreelancersNovos(freelancersData);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar rankings:', error);
+    }
+  };
+
+  // Buscar rankings quando incorporadora acessar o dashboard
+  useEffect(() => {
+    if (isIncorporadora) {
+      fetchRankings();
+    }
+  }, [isIncorporadora]);
+
+  // Se for freelancer, mudar tab automaticamente para freelancers
+  useEffect(() => {
+    if (isFreelancer) {
+      setRankingTab('freelancers');
+    }
+  }, [isFreelancer]);
 
   const fetchRegioesDisponiveis = async () => {
     try {
@@ -3790,7 +3838,282 @@ const Dashboard = () => {
         </div>
       )}
 
+      {/* Seção de Rankings Diferenciados */}
+      {isIncorporadora && (
+        <div style={{ marginTop: '2rem', padding: '1.5rem', backgroundColor: '#ffffff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1e293b', marginBottom: '1.5rem' }}>
+            {isFreelancer ? 'Ranking dos Freelancers' : 'Rankings por Categoria'}
+          </h2>
 
+          {/* Tabs - Apenas para admin/corretores (não para freelancers) */}
+          {!isFreelancer && (
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '2px solid #e5e7eb' }}>
+              <button
+                onClick={() => setRankingTab('sdrs')}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  color: rankingTab === 'sdrs' ? '#1e293b' : '#6b7280',
+                  fontSize: '1rem',
+                  fontWeight: rankingTab === 'sdrs' ? '600' : '400',
+                  cursor: 'pointer',
+                  borderBottom: rankingTab === 'sdrs' ? '3px solid #1e293b' : '3px solid transparent',
+                  transition: 'all 0.2s'
+                }}
+              >
+                SDRs
+              </button>
+              <button
+                onClick={() => setRankingTab('internos')}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  color: rankingTab === 'internos' ? '#1e293b' : '#6b7280',
+                  fontSize: '1rem',
+                  fontWeight: rankingTab === 'internos' ? '600' : '400',
+                  cursor: 'pointer',
+                  borderBottom: rankingTab === 'internos' ? '3px solid #1e293b' : '3px solid transparent',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Corretores Internos
+              </button>
+              <button
+                onClick={() => setRankingTab('freelancers')}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  color: rankingTab === 'freelancers' ? '#1e293b' : '#6b7280',
+                  fontSize: '1rem',
+                  fontWeight: rankingTab === 'freelancers' ? '600' : '400',
+                  cursor: 'pointer',
+                  borderBottom: rankingTab === 'freelancers' ? '3px solid #1e293b' : '3px solid transparent',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Freelancers
+              </button>
+            </div>
+          )}
+
+          {/* Conteúdo dos Rankings */}
+          {!isFreelancer && rankingTab === 'sdrs' && (
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1e293b', marginBottom: '1rem' }}>
+                Ranking de SDRs por Agendamentos
+              </h3>
+              <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+                {rankingSDRs.map((sdr, index) => {
+                  let borderStyle = '1px solid #e5e7eb';
+                  if (index === 0) borderStyle = '3px solid #FFD700'; // Dourado
+                  else if (index === 1) borderStyle = '3px solid #C0C0C0'; // Prata
+                  else if (index === 2) borderStyle = '3px solid #CD7F32'; // Bronze
+                  
+                  return (
+                  <div
+                    key={sdr.id}
+                    style={{
+                      padding: '1rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: borderStyle
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      {sdr.foto_url && (
+                        <img
+                          src={sdr.foto_url}
+                          alt={sdr.nome}
+                          style={{ width: '50px', height: '50px', borderRadius: '50%', objectFit: 'cover' }}
+                        />
+                      )}
+                      <div>
+                        <div style={{ fontWeight: '600', color: '#1e293b' }}>{sdr.nome}</div>
+                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                          #{index + 1} no ranking
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <div>
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Este mês</div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#3b82f6' }}>
+                          {sdr.mes_atual}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Total</div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b' }}>
+                          {sdr.total_agendamentos}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {!isFreelancer && rankingTab === 'internos' && (
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1e293b', marginBottom: '1rem' }}>
+                Ranking de Corretores Internos por Fechamentos
+              </h3>
+              <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+                {rankingInternosNovos.map((interno, index) => {
+                  let borderStyle = '1px solid #e5e7eb';
+                  if (index === 0) borderStyle = '3px solid #FFD700'; // Dourado
+                  else if (index === 1) borderStyle = '3px solid #C0C0C0'; // Prata
+                  else if (index === 2) borderStyle = '3px solid #CD7F32'; // Bronze
+                  
+                  return (
+                  <div
+                    key={interno.id}
+                    style={{
+                      padding: '1rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: borderStyle
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      {interno.foto_url && (
+                        <img
+                          src={interno.foto_url}
+                          alt={interno.nome}
+                          style={{ width: '50px', height: '50px', borderRadius: '50%', objectFit: 'cover' }}
+                        />
+                      )}
+                      <div>
+                        <div style={{ fontWeight: '600', color: '#1e293b' }}>{interno.nome}</div>
+                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                          #{index + 1} no ranking
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <div>
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Total fechado</div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#10b981' }}>
+                          {formatCurrency(interno.valor_fechado)}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Quantidade</div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b' }}>
+                          {interno.total_fechamentos}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {isFreelancer ? (
+            <div>
+              {/* Para freelancers: mostrar apenas os cards */}
+              <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+                {rankingFreelancersNovos.map((freelancer, index) => {
+                  let borderStyle = '1px solid #e5e7eb';
+                  if (index === 0) borderStyle = '3px solid #FFD700'; // Dourado
+                  else if (index === 1) borderStyle = '3px solid #C0C0C0'; // Prata
+                  else if (index === 2) borderStyle = '3px solid #CD7F32'; // Bronze
+                  
+                  return (
+                  <div
+                    key={freelancer.id}
+                    style={{
+                      padding: '1rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: borderStyle
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: '600', color: '#1e293b' }}>{freelancer.nome}</div>
+                      <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                        #{index + 1} no ranking
+                      </div>
+                    </div>
+                    <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <div>
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Comissões</div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#d97706' }}>
+                          {formatCurrency(freelancer.total_comissoes)}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Indicações convertidas</div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b' }}>
+                          {freelancer.fechamentos_convertidos}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            // Admin/corretores veem a tab de freelancers
+            rankingTab === 'freelancers' && (
+              <div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1e293b', marginBottom: '1rem' }}>
+                  Ranking de Freelancers por Comissões
+                </h3>
+                <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+                  {rankingFreelancersNovos.map((freelancer, index) => {
+                    let borderStyle = '1px solid #e5e7eb';
+                    if (index === 0) borderStyle = '3px solid #FFD700'; // Dourado
+                    else if (index === 1) borderStyle = '3px solid #C0C0C0'; // Prata
+                    else if (index === 2) borderStyle = '3px solid #CD7F32'; // Bronze
+                    
+                    return (
+                    <div
+                      key={freelancer.id}
+                      style={{
+                        padding: '1rem',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '8px',
+                        border: borderStyle
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: '600', color: '#1e293b' }}>{freelancer.nome}</div>
+                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                          #{index + 1} no ranking
+                        </div>
+                      </div>
+                      <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Comissões</div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#d97706' }}>
+                            {formatCurrency(freelancer.total_comissoes)}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Indicações convertidas</div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b' }}>
+                            {freelancer.fechamentos_convertidos}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )
+          )}
+        </div>
+      )}
 
     </div>
     </>
@@ -3798,3 +4121,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+

@@ -20,5 +20,14 @@ router.get('/dashboard/gerais/fechamentos', authenticateToken, dashboardControll
 // GET /api/dashboard/gerais/clinicas - Dados gerais de clínicas (para gráficos)
 router.get('/dashboard/gerais/clinicas', authenticateToken, dashboardController.getGeraisClinicas);
 
+// GET /api/dashboard/ranking/sdrs - Ranking de SDRs
+router.get('/dashboard/ranking/sdrs', authenticateToken, dashboardController.getRankingSDRs);
+
+// GET /api/dashboard/ranking/internos - Ranking de consultores internos
+router.get('/dashboard/ranking/internos', authenticateToken, dashboardController.getRankingInternos);
+
+// GET /api/dashboard/ranking/freelancers - Ranking de freelancers
+router.get('/dashboard/ranking/freelancers', authenticateToken, dashboardController.getRankingFreelancers);
+
 module.exports = router;
 
