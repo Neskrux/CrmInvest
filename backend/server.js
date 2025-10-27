@@ -332,19 +332,22 @@ if (io) {
         timestamp: new Date().toISOString()
       });
       
-      // Permitir apenas admin ou consultor
-      if (data.userType === 'admin' || data.userType === 'consultor') {
+      // Permitir TODOS os usuários da incorporadora (empresa_id === 5)
+      // Isso garante que todos os usuários logados recebam as notificações de novo lead
+      if (data.empresaId === 5) {
         socket.join('incorporadora-notifications');
         console.log('✅ [SOCKET.IO] Cliente adicionado ao grupo: incorporadora-notifications');
         console.log('🏢 [SOCKET.IO] Incorporadora conectada - Notificações ativas para:', {
           empresaId: data.empresaId,
           socketId: socket.id,
-          userType: data.userType
+          userType: data.userType,
+          userId: data.userId
         });
       } else {
         console.log('⚠️ [SOCKET.IO] Acesso negado ao grupo incorporadora-notifications:', {
           userType: data.userType,
-          motivo: 'Apenas admin e consultor podem receber notificações'
+          empresaId: data.empresaId,
+          motivo: 'Apenas usuários da incorporadora (empresa_id === 5) podem receber notificações'
         });
       }
     });

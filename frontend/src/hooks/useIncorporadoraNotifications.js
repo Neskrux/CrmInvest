@@ -13,18 +13,15 @@ const useIncorporadoraNotifications = () => {
   const [newLeadData, setNewLeadData] = useState(null);
 
   useEffect(() => {
-    // Inicializar hook para incorporadora OU para SDRs/corretores (consultores internos)
-    const isIncorporadoraUser = isIncorporadora;
-    const isSDR = user?.tipo === 'consultor' && !user?.is_freelancer;
+    // Permitir entrada para TODOS os usuários da incorporadora (empresa_id === 5)
+    // O backend já valida empresa_id === 5, então basta verificar aqui
+    const isUserFromIncorporadora = user?.empresa_id === 5;
     
-    if (!isIncorporadoraUser && !isSDR) {
-      console.log('⚠️ [SOCKET.IO] Hook não inicializado - usuário não é incorporadora nem SDR:', {
-        isIncorporadora: isIncorporadoraUser,
-        isSDR: isSDR,
-        userTipo: user?.tipo,
-        isFreelancer: user?.is_freelancer,
-        userId: user?.id,
+    if (!isUserFromIncorporadora) {
+      console.log('⚠️ [SOCKET.IO] Hook não inicializado - usuário não é da incorporadora:', {
         empresaId: user?.empresa_id,
+        userTipo: user?.tipo,
+        userId: user?.id,
         timestamp: new Date().toISOString()
       });
       return;
@@ -34,8 +31,6 @@ const useIncorporadoraNotifications = () => {
       userId: user.id,
       userType: user.tipo,
       empresaId: user.empresa_id,
-      isIncorporadora: isIncorporadoraUser,
-      isSDR: isSDR,
       timestamp: new Date().toISOString()
     });
 
@@ -52,8 +47,9 @@ const useIncorporadoraNotifications = () => {
     console.log('🔌 [SOCKET.IO] Socket criado:', newSocket.id);
 
     // Entrar no grupo de notificações da incorporadora
-    // Enviar tipo de usuário correto (admin ou consultor)
-    const userTypeToSend = user.tipo === 'admin' ? 'admin' : 'consultor';
+    // Enviar tipo de usuário real
+    // Mas converter para 'consultor' se for admin para permitir entrada no backend
+    const userTypeToSend = user.tipo === 'admin' ? 'admin' : (user.tipo === 'consultor' ? 'consultor' : 'consultor');
     
     newSocket.emit('join-incorporadora-notifications', {
       userType: userTypeToSend,
@@ -62,6 +58,7 @@ const useIncorporadoraNotifications = () => {
     });
     console.log('📢 [SOCKET.IO] Emitindo join-incorporadora-notifications:', {
       userType: userTypeToSend,
+      userTipoOriginal: user.tipo,
       userId: user.id,
       empresaId: user.empresa_id
     });
@@ -80,18 +77,14 @@ const useIncorporadoraNotifications = () => {
         socketId: newSocket.id
       });
       
-      // Tocar som de notificação apenas se não for freelancer
-      if (!user.is_freelancer) {
-        playNotificationSound();
-      }
+      // Tocar som de notificação para TODOS os usuários logados (não apenas freelancers)
+      playNotificationSound();
       
-      // Mostrar toast apenas se não for freelancer
-      if (!user.is_freelancer) {
-        showInfoToast(
-          `Novo cliente: ${data.nome} - ${data.cidade}/${data.estado}`,
-          6000
-        );
-      }
+      // Mostrar toast para TODOS os usuários logados
+      showInfoToast(
+        `Novo cliente: ${data.nome} - ${data.cidade}/${data.estado}`,
+        6000
+      );
       
       // Adicionar à lista de notificações
       setNotifications(prev => [...prev, {
@@ -254,7 +247,7 @@ const useIncorporadoraNotifications = () => {
       });
       newSocket.disconnect();
     };
-  }, [isIncorporadora, user, showSuccessToast, showInfoToast]);
+  }, [user, showSuccessToast, showInfoToast]);
 
   // Estado do áudio
   const [audioInstance, setAudioInstance] = useState(null);
