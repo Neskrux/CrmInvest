@@ -5,6 +5,13 @@ import { useToast } from '../components/Toast';
 
 const Consultores = () => {
   const { t, shouldShow } = useBranding();
+  
+  // Função para limitar caracteres e evitar sobreposição
+  const limitarCaracteres = (texto, limite = 20) => {
+    if (!texto) return '';
+    if (texto.length <= limite) return texto;
+    return texto.substring(0, limite) + '...';
+  };
   const { makeRequest, isAdmin, user } = useAuth();
   const { showErrorToast, showSuccessToast } = useToast();
   const [consultores, setConsultores] = useState([]);
@@ -1116,7 +1123,7 @@ Digite o número da opção desejada:`;
                 {consultoresFiltrados.map(consultor => (
                   <tr key={consultor.id}>
                     <td>
-                      <strong>{consultor.nome}</strong>
+                      <strong title={consultor.nome}>{limitarCaracteres(consultor.nome, 20)}</strong>
                     </td>
                     <td style={{ display: isMobile ? 'none' : 'table-cell' }}>
                       {consultor.empresa_id ? (

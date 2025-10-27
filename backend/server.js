@@ -349,6 +349,30 @@ if (io) {
       }
     });
     
+    // Handler para lead-capturado (notificar outros usuários que o lead foi pego)
+    socket.on('lead-capturado', (data) => {
+      console.log('🎯 [SOCKET.IO] Lead capturado - notificando outros usuários:', {
+        leadId: data.leadId,
+        sdrId: data.sdrId,
+        sdrNome: data.sdrNome,
+        empresaId: data.empresaId,
+        socketId: socket.id,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Emitir para todos os usuários do grupo incorporadora-notifications
+      // EXCETO o usuário que capturou o lead
+      socket.to('incorporadora-notifications').emit('lead-capturado-incorporadora', {
+        leadId: data.leadId,
+        sdrId: data.sdrId,
+        sdrNome: data.sdrNome,
+        empresaId: data.empresaId,
+        timestamp: new Date().toISOString()
+      });
+      
+      console.log('✅ [SOCKET.IO] Evento lead-capturado-incorporadora emitido para outros usuários');
+    });
+    
     socket.on('disconnect', () => {
       console.log('🔌 [SOCKET.IO] Cliente desconectado:', {
         socketId: socket.id,

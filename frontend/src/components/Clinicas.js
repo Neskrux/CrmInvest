@@ -9,6 +9,13 @@ import config from '../config';
 
 const Clinicas = () => {
   const { makeRequest, user, isAdmin, podeAlterarStatus, isFreelancer, isConsultorInterno, isClinica } = useAuth();
+  
+  // Função para limitar caracteres e evitar sobreposição
+  const limitarCaracteres = (texto, limite = 20) => {
+    if (!texto) return '';
+    if (texto.length <= limite) return texto;
+    return texto.substring(0, limite) + '...';
+  };
   const { showSuccessToast, showErrorToast, showWarningToast } = useToast();
   const navigate = useNavigate();
   const [clinicas, setClinicas] = useState([]);
@@ -6204,7 +6211,7 @@ const Clinicas = () => {
                            {pacientesClinica.map((paciente) => (
                              <tr key={paciente.id}>
                                <td>
-                                 <strong>{paciente.nome}</strong>
+                                 <strong title={paciente.nome}>{limitarCaracteres(paciente.nome, 18)}</strong>
                                </td>
                                <td>
                                  {paciente.telefone ? 

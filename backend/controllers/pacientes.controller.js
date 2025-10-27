@@ -1117,7 +1117,7 @@ const updateStatusLead = async (req, res) => {
 const cadastroPublicoLead = async (req, res) => {
   try {
     console.log('📝 Cadastro de lead recebido:', req.body);
-    let { nome, telefone, email, cpf, tipo_tratamento, empreendimento_id, observacoes, cidade, estado, grau_parentesco, ref_consultor } = req.body;
+    let { nome, telefone, email, cpf, tipo_tratamento, empreendimento_id, observacoes, cidade, estado, grau_parentesco, ref_consultor, origem_formulario } = req.body;
     console.log('👥 Grau de parentesco:', grau_parentesco);
     
     // Validar campos obrigatórios
@@ -1139,8 +1139,85 @@ const cadastroPublicoLead = async (req, res) => {
     // Normalizar telefone (remover formatação)
     const telefoneNumeros = telefone.replace(/\D/g, '');
     
-    // Verificar se telefone já existe na mesma empresa (Incorporadora = 5)
-    const empresaId = 5; // Todos os leads do CapturaClientes.js vêm para a Incorporadora
+    // Buscar consultor pelo código de referência se fornecido
+    let consultorId = null;
+    if (ref_consultor && ref_consultor.trim() !== '') {
+      console.log('🔍 Buscando consultor pelo código de referência:', ref_consultor);
+      
+      const { data: consultorData, error: consultorError } = await supabaseAdmin
+        .from('consultores')
+        .select('id, nome, codigo_referencia, ativo, empresa_id')
+        .eq('codigo_referencia', ref_consultor.trim())
+        .eq('ativo', true)
+        .single();
+      
+      if (consultorError) {
+        console.error('❌ Erro ao buscar consultor:', consultorError);
+      } else if (consultorData) {
+        consultorId = consultorData.id;
+        console.log('✅ Consultor encontrado:', {
+          id: consultorData.id,
+          nome: consultorData.nome,
+          codigo_referencia: consultorData.codigo_referencia,
+          empresa_id: consultorData.empresa_id,
+          ativo: consultorData.ativo
+        });
+      } else {
+        console.log('⚠️ Consultor não encontrado para o código:', ref_consultor);
+      }
+    } else {
+      console.log('ℹ️ Nenhum código de referência fornecido');
+    }
+    
+    // Determinar empresa_id baseado na origem do lead
+    // PRIORIDADE 1: Se tem consultor_id (freelancer), usar empresa_id do consultor
+    // PRIORIDADE 2: Se é CapturaClientes, usar empresa_id=5 (Incorporadora)
+    // PRIORIDADE 3: Se é CapturaLead, usar empresa_id=3 (Outra empresa)
+    
+    let empresaId = 3; // Padrão: Outra empresa
+    
+    // Se tem consultor_id, buscar empresa_id do consultor
+    if (consultorId) {
+      const { data: consultorData } = await supabaseAdmin
+        .from('consultores')
+        .select('empresa_id')
+        .eq('id', consultorId)
+        .single();
+      
+      if (consultorData && consultorData.empresa_id) {
+        empresaId = consultorData.empresa_id;
+        console.log('👤 Lead de freelancer - usando empresa_id do consultor:', empresaId);
+      }
+    }
+    
+    // Se não tem consultor_id, determinar pela origem do formulário
+    if (!consultorId) {
+      const userAgent = req.headers['user-agent'] || '';
+      const referer = req.headers.referer || '';
+      const origin = req.headers.origin || '';
+      
+      const isCapturaClientes = 
+        origem_formulario === 'captura-clientes' ||
+        referer.includes('/captura-clientes') || 
+        referer.includes('captura-clientes') ||
+        origin.includes('/captura-clientes') ||
+        origin.includes('captura-clientes') ||
+        userAgent.includes('CapturaClientes') ||
+        (referer.includes('clientes') && !referer.includes('captura-lead'));
+      
+      empresaId = isCapturaClientes ? 5 : 3;
+      console.log('📝 Lead direto - determinando empresa_id pela origem:', empresaId);
+    }
+    
+    console.log('🏢 Empresa_id final determinado:', {
+      consultorId: consultorId,
+      origem_formulario: origem_formulario,
+      empresaIdFinal: empresaId,
+      origem: consultorId ? `Freelancer (empresa_id=${empresaId})` : 
+             empresaId === 5 ? 'CapturaClientes (Incorporadora - empresa_id=5)' : 
+             'CapturaLead (Outra empresa - empresa_id=3)'
+    });
+    
     const { data: telefoneExistente, error: telefoneError } = await supabaseAdmin
       .from('pacientes')
       .select('id, nome, created_at, empresa_id')
@@ -1205,44 +1282,9 @@ const cadastroPublicoLead = async (req, res) => {
       }
     }
     
-    // Buscar consultor pelo código de referência se fornecido
-    let consultorId = null;
-    if (ref_consultor && ref_consultor.trim() !== '') {
-      console.log('🔍 Buscando consultor pelo código de referência:', ref_consultor);
-      
-      const { data: consultorData, error: consultorError } = await supabaseAdmin
-        .from('consultores')
-        .select('id, nome, codigo_referencia, ativo')
-        .eq('codigo_referencia', ref_consultor.trim())
-        .eq('ativo', true)
-        .single();
-      
-      if (consultorError) {
-        console.error('❌ Erro ao buscar consultor:', consultorError);
-        console.error('❌ Detalhes do erro:', {
-          message: consultorError.message,
-          details: consultorError.details,
-          hint: consultorError.hint,
-          code: consultorError.code
-        });
-        // Não falhar o cadastro se não encontrar o consultor, apenas logar o erro
-      } else if (consultorData) {
-        consultorId = consultorData.id;
-        console.log('✅ Consultor encontrado:', { 
-          id: consultorData.id, 
-          nome: consultorData.nome,
-          codigo_referencia: consultorData.codigo_referencia,
-          ativo: consultorData.ativo
-        });
-      } else {
-        console.log('⚠️ Consultor não encontrado para o código:', ref_consultor);
-      }
-    } else {
-      console.log('ℹ️ Nenhum código de referência fornecido');
-    }
     
     // Inserir lead/paciente
-    console.log('💾 Inserindo lead com consultor_id:', consultorId, 'e empresa_id: 5 (Incorporadora)');
+    console.log('💾 Inserindo lead com consultor_id:', consultorId, 'e empresa_id:', empresaId);
     
     const { data, error } = await supabaseAdmin
       .from('pacientes')
@@ -1259,7 +1301,7 @@ const cadastroPublicoLead = async (req, res) => {
         estado: estado ? estado.trim() : null,
         grau_parentesco: grau_parentesco || null, // Grau de parentesco do indicador
         consultor_id: consultorId, // Atribuir ao consultor se encontrado pelo código de referência
-        empresa_id: 5 // Incorporadora - todos os leads do formulário CapturaClientes vêm para empresa_id=5
+        empresa_id: empresaId // Incorporadora (5) ou Outra empresa (3) baseado no formulário
       }])
       .select();
 
@@ -1306,6 +1348,7 @@ const cadastroPublicoLead = async (req, res) => {
     }
     
     // Emitir evento Socket.IO para notificar incorporadora sobre novo lead
+    // APENAS se for da incorporadora (empresa_id = 5)
     if (req.io && data[0].empresa_id === 5) {
       console.log('📢 [SOCKET.IO] Emitindo evento new-lead-incorporadora:', {
         leadId: data[0].id,
@@ -1314,6 +1357,9 @@ const cadastroPublicoLead = async (req, res) => {
         estado: data[0].estado,
         consultorId: consultorId,
         empresa_id: data[0].empresa_id,
+        origem: consultorId ? `Freelancer (empresa_id=${empresaId})` : 
+               empresaId === 5 ? 'CapturaClientes (Incorporadora - empresa_id=5)' : 
+               'CapturaLead (Outra empresa - empresa_id=3)',
         timestamp: new Date().toISOString(),
         room: 'incorporadora-notifications'
       });
@@ -1354,8 +1400,11 @@ const cadastroPublicoLead = async (req, res) => {
       console.log('⚠️ [SOCKET.IO] Evento new-lead-incorporadora não enviado:', {
         temSocketIO: !!req.io,
         empresaId: data[0].empresa_id,
+        origem: consultorId ? `Freelancer (empresa_id=${empresaId})` : 
+               empresaId === 5 ? 'CapturaClientes (Incorporadora - empresa_id=5)' : 
+               'CapturaLead (Outra empresa - empresa_id=3)',
         motivo: !req.io ? 'Socket.IO não disponível' : 
-                data[0].empresa_id !== 5 ? 'Não é incorporadora' : 'Desconhecido'
+                data[0].empresa_id !== 5 ? 'Não é incorporadora - lead vai para empresa_id=3' : 'Desconhecido'
       });
     }
     

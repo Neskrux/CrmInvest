@@ -117,6 +117,26 @@ const useIncorporadoraNotifications = () => {
       console.log('✅ [SOCKET.IO] Processamento do evento new-lead-incorporadora concluído');
     });
 
+    // Listener para lead capturado (fechar modal em todos os clientes)
+    newSocket.on('lead-capturado-incorporadora', (data) => {
+      console.log('🎯 [SOCKET.IO] Lead capturado por outro usuário:', {
+        leadId: data.leadId,
+        sdrNome: data.sdrNome,
+        timestamp: data.timestamp
+      });
+      
+      // Se a modal estiver aberta com esse lead, fechar
+      if (showNewLeadModal && newLeadData && newLeadData.leadId === data.leadId) {
+        console.log('✅ [SOCKET.IO] Fechando modal de lead capturado');
+        stopNotificationSound();
+        setShowNewLeadModal(false);
+        setNewLeadData(null);
+        
+        // Mostrar toast informando que o lead foi capturado
+        showInfoToast(`Lead capturado por ${data.sdrNome}`, 3000);
+      }
+    });
+
     // Listener para novos agendamentos
     newSocket.on('new-agendamento-incorporadora', (data) => {
       console.log('🔔 [SOCKET.IO] Recebido evento new-agendamento-incorporadora:', {
@@ -346,6 +366,17 @@ const useIncorporadoraNotifications = () => {
         setShowNewLeadModal(false);
         setNewLeadData(null);
         
+        // Emitir evento para notificar outros usuários
+        if (socket) {
+          socket.emit('lead-capturado', {
+            leadId: newLeadData.leadId,
+            sdrId: user.id,
+            sdrNome: user.nome,
+            empresaId: user.empresa_id
+          });
+          console.log('📢 [SOCKET.IO] Evento lead-capturado emitido para outros usuários');
+        }
+        
         // Recarregar a página para atualizar a lista
         setTimeout(() => {
           window.location.reload();
@@ -370,8 +401,10 @@ const useIncorporadoraNotifications = () => {
     }
   };
 
-  // Função para fechar modal
+  // Função para fechar modal e dispensar notificação
   const fecharModalLead = () => {
+    console.log('❌ [SOCKET.IO] Dispensando notificação de lead');
+    stopNotificationSound(); // Parar o som
     setShowNewLeadModal(false);
     setNewLeadData(null);
   };
@@ -545,49 +578,88 @@ const useIncorporadoraNotifications = () => {
             </div>
           </div>
 
-          {/* Botão de captura */}
-          <button
-            onClick={capturarLead}
-            style={{
-              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-              color: 'white',
-              padding: '0.6rem 1.5rem',
-              borderRadius: '6px',
-              fontSize: '0.9rem',
-              fontWeight: '700',
-              border: 'none',
-              cursor: 'pointer',
-              textTransform: 'uppercase',
-              letterSpacing: '0.25px',
-              boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)',
-              transition: 'all 0.3s ease',
-              width: '100%',
-              maxWidth: '240px',
-              position: 'relative',
-              overflow: 'hidden',
-              backgroundSize: '200% 100%',
-              animation: 'shimmer 3s linear infinite'
-            }}
-            onMouseOver={(e) => {
-              e.target.style.transform = 'translateY(-2px)';
-              e.target.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.5)';
-            }}
-            onMouseOut={(e) => {
-              e.target.style.transform = 'translateY(0)';
-              e.target.style.boxShadow = '0 4px 15px rgba(59, 130, 246, 0.4)';
-            }}
-          >
-            <span style={{ 
-              position: 'relative', 
-              zIndex: 2,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.75rem'
-            }}>
-              CAPTURAR LEAD AGORA
-            </span>
-          </button>
+          {/* Botões de ação */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.75rem',
+            width: '100%',
+            alignItems: 'center'
+          }}>
+            {/* Botão de captura - Apenas para SDRs */}
+            {user.tipo === 'consultor' && !user.is_freelancer && (
+              <button
+                onClick={capturarLead}
+                style={{
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  color: 'white',
+                  padding: '0.6rem 1.5rem',
+                  borderRadius: '6px',
+                  fontSize: '0.9rem',
+                  fontWeight: '700',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.25px',
+                  boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)',
+                  transition: 'all 0.3s ease',
+                  width: '100%',
+                  maxWidth: '240px',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  backgroundSize: '200% 100%',
+                  animation: 'shimmer 3s linear infinite'
+                }}
+                onMouseOver={(e) => {
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.5)';
+                }}
+                onMouseOut={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 4px 15px rgba(59, 130, 246, 0.4)';
+                }}
+              >
+                <span style={{ 
+                  position: 'relative', 
+                  zIndex: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.75rem'
+                }}>
+                  CAPTURAR LEAD AGORA
+                </span>
+              </button>
+            )}
+
+            {/* Botão dispensar - Para todos */}
+            <button
+              onClick={fecharModalLead}
+              style={{
+                background: '#f1f5f9',
+                color: '#64748b',
+                padding: '0.5rem 1.5rem',
+                borderRadius: '6px',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                border: '1px solid #e2e8f0',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                width: '100%',
+                maxWidth: '240px'
+              }}
+              onMouseOver={(e) => {
+                e.target.style.background = '#e2e8f0';
+                e.target.style.color = '#475569';
+              }}
+              onMouseOut={(e) => {
+                e.target.style.background = '#f1f5f9';
+                e.target.style.color = '#64748b';
+              }}
+            >
+              Dispensar Notificação
+            </button>
+          </div>
           
           <p style={{
             marginTop: '1.5rem',
