@@ -68,6 +68,7 @@ const Pacientes = () => {
     cidade: '',
     estado: '',
     tipo_tratamento: '',
+    empreendimento_id: '',
     status: 'lead',
     observacoes: '',
     consultor_id: ''
@@ -1052,6 +1053,7 @@ const Pacientes = () => {
           cidade: '',
           estado: '',
           tipo_tratamento: '',
+          empreendimento_id: '',
           status: 'lead',
           observacoes: '',
           consultor_id: ''
@@ -1075,6 +1077,7 @@ const Pacientes = () => {
       cidade: paciente.cidade || '',
       estado: paciente.estado || '',
       tipo_tratamento: paciente.tipo_tratamento || '',
+      empreendimento_id: paciente.empreendimento_id || '',
       status: paciente.status || 'lead',
       observacoes: paciente.observacoes || '',
       consultor_id: paciente.consultor_id || ''
@@ -3935,14 +3938,14 @@ const Pacientes = () => {
                 <table className="table">
                   <thead>
                     <tr>
-                      <th>Nome</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>SDR</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Corretor' : 'Consultor'}</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Empreendimento' : 'Tipo'}</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Status</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
-                      <th style={{ width: isConsultor || isClinica ? '80px' : '200px', minWidth: isConsultor || isClinica ? '80px' : '200px' }}>Ações</th>
+                      <th style={{ width: '200px', minWidth: '200px' }}>Nome</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', width: '150px', minWidth: '150px' }}>Freelancer</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', width: '120px', minWidth: '120px' }}>SDR</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', width: '120px', minWidth: '120px' }}>{isIncorporadora ? 'Corretor' : 'Consultor'}</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', width: '120px', minWidth: '120px' }}>{isIncorporadora ? 'Empreendimento' : 'Tipo'}</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', width: '100px', minWidth: '100px' }}>Status</th>
+                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', width: '100px', minWidth: '100px' }}>Cadastrado</th>
+                      <th style={{ width: '150px', minWidth: '150px' }}>Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -4100,13 +4103,21 @@ const Pacientes = () => {
                             )}
                           </td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarData(lead.created_at)}</td>
-                          <td style={{ padding: '0.5rem', minWidth: '200px' }}>
+                          <td style={{ 
+                            padding: '0.5rem', 
+                            width: '150px',
+                            minWidth: '150px',
+                            maxWidth: '150px',
+                            whiteSpace: 'nowrap',
+                            overflow: 'visible'
+                          }}>
                             <div style={{ 
                               display: 'flex', 
                               gap: '0.25rem', 
                               alignItems: 'center',
-                              flexWrap: 'wrap',
-                              justifyContent: 'flex-start'
+                              flexWrap: 'nowrap',
+                              justifyContent: 'flex-start',
+                              width: '100%'
                             }}>
                               <button
                                 onClick={() => handleView(lead)}
@@ -4128,31 +4139,33 @@ const Pacientes = () => {
                                   onClick={() => aprovarLead(lead.id)}
                                   className="btn"
                                   style={{ 
-                                    fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.8rem',
-                                    padding: window.innerWidth <= 768 ? '0.375rem 0.5rem' : '0.5rem 0.75rem',
-                                    minWidth: '80px',
+                                    fontSize: '0.75rem',
+                                    padding: '0.375rem 0.5rem',
+                                    minWidth: '65px',
                                     height: '32px',
                                     whiteSpace: 'nowrap',
                                     background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                                     color: 'white',
-                                    border: 'none'
+                                    border: 'none',
+                                    flexShrink: 0
                                   }}
                                 >
-                                  {window.innerWidth <= 768 ? 'Aprovar' : 'Aprovar Lead'}
+                                  Aprovar
                                 </button>
                               ) : (
                               <button
                                 onClick={() => pegarLead(lead.id)}
                                 className="btn btn-primary"
                                 style={{ 
-                                  fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.8rem',
-                                  padding: window.innerWidth <= 768 ? '0.375rem 0.5rem' : '0.5rem 0.75rem',
-                                  minWidth: '80px',
+                                  fontSize: '0.75rem',
+                                  padding: '0.375rem 0.5rem',
+                                  minWidth: '65px',
                                   height: '32px',
-                                  whiteSpace: 'nowrap'
+                                  whiteSpace: 'nowrap',
+                                  flexShrink: 0
                                 }}
                               >
-                                {window.innerWidth <= 768 ? 'Atribuir' : 'Atribuir Lead'}
+                                Atribuir
                               </button>
                               )}
                               {/* Botão de excluir - apenas para admin */}
@@ -4171,7 +4184,8 @@ const Pacientes = () => {
                                     borderRadius: '4px',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    justifyContent: 'center'
+                                    justifyContent: 'center',
+                                    flexShrink: 0
                                   }}
                                 >
                                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -6192,19 +6206,37 @@ const Pacientes = () => {
 
               <div className="grid grid-2">
                 <div className="form-group">
-                  <label className="form-label">{t.tipoTratamento} *</label>
-                  <select
-                    name="tipo_tratamento"
-                    className="form-select"
-                    value={formData.tipo_tratamento}
-                    onChange={handleInputChange}
-                    required
-                  >
-                    <option value="">Selecione</option>
-                    <option value="Estético">Estético</option>
-                    <option value="Odontológico">Odontológico</option>
-                    <option value="Ambos">Ambos</option>
-                  </select>
+                  <label className="form-label">{isIncorporadora ? 'Empreendimento' : t.tipoTratamento} *</label>
+                  {isIncorporadora ? (
+                    <select
+                      name="empreendimento_id"
+                      className="form-select"
+                      value={formData.empreendimento_id || ''}
+                      onChange={handleInputChange}
+                      required
+                    >
+                      <option value="">Selecione</option>
+                      <option value="4">Laguna Sky Garden</option>
+                      <option value="5">Residencial Girassol</option>
+                      <option value="6">Sintropia Sky Garden</option>
+                      <option value="7">Residencial Lotus</option>
+                      <option value="8">River Sky Garden</option>
+                      <option value="9">Condomínio Figueira Garcia</option>
+                    </select>
+                  ) : (
+                    <select
+                      name="tipo_tratamento"
+                      className="form-select"
+                      value={formData.tipo_tratamento}
+                      onChange={handleInputChange}
+                      required
+                    >
+                      <option value="">Selecione</option>
+                      <option value="Estético">Estético</option>
+                      <option value="Odontológico">Odontológico</option>
+                      <option value="Ambos">Ambos</option>
+                    </select>
+                  )}
                 </div>
               </div>
 

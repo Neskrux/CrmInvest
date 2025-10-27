@@ -4,7 +4,7 @@ import './App.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './components/Toast';
 import useBranding from './hooks/useBranding';
-import useNotificationsIncorporadora from './hooks/useNotificationsIncorporadora';
+import useIncorporadoraNotifications from './hooks/useIncorporadoraNotifications';
 import { HelpCircle } from 'lucide-react';
 import CadastroConsultor from './components/CadastroConsultor';
 import CadastroSucesso from './components/CadastroSucesso';
@@ -73,21 +73,17 @@ const AppContent = () => {
   
   // Hook de notificações da incorporadora (para admins e consultores)
   const {
-    showLeadModal,
-    showAgendamentoModal,
-    showFechamentoModal,
-    leadData,
-    agendamentoData,
-    fechamentoData,
-    audioPlaying,
-    closeLeadModal,
-    closeAgendamentoModal,
-    closeFechamentoModal,
+    socket,
+    notifications,
+    clearNotifications,
+    playNotificationSound,
     stopNotificationSound,
-    formatPhoneNumber,
-    formatCurrency,
-    formatDateTime
-  } = useNotificationsIncorporadora();
+    showNewLeadModal,
+    newLeadData,
+    capturarLead,
+    fecharModalLead,
+    NewLeadModal
+  } = useIncorporadoraNotifications();
 
   // Função para fechar sidebar ao navegar no mobile
   const handleMobileNavigation = () => {
@@ -460,147 +456,6 @@ const AppContent = () => {
         <main className="freelancer-main">
           {RenderContent()}
         </main>
-        
-        {/* Modais de notificações - Para consultores e admins */}
-        {showLeadModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">🎉 Novo Lead!</h3>
-                <button
-                  onClick={closeLeadModal}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  {leadData?.sdr_foto && (
-                    <img
-                      src={leadData.sdr_foto}
-                      alt={leadData.sdr_nome}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                  )}
-                  <div>
-                    <p className="font-medium text-gray-900">{leadData?.paciente_nome}</p>
-                    <p className="text-sm text-gray-600">{formatPhoneNumber(leadData?.paciente_telefone)}</p>
-                    <p className="text-xs text-gray-500">SDR: {leadData?.sdr_nome}</p>
-                  </div>
-                </div>
-                
-                <div className="text-sm text-gray-600">
-                  <p>📅 Data: {formatDateTime(leadData?.timestamp)}</p>
-                </div>
-              </div>
-              
-              <div className="mt-4 flex justify-end">
-                <button
-                  onClick={closeLeadModal}
-                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                >
-                  Fechar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showAgendamentoModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">📅 Novo Agendamento!</h3>
-                <button
-                  onClick={closeAgendamentoModal}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  {agendamentoData?.sdr_foto && (
-                    <img
-                      src={agendamentoData.sdr_foto}
-                      alt={agendamentoData.sdr_nome}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                  )}
-                  <div>
-                    <p className="font-medium text-gray-900">{agendamentoData?.paciente_nome}</p>
-                    <p className="text-sm text-gray-600">{formatPhoneNumber(agendamentoData?.paciente_telefone)}</p>
-                    <p className="text-xs text-gray-500">SDR: {agendamentoData?.sdr_nome}</p>
-                  </div>
-                </div>
-                
-                <div className="text-sm text-gray-600">
-                  <p>📅 Data: {agendamentoData?.data_agendamento}</p>
-                  <p>🕐 Horário: {agendamentoData?.horario}</p>
-                </div>
-              </div>
-              
-              <div className="mt-4 flex justify-end">
-                <button
-                  onClick={closeAgendamentoModal}
-                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                >
-                  Fechar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showFechamentoModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">💰 Novo Fechamento!</h3>
-                <button
-                  onClick={closeFechamentoModal}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  {fechamentoData?.corretor_foto && (
-                    <img
-                      src={fechamentoData.corretor_foto}
-                      alt={fechamentoData.corretor_nome}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                  )}
-                  <div>
-                    <p className="font-medium text-gray-900">{fechamentoData?.paciente_nome}</p>
-                    <p className="text-sm text-gray-600">{formatPhoneNumber(fechamentoData?.paciente_telefone)}</p>
-                    <p className="text-xs text-gray-500">Corretor: {fechamentoData?.corretor_nome}</p>
-                  </div>
-                </div>
-                
-                <div className="text-sm text-gray-600">
-                  <p>💰 Valor: {formatCurrency(fechamentoData?.valor_fechado)}</p>
-                  <p>📅 Data: {fechamentoData?.data_fechamento}</p>
-                </div>
-              </div>
-              
-              <div className="mt-4 flex justify-end">
-                <button
-                  onClick={closeFechamentoModal}
-                  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-                >
-                  Fechar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Botão Flutuante WhatsApp - Para Freelancers */}
         <a
@@ -1275,147 +1130,9 @@ const AppContent = () => {
         </div>
       </main>
       
-      {/* Modais de notificações - Para consultores e admins */}
-      {showLeadModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">🎉 Novo Lead!</h3>
-              <button
-                onClick={closeLeadModal}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="space-y-3">
-              <div className="flex items-center space-x-3">
-                {leadData?.sdr_foto && (
-                  <img
-                    src={leadData.sdr_foto}
-                    alt={leadData.sdr_nome}
-                    className="w-12 h-12 rounded-full object-cover"
-                  />
-                )}
-                <div>
-                  <p className="font-medium text-gray-900">{leadData?.paciente_nome}</p>
-                  <p className="text-sm text-gray-600">{formatPhoneNumber(leadData?.paciente_telefone)}</p>
-                  <p className="text-xs text-gray-500">SDR: {leadData?.sdr_nome}</p>
-                </div>
-              </div>
-              
-              <div className="text-sm text-gray-600">
-                <p>📅 Data: {formatDateTime(leadData?.timestamp)}</p>
-              </div>
-            </div>
-            
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={closeLeadModal}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showAgendamentoModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">📅 Novo Agendamento!</h3>
-              <button
-                onClick={closeAgendamentoModal}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="space-y-3">
-              <div className="flex items-center space-x-3">
-                {agendamentoData?.sdr_foto && (
-                  <img
-                    src={agendamentoData.sdr_foto}
-                    alt={agendamentoData.sdr_nome}
-                    className="w-12 h-12 rounded-full object-cover"
-                  />
-                )}
-                <div>
-                  <p className="font-medium text-gray-900">{agendamentoData?.paciente_nome}</p>
-                  <p className="text-sm text-gray-600">{formatPhoneNumber(agendamentoData?.paciente_telefone)}</p>
-                  <p className="text-xs text-gray-500">SDR: {agendamentoData?.sdr_nome}</p>
-                </div>
-              </div>
-              
-              <div className="text-sm text-gray-600">
-                <p>📅 Data: {agendamentoData?.data_agendamento}</p>
-                <p>🕐 Horário: {agendamentoData?.horario}</p>
-              </div>
-            </div>
-            
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={closeAgendamentoModal}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showFechamentoModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">💰 Novo Fechamento!</h3>
-              <button
-                onClick={closeFechamentoModal}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="space-y-3">
-              <div className="flex items-center space-x-3">
-                {fechamentoData?.corretor_foto && (
-                  <img
-                    src={fechamentoData.corretor_foto}
-                    alt={fechamentoData.corretor_nome}
-                    className="w-12 h-12 rounded-full object-cover"
-                  />
-                )}
-                <div>
-                  <p className="font-medium text-gray-900">{fechamentoData?.paciente_nome}</p>
-                  <p className="text-sm text-gray-600">{formatPhoneNumber(fechamentoData?.paciente_telefone)}</p>
-                  <p className="text-xs text-gray-500">Corretor: {fechamentoData?.corretor_nome}</p>
-                </div>
-              </div>
-              
-              <div className="text-sm text-gray-600">
-                <p>💰 Valor: {formatCurrency(fechamentoData?.valor_fechado)}</p>
-                <p>📅 Data: {fechamentoData?.data_fechamento}</p>
-              </div>
-            </div>
-            
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={closeFechamentoModal}
-                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* Modal de notificações da incorporadora */}
+      <NewLeadModal />
+      
       {/* Botão Flutuante WhatsApp - Apenas para consultores */}
       {user?.tipo === 'consultor' && (
         <a

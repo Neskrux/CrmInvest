@@ -955,12 +955,15 @@ const pegarLead = async (req, res) => {
 
     console.log('🔍 DEBUG sdrIdParaAtribuir:', sdrIdParaAtribuir);
 
-    // Atribuir o lead ao SDR (atualizar sdr_id)
-    console.log('🔍 DEBUG atualizando paciente:', { id, sdr_id: sdrIdParaAtribuir });
+    // Atribuir o lead ao SDR e atualizar status para 'em_conversa'
+    console.log('🔍 DEBUG atualizando paciente:', { id, sdr_id: sdrIdParaAtribuir, status: 'em_conversa' });
     
     const { error } = await supabaseAdmin
       .from('pacientes')
-      .update({ sdr_id: sdrIdParaAtribuir })
+      .update({ 
+        sdr_id: sdrIdParaAtribuir,
+        status: 'em_conversa'  // Mudar status de 'lead' para 'em_conversa' quando atribuído
+      })
       .eq('id', id);
 
     if (error) {
@@ -968,7 +971,7 @@ const pegarLead = async (req, res) => {
       throw error;
     }
     
-    console.log('✅ sdr_id atualizado com sucesso!');
+    console.log('✅ Lead atribuído e status atualizado com sucesso!');
     
     // Registrar movimentação de lead atribuído
     try {
