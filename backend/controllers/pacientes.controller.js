@@ -672,6 +672,50 @@ const updateStatusPaciente = async (req, res) => {
             aprovado: 'aprovado', // Para fechamentos automáticos, sempre aprovado
             empresa_id: req.user.empresa_id
           });
+
+        // Para incorporadora, atualizar também o empreendimento_id do paciente se houver agendamento
+        if (req.user.empresa_id === 5 && agendamento?.empreendimento_id) {
+          await supabaseAdmin
+            .from('pacientes')
+            .update({ empreendimento_id: agendamento.empreendimento_id })
+            .eq('id', id);
+          console.log('✅ Atualizando empreendimento_id na tabela pacientes:', agendamento.empreendimento_id);
+        }
+
+        // Emitir evento Socket.IO para incorporadora sobre novo fechamento (fluxo automático)
+        try {
+          const consultorInternoIdFinal = agendamento?.consultor_interno_id || paciente.consultor_id;
+          if (req.io && consultorInternoIdFinal && req.user.empresa_id === 5) {
+            // Buscar dados do corretor (consultor interno)
+            const { data: corretorData } = await supabaseAdmin
+              .from('consultores')
+              .select('nome, foto_url, musica_url')
+              .eq('id', consultorInternoIdFinal)
+              .single();
+
+            // Buscar dados do paciente
+            const { data: pacienteData } = await supabaseAdmin
+              .from('pacientes')
+              .select('nome, telefone')
+              .eq('id', id)
+              .single();
+
+            req.io.to('incorporadora-notifications').emit('new-fechamento-incorporadora', {
+              fechamentoId: null, // fechamentos automáticos podem não ter ID retornado aqui
+              paciente_nome: pacienteData?.nome || 'Cliente',
+              paciente_telefone: pacienteData?.telefone || '',
+              valor_fechado: 0,
+              data_fechamento: new Date().toISOString().split('T')[0],
+              consultor_interno_id: consultorInternoIdFinal,
+              corretor_nome: corretorData?.nome || 'Corretor',
+              corretor_foto: corretorData?.foto_url || null,
+              corretor_musica: corretorData?.musica_url || null,
+              timestamp: new Date().toISOString()
+            });
+          }
+        } catch (emitError) {
+          console.error('⚠️ Erro ao emitir evento de fechamento automático:', emitError);
+        }
       }
     }
 

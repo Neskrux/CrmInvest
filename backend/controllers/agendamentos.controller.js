@@ -153,7 +153,7 @@ const getDashboardAgendamentos = async (req, res) => {
 // POST /api/agendamentos - Criar agendamento
 const createAgendamento = async (req, res) => {
   try {
-    const { paciente_id, consultor_id, clinica_id, data_agendamento, horario, status, observacoes, consultor_interno_id } = req.body;
+    const { paciente_id, consultor_id, clinica_id, empreendimento_id, data_agendamento, horario, status, observacoes, consultor_interno_id } = req.body;
     
     // Buscar dados completos do paciente para copiar os IDs
     const { data: pacienteData, error: pacienteError } = await supabaseAdmin
@@ -178,7 +178,7 @@ const createAgendamento = async (req, res) => {
       }
     }
     
-    // Para incorporadora (empresa_id = 5), não usar clinica_id
+    // Para incorporadora (empresa_id = 5), usar empreendimento_id e não usar clinica_id
     const dadosAgendamento = {
       paciente_id,
       consultor_id: pacienteData.consultor_id, // freelancer que indicou
@@ -191,8 +191,10 @@ const createAgendamento = async (req, res) => {
       empresa_id
     };
     
-    // Só incluir clinica_id se não for incorporadora
-    if (empresa_id !== 5) {
+    if (empresa_id === 5) {
+      dadosAgendamento.empreendimento_id = empreendimento_id || null;
+    } else {
+      // Só incluir clinica_id se não for incorporadora
       dadosAgendamento.clinica_id = clinica_id;
     }
     
@@ -229,6 +231,12 @@ const createAgendamento = async (req, res) => {
       if (dadosAgendamento.consultor_interno_id) {
         updateData.consultor_interno_id = dadosAgendamento.consultor_interno_id;
         console.log('✅ Atualizando consultor_interno_id na tabela pacientes:', dadosAgendamento.consultor_interno_id);
+      }
+      
+      // Para incorporadora, atualizar também o empreendimento_id do paciente
+      if (empresa_id === 5 && empreendimento_id) {
+        updateData.empreendimento_id = empreendimento_id;
+        console.log('✅ Atualizando empreendimento_id na tabela pacientes:', empreendimento_id);
       }
       
       await supabaseAdmin

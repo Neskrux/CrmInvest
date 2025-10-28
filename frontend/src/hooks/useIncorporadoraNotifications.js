@@ -174,41 +174,6 @@ const useIncorporadoraNotifications = () => {
       console.log('✅ [SOCKET.IO] Processamento do evento new-agendamento-incorporadora concluído');
     });
 
-    // Listener para novos fechamentos
-    newSocket.on('new-fechamento-incorporadora', (data) => {
-      console.log('🔔 [SOCKET.IO] Recebido evento new-fechamento-incorporadora:', {
-        fechamentoId: data.fechamentoId,
-        paciente_nome: data.paciente_nome,
-        valor_fechado: data.valor_fechado,
-        data_fechamento: data.data_fechamento,
-        corretor_nome: data.corretor_nome,
-        corretor_foto: data.corretor_foto ? 'Disponível' : 'Não disponível',
-        timestamp: data.timestamp,
-        socketId: newSocket.id
-      });
-      
-      // Música removida temporariamente para fechamentos
-      // playNotificationSound();
-      
-      // Mostrar toast personalizado com nome do corretor e valor apenas se não for freelancer
-      if (!user.is_freelancer) {
-        showSuccessToast(
-          `💰 Fechamento realizado por ${data.corretor_nome} - R$ ${data.valor_fechado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-          8000
-        );
-      }
-      
-      // Adicionar à lista de notificações
-      setNotifications(prev => [...prev, {
-        id: Date.now(),
-        type: 'new-fechamento',
-        data,
-        timestamp: new Date()
-      }]);
-      
-      console.log('✅ [SOCKET.IO] Processamento do evento new-fechamento-incorporadora concluído');
-    });
-
     // Log de conexão/desconexão
     newSocket.on('connect', () => {
       console.log('✅ [SOCKET.IO] Socket conectado - Incorporadora:', {
@@ -247,7 +212,7 @@ const useIncorporadoraNotifications = () => {
       });
       newSocket.disconnect();
     };
-  }, [user, showSuccessToast, showInfoToast]);
+  }, [user?.id, user?.empresa_id, user?.tipo, showSuccessToast, showInfoToast]);
 
   // Estado do áudio
   const [audioInstance, setAudioInstance] = useState(null);

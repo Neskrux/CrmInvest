@@ -7,9 +7,13 @@ import { useToast } from '../components/Toast';
 import ModalEvidencia from './ModalEvidencia';
 import * as XLSX from 'xlsx';
 import useSmartPolling from '../hooks/useSmartPolling';
+import useFechamentoNotifications from '../hooks/useFechamentoNotifications';
 
 const Pacientes = () => {
   const { t, empresaId, shouldShow } = useBranding();
+  
+  // Hook para notificações de fechamento
+  const { FechamentoModal } = useFechamentoNotifications();
   
   // Função para limitar caracteres e evitar sobreposição
   const limitarCaracteres = (texto, limite = 20) => {
@@ -304,16 +308,6 @@ const Pacientes = () => {
   // Estado para modal de explicação de permissões
   const [showPermissaoModal, setShowPermissaoModal] = useState(false);
 
-  // Estados para modal de fechamento
-  const [showFechamentoModal, setShowFechamentoModal] = useState(false);
-  const [pacienteParaFechar, setPacienteParaFechar] = useState(null);
-  const [valorFechamento, setValorFechamento] = useState('');
-  const [valorFormatado, setValorFormatado] = useState('');
-  const [salvandoFechamento, setSalvandoFechamento] = useState(false);
-  const [contratoFechamento, setContratoFechamento] = useState(null);
-  const [tipoTratamentoFechamento, setTipoTratamentoFechamento] = useState('');
-  const [observacoesFechamento, setObservacoesFechamento] = useState('');
-  const [dataFechamento, setDataFechamento] = useState(new Date().toISOString().split('T')[0]);
 
   // Estados para cadastro completo da clínica
   const [showCadastroCompletoModal, setShowCadastroCompletoModal] = useState(false);
@@ -362,6 +356,7 @@ const Pacientes = () => {
   const [clinicas, setClinicas] = useState([]);
   const [agendamentoData, setAgendamentoData] = useState({
     clinica_id: '',
+    empreendimento_id: '',
     data_agendamento: '',
     horario: '',
     observacoes: '',
@@ -440,25 +435,16 @@ const Pacientes = () => {
 
   // Status disponíveis para o pipeline
   const statusOptions = [
-    { value: 'sem_primeiro_contato', label: 'Prospecção Ativa', color: '#6b7280', description: 'Cadastrado manualmente, aguardando primeiro contato' },
     { value: 'lead', label: 'Lead', color: '#f59e0b', description: 'Lead inicial' },
     { value: 'em_conversa', label: 'Em conversa', color: '#0ea5e9', description: 'Conversando com o cliente' },
     { value: 'cpf_aprovado', label: 'CPF Aprovado', color: '#10b981', description: 'CPF foi aprovado' },
     { value: 'cpf_reprovado', label: 'CPF Reprovado', color: '#ef4444', description: 'CPF foi reprovado' },
-    { value: 'nao_passou_cpf', label: 'Não forneceu CPF', color: '#6366f1', description: 'Cliente não forneceu CPF' },
-    { value: 'nao_tem_outro_cpf', label: 'Não tem outro CPF', color: '#a3a3a3', description: 'Cliente não tem CPF alternativo' },
     { value: 'nao_existe', label: `${t.paciente} não existe`, color: '#17202A', description: 'Cliente não existe' },
     { value: 'nao_tem_interesse', label: `${t.paciente} não tem interesse`, color: '#17202A', description: 'Cliente não tem interesse' },
-    { value: 'nao_reconhece', label: `${t.paciente} não reconhece`, color: '#17202A', description: 'Cliente não reconhece' },
     { value: 'nao_responde', label: `${t.paciente} não responde`, color: '#17202A', description: 'Cliente não responde' },
-    { value: 'sem_clinica', label: 'Sem clínica', color: '#fbbf24', description: 'Sem clínica' },
     // Demais status no final
     { value: 'agendado', label: 'Agendado', color: '#3b82f6', description: 'Abre modal para criar agendamento' },
-    { value: 'compareceu', label: 'Compareceu', color: '#10b981', description: 'Cliente compareceu ao agendamento' },
-    { value: 'fechado', label: 'Fechado', color: '#059669', description: 'Abre modal para criar fechamento' },
-    { value: 'nao_fechou', label: 'Não Fechou', color: '#dc2626', description: 'Cliente não fechou o negócio' },
-    { value: 'nao_compareceu', label: 'Não Compareceu', color: '#ef4444', description: 'Cliente não compareceu' },
-    { value: 'reagendado', label: 'Reagendado', color: '#8b5cf6', description: 'Agendamento foi reagendado' }
+    { value: 'fechado', label: 'Fechado', color: '#10b981', description: 'Cliente fechou o negócio' },
   ];
 
   // Status que requerem evidência obrigatória
@@ -566,7 +552,7 @@ const Pacientes = () => {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [showModal, showViewModal, showObservacoesModal, showAgendamentoModal, showFechamentoModal, showPermissaoModal, showAtribuirConsultorModal, showEvidenciaModal, showCadastroCompletoModal]);
+  }, [showModal, showViewModal, showObservacoesModal, showAgendamentoModal, showPermissaoModal, showAtribuirConsultorModal, showEvidenciaModal, showCadastroCompletoModal]);
   
   //Sempre que FILTROS mudarem, voltar para a primeira página
   useEffect(() => {
@@ -791,7 +777,6 @@ const Pacientes = () => {
       console.error('Erro ao carregar clínicas:', error);
     }
   };
-
   const fetchAgendamentos = async () => {
     try {
       // Usar endpoint geral se for freelancer, endpoint filtrado caso contrário
@@ -1446,7 +1431,6 @@ const Pacientes = () => {
       showErrorToast('Erro ao exportar planilha');
     }
   };
-
   const calcularCarteiraExistente = (percentualAlvo = 130) => {
     if (pacientesCarteira.length === 0) {
       showErrorToast(`Adicione pelo menos um ${empresaId === 5 ? 'cliente' : 'paciente'} antes de calcular`);
@@ -2225,7 +2209,6 @@ const Pacientes = () => {
       .replace(/(\d{3})(\d)/, '$1.$2')
       .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
   }
-
   // Função para formatar nome (mesmo padrão da migração do banco)
   function formatarNome(value) {
     if (!value) return '';
@@ -2379,16 +2362,6 @@ const Pacientes = () => {
       }
       return;
     }
-    
-    if (newStatus === 'fechado') {
-      const paciente = pacientes.find(p => p.id === pacienteId);
-      if (paciente) {
-        // Definir status temporário para o select
-        setStatusTemporario(prev => ({ ...prev, [pacienteId]: newStatus }));
-        abrirModalFechamento(paciente, newStatus);
-      }
-      return;
-    }
 
     // VERIFICAR SE STATUS REQUER EVIDÊNCIA
     if (STATUS_COM_EVIDENCIA_PACIENTES.includes(newStatus) && !evidenciaId) {
@@ -2435,6 +2408,24 @@ const Pacientes = () => {
         let message = 'Status atualizado com sucesso!';
         
         showSuccessToast(message);
+        
+        // Para incorporadora, redirecionar para aba "Leads Negativos" se status for negativo
+        if (user?.empresa_id === 5) {
+          const statusNegativos = [
+            'nao_existe',
+            'nao_tem_interesse', 
+            'nao_reconhece',
+            'nao_responde',
+            'nao_passou_cpf',
+            'nao_tem_outro_cpf',
+            'cpf_reprovado'
+          ];
+          
+          if (statusNegativos.includes(newStatus)) {
+            setActiveTab('leads-negativos');
+            showInfoToast('Cliente movido para aba "Leads Negativos"');
+          }
+        }
         
         // Recarregar dados completos para garantir sincronia entre todas as telas
         await fetchPacientes();
@@ -2603,7 +2594,8 @@ const Pacientes = () => {
       clinica_id: '',
       data_agendamento: '',
       horario: '',
-      observacoes: ''
+      observacoes: '',
+      consultor_interno_id: ''
     });
     setShowAgendamentoModal(true);
   };
@@ -2630,25 +2622,39 @@ const Pacientes = () => {
   };
 
   const salvarAgendamento = async () => {
-    if (!agendamentoData.clinica_id || !agendamentoData.data_agendamento || !agendamentoData.horario) {
+    const empreendimentoObrigatorio = isIncorporadora;
+    const clinicaObrigatoria = !isIncorporadora;
+
+    if ((empreendimentoObrigatorio && !agendamentoData.empreendimento_id) ||
+        (clinicaObrigatoria && !agendamentoData.clinica_id) ||
+        !agendamentoData.data_agendamento ||
+        !agendamentoData.horario ||
+        !agendamentoData.consultor_interno_id) {
       showErrorToast('Por favor, preencha todos os campos obrigatórios!');
       return;
     }
 
     setSalvandoAgendamento(true);
     try {
-      const response = await makeRequest('/agendamentos', {
-        method: 'POST',
-        body: JSON.stringify({
+      const payload = {
           paciente_id: pacienteParaAgendar.id,
           consultor_id: pacienteParaAgendar.consultor_id,
-          clinica_id: parseInt(agendamentoData.clinica_id),
           data_agendamento: agendamentoData.data_agendamento,
           horario: agendamentoData.horario,
           status: 'agendado',
           observacoes: agendamentoData.observacoes || '',
           consultor_interno_id: agendamentoData.consultor_interno_id || null
-        })
+      };
+
+      if (isIncorporadora) {
+        payload.empreendimento_id = parseInt(agendamentoData.empreendimento_id);
+      } else {
+        payload.clinica_id = parseInt(agendamentoData.clinica_id);
+      }
+
+      const response = await makeRequest('/agendamentos', {
+        method: 'POST',
+        body: JSON.stringify(payload)
       });
 
       if (response.ok) {
@@ -2677,70 +2683,6 @@ const Pacientes = () => {
     }
   };
 
-  // Estados adicionais para modal de fechamento
-  const [clinicaFechamento, setClinicaFechamento] = useState('');
-  const [valorParcelaFechamento, setValorParcelaFechamento] = useState('');
-  const [valorParcelaFormatado, setValorParcelaFormatado] = useState('');
-  const [numeroParcelasFechamento, setNumeroParcelasFechamento] = useState('');
-  const [vencimentoFechamento, setVencimentoFechamento] = useState('');
-  const [antecipacaoFechamento, setAntecipacaoFechamento] = useState('');
-  
-  // Novos campos para admin/consultor interno
-  const [dataOperacaoFechamento, setDataOperacaoFechamento] = useState('');
-  const [valorEntregue, setValorEntregue] = useState('');
-  const [valorEntregueFormatado, setValorEntregueFormatado] = useState('');
-  const [printConfirmacao, setPrintConfirmacao] = useState(null);
-  const [tipoOperacao, setTipoOperacao] = useState('');
-
-  // Funções do modal de fechamento
-  const abrirModalFechamento = (paciente, novoStatus = null) => {
-    setPacienteParaFechar({ ...paciente, novoStatus });
-    setValorFechamento('');
-    setValorFormatado('');
-    setContratoFechamento(null);
-    setClinicaFechamento('');
-    setTipoTratamentoFechamento(paciente.tipo_tratamento || '');
-    setObservacoesFechamento('');
-    setDataFechamento(new Date().toISOString().split('T')[0]);
-    setValorParcelaFechamento('');
-    setValorParcelaFormatado('');
-    setNumeroParcelasFechamento('');
-    setVencimentoFechamento('');
-    setAntecipacaoFechamento('');
-    setShowFechamentoModal(true);
-  };
-
-  const fecharModalFechamento = () => {
-    // Limpar status temporário quando cancelar
-    if (pacienteParaFechar && pacienteParaFechar.novoStatus) {
-      setStatusTemporario(prev => {
-        const newState = { ...prev };
-        delete newState[pacienteParaFechar.id];
-        return newState;
-      });
-    }
-    
-    setShowFechamentoModal(false);
-    setPacienteParaFechar(null);
-    setValorFechamento('');
-    setValorFormatado('');
-    setContratoFechamento(null);
-    setClinicaFechamento('');
-    setTipoTratamentoFechamento('');
-    setObservacoesFechamento('');
-    setDataFechamento(new Date().toISOString().split('T')[0]);
-    setValorParcelaFechamento('');
-    setValorParcelaFormatado('');
-    setNumeroParcelasFechamento('');
-    setVencimentoFechamento('');
-    setAntecipacaoFechamento('');
-    // Limpar novos campos
-    setDataOperacaoFechamento('');
-    setValorEntregue('');
-    setValorEntregueFormatado('');
-    setPrintConfirmacao(null);
-    setTipoOperacao('');
-  };
 
   // Funções do modal de atribuir consultor
   const fecharModalAtribuirConsultor = () => {
@@ -2757,10 +2699,8 @@ const Pacientes = () => {
 
     setSalvandoAtribuicao(true);
     try {
-      // Para incorporadora, usar sdr_id; para outras empresas, usar consultor_id
-      const body = isIncorporadora 
-        ? { sdr_id: parseInt(consultorSelecionado) }
-        : { consultor_id: parseInt(consultorSelecionado) };
+      // Backend espera consultor_id mesmo para incorporadora (mapeado como SDR na UI)
+      const body = { consultor_id: parseInt(consultorSelecionado) };
 
       const response = await makeRequest(`/novos-leads/${leadParaAtribuir.id}/pegar`, {
         method: 'PUT',
@@ -2796,33 +2736,6 @@ const Pacientes = () => {
 
   const desformatarValor = (valorFormatado) => {
     return valorFormatado.replace(/[^\d]/g, '') / 100;
-  };
-
-  const handleValorChange = (e) => {
-    const valorDigitado = e.target.value;
-    const valorFormatado = formatarValorInput(valorDigitado);
-    const valorNumerico = desformatarValor(valorFormatado);
-    
-    setValorFormatado(valorFormatado);
-    setValorFechamento(valorNumerico);
-  };
-
-  const handleValorParcelaChange = (e) => {
-    const valorDigitado = e.target.value;
-    const valorFormatado = formatarValorInput(valorDigitado);
-    const valorNumerico = desformatarValor(valorFormatado);
-    
-    setValorParcelaFormatado(valorFormatado);
-    setValorParcelaFechamento(valorNumerico);
-  };
-  
-  const handleValorEntregueChange = (e) => {
-    const valorDigitado = e.target.value;
-    const valorFormatado = formatarValorInput(valorDigitado);
-    const valorNumerico = desformatarValor(valorFormatado);
-    
-    setValorEntregueFormatado(valorFormatado);
-    setValorEntregue(valorNumerico);
   };
 
   // Funções para cadastro completo da clínica
@@ -3073,138 +2986,6 @@ const Pacientes = () => {
     }
   };
 
-  const confirmarFechamento = async () => {
-    if (!valorFechamento || valorFechamento <= 0) {
-      showErrorToast('Por favor, informe um valor válido para o fechamento!');
-      return;
-    }
-
-    if (!clinicaFechamento) {
-      showErrorToast('Por favor, selecione a clínica!');
-      return;
-    }
-
-    if (!contratoFechamento) {
-      showErrorToast('Por favor, selecione o contrato em PDF!');
-      return;
-    }
-
-    if (contratoFechamento && contratoFechamento.type !== 'application/pdf') {
-      showErrorToast('Apenas arquivos PDF são permitidos para o contrato!');
-      return;
-    }
-
-    if (contratoFechamento && contratoFechamento.size > 10 * 1024 * 1024) {
-      showErrorToast('O arquivo deve ter no máximo 10MB!');
-      return;
-    }
-
-    setSalvandoFechamento(true);
-    try {
-      // Criar o fechamento com o valor informado
-      const formData = new FormData();
-      formData.append('paciente_id', pacienteParaFechar.id);
-      formData.append('consultor_id', pacienteParaFechar.consultor_id || '');
-      
-      // Para incorporadora (empresa_id = 5), usar empreendimento_id do paciente
-      if (empresaId === 5) {
-        if (pacienteParaFechar.empreendimento_id) {
-          formData.append('clinica_id', pacienteParaFechar.empreendimento_id); // Backend espera clinica_id mesmo para empreendimentos
-        }
-      } else {
-        // Para securitizadora, usar clinica_id
-        formData.append('clinica_id', clinicaFechamento);
-        formData.append('tipo_tratamento', tipoTratamentoFechamento || '');
-      }
-      
-      formData.append('valor_fechado', parseFloat(valorFechamento));
-      formData.append('data_fechamento', dataFechamento);
-      formData.append('observacoes', observacoesFechamento || 'Fechamento criado pelo pipeline');
-      
-      // Novos campos de parcelamento
-      if (valorParcelaFechamento) {
-        formData.append('valor_parcela', parseFloat(valorParcelaFechamento));
-      }
-      if (numeroParcelasFechamento) {
-        formData.append('numero_parcelas', parseInt(numeroParcelasFechamento));
-      }
-      if (vencimentoFechamento) {
-        formData.append('vencimento', vencimentoFechamento);
-      }
-      if (antecipacaoFechamento) {
-        formData.append('antecipacao_meses', parseInt(antecipacaoFechamento));
-      }
-      
-      // Campos administrativos (admin/consultor interno)
-      if (dataOperacaoFechamento) {
-        formData.append('data_operacao', dataOperacaoFechamento);
-      }
-      if (valorEntregue) {
-        formData.append('valor_entregue', parseFloat(valorEntregue));
-      }
-      if (tipoOperacao) {
-        formData.append('tipo_operacao', tipoOperacao);
-      }
-      if (printConfirmacao) {
-        formData.append('print_confirmacao', printConfirmacao);
-      }
-      
-      if (contratoFechamento) {
-        formData.append('contrato', contratoFechamento);
-      }
-
-      const API_BASE_URL = process.env.NODE_ENV === 'production' ? 'https://crminvest-backend.fly.dev/api' : 'http://localhost:5000/api';
-      const token = localStorage.getItem('token');
-      
-      const fechamentoResponse = await fetch(`${API_BASE_URL}/fechamentos`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      });
-
-      if (fechamentoResponse.ok) {
-        // Se há um novo status para atualizar, atualizar o status do paciente
-        if (pacienteParaFechar.novoStatus) {
-          await atualizarStatusPaciente(pacienteParaFechar.id, pacienteParaFechar.novoStatus);
-          // Limpar status temporário após confirmação
-          setStatusTemporario(prev => {
-            const newState = { ...prev };
-            delete newState[pacienteParaFechar.id];
-            return newState;
-          });
-        }
-        
-        showSuccessToast(`Fechamento criado com sucesso! Valor: R$ ${valorFormatado}`);
-        fecharModalFechamento();
-        
-        // Recarregar dados para manter sincronia
-        await fetchPacientes();
-        
-        // Forçar atualização nas outras telas
-        const timestamp = Date.now();
-        localStorage.setItem('data_sync_trigger', timestamp.toString());
-        window.dispatchEvent(new CustomEvent('data_updated', { detail: { timestamp } }));
-      } else {
-        let errorMessage = 'Erro ao criar fechamento';
-        try {
-        const errorData = await fechamentoResponse.json();
-          errorMessage = errorData.error || errorMessage;
-        } catch (parseError) {
-          // Se não conseguir fazer parse do JSON, usar o status text
-          errorMessage = `Erro ${fechamentoResponse.status}: ${fechamentoResponse.statusText}`;
-        }
-        showErrorToast(errorMessage);
-      }
-    } catch (error) {
-      console.error('Erro ao confirmar fechamento:', error);
-      showErrorToast('Erro ao confirmar fechamento: ' + error.message);
-    } finally {
-      setSalvandoFechamento(false);
-    }
-  };
-
   const resetForm = () => {
     setFormData({
       nome: '',
@@ -3222,7 +3003,6 @@ const Pacientes = () => {
     setShowModal(false);
     setCidadeCustomizada(false);
   };
-
   const pacientesFiltrados = pacientes.filter(p => {
     // Verificar se é um paciente sem consultor
     const semConsultor = !p.consultor_id || p.consultor_id === '' || p.consultor_id === null || p.consultor_id === undefined || Number(p.consultor_id) === 0;
@@ -3279,7 +3059,10 @@ const Pacientes = () => {
     );
     const matchStatus = !filtroStatus || p.status === filtroStatus;
 
-    const matchConsultor = !filtroConsultor || String(p.consultor_id) === filtroConsultor;
+    const matchConsultor = !filtroConsultor || 
+      String(p.consultor_id) === filtroConsultor ||
+      String(p.sdr_id) === filtroConsultor ||
+      String(p.consultor_interno_id) === filtroConsultor;
     
     // Filtro por data de cadastro
     let matchData = true;
@@ -3314,7 +3097,10 @@ const Pacientes = () => {
   const leadsNegativosFiltrados = leadsNegativos.filter(lead => {
     const matchNome = !filtroNomeNegativos || lead.nome.toLowerCase().includes(filtroNomeNegativos.toLowerCase());
     const matchStatus = !filtroStatusNegativos || lead.status === filtroStatusNegativos;
-    const matchConsultor = !filtroConsultorNegativos || String(lead.consultor_id) === filtroConsultorNegativos;
+    const matchConsultor = !filtroConsultorNegativos || 
+      String(lead.consultor_id) === filtroConsultorNegativos ||
+      String(lead.sdr_id) === filtroConsultorNegativos ||
+      String(lead.consultor_interno_id) === filtroConsultorNegativos;
     
     return matchNome && matchStatus && matchConsultor;
   });
@@ -3819,6 +3605,10 @@ const Pacientes = () => {
                                 .filter(option => {
                                   // Freelancers veem todos os status
                                   if (isFreelancer) return true;
+                                  
+                                  // Para incorporadora, mostrar todos os status (incluindo negativos)
+                                  if (user?.empresa_id === 5) return true;
+                                  
                                   // Outros usuários não veem status de leads e negativas
                                   return ![
                                     'lead',
@@ -3827,14 +3617,18 @@ const Pacientes = () => {
                                     'nao_tem_interesse',
                                     'nao_reconhece',
                                     'nao_responde',
-                                    'sem_clinica',
                                     'nao_passou_cpf',
                                     'nao_tem_outro_cpf',
                                     'cpf_reprovado'
                                   ].includes(option.value);
                                 })
                                 .map(option => (
-                                <option key={option.value} value={option.value} title={option.description}>
+                                <option 
+                                  key={option.value} 
+                                  value={option.value} 
+                                  title={option.description}
+                                  disabled={option.value === 'fechado' && paciente.status !== 'fechado'}
+                                >
                                   {option.label}
                                 </option>
                               ))}
@@ -3913,7 +3707,6 @@ const Pacientes = () => {
           </div>
         </>
       )}
-
       {/* Conteúdo da aba Novos Leads */}
       {activeTab === 'novos-leads' && (
         <>
@@ -4704,7 +4497,6 @@ const Pacientes = () => {
           </div>
         </>
       )}
-
       {/* Conteúdo da aba Meus Pacientes (apenas para clínicas) */}
       {activeTab === 'meus-pacientes' && isClinica && (
         <>
@@ -5405,7 +5197,6 @@ const Pacientes = () => {
           </div>
         </>
       )}
-
       {/* Modal de Cadastro - Formulário Simples (para freelancers) */}
       {showModal && !editingPaciente && isConsultor && !isAdmin && !isConsultorInterno && (
         <div className="modal-overlay">
@@ -6078,7 +5869,6 @@ const Pacientes = () => {
           </div>
         </div>
       )}
-      
       {/* Modal de Edição - Formulário Completo (para todos que podem editar) */}
       {showModal && editingPaciente && (
         <div className="modal-overlay">
@@ -6701,7 +6491,6 @@ const Pacientes = () => {
           </div>
         </div>
       )}
-
                         {/* Contrato do Fechamento */}
                         <div style={{ 
                           marginTop: '1rem',
@@ -7383,7 +7172,6 @@ const Pacientes = () => {
             </div>
         </div>
       )}
-
       {/* Modal de Cadastro/Edição para Clínicas com Upload de Documentos */}
       {showModal && isClinica && (
         <div className="modal-overlay">
@@ -7815,8 +7603,11 @@ const Pacientes = () => {
                 <label className="form-label">{isIncorporadora ? 'Empreendimento *' : 'Clínica *'}</label>
                 <select 
                   className="form-select"
-                  value={agendamentoData.clinica_id}
-                  onChange={(e) => setAgendamentoData({...agendamentoData, clinica_id: e.target.value})}
+                  value={isIncorporadora ? agendamentoData.empreendimento_id : agendamentoData.clinica_id}
+                  onChange={(e) => setAgendamentoData({
+                    ...agendamentoData,
+                    ...(isIncorporadora ? { empreendimento_id: e.target.value } : { clinica_id: e.target.value })
+                  })}
                 >
                   <option value="">{isIncorporadora ? 'Selecione um empreendimento' : 'Selecione uma clínica'}</option>
                   {isIncorporadora ? (
@@ -7862,7 +7653,7 @@ const Pacientes = () => {
               </div>
 
               <div className="form-group" style={{ marginBottom: '1rem' }}>
-                <label className="form-label">{isIncorporadora ? 'Qual corretor será responsável?' : 'Qual consultor será responsável?'}</label>
+                <label className="form-label">{isIncorporadora ? 'Qual corretor será responsável? *' : 'Qual consultor será responsável? *'}</label>
                 <select 
                   className="form-select"
                   value={agendamentoData.consultor_interno_id || ''}
@@ -7905,7 +7696,14 @@ const Pacientes = () => {
                   type="button"
                   className="btn btn-primary"
                   onClick={salvarAgendamento}
-                  disabled={salvandoAgendamento || !agendamentoData.clinica_id || !agendamentoData.data_agendamento || !agendamentoData.horario}
+                  disabled={
+                    salvandoAgendamento ||
+                    (!isIncorporadora && !agendamentoData.clinica_id) ||
+                    (isIncorporadora && !agendamentoData.empreendimento_id) ||
+                    !agendamentoData.data_agendamento ||
+                    !agendamentoData.horario ||
+                    !agendamentoData.consultor_interno_id
+                  }
                 >
                   {salvandoAgendamento ? (
                     <>
@@ -7918,321 +7716,6 @@ const Pacientes = () => {
                     </>
                   ) : (
                     'Criar Agendamento'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Fechamento */}
-      {showFechamentoModal && (
-        <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: '800px' }}>
-            <div className="modal-header">
-              <h2 className="modal-title">Criar Fechamento</h2>
-              <button className="close-btn" onClick={fecharModalFechamento}>
-                ×
-              </button>
-            </div>
-
-            <div style={{ padding: '1.5rem' }}>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <p style={{ 
-                  color: '#374151', 
-                  marginBottom: '1rem',
-                  lineHeight: '1.5'
-                }}>
-                  <strong>{empresaId === 5 ? 'Cliente' : 'Paciente'}:</strong> {pacienteParaFechar?.nome}
-                </p>
-                <p style={{ 
-                  color: '#6b7280', 
-                  fontSize: '0.875rem',
-                  lineHeight: '1.5'
-                }}>
-                  Preencha os dados do fechamento:
-                </p>
-              </div>
-
-              <div className="form-group" style={{ marginBottom: '1rem' }}>
-                <label className="form-label">{user?.empresa_id === 5 ? 'Empreendimento *' : 'Clínica *'}</label>
-                <select 
-                  className="form-select"
-                  value={clinicaFechamento}
-                  onChange={(e) => setClinicaFechamento(e.target.value)}
-                >
-                  <option value="">{user?.empresa_id === 5 ? 'Selecione um empreendimento' : 'Selecione uma clínica'}</option>
-                  {user?.empresa_id === 5 ? (
-                    // Para incorporadora, mostrar empreendimentos hardcoded
-                    <>
-                      <option value="4">Laguna Sky Garden</option>
-                      <option value="5">Residencial Girassol</option>
-                      <option value="6">Sintropia Sky Garden</option>
-                      <option value="7">Residencial Lotus</option>
-                      <option value="8">River Sky Garden</option>
-                      <option value="9">Condomínio Figueira Garcia</option>
-                    </>
-                  ) : (
-                    // Para outras empresas, mostrar clínicas
-                    clinicas.map(c => (
-                      <option key={c.id} value={c.id}>{c.nome}</option>
-                    ))
-                  )}
-                </select>
-              </div>
-
-              <div className="form-group" style={{ marginBottom: '1rem' }}>
-                <label className="form-label">Valor do Fechamento *</label>
-                <input 
-                  type="text"
-                  className="form-input"
-                  value={valorFormatado}
-                  onChange={handleValorChange}
-                  placeholder="R$ 0,00"
-                />
-              </div>
-
-              <div className="form-group" style={{ marginBottom: '1rem' }}>
-                <label className="form-label">Contrato (PDF) *</label>
-                <input 
-                  type="file"
-                  className="form-input"
-                  accept=".pdf"
-                  onChange={(e) => setContratoFechamento(e.target.files[0])}
-                />
-                {contratoFechamento && (
-                  <div style={{ 
-                    marginTop: '0.5rem', 
-                    fontSize: '0.875rem', 
-                    color: '#059669' 
-                  }}>
-                    ✓ {contratoFechamento.name}
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
-                {user?.empresa_id !== 5 && (
-                  <div className="form-group">
-                    <label className="form-label">Tipo de Tratamento</label>
-                    <select 
-                      className="form-select"
-                      value={tipoTratamentoFechamento}
-                      onChange={(e) => setTipoTratamentoFechamento(e.target.value)}
-                    >
-                      <option value="">Selecione</option>
-                      <option value="Estético">Estético</option>
-                      <option value="Odontológico">Odontológico</option>
-                    </select>
-                  </div>
-                )}
-
-                <div className="form-group">
-                  <label className="form-label">Data do Fechamento</label>
-                  <input 
-                    type="date"
-                    className="form-input"
-                    value={dataFechamento}
-                    onChange={(e) => setDataFechamento(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Seção de Parcelamento - Apenas para não incorporadora */}
-              {user?.empresa_id !== 5 && (
-                <div style={{ 
-                  border: '1px solid #e5e7eb', 
-                  borderRadius: '8px', 
-                  padding: '1rem', 
-                  marginBottom: '1rem',
-                  backgroundColor: '#f9fafb'
-                }}>
-                  <h4 style={{ 
-                    margin: '0 0 1rem 0', 
-                    fontSize: '1rem', 
-                    fontWeight: '600', 
-                    color: '#374151' 
-                  }}>
-                    Dados de Parcelamento
-                  </h4>
-                  
-                  <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
-                    <div className="form-group">
-                      <label className="form-label">Valor da Parcela (R$)</label>
-                      <input 
-                        type="text"
-                        className="form-input"
-                        value={valorParcelaFormatado}
-                        onChange={handleValorParcelaChange}
-                        placeholder="R$ 0,00"
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label">Nº de Parcelas</label>
-                      <input 
-                        type="number"
-                        className="form-input"
-                        value={numeroParcelasFechamento}
-                        onChange={(e) => setNumeroParcelasFechamento(e.target.value)}
-                        placeholder="Ex: 12"
-                        min="1"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-2" style={{ gap: '1rem' }}>
-                    <div className="form-group">
-                      <label className="form-label">Dia do Vencimento</label>
-                      <input 
-                        type="date"
-                        className="form-input"
-                        value={vencimentoFechamento}
-                        onChange={(e) => setVencimentoFechamento(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label">Antecipação (em meses)</label>
-                      <input 
-                        type="number"
-                        className="form-input"
-                        value={antecipacaoFechamento}
-                        onChange={(e) => setAntecipacaoFechamento(e.target.value)}
-                        placeholder="Ex: 3"
-                        min="1"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Seção de Dados Administrativos - Apenas Admin/Consultor Interno e não incorporadora */}
-              {(isAdmin || isConsultorInterno) && user?.empresa_id !== 5 && (
-                <div style={{ 
-                  border: '1px solid #3b82f6', 
-                  borderRadius: '8px', 
-                  padding: '1rem', 
-                  marginBottom: '1rem',
-                  backgroundColor: '#eff6ff'
-                }}>
-                  <h4 style={{ 
-                    margin: '0 0 1rem 0', 
-                    fontSize: '1rem', 
-                    fontWeight: '600', 
-                    color: '#1e40af',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}>
-                    Dados da Operação
-                  </h4>
-                  
-                  <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
-                    <div className="form-group">
-                      <label className="form-label">Data da Operação</label>
-                      <input 
-                        type="date"
-                        className="form-input"
-                        value={dataOperacaoFechamento}
-                        onChange={(e) => setDataOperacaoFechamento(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label">Tipo</label>
-                      <select 
-                        className="form-select"
-                        value={tipoOperacao}
-                        onChange={(e) => setTipoOperacao(e.target.value)}
-                      >
-                        <option value="">Selecione</option>
-                        <option value="operacao">Operação</option>
-                        <option value="colateral">Colateral</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="form-group" style={{ marginBottom: '1rem' }}>
-                    <label className="form-label">Valor Entregue (R$)</label>
-                    <input 
-                      type="text"
-                      className="form-input"
-                      value={valorEntregueFormatado}
-                      onChange={handleValorEntregueChange}
-                      placeholder="R$ 0,00"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Print de Confirmação com Sacado</label>
-                    <input 
-                      type="file"
-                      className="form-input"
-                      accept="image/*,.pdf"
-                      onChange={(e) => setPrintConfirmacao(e.target.files[0])}
-                    />
-                    {printConfirmacao && (
-                      <div style={{ 
-                        marginTop: '0.5rem', 
-                        fontSize: '0.875rem', 
-                        color: '#059669',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                      }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                        {printConfirmacao.name}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                <label className="form-label">Observações</label>
-                <textarea 
-                  className="form-textarea"
-                  rows="3"
-                  value={observacoesFechamento}
-                  onChange={(e) => setObservacoesFechamento(e.target.value)}
-                  placeholder="Observações sobre o fechamento..."
-                />
-              </div>
-
-              <div style={{ 
-                display: 'flex', 
-                gap: '1rem', 
-                justifyContent: 'flex-end' 
-              }}>
-                <button 
-                  type="button"
-                  className="btn btn-secondary" 
-                  onClick={fecharModalFechamento}
-                  disabled={salvandoFechamento}
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={confirmarFechamento}
-                  disabled={salvandoFechamento || !valorFechamento || !clinicaFechamento}
-                >
-                  {salvandoFechamento ? (
-                    <>
-                      <span className="loading-spinner" style={{ 
-                        display: 'inline-block', 
-                        verticalAlign: 'middle', 
-                        marginRight: 8 
-                      }}></span>
-                      Criando...
-                    </>
-                  ) : (
-                    'Criar Fechamento'
                   )}
                 </button>
               </div>
@@ -8385,7 +7868,6 @@ const Pacientes = () => {
         nomeRegistro={evidenciaData.pacienteNome}
         empresaId={empresaId}
       />
-
       {/* Modal de Cadastro Completo para Clínicas */}
       {showCadastroCompletoModal && isClinica && (
         <div className="modal-overlay">
@@ -9038,7 +8520,6 @@ const Pacientes = () => {
           </div>
         </div>
       )}
-
       {/* Modal de Carteira Existente */}
       {showCarteiraModal && (
         <div className="modal-overlay">
@@ -9458,7 +8939,6 @@ const Pacientes = () => {
           </div>
         </div>
       )}
-
       {/* Modal de Análise de Solicitação (Admin) */}
       {showSolicitacaoModal && solicitacaoSelecionada && (
         <div className="modal-overlay">
@@ -10237,7 +9717,6 @@ const Pacientes = () => {
           </div>
         </div>
       )}
-
       {/* Modal de Reprovação de Contrato */}
       {contratoParaReprovar && (
         <div className="modal-overlay">
@@ -10314,6 +9793,9 @@ const Pacientes = () => {
           </div>
         </div>
       )}
+      
+      {/* Modal de Notificação de Fechamento */}
+      <FechamentoModal />
       
     </div>
   );

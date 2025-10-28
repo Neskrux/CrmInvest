@@ -4,11 +4,16 @@ import useBranding from '../hooks/useBranding';
 import { useToast } from '../components/Toast';
 import ModalEvidencia from './ModalEvidencia';
 import useSmartPolling from '../hooks/useSmartPolling';
+import useFechamentoNotifications from '../hooks/useFechamentoNotifications';
 
 const Agendamentos = () => {
   const { t } = useBranding();
   const { makeRequest, user, isAdmin, podeAlterarStatus, isIncorporadora, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isClinica } = useAuth();
   const { showSuccessToast, showErrorToast } = useToast();
+  
+  // Hook para notificações de fechamento
+  const { FechamentoModal } = useFechamentoNotifications();
+  
   const [agendamentos, setAgendamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [consultores, setConsultores] = useState([]);
@@ -53,6 +58,7 @@ const Agendamentos = () => {
   const [tipoTratamentoFechamento, setTipoTratamentoFechamento] = useState('');
   const [observacoesFechamento, setObservacoesFechamento] = useState('');
   const [dataFechamento, setDataFechamento] = useState(new Date().toISOString().split('T')[0]);
+  const [empreendimentoFechamento, setEmpreendimentoFechamento] = useState('');
   const [valorParcelaFechamento, setValorParcelaFechamento] = useState('');
   const [valorParcelaFormatado, setValorParcelaFormatado] = useState('');
   const [numeroParcelasFechamento, setNumeroParcelasFechamento] = useState('');
@@ -524,12 +530,10 @@ const Agendamentos = () => {
         formData.append('paciente_id', agendamentoParaFechar.paciente_id);
         formData.append('consultor_id', agendamentoParaFechar.consultor_id || '');
         
-        // Para incorporadora (empresa_id = 5), usar empreendimento_id do paciente
+        // Para incorporadora (empresa_id = 5), usar empreendimento_id selecionado no modal
         if (user?.empresa_id === 5) {
-          // Buscar empreendimento_id do paciente
-          const paciente = pacientes.find(p => p.id === agendamentoParaFechar.paciente_id);
-          if (paciente?.empreendimento_id) {
-            formData.append('clinica_id', paciente.empreendimento_id); // Backend espera clinica_id mesmo para empreendimentos
+          if (empreendimentoFechamento) {
+            formData.append('empreendimento_id', empreendimentoFechamento);
           }
         } else {
           // Para securitizadora, usar clinica_id e não enviar empreendimento_id
@@ -608,6 +612,7 @@ const Agendamentos = () => {
     setTipoTratamentoFechamento('');
     setObservacoesFechamento('');
     setDataFechamento(new Date().toISOString().split('T')[0]);
+    setEmpreendimentoFechamento('');
     setValorParcelaFechamento('');
     setValorParcelaFormatado('');
     setNumeroParcelasFechamento('');
@@ -1009,7 +1014,7 @@ const Agendamentos = () => {
                       )}
                       <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{agendamento.sdr_nome || '-'}</td>
                       <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{agendamento.consultor_interno_nome || '-'}</td>
-                      <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                      <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', maxWidth: '150px' }}>
                         {user?.empresa_id === 5 ? (
                           // Para incorporadora, mostrar empreendimento baseado no empreendimento_id ou clinica_id
                           (agendamento.empreendimento_id || agendamento.clinica_id) ? (
@@ -1023,12 +1028,24 @@ const Agendamentos = () => {
                                 9: 'Condomínio Figueira Garcia'
                               };
                               const empreendimentoId = agendamento.empreendimento_id || agendamento.clinica_id;
-                              return empreendimentoMap[empreendimentoId] || '-';
+                              const nomeCompleto = empreendimentoMap[empreendimentoId] || '-';
+                              // Limitar caracteres e adicionar quebra de linha
+                              return nomeCompleto.length > 15 ? (
+                                <div style={{ fontSize: '0.8rem', lineHeight: '1.2' }}>
+                                  {nomeCompleto.substring(0, 15)}...
+                                </div>
+                              ) : nomeCompleto;
                             })()
                           ) : '-'
                         ) : (
                           // Para outras empresas, mostrar nome da clínica
-                          agendamento.clinica_nome
+                          agendamento.clinica_nome ? (
+                            agendamento.clinica_nome.length > 15 ? (
+                              <div style={{ fontSize: '0.8rem', lineHeight: '1.2' }}>
+                                {agendamento.clinica_nome.substring(0, 15)}...
+                              </div>
+                            ) : agendamento.clinica_nome
+                          ) : '-'
                         )}
                       </td>
                       <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
@@ -1715,6 +1732,25 @@ const Agendamentos = () => {
                 </div>
               </div>
 
+              {user?.empresa_id === 5 && (
+                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                  <label className="form-label">Empreendimento *</label>
+                  <select
+                    className="form-select"
+                    value={empreendimentoFechamento}
+                    onChange={(e) => setEmpreendimentoFechamento(e.target.value)}
+                  >
+                    <option value="">Selecione um empreendimento</option>
+                    <option value="4">Laguna Sky Garden</option>
+                    <option value="5">Residencial Girassol</option>
+                    <option value="6">Sintropia Sky Garden</option>
+                    <option value="7">Residencial Lotus</option>
+                    <option value="8">River Sky Garden</option>
+                    <option value="9">Condomínio Figueira Garcia</option>
+                  </select>
+                </div>
+              )}
+
               {user?.empresa_id !== 5 && (
                 <div className="form-group" style={{ marginBottom: '1rem' }}>
                   <label className="form-label">Tipo de Tratamento</label>
@@ -1730,24 +1766,6 @@ const Agendamentos = () => {
                 </div>
               )}
 
-              {user?.empresa_id === 5 && (
-                <div className="form-group" style={{ marginBottom: '1rem' }}>
-                  <label className="form-label">Empreendimento</label>
-                  <select 
-                    className="form-select"
-                    value={tipoTratamentoFechamento}
-                    onChange={(e) => setTipoTratamentoFechamento(e.target.value)}
-                  >
-                    <option value="">Selecione</option>
-                    <option value="4">Laguna Sky Garden</option>
-                    <option value="5">Residencial Girassol</option>
-                    <option value="6">Sintropia Sky Garden</option>
-                    <option value="7">Residencial Lotus</option>
-                    <option value="8">River Sky Garden</option>
-                    <option value="9">Condomínio Figueira Garcia</option>
-                  </select>
-                </div>
-              )}
 
               <div className="form-group" style={{ marginBottom: '1rem' }}>
                 <label className="form-label">Contrato (PDF) *</label>
@@ -1860,7 +1878,7 @@ const Agendamentos = () => {
                   type="button"
                   className="btn btn-primary"
                   onClick={confirmarFechamento}
-                  disabled={salvandoFechamento || !valorFechamento}
+                  disabled={salvandoFechamento || !valorFechamento || (user?.empresa_id === 5 && !empreendimentoFechamento)}
                 >
                   {salvandoFechamento ? (
                     <>
@@ -1941,6 +1959,9 @@ const Agendamentos = () => {
         statusNovo={evidenciaData.statusNovo}
         nomeRegistro={evidenciaData.agendamentoNome}
       />
+
+      {/* Modal de Notificação de Fechamento */}
+      <FechamentoModal />
 
     </div>
   );
