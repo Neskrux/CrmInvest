@@ -287,15 +287,13 @@ const createAgendamento = async (req, res) => {
     const temCorretor = !!dadosAgendamento.consultor_interno_id;
     
     if (req.io && (temSDR || temCorretor) && empresa_id === 5) {
-      // Determinar qual ID buscar (SDR ou Corretor)
-      const consultorId = temCorretor ? dadosAgendamento.consultor_interno_id : dadosAgendamento.sdr_id;
-      const tipoCriador = temCorretor ? 'corretor' : 'sdr';
+      // Buscar dados do SDR que criou o agendamento
+      // Se não há SDR mas há corretor, usar o corretor (caso onde corretor criou diretamente)
+      const sdrId = dadosAgendamento.sdr_id || dadosAgendamento.consultor_interno_id;
       
       console.log('📢 [SOCKET.IO] Emitindo evento new-agendamento-incorporadora:', {
         agendamentoId: data[0].id,
         paciente_id: paciente_id,
-        consultor_id: consultorId,
-        tipo_criador: tipoCriador,
         sdr_id: dadosAgendamento.sdr_id,
         corretor_id: dadosAgendamento.consultor_interno_id,
         empresa_id: empresa_id,
@@ -305,19 +303,18 @@ const createAgendamento = async (req, res) => {
         room: 'incorporadora-notifications'
       });
       
-      // Buscar dados do SDR ou Corretor com foto e música
-      const { data: consultorData } = await supabaseAdmin
+      // Buscar dados do SDR com foto e música
+      const { data: sdrData } = await supabaseAdmin
         .from('consultores')
         .select('nome, foto_url, musica_url')
-        .eq('id', consultorId)
+        .eq('id', sdrId)
         .single();
 
-      console.log(`👤 [SOCKET.IO] Dados do ${tipoCriador} encontrados:`, {
-        id: consultorId,
-        tipo: tipoCriador,
-        nome: consultorData?.nome || 'N/A',
-        temFoto: !!consultorData?.foto_url,
-        temMusica: !!consultorData?.musica_url
+      console.log(`👤 [SOCKET.IO] Dados do SDR encontrados:`, {
+        id: sdrId,
+        nome: sdrData?.nome || 'N/A',
+        temFoto: !!sdrData?.foto_url,
+        temMusica: !!sdrData?.musica_url
       });
 
       // Buscar dados do paciente
@@ -340,9 +337,9 @@ const createAgendamento = async (req, res) => {
         data_agendamento: data_agendamento,
         horario: horario,
         sdr_id: dadosAgendamento.sdr_id,
-        sdr_nome: consultorData?.nome || 'SDR/Corretor',
-        sdr_foto: consultorData?.foto_url || null,
-        sdr_musica: consultorData?.musica_url || null,
+        sdr_nome: sdrData?.nome || 'SDR',
+        sdr_foto: sdrData?.foto_url || null,
+        sdr_musica: sdrData?.musica_url || null,
         consultor_interno_id: dadosAgendamento.consultor_interno_id,
         timestamp: new Date().toISOString()
       });
