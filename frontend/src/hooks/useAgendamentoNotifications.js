@@ -42,27 +42,26 @@ const useAgendamentoNotifications = () => {
 
     // Listener para novos agendamentos
     newSocket.on('new-agendamento-incorporadora', (data) => {
-      // Determinar quem deve receber notificações:
+      // Regras de recebimento:
       // - Admins: sempre recebem
-      // - Consultores que NÃO são freelancers (corretos internos): recebem
-      // - Freelancers: NÃO recebem (apenas visualizam quando falam com SDR)
-      const deveReceberNotificacao = user.tipo === 'admin' || !user.is_freelancer;
-      
-      // Mostrar toast personalizado apenas para quem deve receber
+      // - Internos (não freelancers): recebem
+      // - Criador do agendamento (SDR): recebe
+      // NOTA: A notificação sempre mostra o SDR que criou, não o corretor responsável
+      const isAdmin = user?.tipo === 'admin';
+      const isInternal = !user?.is_freelancer;
+      const isCreator = user?.id && data?.sdr_id && Number(user.id) === Number(data.sdr_id);
+      const deveReceberNotificacao = isAdmin || isInternal || isCreator;
+
       if (deveReceberNotificacao) {
         showSuccessToast(
           `📅 Novo agendamento criado por ${data.sdr_nome} - ${data.paciente_nome}`,
           6000
         );
-      }
-      
-      // Mostrar modal com foto e música apenas para quem deve receber
-      if (deveReceberNotificacao) {
+
         setAgendamentoData(data);
         setShowAgendamentoModal(true);
       }
-      
-      // Adicionar à lista de notificações
+
       setNotifications(prev => [...prev, {
         id: Date.now(),
         type: 'new-agendamento',
