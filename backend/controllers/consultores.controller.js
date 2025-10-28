@@ -160,8 +160,9 @@ const getAllConsultores = async (req, res) => {
       .select('*')
       .order('nome');
     
-    // Se for admin ou parceiro, filtrar apenas consultores da empresa
-    if ((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) {
+    // Se for admin, parceiro ou consultor interno, filtrar apenas consultores da empresa
+    if (((req.user.tipo === 'admin' || req.user.tipo === 'parceiro') && req.user.empresa_id) ||
+        (req.user.tipo === 'consultor' && req.user.empresa_id && !req.user.is_freelancer)) {
       query = query.eq('empresa_id', req.user.empresa_id);
     }
 

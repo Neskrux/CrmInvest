@@ -3,10 +3,15 @@ import { useAuth } from '../contexts/AuthContext';
 import useBranding from '../hooks/useBranding';
 import { useToast } from '../components/Toast';
 import ModalEvidencia from './ModalEvidencia';
+import useFechamentoNotifications from '../hooks/useFechamentoNotifications';
 
 const Fechamentos = () => {
   const { t, shouldShow, empresaId } = useBranding();
   const { makeRequest, isAdmin, user, podeAlterarStatus, isIncorporadora, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isClinica } = useAuth();
+  
+  // Hook para notificações de fechamento
+  const { FechamentoModal } = useFechamentoNotifications();
+  
   const [fechamentos, setFechamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [consultores, setConsultores] = useState([]);
@@ -1432,7 +1437,7 @@ const Fechamentos = () => {
                         <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{fechamento.sdr_nome || '-'}</td>
                         <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{fechamento.consultor_interno_nome || '-'}</td>
                         {empresaId === 5 ? (
-                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', maxWidth: '150px' }}>
                             {(() => {
                               const empreendimentoMap = {
                                 4: 'Laguna Sky Garden',
@@ -1444,12 +1449,26 @@ const Fechamentos = () => {
                               };
                               // Usar empreendimento_id do paciente ou clinica_id do fechamento como fallback
                               const empreendimentoId = fechamento.paciente_empreendimento_id || fechamento.clinica_id;
-                              return empreendimentoMap[empreendimentoId] || '-';
+                              const nomeCompleto = empreendimentoMap[empreendimentoId] || '-';
+                              // Limitar caracteres e adicionar quebra de linha
+                              return nomeCompleto.length > 15 ? (
+                                <div style={{ fontSize: '0.8rem', lineHeight: '1.2' }}>
+                                  {nomeCompleto.substring(0, 15)}...
+                                </div>
+                              ) : nomeCompleto;
                             })()}
                           </td>
                         ) : (
                           <>
-                        <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{clinica?.nome || 'N/A'}</td>
+                        <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', maxWidth: '150px' }}>
+                          {clinica?.nome ? (
+                            clinica.nome.length > 15 ? (
+                              <div style={{ fontSize: '0.8rem', lineHeight: '1.2' }}>
+                                {clinica.nome.substring(0, 15)}...
+                              </div>
+                            ) : clinica.nome
+                          ) : 'N/A'}
+                        </td>
                         <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                           {fechamento.tipo_tratamento && (
                             <span className="badge badge-info">
@@ -3496,6 +3515,9 @@ const Fechamentos = () => {
         nomeRegistro={evidenciaData.fechamentoNome}
         empresaId={empresaId}
       />
+
+      {/* Modal de Notificação de Fechamento */}
+      <FechamentoModal />
 
     </div>
   );

@@ -162,6 +162,7 @@ const createFechamento = async (req, res) => {
       data_fechamento, 
       tipo_tratamento,
       observacoes,
+      empreendimento_id,
       valor_parcela,
       numero_parcelas,
       vencimento,
@@ -185,6 +186,8 @@ const createFechamento = async (req, res) => {
       (typeof consultor_id === 'number' ? consultor_id : parseInt(consultor_id)) : null;
     const clinicaId = clinica_id && clinica_id !== '' ? 
       (typeof clinica_id === 'number' ? clinica_id : parseInt(clinica_id)) : null;
+    const empreendimentoId = empreendimento_id && empreendimento_id !== '' ? 
+      (typeof empreendimento_id === 'number' ? empreendimento_id : parseInt(empreendimento_id)) : null;
 
     // Validar que clínica é obrigatória apenas para não incorporadora
     if (!clinicaId && req.user.empresa_id !== 5) {
@@ -270,6 +273,8 @@ const createFechamento = async (req, res) => {
         sdr_id: dadosAgendamento?.sdr_id, // SDR que trabalhou o lead
         consultor_interno_id: dadosAgendamento?.consultor_interno_id || consultorId, // consultor interno que fechou
         clinica_id: clinicaId,
+        // Para incorporadora (empresa_id = 5), salvar o empreendimento_id
+        empreendimento_id: req.user.empresa_id === 5 ? empreendimentoId : null,
         valor_fechado: valorFechado,
         data_fechamento,
         tipo_tratamento: tipo_tratamento || null,
@@ -309,9 +314,17 @@ const createFechamento = async (req, res) => {
 
     // Atualizar status do paciente para "fechado"
     if (paciente_id) {
+      const updateData = { status: 'fechado' };
+      
+      // Para incorporadora, atualizar também o empreendimento_id do paciente
+      if (req.user.empresa_id === 5 && empreendimentoId) {
+        updateData.empreendimento_id = empreendimentoId;
+        console.log('✅ Atualizando empreendimento_id na tabela pacientes:', empreendimentoId);
+      }
+      
       await supabaseAdmin
         .from('pacientes')
-        .update({ status: 'fechado' })
+        .update(updateData)
         .eq('id', paciente_id);
     }
 
