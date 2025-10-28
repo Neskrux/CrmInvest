@@ -79,24 +79,55 @@ const useFechamentoNotifications = () => {
     // Configurar URL do backend
     const API_BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000';
     
-    // Conectar ao Socket.IO
+    // Conectar ao Socket.IO com configurações para múltiplas abas
     const newSocket = io(API_BASE_URL, {
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      forceNew: true, // Forçar nova conexão
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 20000,
+      // Adicionar identificador único para cada aba
+      query: {
+        tabId: `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        userId: userData.id
+      }
     });
     
     socketRef.current = newSocket;
     isInitializedRef.current = true;
 
-    // Entrar no grupo de notificações da incorporadora
-    newSocket.emit('join-incorporadora-notifications', {
-      userType: 'admin',
+    console.log('🔌 [FECHAMENTO] Socket conectado:', {
+      socketId: newSocket.id,
+      tabId: newSocket.query?.tabId,
       userId: userData.id,
       empresaId: userData.empresa_id
     });
 
+    // Entrar no grupo de notificações da incorporadora
+    newSocket.emit('join-incorporadora-notifications', {
+      userType: 'admin',
+      userId: userData.id,
+      empresaId: userData.empresa_id,
+      tabId: newSocket.query?.tabId
+    });
+
+    // Debug: Listener para eventos de conexão
+    newSocket.on('connect', () => {
+      console.log('✅ [FECHAMENTO] Socket conectado com sucesso:', newSocket.id);
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('❌ [FECHAMENTO] Socket desconectado');
+    });
+
     // Listener para novos fechamentos
     newSocket.on('new-fechamento-incorporadora', (data) => {
-      console.log('🎵 [MÚSICA] Recebido evento de fechamento, tocando música...');
+      console.log('🎵 [FECHAMENTO] Recebido evento de fechamento:', {
+        tabId: newSocket.query?.tabId,
+        socketId: newSocket.id,
+        data: data
+      });
       
       // Tocar música personalizada do corretor
       playFechamentoSound(data.corretor_musica);

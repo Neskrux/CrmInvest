@@ -35,9 +35,19 @@ const useIncorporadoraNotifications = () => {
     const API_BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000';
     console.log('🔗 [SOCKET.IO] Conectando ao backend:', API_BASE_URL);
     
-    // Conectar ao Socket.IO
+    // Conectar ao Socket.IO com configurações para múltiplas abas
     const newSocket = io(API_BASE_URL, {
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      forceNew: true, // Forçar nova conexão
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 20000,
+      // Adicionar identificador único para cada aba
+      query: {
+        tabId: `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        userId: user.id
+      }
     });
     
     setSocket(newSocket);
