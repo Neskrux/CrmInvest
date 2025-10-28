@@ -19,13 +19,15 @@ const CapturaClientes = () => {
     melhor_dia1: '',
     melhor_horario1: '',
     melhor_dia2: '',
-    melhor_horario2: ''
+    melhor_horario2: '',
+    sdr_id: ''
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
   const [refConsultor, setRefConsultor] = useState(null);
   const [nomeConsultor, setNomeConsultor] = useState(null);
+  const [sdrsIncorporadora, setSdrsIncorporadora] = useState([]);
 
   // Estados brasileiros
   const estadosBrasileiros = [
@@ -126,6 +128,23 @@ const CapturaClientes = () => {
       }
     };
   }, []);
+
+  // Buscar SDRs da incorporadora
+  useEffect(() => {
+    fetchSDRsIncorporadora();
+  }, []);
+
+  const fetchSDRsIncorporadora = async () => {
+    try {
+      const response = await fetch(`${config.API_BASE_URL}/consultores/sdrs-incorporadora`);
+      const data = await response.json();
+      if (response.ok) {
+        setSdrsIncorporadora(data);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar SDRs:', error);
+    }
+  };
 
   // Função para formatar telefone (formato brasileiro correto)
   const formatarTelefone = (value) => {
@@ -413,7 +432,8 @@ const CapturaClientes = () => {
       ...formData,
       observacoes: observacoesComDias,
       ref_consultor: refConsultor, // Incluir código de referência se existir
-      origem_formulario: 'captura-clientes' // Identificar origem do formulário
+      origem_formulario: 'captura-clientes', // Identificar origem do formulário
+      sdr_id: formData.sdr_id || null // ADICIONAR
     };
 
 
@@ -641,6 +661,24 @@ const CapturaClientes = () => {
                     )}
                   </div>
                 )}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Quer ser atendido por quem?</label>
+                <select
+                  name="sdr_id"
+                  className="form-select"
+                  value={formData.sdr_id}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                >
+                  <option value="">Selecione um atendente (opcional)</option>
+                  {sdrsIncorporadora.map(sdr => (
+                    <option key={sdr.id} value={sdr.id}>
+                      {sdr.nome}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="form-group">

@@ -1164,7 +1164,7 @@ const updateStatusLead = async (req, res) => {
 const cadastroPublicoLead = async (req, res) => {
   try {
     console.log('📝 Cadastro de lead recebido:', req.body);
-    let { nome, telefone, email, cpf, tipo_tratamento, empreendimento_id, observacoes, cidade, estado, grau_parentesco, ref_consultor } = req.body;
+    let { nome, telefone, email, cpf, tipo_tratamento, empreendimento_id, observacoes, cidade, estado, grau_parentesco, ref_consultor, sdr_id } = req.body;
     console.log('👥 Grau de parentesco:', grau_parentesco);
     
     // Validar campos obrigatórios
@@ -1288,8 +1288,11 @@ const cadastroPublicoLead = async (req, res) => {
       console.log('ℹ️ Nenhum código de referência fornecido');
     }
     
+    // Determinar status inicial baseado na presença de sdr_id
+    const statusInicial = sdr_id ? 'em_conversa' : 'lead';
+    
     // Inserir lead/paciente
-    console.log('💾 Inserindo lead com consultor_id:', consultorId, 'e empresa_id: 5 (Incorporadora)');
+    console.log('💾 Inserindo lead com consultor_id:', consultorId, 'sdr_id:', sdr_id, 'status:', statusInicial, 'e empresa_id: 5 (Incorporadora)');
     
     const { data, error } = await supabaseAdmin
       .from('pacientes')
@@ -1300,12 +1303,13 @@ const cadastroPublicoLead = async (req, res) => {
         cpf: cpfNumeros,
         tipo_tratamento: tipo_tratamento || null,
         empreendimento_id: empreendimento_id || null, // ID do empreendimento de interesse
-        status: 'lead', 
+        status: statusInicial, 
         observacoes: observacoes || null,
         cidade: cidade ? cidade.trim() : null,
         estado: estado ? estado.trim() : null,
         grau_parentesco: grau_parentesco || null, // Grau de parentesco do indicador
         consultor_id: consultorId, // Atribuir ao consultor se encontrado pelo código de referência
+        sdr_id: sdr_id || null, // Atribuir ao SDR se selecionado
         empresa_id: 5 // Incorporadora - todos os leads do formulário CapturaClientes vêm para empresa_id=5
       }])
       .select();
@@ -1353,7 +1357,8 @@ const cadastroPublicoLead = async (req, res) => {
     }
     
     // Emitir evento Socket.IO para notificar incorporadora sobre novo lead
-    if (req.io && data[0].empresa_id === 5) {
+    // Só emitir se NÃO tiver sdr_id pré-atribuído (para evitar notificação desnecessária)
+    if (req.io && data[0].empresa_id === 5 && !sdr_id) {
       console.log('📢 [SOCKET.IO] Emitindo evento new-lead-incorporadora:', {
         leadId: data[0].id,
         nome: data[0].nome,
@@ -1401,8 +1406,10 @@ const cadastroPublicoLead = async (req, res) => {
       console.log('⚠️ [SOCKET.IO] Evento new-lead-incorporadora não enviado:', {
         temSocketIO: !!req.io,
         empresaId: data[0].empresa_id,
+        sdrId: sdr_id,
         motivo: !req.io ? 'Socket.IO não disponível' : 
-                data[0].empresa_id !== 5 ? 'Não é incorporadora' : 'Desconhecido'
+                data[0].empresa_id !== 5 ? 'Não é incorporadora' : 
+                sdr_id ? 'Lead já atribuído a SDR específico' : 'Desconhecido'
       });
     }
     
