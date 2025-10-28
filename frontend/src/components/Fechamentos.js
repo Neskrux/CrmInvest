@@ -3,14 +3,10 @@ import { useAuth } from '../contexts/AuthContext';
 import useBranding from '../hooks/useBranding';
 import { useToast } from '../components/Toast';
 import ModalEvidencia from './ModalEvidencia';
-import useFechamentoNotifications from '../hooks/useFechamentoNotifications';
 
 const Fechamentos = () => {
   const { t, shouldShow, empresaId } = useBranding();
   const { makeRequest, isAdmin, user, podeAlterarStatus, isIncorporadora, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isClinica } = useAuth();
-  
-  // Hook para notificações de fechamento
-  const { FechamentoModal } = useFechamentoNotifications();
   
   const [fechamentos, setFechamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
@@ -3542,9 +3538,6 @@ const Fechamentos = () => {
         nomeRegistro={evidenciaData.fechamentoNome}
         empresaId={empresaId}
       />
-
-      {/* Modal de Notificação de Fechamento */}
-      <FechamentoModal />
 
     </div>
   );

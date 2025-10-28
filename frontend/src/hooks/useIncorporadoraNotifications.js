@@ -13,12 +13,9 @@ const useIncorporadoraNotifications = () => {
   const [newLeadData, setNewLeadData] = useState(null);
 
   useEffect(() => {
-    // Permitir entrada para TODOS os usuários da incorporadora (empresa_id === 5)
-    // O backend já valida empresa_id === 5, então basta verificar aqui
-    const isUserFromIncorporadora = user?.empresa_id === 5;
-    
-    if (!isUserFromIncorporadora) {
-      console.log('⚠️ [SOCKET.IO] Hook não inicializado - usuário não é da incorporadora:', {
+    // Permitir entrada APENAS para admin da incorporadora
+    if (user?.tipo !== 'admin' || user?.empresa_id !== 5) {
+      console.log('⚠️ [SOCKET.IO] Hook não inicializado - usuário não é admin da incorporadora:', {
         empresaId: user?.empresa_id,
         userTipo: user?.tipo,
         userId: user?.id,
@@ -47,17 +44,13 @@ const useIncorporadoraNotifications = () => {
     console.log('🔌 [SOCKET.IO] Socket criado:', newSocket.id);
 
     // Entrar no grupo de notificações da incorporadora
-    // Enviar tipo de usuário real
-    // Mas converter para 'consultor' se for admin para permitir entrada no backend
-    const userTypeToSend = user.tipo === 'admin' ? 'admin' : (user.tipo === 'consultor' ? 'consultor' : 'consultor');
-    
     newSocket.emit('join-incorporadora-notifications', {
-      userType: userTypeToSend,
+      userType: 'admin',
       userId: user.id,
       empresaId: user.empresa_id
     });
     console.log('📢 [SOCKET.IO] Emitindo join-incorporadora-notifications:', {
-      userType: userTypeToSend,
+      userType: 'admin',
       userTipoOriginal: user.tipo,
       userId: user.id,
       empresaId: user.empresa_id
@@ -77,14 +70,18 @@ const useIncorporadoraNotifications = () => {
         socketId: newSocket.id
       });
       
-      // Tocar som de notificação para TODOS os usuários logados (não apenas freelancers)
-      playNotificationSound();
+      // Tocar música personalizada do corretor
+      playNotificationSound(data.corretor_musica);
       
-      // Mostrar toast para TODOS os usuários logados
-      showInfoToast(
-        `Novo cliente: ${data.nome} - ${data.cidade}/${data.estado}`,
+      // Mostrar toast
+      showSuccessToast(
+        `🎯 Novo ${isIncorporadora ? 'cliente' : 'lead'} disponível - ${data.nome}`,
         6000
       );
+      
+      // Mostrar modal (apenas visualização)
+      setNewLeadData(data);
+      setShowNewLeadModal(true);
       
       // Adicionar à lista de notificações
       setNotifications(prev => [...prev, {
@@ -93,28 +90,6 @@ const useIncorporadoraNotifications = () => {
         data,
         timestamp: new Date()
       }]);
-      
-      // Se for SDR (consultor interno) ou admin da incorporadora, mostrar modal para capturar lead
-      // SDR = consultor interno (NÃO freelancer)
-      const isSDR = user.tipo === 'consultor' && !user.is_freelancer;
-      const isAdminIncorporadora = user.tipo === 'admin' && user.empresa_id === 5;
-      
-      console.log('🔍 [SOCKET.IO] Verificando tipo de usuário para mostrar modal:', {
-        userTipo: user.tipo,
-        isFreelancer: user.is_freelancer,
-        isSDR: isSDR,
-        isAdminIncorporadora: isAdminIncorporadora,
-        empresaId: user.empresa_id
-      });
-      
-      if (isSDR || isAdminIncorporadora) {
-        console.log('🎯 [SOCKET.IO] Abrindo modal de novo lead para SDR/Admin');
-        setNewLeadData(data);
-        setShowNewLeadModal(true);
-        console.log('✅ [SOCKET.IO] Modal deve estar aberta agora');
-      } else {
-        console.log('ℹ️ [SOCKET.IO] Usuário não é SDR nem admin da incorporadora - modal não será exibida');
-      }
       
       console.log('✅ [SOCKET.IO] Processamento do evento new-lead-incorporadora concluído');
     });
@@ -265,105 +240,6 @@ const useIncorporadoraNotifications = () => {
       timestamp: new Date().toISOString()
     });
     setNotifications([]);
-  };
-
-  // Função para capturar lead (atribuir ao SDR logado)
-  const capturarLead = async () => {
-    if (!newLeadData) return;
-    
-    // Verificar se é SDR (consultor interno)
-    const isSDR = user.tipo === 'consultor' && !user.is_freelancer;
-    
-    if (!isSDR) {
-      console.error('❌ [CAPTURAR LEAD] Apenas SDRs podem capturar leads!');
-      showInfoToast('Apenas SDRs podem capturar leads.');
-      return;
-    }
-    
-    try {
-      console.log('🎯 [SOCKET.IO] Capturando lead:', newLeadData.leadId);
-      
-      // Fazer requisição para atribuir lead ao SDR e alterar status para "em conversa"
-      console.log('📤 [CAPTURAR LEAD] Dados do SDR:', {
-        userId: user.id,
-        userName: user.nome,
-        userType: user.tipo,
-        isFreelancer: user.is_freelancer,
-        isSDR: isSDR,
-        empresaId: user.empresa_id
-      });
-      
-      console.log('📤 [CAPTURAR LEAD] Enviando requisição para endpoint pegarLead:', {
-        leadId: newLeadData.leadId,
-        endpoint: `/novos-leads/${newLeadData.leadId}/pegar`,
-        sdrId: user.id  // Este ID será usado automaticamente pelo endpoint
-      });
-      
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/novos-leads/${newLeadData.leadId}/pegar`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-        // Não enviar body - o endpoint pegarLead usa o ID do usuário logado automaticamente
-      });
-      
-      console.log('📤 [CAPTURAR LEAD] Resposta recebida:', response.status, response.statusText);
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log('✅ [SOCKET.IO] Lead capturado com sucesso:', result);
-        console.log('✅ [CAPTURAR LEAD] Lead atribuído ao SDR via endpoint pegarLead:', {
-          leadId: newLeadData.leadId,
-          sdrId: user.id,
-          sdrNome: user.nome,
-          isFreelancer: user.is_freelancer,
-          isSDR: true,
-          novoStatus: 'em_conversa',
-          campoAtualizado: 'sdr_id',
-          endpoint: 'pegarLead'
-        });
-        
-        // PARAR A MÚSICA!
-        stopNotificationSound();
-        
-        showSuccessToast(`Lead capturado por ${user.nome}!`);
-        setShowNewLeadModal(false);
-        setNewLeadData(null);
-        
-        // Emitir evento para notificar outros usuários
-        if (socket) {
-          socket.emit('lead-capturado', {
-            leadId: newLeadData.leadId,
-            sdrId: user.id,
-            sdrNome: user.nome,
-            empresaId: user.empresa_id
-          });
-          console.log('📢 [SOCKET.IO] Evento lead-capturado emitido para outros usuários');
-        }
-        
-        // Recarregar a página para atualizar a lista
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
-      } else {
-        // Tentar parsear JSON, mas não falhar se não for JSON
-        let errorMessage = 'Erro ao capturar lead';
-        try {
-          const error = await response.json();
-          console.error('❌ [SOCKET.IO] Erro ao capturar lead:', error);
-          errorMessage = error.error || errorMessage;
-        } catch (parseError) {
-          const text = await response.text();
-          console.error('❌ [SOCKET.IO] Erro ao capturar lead (texto):', text);
-          errorMessage = text || errorMessage;
-        }
-        showInfoToast(errorMessage);
-      }
-    } catch (error) {
-      console.error('❌ [SOCKET.IO] Erro ao capturar lead:', error);
-      showInfoToast('Erro de conexão ao capturar lead');
-    }
   };
 
   // Função para fechar modal e dispensar notificação
@@ -543,86 +419,43 @@ const useIncorporadoraNotifications = () => {
             </div>
           </div>
 
-          {/* Botões de ação */}
+          {/* Botão de fechar */}
           <div style={{
             display: 'flex',
-            flexDirection: 'column',
-            gap: '0.75rem',
-            width: '100%',
+            gap: '1rem',
+            justifyContent: 'center',
             alignItems: 'center'
           }}>
-            {/* Botão de captura - Apenas para SDRs */}
-            {user.tipo === 'consultor' && !user.is_freelancer && (
-              <button
-                onClick={capturarLead}
-                style={{
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                  color: 'white',
-                  padding: '0.6rem 1.5rem',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem',
-                  fontWeight: '700',
-                  border: 'none',
-                  cursor: 'pointer',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.25px',
-                  boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)',
-                  transition: 'all 0.3s ease',
-                  width: '100%',
-                  maxWidth: '240px',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  backgroundSize: '200% 100%',
-                  animation: 'shimmer 3s linear infinite'
-                }}
-                onMouseOver={(e) => {
-                  e.target.style.transform = 'translateY(-2px)';
-                  e.target.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.5)';
-                }}
-                onMouseOut={(e) => {
-                  e.target.style.transform = 'translateY(0)';
-                  e.target.style.boxShadow = '0 4px 15px rgba(59, 130, 246, 0.4)';
-                }}
-              >
-                <span style={{ 
-                  position: 'relative', 
-                  zIndex: 2,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.75rem'
-                }}>
-                  CAPTURAR LEAD AGORA
-                </span>
-              </button>
-            )}
-
-            {/* Botão dispensar - Para todos */}
             <button
               onClick={fecharModalLead}
               style={{
-                background: '#f1f5f9',
-                color: '#64748b',
-                padding: '0.5rem 1.5rem',
+                background: 'rgba(107, 114, 128, 0.1)',
+                color: '#6b7280',
+                padding: '0.6rem 1.5rem',
                 borderRadius: '6px',
+                border: '1px solid rgba(107, 114, 128, 0.2)',
                 fontSize: '0.875rem',
-                fontWeight: '600',
-                border: '1px solid #e2e8f0',
+                fontWeight: '500',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                width: '100%',
-                maxWidth: '240px'
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
               }}
-              onMouseOver={(e) => {
-                e.target.style.background = '#e2e8f0';
-                e.target.style.color = '#475569';
+              onMouseEnter={(e) => {
+                e.target.style.background = 'rgba(107, 114, 128, 0.2)';
+                e.target.style.borderColor = 'rgba(107, 114, 128, 0.3)';
               }}
-              onMouseOut={(e) => {
-                e.target.style.background = '#f1f5f9';
-                e.target.style.color = '#64748b';
+              onMouseLeave={(e) => {
+                e.target.style.background = 'rgba(107, 114, 128, 0.1)';
+                e.target.style.borderColor = 'rgba(107, 114, 128, 0.2)';
               }}
             >
-              Dispensar Notificação
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+              Fechar
             </button>
           </div>
           
@@ -684,7 +517,6 @@ const useIncorporadoraNotifications = () => {
     stopNotificationSound,
     showNewLeadModal,
     newLeadData,
-    capturarLead,
     fecharModalLead,
     NewLeadModal
   };

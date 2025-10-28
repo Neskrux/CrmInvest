@@ -6,6 +6,7 @@ import { ToastProvider } from './components/Toast';
 import useBranding from './hooks/useBranding';
 import useIncorporadoraNotifications from './hooks/useIncorporadoraNotifications';
 import useAgendamentoNotifications from './hooks/useAgendamentoNotifications';
+import useFechamentoNotifications from './hooks/useFechamentoNotifications';
 import { HelpCircle } from 'lucide-react';
 import CadastroConsultor from './components/CadastroConsultor';
 import CadastroSucesso from './components/CadastroSucesso';
@@ -81,7 +82,6 @@ const AppContent = () => {
     stopNotificationSound,
     showNewLeadModal,
     newLeadData,
-    capturarLead,
     fecharModalLead,
     NewLeadModal
   } = useIncorporadoraNotifications();
@@ -93,6 +93,11 @@ const AppContent = () => {
     clearNotifications: clearAgendamentoNotifications,
     AgendamentoModal
   } = useAgendamentoNotifications();
+
+  // Hook de notificações de fechamento (para admins e consultores)
+  const {
+    FechamentoModal
+  } = useFechamentoNotifications();
 
   // Função para fechar sidebar ao navegar no mobile
   const handleMobileNavigation = () => {
@@ -1144,6 +1149,9 @@ const AppContent = () => {
       
       {/* Modal de notificações de agendamento */}
       <AgendamentoModal />
+      
+      {/* Modal de notificações de fechamento */}
+      <FechamentoModal />
       
       {/* Botão Flutuante WhatsApp - Apenas para consultores */}
       {user?.tipo === 'consultor' && (

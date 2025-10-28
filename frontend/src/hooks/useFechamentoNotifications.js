@@ -71,10 +71,8 @@ const useFechamentoNotifications = () => {
       return;
     }
 
-    // Permitir entrada para TODOS os usuários da incorporadora (empresa_id === 5)
-    const isUserFromIncorporadora = userData.empresa_id === 5;
-    
-    if (!isUserFromIncorporadora || !userData.id) {
+    // Permitir entrada APENAS para admin da incorporadora
+    if (userData.tipo !== 'admin' || userData.empresa_id !== 5 || !userData.id) {
       return;
     }
 
@@ -90,10 +88,8 @@ const useFechamentoNotifications = () => {
     isInitializedRef.current = true;
 
     // Entrar no grupo de notificações da incorporadora
-    const userTypeToSend = userData.tipo === 'admin' ? 'admin' : (userData.tipo === 'consultor' ? 'consultor' : 'consultor');
-    
     newSocket.emit('join-incorporadora-notifications', {
-      userType: userTypeToSend,
+      userType: 'admin',
       userId: userData.id,
       empresaId: userData.empresa_id
     });
@@ -143,7 +139,7 @@ const useFechamentoNotifications = () => {
       newSocket.disconnect();
       isInitializedRef.current = false;
     };
-  }, []); // Array vazio para executar apenas uma vez
+  }, [userData]); // Executar quando userData mudar
 
   // Componente da Modal - SEM ANIMAÇÕES
   const FechamentoModal = () => {
