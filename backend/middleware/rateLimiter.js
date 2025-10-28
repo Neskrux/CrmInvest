@@ -16,10 +16,10 @@ const loginLimiter = rateLimit({
 
 // Rate limiter geral para todas as rotas
 const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: isDevelopment ? 9999 : 500, // 500 requisições em produção, ilimitado em dev
+  windowMs: 60 * 1000, // 1 minuto
+  max: isDevelopment ? 9999 : 2000, // 2000 requisições em produção, ilimitado em dev
   message: {
-    error: 'Muitas requisições. Tente novamente em 15 minutos.'
+    error: 'Muitas requisições. Tente novamente em 1 minuto.'
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -41,9 +41,21 @@ const uploadLimiter = rateLimit({
 // Rate limiter para APIs externas (Meta Ads, IDSF)
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minuto
-  max: isDevelopment ? 9999 : 60, // 60 requisições por minuto em produção, ilimitado em dev
+  max: isDevelopment ? 9999 : 2000, // 2000 requisições por minuto em produção, ilimitado em dev
   message: {
-    error: 'Muitas requisições para API externa. Aguarde 1 minuto.'
+    error: 'Muitas requisições para API externa. Tente novamente em 1 minuto.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => isDevelopment
+});
+
+// Rate limiter específico para verify-token (mais permissivo)
+const verifyTokenLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: isDevelopment ? 9999 : 120, // 120 requisições por minuto em produção, ilimitado em dev
+  message: {
+    error: 'Muitas verificações de token. Aguarde 1 minuto.'
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -54,6 +66,7 @@ module.exports = {
   loginLimiter,
   generalLimiter,
   uploadLimiter,
-  apiLimiter
+  apiLimiter,
+  verifyTokenLimiter
 };
 
