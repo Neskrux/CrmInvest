@@ -73,6 +73,7 @@ const Pacientes = () => {
     estado: '',
     tipo_tratamento: '',
     empreendimento_id: '',
+    empreendimento_externo: '',
     status: 'lead',
     observacoes: '',
     consultor_id: ''
@@ -357,6 +358,7 @@ const Pacientes = () => {
   const [agendamentoData, setAgendamentoData] = useState({
     clinica_id: '',
     empreendimento_id: '',
+    empreendimento_externo: '',
     data_agendamento: '',
     horario: '',
     observacoes: '',
@@ -2325,6 +2327,12 @@ const Pacientes = () => {
         [name]: value,
         cidade: '' // Limpar cidade quando estado muda
       });
+    } else if (name === 'empreendimento_id') {
+      setFormData({
+        ...formData,
+        [name]: value,
+        empreendimento_externo: value === 'externo' ? formData.empreendimento_externo : ''
+      });
     } else {
       setFormData({
         ...formData,
@@ -2994,6 +3002,8 @@ const Pacientes = () => {
       cidade: '',
       estado: '',
       tipo_tratamento: '',
+      empreendimento_id: '',
+      empreendimento_externo: '',
       status: 'sem_primeiro_contato',
       observacoes: '',
       // Se for consultor, pré-preenche com o próprio ID
@@ -5998,21 +6008,36 @@ const Pacientes = () => {
                 <div className="form-group">
                   <label className="form-label">{isIncorporadora ? 'Empreendimento' : t.tipoTratamento} *</label>
                   {isIncorporadora ? (
-                    <select
-                      name="empreendimento_id"
-                      className="form-select"
-                      value={formData.empreendimento_id || ''}
-                      onChange={handleInputChange}
-                      required
-                    >
-                      <option value="">Selecione</option>
-                      <option value="4">Laguna Sky Garden</option>
-                      <option value="5">Residencial Girassol</option>
-                      <option value="6">Sintropia Sky Garden</option>
-                      <option value="7">Residencial Lotus</option>
-                      <option value="8">River Sky Garden</option>
-                      <option value="9">Condomínio Figueira Garcia</option>
-                    </select>
+                    <>
+                      <select
+                        name="empreendimento_id"
+                        className="form-select"
+                        value={formData.empreendimento_id || ''}
+                        onChange={handleInputChange}
+                        required
+                      >
+                        <option value="">Selecione</option>
+                        <option value="4">Laguna Sky Garden</option>
+                        <option value="5">Residencial Girassol</option>
+                        <option value="6">Sintropia Sky Garden</option>
+                        <option value="7">Residencial Lotus</option>
+                        <option value="8">River Sky Garden</option>
+                        <option value="9">Condomínio Figueira Garcia</option>
+                        <option value="externo">Empreendimento Externo</option>
+                      </select>
+                      {formData.empreendimento_id === 'externo' && (
+                        <input
+                          type="text"
+                          name="empreendimento_externo"
+                          className="form-input"
+                          value={formData.empreendimento_externo || ''}
+                          onChange={handleInputChange}
+                          style={{ marginTop: '0.5rem' }}
+                          placeholder="Digite o nome do empreendimento externo"
+                          required
+                        />
+                      )}
+                    </>
                   ) : (
                     <select
                       name="tipo_tratamento"
@@ -7601,32 +7626,56 @@ const Pacientes = () => {
 
               <div className="form-group" style={{ marginBottom: '1rem' }}>
                 <label className="form-label">{isIncorporadora ? 'Empreendimento *' : 'Clínica *'}</label>
-                <select 
-                  className="form-select"
-                  value={isIncorporadora ? agendamentoData.empreendimento_id : agendamentoData.clinica_id}
-                  onChange={(e) => setAgendamentoData({
-                    ...agendamentoData,
-                    ...(isIncorporadora ? { empreendimento_id: e.target.value } : { clinica_id: e.target.value })
-                  })}
-                >
-                  <option value="">{isIncorporadora ? 'Selecione um empreendimento' : 'Selecione uma clínica'}</option>
-                  {isIncorporadora ? (
-                    // Para incorporadora, mostrar empreendimentos hardcoded
-                    <>
+                {isIncorporadora ? (
+                  <>
+                    <select 
+                      className="form-select"
+                      value={agendamentoData.empreendimento_id}
+                      onChange={(e) => setAgendamentoData({
+                        ...agendamentoData,
+                        empreendimento_id: e.target.value,
+                        empreendimento_externo: e.target.value === 'externo' ? agendamentoData.empreendimento_externo : ''
+                      })}
+                    >
+                      <option value="">Selecione um empreendimento</option>
                       <option value="4">Laguna Sky Garden</option>
                       <option value="5">Residencial Girassol</option>
                       <option value="6">Sintropia Sky Garden</option>
                       <option value="7">Residencial Lotus</option>
                       <option value="8">River Sky Garden</option>
                       <option value="9">Condomínio Figueira Garcia</option>
-                    </>
-                  ) : (
-                    // Para outras empresas, mostrar clínicas
-                    clinicas.map(c => (
+                      <option value="externo">Empreendimento Externo</option>
+                    </select>
+                    {agendamentoData.empreendimento_id === 'externo' && (
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={agendamentoData.empreendimento_externo || ''}
+                        onChange={(e) => setAgendamentoData({
+                          ...agendamentoData,
+                          empreendimento_externo: e.target.value
+                        })}
+                        style={{ marginTop: '0.5rem' }}
+                        placeholder="Digite o nome do empreendimento externo"
+                        required
+                      />
+                    )}
+                  </>
+                ) : (
+                  <select 
+                    className="form-select"
+                    value={agendamentoData.clinica_id}
+                    onChange={(e) => setAgendamentoData({
+                      ...agendamentoData,
+                      clinica_id: e.target.value
+                    })}
+                  >
+                    <option value="">Selecione uma clínica</option>
+                    {clinicas.map(c => (
                       <option key={c.id} value={c.id}>{c.nome}</option>
-                    ))
-                  )}
-                </select>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>

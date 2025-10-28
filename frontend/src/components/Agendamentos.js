@@ -35,6 +35,7 @@ const Agendamentos = () => {
     consultor_id: '',
     consultor_interno_id: '',
     clinica_id: '',
+    empreendimento_externo: '',
     data_agendamento: '',
     horario: '',
     status: 'agendado',
@@ -347,10 +348,20 @@ const Agendamentos = () => {
   };
 
   const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    const { name, value } = e.target;
+    
+    if (name === 'clinica_id') {
+      setFormData({
+        ...formData,
+        [name]: value,
+        empreendimento_externo: value === 'externo' ? formData.empreendimento_externo : ''
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value
+      });
+    }
   };
 
   // Funções para formatação do valor
@@ -663,7 +674,9 @@ const Agendamentos = () => {
     setFormData({
       paciente_id: '',
       consultor_id: '',
+      consultor_interno_id: '',
       clinica_id: '',
+      empreendimento_externo: '',
       data_agendamento: '',
       horario: '',
       status: 'agendado',
@@ -1223,32 +1236,51 @@ const Agendamentos = () => {
 
                 <div className="form-group">
                   <label className="form-label">{user?.empresa_id === 5 ? 'Empreendimento' : t.clinica}</label>
-                  <select
-                    name="clinica_id"
-                    className="form-select"
-                    value={formData.clinica_id}
-                    onChange={handleInputChange}
-                  >
-                    <option value="">{user?.empresa_id === 5 ? 'Selecione um empreendimento' : `Selecione um ${t.clinica.toLowerCase()}`}</option>
-                    {user?.empresa_id === 5 ? (
-                      // Para incorporadora, mostrar empreendimentos hardcoded (igual Pacientes.js)
-                      <>
+                  {user?.empresa_id === 5 ? (
+                    <>
+                      <select
+                        name="clinica_id"
+                        className="form-select"
+                        value={formData.clinica_id}
+                        onChange={handleInputChange}
+                      >
+                        <option value="">Selecione um empreendimento</option>
                         <option value="4">Laguna Sky Garden</option>
                         <option value="5">Residencial Girassol</option>
                         <option value="6">Sintropia Sky Garden</option>
                         <option value="7">Residencial Lotus</option>
                         <option value="8">River Sky Garden</option>
                         <option value="9">Condomínio Figueira Garcia</option>
-                      </>
-                    ) : (
-                      // Para outras empresas, mostrar clínicas
-                      clinicas.map(clinica => (
+                        <option value="externo">Empreendimento Externo</option>
+                      </select>
+                      {formData.clinica_id === 'externo' && (
+                        <input
+                          type="text"
+                          name="empreendimento_externo"
+                          className="form-input"
+                          value={formData.empreendimento_externo || ''}
+                          onChange={handleInputChange}
+                          style={{ marginTop: '0.5rem' }}
+                          placeholder="Digite o nome do empreendimento externo"
+                          required
+                        />
+                      )}
+                    </>
+                  ) : (
+                    <select
+                      name="clinica_id"
+                      className="form-select"
+                      value={formData.clinica_id}
+                      onChange={handleInputChange}
+                    >
+                      <option value="">{`Selecione um ${t.clinica.toLowerCase()}`}</option>
+                      {clinicas.map(clinica => (
                         <option key={clinica.id} value={clinica.id}>
                           {clinica.nome}
                         </option>
-                      ))
-                    )}
-                  </select>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
 
