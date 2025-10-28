@@ -18,6 +18,9 @@ export const AuthProvider = ({ children }) => {
     // Verificar se o token é válido (não vazio e não 'null' string)
     return savedToken && savedToken !== 'null' && savedToken.trim() !== '' ? savedToken : null;
   });
+  
+  // Cache para evitar chamadas desnecessárias do verify-token
+  const [lastTokenVerification, setLastTokenVerification] = useState(null);
 
   // Configurar URL base da API
   const API_BASE_URL = process.env.REACT_APP_API_URL || 
@@ -30,6 +33,7 @@ export const AuthProvider = ({ children }) => {
   const clearAllData = () => {
     setUser(null);
     setToken(null);
+    setLastTokenVerification(null); // Limpar cache de verificação
     
     // Limpar apenas dados sensíveis do usuário, mantendo preferências de UI (tutoriais)
     // Dados de autenticação
@@ -73,6 +77,11 @@ export const AuthProvider = ({ children }) => {
       throw new Error('Sessão expirada');
     }
 
+    if (response.status === 429) {
+      // Rate limiting - não fazer logout, apenas propagar o erro
+      throw new Error('429 Too Many Requests');
+    }
+
     return response;
   };
 
@@ -89,6 +98,7 @@ export const AuthProvider = ({ children }) => {
       sessionStorage.clear(); // Limpa session storage também
       setUser(null);
       setToken(null);
+      setLastTokenVerification(null); // Limpar cache de verificação
       
       const response = await fetch(`${API_BASE_URL}/login`, {
         method: 'POST',
@@ -127,7 +137,7 @@ export const AuthProvider = ({ children }) => {
     clearAllData();
   };
 
-  const verifyToken = async () => {
+  const verifyToken = async (forceVerification = false) => {
     const currentToken = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
     const loginEmail = localStorage.getItem('login_email');
@@ -136,6 +146,23 @@ export const AuthProvider = ({ children }) => {
       clearAllData();
       setLoading(false);
       return;
+    }
+
+    // Cache: evitar chamadas desnecessárias se já verificamos recentemente
+    const now = Date.now();
+    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+    
+    if (!forceVerification && lastTokenVerification && (now - lastTokenVerification) < CACHE_DURATION) {
+      // Usar dados do cache se ainda são válidos
+      try {
+        const savedUserParsed = JSON.parse(savedUser);
+        setUser(savedUserParsed);
+        setToken(currentToken);
+        setLoading(false);
+        return;
+      } catch (e) {
+        // Se o cache está corrompido, fazer verificação
+      }
     }
 
     try {
@@ -164,10 +191,26 @@ export const AuthProvider = ({ children }) => {
         setUser(usuarioBackend);
         setToken(currentToken);
         localStorage.setItem('user', JSON.stringify(usuarioBackend));
+        
+        // Atualizar timestamp da última verificação
+        setLastTokenVerification(now);
       } else {
         clearAllData();
       }
     } catch (error) {
+      // Se for erro 429 (Too Many Requests), usar cache se disponível
+      if (error.message.includes('429') && savedUser) {
+        try {
+          const savedUserParsed = JSON.parse(savedUser);
+          setUser(savedUserParsed);
+          setToken(currentToken);
+          setLoading(false);
+          console.warn('Usando cache devido a rate limiting');
+          return;
+        } catch (e) {
+          // Cache corrompido, continuar com logout
+        }
+      }
       clearAllData();
     } finally {
       setLoading(false);
@@ -229,6 +272,7 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     makeRequest,
+    verifyToken: () => verifyToken(true), // Função para forçar verificação
     empresaId: user?.empresa_id || user?.empresaId || null,
     isAuthenticated: !!user && !!token,
     isAdmin: user?.tipo === 'admin',
