@@ -35,6 +35,7 @@ const Fechamentos = () => {
     paciente_id: '',
     consultor_id: '',
     clinica_id: '',
+    empreendimento_externo: '',
     valor_fechado: '',
     valor_formatado: '',
     data_fechamento: new Date().toISOString().split('T')[0],
@@ -1759,30 +1760,56 @@ const Fechamentos = () => {
 
                 <div className="form-group">
                 <label className="form-label">{empresaId === 5 ? 'Empreendimento' : t.clinica}</label>
-                  <select 
-                    className="form-select"
-                    value={novoFechamento.clinica_id || ''}
-                    onChange={(e) => setNovoFechamento({...novoFechamento, clinica_id: e.target.value})}
-                    disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
-                  >
-                  <option value="">{empresaId === 5 ? 'Selecione um empreendimento' : `Selecione um ${t.clinica.toLowerCase()}`}</option>
                   {empresaId === 5 ? (
-                    // Para incorporadora, mostrar empreendimentos hardcoded
                     <>
-                      <option value="4">Laguna Sky Garden</option>
-                      <option value="5">Residencial Girassol</option>
-                      <option value="6">Sintropia Sky Garden</option>
-                      <option value="7">Residencial Lotus</option>
-                      <option value="8">River Sky Garden</option>
-                      <option value="9">Condomínio Figueira Garcia</option>
+                      <select 
+                        className="form-select"
+                        value={novoFechamento.clinica_id || ''}
+                        onChange={(e) => setNovoFechamento({
+                          ...novoFechamento, 
+                          clinica_id: e.target.value,
+                          empreendimento_externo: e.target.value === 'externo' ? novoFechamento.empreendimento_externo : ''
+                        })}
+                        disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
+                      >
+                        <option value="">Selecione um empreendimento</option>
+                        <option value="4">Laguna Sky Garden</option>
+                        <option value="5">Residencial Girassol</option>
+                        <option value="6">Sintropia Sky Garden</option>
+                        <option value="7">Residencial Lotus</option>
+                        <option value="8">River Sky Garden</option>
+                        <option value="9">Condomínio Figueira Garcia</option>
+                        <option value="externo">Empreendimento Externo</option>
+                      </select>
+                      {novoFechamento.clinica_id === 'externo' && (
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={novoFechamento.empreendimento_externo || ''}
+                          onChange={(e) => setNovoFechamento({
+                            ...novoFechamento,
+                            empreendimento_externo: e.target.value
+                          })}
+                          style={{ marginTop: '0.5rem' }}
+                          placeholder="Digite o nome do empreendimento externo"
+                          disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
+                          required
+                        />
+                      )}
                     </>
                   ) : (
-                    // Para outras empresas, mostrar clínicas
-                    clinicas.map(c => (
-                      <option key={c.id} value={c.id}>{c.nome}</option>
-                    ))
+                    <select 
+                      className="form-select"
+                      value={novoFechamento.clinica_id || ''}
+                      onChange={(e) => setNovoFechamento({...novoFechamento, clinica_id: e.target.value})}
+                      disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
+                    >
+                      <option value="">{`Selecione um ${t.clinica.toLowerCase()}`}</option>
+                      {clinicas.map(c => (
+                        <option key={c.id} value={c.id}>{c.nome}</option>
+                      ))}
+                    </select>
                   )}
-                  </select>
                 </div>
 
               <div className="grid grid-2">

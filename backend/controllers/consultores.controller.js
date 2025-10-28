@@ -688,6 +688,23 @@ const getConsultorById = async (req, res) => {
   }
 };
 
+// Buscar SDRs da incorporadora (consultores internos da empresa_id 5)
+const getSDRsIncorporadora = async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('consultores')
+      .select('id, nome, foto_url')
+      .eq('empresa_id', 5)
+      .eq('is_freelancer', false)
+      .order('nome');
+    
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   updatePerfil,
   getPerfil,
@@ -700,6 +717,7 @@ module.exports = {
   gerarCodigo,
   gerarCodigosFaltantes,
   getLinkPersonalizado,
-  getConsultorById
+  getConsultorById,
+  getSDRsIncorporadora
 };
 

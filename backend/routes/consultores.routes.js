@@ -20,6 +20,9 @@ router.get('/consultores', authenticateToken, consultoresController.getAllConsul
 // POST /api/consultores/cadastro (sem autenticação)
 router.post('/consultores/cadastro', consultoresController.cadastroPublico);
 
+// GET /api/consultores/sdrs-incorporadora (público)
+router.get('/consultores/sdrs-incorporadora', consultoresController.getSDRsIncorporadora);
+
 // POST /api/consultores
 router.post('/consultores', authenticateToken, requireAdminOrEmpresa, consultoresController.createConsultor);
 

@@ -39,13 +39,15 @@ const Indicacoes = () => {
     grauParentescoOutros: '',
     observacoes: '',
     melhor_dia1: '',
-    melhor_horario1: ''
+    melhor_horario1: '',
+    sdr_id: ''
   });
   
   const [submittingPaciente, setSubmittingPaciente] = useState(false);
   const [submittingCliente, setSubmittingCliente] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
+  const [sdrsIncorporadora, setSdrsIncorporadora] = useState([]);
 
   // Opções para o formulário
   const opcoesGrauParentesco = [
@@ -150,6 +152,25 @@ const Indicacoes = () => {
       return;
     }
   }, [user]);
+
+  // Buscar SDRs da incorporadora se for isIncorporadora
+  useEffect(() => {
+    if (isIncorporadora) {
+      fetchSDRsIncorporadora();
+    }
+  }, [isIncorporadora]);
+
+  const fetchSDRsIncorporadora = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/consultores/sdrs-incorporadora`);
+      const data = await response.json();
+      if (response.ok) {
+        setSdrsIncorporadora(data);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar SDRs:', error);
+    }
+  };
 
 
   // Cleanup: restaurar scroll quando componente for desmontado
@@ -600,7 +621,8 @@ const Indicacoes = () => {
         estado: formCliente.estado,
         observacoes: observacoesComDias,
         grau_parentesco: formCliente.grauParentesco === 'outros' ? formCliente.grauParentescoOutros : formCliente.grauParentesco,
-        ref_consultor: user.codigo_referencia
+        ref_consultor: user.codigo_referencia,
+        sdr_id: formCliente.sdr_id || null
       };
       
       
@@ -629,7 +651,8 @@ const Indicacoes = () => {
           grauParentescoOutros: '',
           observacoes: '',
           melhor_dia1: '',
-          melhor_horario1: ''
+          melhor_horario1: '',
+          sdr_id: ''
         });
         setCidadeCustomizada(false);
         setFormErrors({});
@@ -952,6 +975,24 @@ const Indicacoes = () => {
                 )}
                 {formErrors.grauParentesco && <span className="field-error">{formErrors.grauParentesco}</span>}
                 {formErrors.grauParentescoOutros && <span className="field-error">{formErrors.grauParentescoOutros}</span>}
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Quer que sua indicação seja atendida por quem?</label>
+                <select
+                  name="sdr_id"
+                  className="form-select"
+                  value={formCliente.sdr_id}
+                  onChange={handleClienteInputChange}
+                  disabled={submittingCliente}
+                >
+                  <option value="">Selecione um atendente (opcional)</option>
+                  {sdrsIncorporadora.map(sdr => (
+                    <option key={sdr.id} value={sdr.id}>
+                      {sdr.nome}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
