@@ -14,10 +14,8 @@ const useAgendamentoNotifications = () => {
   const [audioInstance, setAudioInstance] = useState(null);
 
   useEffect(() => {
-    // Permitir entrada para TODOS os usuários da incorporadora (empresa_id === 5)
-    const isUserFromIncorporadora = user?.empresa_id === 5;
-    
-    if (!isUserFromIncorporadora) {
+    // Permitir entrada APENAS para admin da incorporadora
+    if (user?.tipo !== 'admin' || user?.empresa_id !== 5) {
       return;
     }
 
@@ -32,42 +30,44 @@ const useAgendamentoNotifications = () => {
     setSocket(newSocket);
 
     // Entrar no grupo de notificações da incorporadora
-    const userTypeToSend = user.tipo === 'admin' ? 'admin' : (user.tipo === 'consultor' ? 'consultor' : 'consultor');
-    
     newSocket.emit('join-incorporadora-notifications', {
-      userType: userTypeToSend,
+      userType: 'admin',
       userId: user.id,
       empresaId: user.empresa_id
     });
 
     // Listener para novos agendamentos
     newSocket.on('new-agendamento-incorporadora', (data) => {
-      // Regras de recebimento:
-      // - Admins: sempre recebem
-      // - Internos (não freelancers): recebem
-      // - Criador do agendamento (SDR): recebe
-      // NOTA: A notificação sempre mostra o SDR que criou, não o corretor responsável
-      const isAdmin = user?.tipo === 'admin';
-      const isInternal = !user?.is_freelancer;
-      const isCreator = user?.id && data?.sdr_id && Number(user.id) === Number(data.sdr_id);
-      const deveReceberNotificacao = isAdmin || isInternal || isCreator;
+      console.log('🔔 [SOCKET.IO] Recebido evento new-agendamento-incorporadora:', {
+        agendamentoId: data.agendamentoId,
+        paciente_nome: data.paciente_nome,
+        data_agendamento: data.data_agendamento,
+        horario: data.horario,
+        sdr_nome: data.sdr_nome,
+        sdr_foto: data.sdr_foto ? 'Disponível' : 'Não disponível',
+        timestamp: data.timestamp,
+        socketId: newSocket.id
+      });
+      
+      // Mostrar toast
+      showSuccessToast(
+        `📅 Novo agendamento criado por ${data.sdr_nome} - ${data.paciente_nome}`,
+        6000
+      );
 
-      if (deveReceberNotificacao) {
-        showSuccessToast(
-          `📅 Novo agendamento criado por ${data.sdr_nome} - ${data.paciente_nome}`,
-          6000
-        );
+      // Mostrar modal
+      setAgendamentoData(data);
+      setShowAgendamentoModal(true);
 
-        setAgendamentoData(data);
-        setShowAgendamentoModal(true);
-      }
-
+      // Adicionar à lista de notificações
       setNotifications(prev => [...prev, {
         id: Date.now(),
         type: 'new-agendamento',
         data,
         timestamp: new Date()
       }]);
+      
+      console.log('✅ [SOCKET.IO] Processamento do evento new-agendamento-incorporadora concluído');
     });
 
     // Log de conexão/desconexão

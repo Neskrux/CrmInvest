@@ -7,13 +7,9 @@ import { useToast } from '../components/Toast';
 import ModalEvidencia from './ModalEvidencia';
 import * as XLSX from 'xlsx';
 import useSmartPolling from '../hooks/useSmartPolling';
-import useFechamentoNotifications from '../hooks/useFechamentoNotifications';
 
 const Pacientes = () => {
   const { t, empresaId, shouldShow } = useBranding();
-  
-  // Hook para notificações de fechamento
-  const { FechamentoModal } = useFechamentoNotifications();
   
   // Função para limitar caracteres e evitar sobreposição
   const limitarCaracteres = (texto, limite = 20) => {
@@ -9842,9 +9838,6 @@ const Pacientes = () => {
           </div>
         </div>
       )}
-      
-      {/* Modal de Notificação de Fechamento */}
-      <FechamentoModal />
       
     </div>
   );

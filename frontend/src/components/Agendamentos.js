@@ -4,15 +4,11 @@ import useBranding from '../hooks/useBranding';
 import { useToast } from '../components/Toast';
 import ModalEvidencia from './ModalEvidencia';
 import useSmartPolling from '../hooks/useSmartPolling';
-import useFechamentoNotifications from '../hooks/useFechamentoNotifications';
 
 const Agendamentos = () => {
   const { t } = useBranding();
   const { makeRequest, user, isAdmin, podeAlterarStatus, isIncorporadora, isConsultorInterno, podeVerTodosDados, deveFiltrarPorConsultor, isClinica } = useAuth();
   const { showSuccessToast, showErrorToast } = useToast();
-  
-  // Hook para notificações de fechamento
-  const { FechamentoModal } = useFechamentoNotifications();
   
   const [agendamentos, setAgendamentos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
@@ -1991,9 +1987,6 @@ const Agendamentos = () => {
         statusNovo={evidenciaData.statusNovo}
         nomeRegistro={evidenciaData.agendamentoNome}
       />
-
-      {/* Modal de Notificação de Fechamento */}
-      <FechamentoModal />
 
     </div>
   );
