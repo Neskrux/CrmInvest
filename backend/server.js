@@ -25,7 +25,10 @@ const server = createServer(app);
 const PORT = process.env.PORT || 5000;
 
 // Middlewares globais de segurança
-app.use(helmet()); // Proteção de headers HTTP
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // ✅ Permitir CORS
+  crossOriginEmbedderPolicy: false // ✅ Não bloquear recursos cross-origin
+}));
 app.use(cors(corsConfig));
 
 // Middleware JSON para outras rotas (exceto uploads)
