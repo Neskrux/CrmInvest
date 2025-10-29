@@ -270,6 +270,8 @@ const useIncorporadoraNotifications = () => {
     });
     
     // Conectar ao Socket.IO com configurações ROBUSTAS para produção
+    // CRÍTICO: forceNew: true para garantir que cada dispositivo tenha sua própria conexão
+    // Isso é essencial para múltiplos PCs/TVs funcionarem simultaneamente
     const newSocket = io(API_BASE_URL, {
       transports: ['websocket', 'polling'], // Tentar websocket primeiro, fallback para polling
       forceNew: true, // ✅ FORÇAR nova conexão - cada dispositivo precisa da sua própria!
@@ -278,7 +280,7 @@ const useIncorporadoraNotifications = () => {
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: 20000,
-      // Adicionar identificador único para cada aba/dispositivo
+      // Adicionar identificador único para cada dispositivo/aba
       query: {
         tabId: `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         deviceId: `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -318,16 +320,24 @@ const useIncorporadoraNotifications = () => {
       if (data.success) {
         console.log('✅ [SOCKET.IO] Confirmado: Entrou no grupo incorporadora-notifications:', {
           socketId: data.socketId,
-          timestamp: data.timestamp
+          deviceId: newSocket.query?.deviceId,
+          tabId: newSocket.query?.tabId,
+          userId: user.id,
+          empresaId: user.empresa_id,
+          timestamp: data.timestamp,
+          url: window.location.href
         });
       } else {
         console.error('❌ [SOCKET.IO] Falha ao entrar no grupo:', {
           motivo: data.motivo,
+          socketId: newSocket.id,
+          deviceId: newSocket.query?.deviceId,
           timestamp: data.timestamp
         });
         // Tentar novamente após delay
         setTimeout(() => {
           if (newSocket.connected) {
+            console.log('🔄 [SOCKET.IO] Tentando entrar no grupo novamente após falha...');
             joinGroup();
           }
         }, 2000);
@@ -348,8 +358,13 @@ const useIncorporadoraNotifications = () => {
           cidade: data.cidade,
           estado: data.estado,
           socketId: newSocket.id,
+          deviceId: newSocket.query?.deviceId,
+          tabId: newSocket.query?.tabId,
+          userId: user.id,
+          empresaId: user.empresa_id,
           connected: newSocket.connected,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          url: window.location.href
         });
         
         // REMOVIDO: Reload automático causa problemas em produção

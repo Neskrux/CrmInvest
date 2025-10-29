@@ -1396,7 +1396,7 @@ const cadastroPublicoLead = async (req, res) => {
           const room = ioInstance.sockets.adapter.rooms.get('incorporadora-notifications');
           if (room) {
             const clients = Array.from(room);
-            console.log('📊 [SOCKET.IO] Total de clientes no grupo antes de emitir new-lead:', clients.length);
+            console.log('📊 [SOCKET.IO] Total de clientes no grupo antes de emitir:', clients.length);
             console.log('📋 [SOCKET.IO] IDs dos clientes que receberão notificação:', clients);
           } else {
             console.log('📊 [SOCKET.IO] Nenhum cliente no grupo incorporadora-notifications antes de emitir');
@@ -1419,6 +1419,21 @@ const cadastroPublicoLead = async (req, res) => {
       });
       
       console.log('✅ [SOCKET.IO] Evento new-lead-incorporadora enviado para grupo incorporadora-notifications');
+      
+      // CRÍTICO: Verificar quantos clientes estão no grupo DEPOIS de emitir
+      if (ioInstance && ioInstance.sockets) {
+        try {
+          const room = ioInstance.sockets.adapter.rooms.get('incorporadora-notifications');
+          if (room) {
+            const clients = Array.from(room);
+            console.log('📊 [SOCKET.IO] Total de clientes no grupo após emitir:', clients.length);
+          } else {
+            console.log('📊 [SOCKET.IO] Nenhum cliente no grupo incorporadora-notifications após emitir');
+          }
+        } catch (error) {
+          console.error('❌ [SOCKET.IO] Erro ao verificar clientes no grupo:', error);
+        }
+      }
     } else {
       console.log('⚠️ [SOCKET.IO] Evento new-lead-incorporadora não enviado:', {
         temSocketIO: !!req.io,

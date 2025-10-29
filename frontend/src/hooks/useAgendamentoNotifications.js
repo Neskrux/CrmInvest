@@ -246,40 +246,10 @@ const useAgendamentoNotifications = () => {
       return;
     }
 
-    // CRÍTICO: Garantir que só inicializa uma vez por dispositivo
+    // CRÍTICO: Permitir múltiplas conexões simultâneas por dispositivo
     // Cada dispositivo (PC/TV) deve ter sua própria conexão Socket.IO
-    if (isInitializedRef.current && socketRef.current && socketRef.current.connected) {
-      console.log('♻️ [SOCKET.IO] Socket já inicializado, usando conexão existente:', {
-        socketId: socketRef.current.id,
-        connected: socketRef.current.connected,
-        timestamp: new Date().toISOString()
-      });
-      
-      // Garantir que está no grupo periodicamente
-      const ensureInGroup = () => {
-        if (socketRef.current && socketRef.current.connected) {
-          socketRef.current.emit('join-incorporadora-notifications', {
-            userType: 'admin',
-            userId: user.id,
-            empresaId: user.empresa_id
-          });
-        }
-      };
-      
-      // Verificar se está no grupo periodicamente
-      const checkInterval = setInterval(() => {
-        if (socketRef.current && socketRef.current.connected) {
-          ensureInGroup();
-        } else {
-          clearInterval(checkInterval);
-        }
-      }, 60000); // A cada 1 minuto
-      
-      return () => clearInterval(checkInterval);
-    }
-
-    // Marcar como inicializado ANTES de criar conexão
-    isInitializedRef.current = true;
+    // REMOVIDO: Bloqueio de inicialização que impedia múltiplas conexões
+    // Com forceNew: true, cada conexão será única mesmo se já houver uma existente
 
     // Configurar URL do backend - CORRIGIDO para produção
     let API_BASE_URL;
@@ -361,8 +331,12 @@ const useAgendamentoNotifications = () => {
           horario: data.horario,
           socketId: newSocket.id,
           deviceId: newSocket.query?.deviceId,
+          tabId: newSocket.query?.tabId,
+          userId: user.id,
+          empresaId: user.empresa_id,
           connected: newSocket.connected,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          url: window.location.href
         });
         
         // CRÍTICO: Resetar estado ANTES de processar nova notificação
@@ -436,16 +410,23 @@ const useAgendamentoNotifications = () => {
         console.log('✅ [SOCKET.IO] Confirmado: Entrou no grupo incorporadora-notifications:', {
           socketId: data.socketId,
           deviceId: newSocket.query?.deviceId,
-          timestamp: data.timestamp
+          tabId: newSocket.query?.tabId,
+          userId: user.id,
+          empresaId: user.empresa_id,
+          timestamp: data.timestamp,
+          url: window.location.href
         });
       } else {
         console.error('❌ [SOCKET.IO] Falha ao entrar no grupo:', {
           motivo: data.motivo,
+          socketId: newSocket.id,
+          deviceId: newSocket.query?.deviceId,
           timestamp: data.timestamp
         });
         // Tentar novamente após delay
         setTimeout(() => {
           if (newSocket.connected) {
+            console.log('🔄 [SOCKET.IO] Tentando entrar no grupo novamente após falha...');
             joinGroup();
           }
         }, 2000);
