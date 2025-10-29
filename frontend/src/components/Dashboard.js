@@ -23,34 +23,53 @@ const Dashboard = () => {
   const fechamentoModalRef = useRef(showFechamentoModal);
   const agendamentoModalRef = useRef(showAgendamentoModal);
   const newLeadModalRef = useRef(showNewLeadModal);
-  const refreshBlockedRef = useRef(false); // Flag para bloquear refresh após notificação
+  const refreshBlockedUntilRef = useRef(null); // Timestamp até quando o refresh está bloqueado (null = não bloqueado)
   const refreshBlockTimerRef = useRef(null); // Timer do bloqueio
   
   // Atualizar refs sempre que os valores mudarem
   useEffect(() => {
+    // Atualizar refs PRIMEIRO para manter sincronizado
     const hadModalBefore = fechamentoModalRef.current || agendamentoModalRef.current || newLeadModalRef.current;
-    const hasModalNow = showFechamentoModal || showAgendamentoModal || showNewLeadModal;
-    
-    // Atualizar refs
     fechamentoModalRef.current = showFechamentoModal;
     agendamentoModalRef.current = showAgendamentoModal;
     newLeadModalRef.current = showNewLeadModal;
+    const hasModalNow = showFechamentoModal || showAgendamentoModal || showNewLeadModal;
     
     // Se uma notificação apareceu (não tinha modal antes, mas tem agora)
     if (!hadModalBefore && hasModalNow) {
-      console.log('🔒 [DASHBOARD] Notificação recebida - bloqueando refresh por 25 segundos');
-      refreshBlockedRef.current = true;
+      const blockUntil = Date.now() + 25000; // Bloquear por 25 segundos
+      refreshBlockedUntilRef.current = blockUntil;
+      console.log('🔒 [DASHBOARD] Notificação recebida - bloqueando refresh até', new Date(blockUntil).toLocaleTimeString());
       
       // Limpar timer anterior se existir
       if (refreshBlockTimerRef.current) {
         clearTimeout(refreshBlockTimerRef.current);
+        refreshBlockTimerRef.current = null;
       }
       
       // Liberar bloqueio após 25 segundos (20s da notificação + 5s de margem de segurança)
       refreshBlockTimerRef.current = setTimeout(() => {
-        refreshBlockedRef.current = false;
-        console.log('🔓 [DASHBOARD] Bloqueio de refresh liberado após 25 segundos');
+        // Verificar novamente antes de liberar (para evitar race conditions)
+        if (!fechamentoModalRef.current && !agendamentoModalRef.current && !newLeadModalRef.current) {
+          refreshBlockedUntilRef.current = null;
+          refreshBlockTimerRef.current = null;
+          console.log('🔓 [DASHBOARD] Bloqueio de refresh liberado após 25 segundos');
+        } else {
+          console.log('⏸️ [DASHBOARD] Bloqueio mantido - notificação ainda ativa');
+        }
       }, 25000);
+    }
+    
+    // Se TODAS as notificações fecharam, liberar bloqueio imediatamente
+    if (hadModalBefore && !hasModalNow) {
+      console.log('🔓 [DASHBOARD] Todas as notificações fecharam - liberando bloqueio imediatamente');
+      refreshBlockedUntilRef.current = null;
+      
+      // Limpar timer se existir
+      if (refreshBlockTimerRef.current) {
+        clearTimeout(refreshBlockTimerRef.current);
+        refreshBlockTimerRef.current = null;
+      }
     }
     
     // Cleanup do timer quando componente desmontar
@@ -1639,7 +1658,10 @@ const Dashboard = () => {
         // 1. Verificar se há notificação ativa (modal aberto)
         // 2. Verificar se o refresh está bloqueado (após receber notificação recente)
         const hasActiveNotification = fechamentoModalRef.current || agendamentoModalRef.current || newLeadModalRef.current;
-        const isRefreshBlocked = refreshBlockedRef.current;
+        
+        // Verificar bloqueio usando timestamp (mais confiável que flag booleana)
+        const now = Date.now();
+        const isRefreshBlocked = refreshBlockedUntilRef.current !== null && now < refreshBlockedUntilRef.current;
         
         if (hasActiveNotification) {
           console.log('⏸️ [DASHBOARD] Refresh cancelado - notificação ativa:', {
@@ -1651,7 +1673,8 @@ const Dashboard = () => {
         }
         
         if (isRefreshBlocked) {
-          console.log('🔒 [DASHBOARD] Refresh bloqueado - notificação recente recebida (aguarde 25s)');
+          const remainingSeconds = Math.ceil((refreshBlockedUntilRef.current - now) / 1000);
+          console.log(`🔒 [DASHBOARD] Refresh bloqueado - ainda faltam ${remainingSeconds}s`);
           return; // Cancelar refresh se estiver bloqueado por notificação recente
         }
         
