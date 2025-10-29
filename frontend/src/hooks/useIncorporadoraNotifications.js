@@ -19,14 +19,34 @@ const useIncorporadoraNotifications = () => {
   const lastJoinCheckRef = useRef(0); // Ref para rastrear último check de join sem usar localStorage
   const joiningGroupRef = useRef(false); // Ref para evitar múltiplas chamadas simultâneas de joinGroup
 
-  // Função para parar música - usar useCallback para garantir que sempre tenha acesso ao ref atual
-  const stopNotificationSound = useCallback(() => {
+  // Função GLOBAL para parar TODOS os áudios da página (incluindo outros hooks)
+  const stopAllAudio = useCallback(() => {
+    // Parar áudio deste hook
     if (audioInstanceRef.current) {
       audioInstanceRef.current.pause();
       audioInstanceRef.current.currentTime = 0;
       audioInstanceRef.current = null;
     }
+    
+    // Parar TODOS os elementos <audio> na página (incluindo outros hooks)
+    try {
+      const allAudioElements = document.querySelectorAll('audio');
+      allAudioElements.forEach((audio) => {
+        if (!audio.paused) {
+          audio.pause();
+          audio.currentTime = 0;
+        }
+      });
+      console.log('🔇 [INCORPORADORA] Todos os áudios parados (incluindo outros hooks)');
+    } catch (error) {
+      console.error('❌ [INCORPORADORA] Erro ao parar todos os áudios:', error);
+    }
   }, []);
+
+  // Função para parar música - usar useCallback para garantir que sempre tenha acesso ao ref atual
+  const stopNotificationSound = useCallback(() => {
+    stopAllAudio();
+  }, [stopAllAudio]);
 
   // Função para tocar som de notificação - usar useCallback para garantir que sempre tenha acesso ao ref atual
   const playNotificationSound = useCallback((musicaUrl) => {
@@ -462,6 +482,13 @@ const useIncorporadoraNotifications = () => {
           timestamp: new Date().toISOString(),
           url: window.location.href
         });
+        
+        // CRÍTICO: Resetar estado ANTES de processar nova notificação
+        audioStartedRef.current = false;
+        
+        // CRÍTICO: Parar TODOS os áudios da página (incluindo áudios de outros hooks)
+        console.log('🛑 [INCORPORADORA] Parando TODOS os áudios (incluindo agendamento e fechamento) para nova notificação de lead');
+        stopAllAudio();
         
         // REMOVIDO: Reload automático causa problemas em produção
         // Mostrar modal diretamente sem reload

@@ -18,14 +18,34 @@ const useFechamentoNotifications = () => {
   const lastJoinCheckRef = useRef(0); // Ref para rastrear último check de join sem usar localStorage
   const joiningGroupRef = useRef(false); // Ref para evitar múltiplas chamadas simultâneas de joinGroup
 
-  // Função para parar música - estabilizada com useCallback
-  const stopFechamentoSound = useCallback(() => {
+  // Função GLOBAL para parar TODOS os áudios da página (incluindo outros hooks)
+  const stopAllAudio = useCallback(() => {
+    // Parar áudio deste hook
     if (audioInstanceRef.current) {
       audioInstanceRef.current.pause();
       audioInstanceRef.current.currentTime = 0;
       audioInstanceRef.current = null;
     }
+    
+    // Parar TODOS os elementos <audio> na página (incluindo outros hooks)
+    try {
+      const allAudioElements = document.querySelectorAll('audio');
+      allAudioElements.forEach((audio) => {
+        if (!audio.paused) {
+          audio.pause();
+          audio.currentTime = 0;
+        }
+      });
+      console.log('🔇 [FECHAMENTO] Todos os áudios parados (incluindo outros hooks)');
+    } catch (error) {
+      console.error('❌ [FECHAMENTO] Erro ao parar todos os áudios:', error);
+    }
   }, []);
+
+  // Função para parar música - estabilizada com useCallback
+  const stopFechamentoSound = useCallback(() => {
+    stopAllAudio();
+  }, [stopAllAudio]);
 
   // Função para tocar música - estabilizada com useCallback
   const playFechamentoSound = useCallback((musicaUrl) => {
@@ -319,12 +339,9 @@ const useFechamentoNotifications = () => {
         // CRÍTICO: Resetar estado ANTES de processar nova notificação
         audioStartedRef.current = false;
         
-        // Parar música anterior se estiver tocando
-        if (audioInstanceRef.current && !audioInstanceRef.current.paused) {
-          console.log('🛑 [FECHAMENTO] Parando música anterior para nova notificação');
-          audioInstanceRef.current.pause();
-          audioInstanceRef.current.currentTime = 0;
-        }
+        // CRÍTICO: Parar TODOS os áudios da página (incluindo áudios de outros hooks)
+        console.log('🛑 [FECHAMENTO] Parando TODOS os áudios (incluindo agendamento) para nova notificação de fechamento');
+        stopAllAudio();
         
         // Limpar timer anterior se existir
         if (modalTimerRef.current) {
