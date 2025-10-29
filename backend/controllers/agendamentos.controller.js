@@ -334,12 +334,18 @@ const createAgendamento = async (req, res) => {
       // Usar io diretamente do app.locals se disponível
       const ioInstance = req.app.locals.io || req.io;
       if (ioInstance && ioInstance.sockets) {
-        ioInstance.in('incorporadora-notifications').clients((err, clients) => {
-          if (!err) {
+        try {
+          const room = ioInstance.sockets.adapter.rooms.get('incorporadora-notifications');
+          if (room) {
+            const clients = Array.from(room);
             console.log('📊 [SOCKET.IO] Total de clientes no grupo antes de emitir:', clients.length);
             console.log('📋 [SOCKET.IO] IDs dos clientes que receberão notificação:', clients);
+          } else {
+            console.log('📊 [SOCKET.IO] Nenhum cliente no grupo incorporadora-notifications antes de emitir');
           }
-        });
+        } catch (error) {
+          console.error('❌ [SOCKET.IO] Erro ao verificar clientes no grupo:', error);
+        }
       }
       
       req.io.to('incorporadora-notifications').emit('new-agendamento-incorporadora', {
@@ -360,11 +366,17 @@ const createAgendamento = async (req, res) => {
       
       // CRÍTICO: Verificar quantos clientes estão no grupo DEPOIS de emitir
       if (ioInstance && ioInstance.sockets) {
-        ioInstance.in('incorporadora-notifications').clients((err, clients) => {
-          if (!err) {
+        try {
+          const room = ioInstance.sockets.adapter.rooms.get('incorporadora-notifications');
+          if (room) {
+            const clients = Array.from(room);
             console.log('📊 [SOCKET.IO] Total de clientes no grupo após emitir:', clients.length);
+          } else {
+            console.log('📊 [SOCKET.IO] Nenhum cliente no grupo incorporadora-notifications após emitir');
           }
-        });
+        } catch (error) {
+          console.error('❌ [SOCKET.IO] Erro ao verificar clientes no grupo:', error);
+        }
       }
     } else {
       console.log('⚠️ [SOCKET.IO] Evento new-agendamento-incorporadora não enviado:', {

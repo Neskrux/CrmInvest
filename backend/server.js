@@ -350,12 +350,18 @@ if (io) {
         });
         
         // CRÍTICO: Verificar quantos clientes estão no grupo para debug
-        io.in('incorporadora-notifications').clients((err, clients) => {
-          if (!err) {
+        try {
+          const room = io.sockets.adapter.rooms.get('incorporadora-notifications');
+          if (room) {
+            const clients = Array.from(room);
             console.log('📊 [SOCKET.IO] Total de clientes no grupo incorporadora-notifications:', clients.length);
             console.log('📋 [SOCKET.IO] IDs dos clientes conectados:', clients);
+          } else {
+            console.log('📊 [SOCKET.IO] Nenhum cliente no grupo incorporadora-notifications ainda');
           }
-        });
+        } catch (error) {
+          console.error('❌ [SOCKET.IO] Erro ao verificar clientes no grupo:', error);
+        }
         
         console.log('✅ [SOCKET.IO] Cliente adicionado ao grupo: incorporadora-notifications');
         console.log('🏢 [SOCKET.IO] Incorporadora conectada - Notificações ativas para:', {
