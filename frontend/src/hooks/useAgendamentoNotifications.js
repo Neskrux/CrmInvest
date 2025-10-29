@@ -15,6 +15,8 @@ const useAgendamentoNotifications = () => {
   const audioStartedRef = useRef(false); // Rastrear se a música já começou a tocar
   const timerCreatedAtRef = useRef(null); // Timestamp de quando o timer foi criado para proteção
   const preloadedAudioRef = useRef(null); // Áudio pré-carregado para iniciar mais rápido
+  const socketRef = useRef(null); // Ref para rastrear socket sem causar re-renders
+  const isInitializedRef = useRef(false); // Ref para garantir que só inicializa uma vez
 
   // Função para parar música - usar useCallback para garantir que sempre tenha acesso ao ref atual
   const stopAgendamentoSound = useCallback(() => {
@@ -244,14 +246,19 @@ const useAgendamentoNotifications = () => {
       return;
     }
 
-    // CRÍTICO: Garantir que só há uma conexão Socket.IO
-    // Se já existe socket conectado, reutilizar ao invés de criar novo
-    if (socket && socket.connected) {
-      console.log('♻️ [SOCKET.IO] Reutilizando conexão Socket.IO existente:', socket.id);
-      // Apenas garantir que está no grupo
-      const joinGroup = () => {
-        if (socket.connected) {
-          socket.emit('join-incorporadora-notifications', {
+    // CRÍTICO: Garantir que só inicializa uma vez por dispositivo
+    // Cada dispositivo (PC/TV) deve ter sua própria conexão Socket.IO
+    if (isInitializedRef.current && socketRef.current && socketRef.current.connected) {
+      console.log('♻️ [SOCKET.IO] Socket já inicializado, usando conexão existente:', {
+        socketId: socketRef.current.id,
+        connected: socketRef.current.connected,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Garantir que está no grupo periodicamente
+      const ensureInGroup = () => {
+        if (socketRef.current && socketRef.current.connected) {
+          socketRef.current.emit('join-incorporadora-notifications', {
             userType: 'admin',
             userId: user.id,
             empresaId: user.empresa_id
@@ -259,13 +266,20 @@ const useAgendamentoNotifications = () => {
         }
       };
       
-      // Verificar se já está no grupo, se não, entrar
-      setTimeout(() => {
-        joinGroup();
-      }, 100);
+      // Verificar se está no grupo periodicamente
+      const checkInterval = setInterval(() => {
+        if (socketRef.current && socketRef.current.connected) {
+          ensureInGroup();
+        } else {
+          clearInterval(checkInterval);
+        }
+      }, 60000); // A cada 1 minuto
       
-      return; // Não criar nova conexão
+      return () => clearInterval(checkInterval);
     }
+
+    // Marcar como inicializado ANTES de criar conexão
+    isInitializedRef.current = true;
 
     // Configurar URL do backend - CORRIGIDO para produção
     let API_BASE_URL;
@@ -278,24 +292,28 @@ const useAgendamentoNotifications = () => {
       API_BASE_URL = 'http://localhost:5000';
     }
     
-    console.log('🔗 [SOCKET.IO] Conectando ao backend:', {
+    console.log('🔗 [SOCKET.IO] Criando NOVA conexão Socket.IO:', {
       API_BASE_URL,
       NODE_ENV: process.env.NODE_ENV,
-      REACT_APP_API_URL: process.env.REACT_APP_API_URL
+      REACT_APP_API_URL: process.env.REACT_APP_API_URL,
+      deviceId: `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: new Date().toISOString()
     });
     
-    // Conectar ao Socket.IO com configurações ROBUSTAS para produção
+    // CRÍTICO: forceNew: true para garantir que cada dispositivo tenha sua própria conexão
+    // Isso é essencial para múltiplos PCs/TVs funcionarem simultaneamente
     const newSocket = io(API_BASE_URL, {
       transports: ['websocket', 'polling'], // Tentar websocket primeiro, fallback para polling
-      forceNew: false, // NÃO forçar nova conexão - reutilizar se possível
+      forceNew: true, // ✅ FORÇAR nova conexão - cada dispositivo precisa da sua própria!
       reconnection: true,
       reconnectionAttempts: Infinity, // Tentar reconectar infinitamente
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: 20000,
-      // Adicionar identificador único para cada aba
+      // Adicionar identificador único para cada dispositivo/aba
       query: {
         tabId: `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        deviceId: `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId: user.id,
         empresaId: user.empresa_id
       },
@@ -305,6 +323,8 @@ const useAgendamentoNotifications = () => {
       autoConnect: true
     });
     
+    // Guardar referência do socket
+    socketRef.current = newSocket;
     setSocket(newSocket);
 
     // Função auxiliar para entrar no grupo (chamada múltiplas vezes se necessário)
@@ -314,7 +334,9 @@ const useAgendamentoNotifications = () => {
           socketId: newSocket.id,
           userId: user.id,
           empresaId: user.empresa_id,
-          connected: newSocket.connected
+          connected: newSocket.connected,
+          deviceId: newSocket.query?.deviceId,
+          timestamp: new Date().toISOString()
         });
         
         newSocket.emit('join-incorporadora-notifications', {
@@ -327,34 +349,9 @@ const useAgendamentoNotifications = () => {
       }
     };
 
-    // Listener para confirmação de entrada no grupo
-    newSocket.on('joined-incorporadora-notifications', (data) => {
-      if (data.success) {
-        console.log('✅ [SOCKET.IO] Confirmado: Entrou no grupo incorporadora-notifications:', {
-          socketId: data.socketId,
-          timestamp: data.timestamp
-        });
-      } else {
-        console.error('❌ [SOCKET.IO] Falha ao entrar no grupo:', {
-          motivo: data.motivo,
-          timestamp: data.timestamp
-        });
-        // Tentar novamente após delay
-        setTimeout(() => {
-          if (newSocket.connected) {
-            joinGroup();
-          }
-        }, 2000);
-      }
-    });
-
-    // Entrar no grupo quando conectado
-    if (newSocket.connected) {
-      joinGroup();
-    }
-
-    // Listener para novos agendamentos - REMOVIDO RELOAD AUTOMÁTICO
-    newSocket.on('new-agendamento-incorporadora', (data) => {
+    // CRÍTICO: Adicionar listener ANTES de entrar no grupo
+    // Isso garante que eventos sejam capturados mesmo se a conexão já estiver estabelecida
+    const handleNewAgendamento = (data) => {
       try {
         console.log('🔔 [SOCKET.IO] Recebido evento new-agendamento-incorporadora:', {
           agendamentoId: data.agendamentoId,
@@ -363,6 +360,7 @@ const useAgendamentoNotifications = () => {
           data_agendamento: data.data_agendamento,
           horario: data.horario,
           socketId: newSocket.id,
+          deviceId: newSocket.query?.deviceId,
           connected: newSocket.connected,
           timestamp: new Date().toISOString()
         });
@@ -385,11 +383,9 @@ const useAgendamentoNotifications = () => {
         }
         
         // Fechar modal anterior se estiver aberto
-        if (showAgendamentoModal) {
-          console.log('🛑 [AGENDAMENTO] Fechando modal anterior para nova notificação');
-          setShowAgendamentoModal(false);
-          setAgendamentoData(null);
-        }
+        // Sempre fechar para garantir que nova notificação apareça
+        setShowAgendamentoModal(false);
+        setAgendamentoData(null);
         
         // Pré-carregar áudio ANTES de mostrar modal
         const audioSource = data.sdr_musica || `${process.env.PUBLIC_URL || ''}/audioNovoLead.mp3`;
@@ -429,7 +425,37 @@ const useAgendamentoNotifications = () => {
       } catch (error) {
         console.error('❌ [SOCKET.IO] Erro ao processar agendamento:', error);
       }
+    };
+    
+    // Adicionar listener ANTES de entrar no grupo
+    newSocket.on('new-agendamento-incorporadora', handleNewAgendamento);
+
+    // Listener para confirmação de entrada no grupo
+    newSocket.on('joined-incorporadora-notifications', (data) => {
+      if (data.success) {
+        console.log('✅ [SOCKET.IO] Confirmado: Entrou no grupo incorporadora-notifications:', {
+          socketId: data.socketId,
+          deviceId: newSocket.query?.deviceId,
+          timestamp: data.timestamp
+        });
+      } else {
+        console.error('❌ [SOCKET.IO] Falha ao entrar no grupo:', {
+          motivo: data.motivo,
+          timestamp: data.timestamp
+        });
+        // Tentar novamente após delay
+        setTimeout(() => {
+          if (newSocket.connected) {
+            joinGroup();
+          }
+        }, 2000);
+      }
     });
+
+    // Entrar no grupo quando conectado
+    if (newSocket.connected) {
+      joinGroup();
+    }
 
     // Log de conexão/desconexão - MELHORADO para produção
     newSocket.on('connect', () => {
@@ -549,8 +575,12 @@ const useAgendamentoNotifications = () => {
       newSocket.off('reconnect_error');
       newSocket.off('reconnect_failed');
       
+      // Resetar flag de inicialização
+      isInitializedRef.current = false;
+      socketRef.current = null;
+      
       // Parar música apenas se não houver modal ativo
-      if (!showAgendamentoModal && audioInstanceRef.current) {
+      if (audioInstanceRef.current) {
         audioInstanceRef.current.pause();
         audioInstanceRef.current.currentTime = 0;
         audioInstanceRef.current = null;

@@ -334,20 +334,48 @@ if (io) {
       
       // Permitir TODOS os usuários da incorporadora (empresa_id === 5)
       // Isso garante que todos os usuários logados recebam as notificações de novo lead
-      if (data.empresaId === 5) {
+      if (data.empresaId === 5 && socket.connected) {
         socket.join('incorporadora-notifications');
+        
+        // Confirmar entrada no grupo ao cliente
+        socket.emit('joined-incorporadora-notifications', {
+          success: true,
+          socketId: socket.id,
+          timestamp: new Date().toISOString()
+        });
+        
+        // CRÍTICO: Verificar quantos clientes estão no grupo para debug
+        io.in('incorporadora-notifications').clients((err, clients) => {
+          if (!err) {
+            console.log('📊 [SOCKET.IO] Total de clientes no grupo incorporadora-notifications:', clients.length);
+            console.log('📋 [SOCKET.IO] IDs dos clientes conectados:', clients);
+          }
+        });
+        
         console.log('✅ [SOCKET.IO] Cliente adicionado ao grupo: incorporadora-notifications');
         console.log('🏢 [SOCKET.IO] Incorporadora conectada - Notificações ativas para:', {
           empresaId: data.empresaId,
           socketId: socket.id,
           userType: data.userType,
-          userId: data.userId
+          userId: data.userId,
+          rooms: Array.from(socket.rooms)
         });
       } else {
+        const motivo = !socket.connected ? 'Socket não conectado' : 
+                      data.empresaId !== 5 ? 'Não é incorporadora (empresa_id !== 5)' : 
+                      'Desconhecido';
+        
         console.log('⚠️ [SOCKET.IO] Acesso negado ao grupo incorporadora-notifications:', {
           userType: data.userType,
           empresaId: data.empresaId,
-          motivo: 'Apenas usuários da incorporadora (empresa_id === 5) podem receber notificações'
+          socketConnected: socket.connected,
+          motivo
+        });
+        
+        socket.emit('joined-incorporadora-notifications', {
+          success: false,
+          motivo,
+          timestamp: new Date().toISOString()
         });
       }
     });

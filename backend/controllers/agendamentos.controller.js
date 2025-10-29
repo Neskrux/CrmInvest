@@ -330,6 +330,18 @@ const createAgendamento = async (req, res) => {
         telefone: pacienteData?.telefone || 'N/A'
       });
 
+      // CRÍTICO: Verificar quantos clientes estão no grupo ANTES de emitir
+      // Usar io diretamente do app.locals se disponível
+      const ioInstance = req.app.locals.io || req.io;
+      if (ioInstance && ioInstance.sockets) {
+        ioInstance.in('incorporadora-notifications').clients((err, clients) => {
+          if (!err) {
+            console.log('📊 [SOCKET.IO] Total de clientes no grupo antes de emitir:', clients.length);
+            console.log('📋 [SOCKET.IO] IDs dos clientes que receberão notificação:', clients);
+          }
+        });
+      }
+      
       req.io.to('incorporadora-notifications').emit('new-agendamento-incorporadora', {
         agendamentoId: data[0].id,
         paciente_nome: pacienteData?.nome || 'Cliente',
@@ -345,6 +357,15 @@ const createAgendamento = async (req, res) => {
       });
       
       console.log('✅ [SOCKET.IO] Evento new-agendamento-incorporadora enviado para grupo incorporadora-notifications');
+      
+      // CRÍTICO: Verificar quantos clientes estão no grupo DEPOIS de emitir
+      if (ioInstance && ioInstance.sockets) {
+        ioInstance.in('incorporadora-notifications').clients((err, clients) => {
+          if (!err) {
+            console.log('📊 [SOCKET.IO] Total de clientes no grupo após emitir:', clients.length);
+          }
+        });
+      }
     } else {
       console.log('⚠️ [SOCKET.IO] Evento new-agendamento-incorporadora não enviado:', {
         temSocketIO: !!req.io,
