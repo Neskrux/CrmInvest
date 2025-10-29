@@ -17,6 +17,7 @@ const useAgendamentoNotifications = () => {
   const preloadedAudioRef = useRef(null); // Áudio pré-carregado para iniciar mais rápido
   const socketRef = useRef(null); // Ref para rastrear socket sem causar re-renders
   const isInitializedRef = useRef(false); // Ref para garantir que só inicializa uma vez
+  const lastJoinCheckRef = useRef(0); // Ref para rastrear último check de join sem usar localStorage
 
   // Função para parar música - usar useCallback para garantir que sempre tenha acesso ao ref atual
   const stopAgendamentoSound = useCallback(() => {
@@ -246,10 +247,39 @@ const useAgendamentoNotifications = () => {
       return;
     }
 
-    // CRÍTICO: Permitir múltiplas conexões simultâneas por dispositivo
-    // Cada dispositivo (PC/TV) deve ter sua própria conexão Socket.IO
-    // REMOVIDO: Bloqueio de inicialização que impedia múltiplas conexões
-    // Com forceNew: true, cada conexão será única mesmo se já houver uma existente
+    // CRÍTICO: Verificar se já existe uma conexão ativa antes de criar nova
+    // Isso evita múltiplas conexões após reload ou re-render
+    if (socketRef.current && socketRef.current.connected) {
+      console.log('♻️ [SOCKET.IO] Socket já existe e está conectado, reutilizando:', {
+        socketId: socketRef.current.id,
+        connected: socketRef.current.connected,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Garantir que está no grupo periodicamente
+      const ensureInGroup = () => {
+        if (socketRef.current && socketRef.current.connected) {
+          socketRef.current.emit('join-incorporadora-notifications', {
+            userType: 'admin',
+            userId: user.id,
+            empresaId: user.empresa_id
+          });
+        }
+      };
+      
+      // Verificar se está no grupo periodicamente
+      const checkInterval = setInterval(() => {
+        if (socketRef.current && socketRef.current.connected) {
+          ensureInGroup();
+        } else {
+          clearInterval(checkInterval);
+        }
+      }, 60000); // A cada 1 minuto
+      
+      return () => {
+        clearInterval(checkInterval);
+      };
+    }
 
     // Configurar URL do backend - CORRIGIDO para produção
     let API_BASE_URL;
@@ -262,6 +292,18 @@ const useAgendamentoNotifications = () => {
       API_BASE_URL = 'http://localhost:5000';
     }
     
+    // Se existe socket anterior mas desconectado, limpar primeiro
+    if (socketRef.current && !socketRef.current.connected) {
+      console.log('🧹 [SOCKET.IO] Limpando socket desconectado antes de criar novo...');
+      try {
+        socketRef.current.removeAllListeners();
+        socketRef.current.disconnect();
+      } catch (e) {
+        console.log('⚠️ [SOCKET.IO] Erro ao limpar socket anterior:', e);
+      }
+      socketRef.current = null;
+    }
+    
     console.log('🔗 [SOCKET.IO] Criando NOVA conexão Socket.IO:', {
       API_BASE_URL,
       NODE_ENV: process.env.NODE_ENV,
@@ -271,10 +313,10 @@ const useAgendamentoNotifications = () => {
     });
     
     // CRÍTICO: forceNew: true para garantir que cada dispositivo tenha sua própria conexão
-    // Isso é essencial para múltiplos PCs/TVs funcionarem simultaneamente
+    // Mas apenas se não houver conexão existente
     const newSocket = io(API_BASE_URL, {
       transports: ['websocket', 'polling'], // Tentar websocket primeiro, fallback para polling
-      forceNew: true, // ✅ FORÇAR nova conexão - cada dispositivo precisa da sua própria!
+      forceNew: !socketRef.current, // Só forçar nova se não houver socket existente
       reconnection: true,
       reconnectionAttempts: Infinity, // Tentar reconectar infinitamente
       reconnectionDelay: 1000,
@@ -522,11 +564,10 @@ const useAgendamentoNotifications = () => {
         
         // Verificar se ainda está no grupo - re-entrar se necessário
         // Isso garante que mesmo se houver algum problema, re-entra automaticamente
-        const lastJoinCheck = localStorage.getItem('last_join_check_agendamento');
         const now = Date.now();
-        if (!lastJoinCheck || (now - parseInt(lastJoinCheck)) > 60000) { // A cada 1 minuto
+        if (!lastJoinCheckRef.current || (now - lastJoinCheckRef.current) > 60000) { // A cada 1 minuto
           joinGroup();
-          localStorage.setItem('last_join_check_agendamento', now.toString());
+          lastJoinCheckRef.current = now;
         }
       }
     }, 30000); // 30 segundos
@@ -545,34 +586,33 @@ const useAgendamentoNotifications = () => {
       }
       
       // Remover todos os listeners antes de desconectar
-      newSocket.off('new-agendamento-incorporadora');
-      newSocket.off('joined-incorporadora-notifications');
-      newSocket.off('pong');
-      newSocket.off('connect');
-      newSocket.off('disconnect');
-      newSocket.off('connect_error');
-      newSocket.off('reconnect');
-      newSocket.off('reconnect_attempt');
-      newSocket.off('reconnect_error');
-      newSocket.off('reconnect_failed');
-      
-      // Resetar flag de inicialização
-      isInitializedRef.current = false;
-      socketRef.current = null;
+      newSocket.removeAllListeners();
       
       // Parar música apenas se não houver modal ativo
-      if (audioInstanceRef.current) {
-        audioInstanceRef.current.pause();
-        audioInstanceRef.current.currentTime = 0;
-        audioInstanceRef.current = null;
+      if (audioInstanceRef.current && !showAgendamentoModal) {
+        try {
+          audioInstanceRef.current.pause();
+          audioInstanceRef.current.currentTime = 0;
+          audioInstanceRef.current = null;
+        } catch (e) {
+          // Ignorar erros ao limpar áudio
+        }
       }
       
-      // Desconectar socket
-      if (newSocket.connected) {
+      // Desconectar socket apenas se não for a mesma referência que está sendo usada
+      if (socketRef.current === newSocket && newSocket.connected) {
+        // Não desconectar se ainda está sendo usado
+        console.log('⚠️ [SOCKET.IO] Socket ainda em uso, não desconectando no cleanup');
+      } else if (newSocket.connected) {
         newSocket.disconnect();
       }
+      
+      // Limpar referência apenas se for o socket que está sendo limpo
+      if (socketRef.current === newSocket) {
+        socketRef.current = null;
+      }
     };
-  }, [user?.id, user?.empresa_id, user?.tipo, playAgendamentoSound, stopAgendamentoSound]);
+  }, [user?.id, user?.empresa_id, user?.tipo]); // REMOVIDO: playAgendamentoSound e stopAgendamentoSound das dependências
 
   // useLayoutEffect para criar timer e tocar música APÓS renderização do modal
   useLayoutEffect(() => {
