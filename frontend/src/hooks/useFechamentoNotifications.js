@@ -15,6 +15,8 @@ const useFechamentoNotifications = () => {
   const audioStartedRef = useRef(false); // Rastrear se a música já começou a tocar
   const timerCreatedAtRef = useRef(null); // Timestamp de quando o timer foi criado para proteção
   const preloadedAudioRef = useRef(null); // Áudio pré-carregado para iniciar mais rápido
+  const lastJoinCheckRef = useRef(0); // Ref para rastrear último check de join sem usar localStorage
+  const joiningGroupRef = useRef(false); // Ref para evitar múltiplas chamadas simultâneas de joinGroup
 
   // Função para parar música - estabilizada com useCallback
   const stopFechamentoSound = useCallback(() => {
@@ -207,63 +209,29 @@ const useFechamentoNotifications = () => {
     tipo: user?.tipo
   }), [user?.id, user?.empresa_id, user?.tipo]);
 
-  // Verificar e processar notificação pendente do localStorage (após refresh)
-  useEffect(() => {
-    if (!userData || !userData.id || userData.tipo !== 'admin' || userData.empresa_id !== 5) {
-      return;
-    }
-
-    const pendingNotification = localStorage.getItem('pending_notification');
-
-    if (pendingNotification) {
-      try {
-        const notification = JSON.parse(pendingNotification);
-        
-        // Verificar se é uma notificação deste hook (fechamento)
-        if (notification.type === 'fechamento' && notification.data) {
-          console.log('✅ [NOTIFICAÇÃO] Processando fechamento pendente');
-          
-          // Limpar do localStorage imediatamente para evitar processar novamente
-          localStorage.removeItem('pending_notification');
-          
-          // PRÉ-CARREGAR áudio ANTES de mostrar modal (para ter mais tempo de carregar)
-          const audioSource = notification.data.corretor_musica || `${process.env.PUBLIC_URL || ''}/audioNovoLead.mp3`;
-          try {
-            const preloadAudio = new Audio(audioSource);
-            preloadAudio.preload = 'auto';
-            preloadAudio.volume = 0.6;
-            preloadAudio.load(); // Forçar início do carregamento
-            preloadedAudioRef.current = preloadAudio;
-            console.log('📦 [FECHAMENTO] Áudio pré-carregado:', audioSource);
-          } catch (e) {
-            console.log('⚠️ [FECHAMENTO] Erro ao pré-carregar áudio:', e);
-          }
-          
-          // Processar a notificação: mostrar modal
-          setFechamentoData(notification.data);
-          setShowFechamentoModal(true);
-          previousModalStateRef.current = true;
-          audioStartedRef.current = false;
-          
-          // Tocar música será feito no useLayoutEffect após renderização
-          // Timer será criado no useLayoutEffect separado
-        }
-      } catch (error) {
-        console.error('❌ [NOTIFICAÇÃO] Erro ao processar notificação:', error);
-        localStorage.removeItem('pending_notification');
-      }
-    }
-  }, [userData?.id, userData?.tipo, userData?.empresa_id, playFechamentoSound, stopFechamentoSound]);
+  // REMOVIDO: useEffect para processar notificação pendente do localStorage
+  // Não precisamos mais disso pois não estamos mais fazendo reload da página
 
   // Inicializar socket apenas uma vez
   useEffect(() => {
-    // Verificar se já foi inicializado
-    if (isInitializedRef.current) {
+    // Permitir entrada APENAS para admin da incorporadora
+    if (!userData || userData.tipo !== 'admin' || userData.empresa_id !== 5 || !userData.id) {
       return;
     }
 
-    // Permitir entrada APENAS para admin da incorporadora
-    if (userData.tipo !== 'admin' || userData.empresa_id !== 5 || !userData.id) {
+    // CRÍTICO: Cada hook precisa de sua própria conexão Socket.IO
+    // Não reutilizar conexões de outros hooks para evitar conflitos de listeners
+
+    // Limpar conexões desconectadas antes de criar nova
+    if (socketRef.current && !socketRef.current.connected) {
+      console.log('🧹 [FECHAMENTO] Limpando conexão desconectada antes de criar nova');
+      socketRef.current.removeAllListeners();
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+
+    // Verificar se já foi inicializado (evitar múltiplas inicializações)
+    if (isInitializedRef.current && socketRef.current) {
       return;
     }
 
@@ -273,99 +241,222 @@ const useFechamentoNotifications = () => {
     // Conectar ao Socket.IO com configurações para múltiplas abas
     const newSocket = io(API_BASE_URL, {
       transports: ['websocket', 'polling'],
-      forceNew: true, // Forçar nova conexão
+      forceNew: true, // ✅ FORÇAR nova conexão - cada dispositivo precisa da sua própria!
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
       timeout: 20000,
-      // Adicionar identificador único para cada aba
       query: {
         tabId: `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        userId: userData.id
-      }
+        deviceId: `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        userId: userData.id,
+        empresaId: userData.empresa_id
+      },
+      upgrade: true,
+      rememberUpgrade: true,
+      autoConnect: true
     });
     
     socketRef.current = newSocket;
     isInitializedRef.current = true;
 
-
-    // Entrar no grupo de notificações da incorporadora
-    newSocket.emit('join-incorporadora-notifications', {
-      userType: 'admin',
-      userId: userData.id,
-      empresaId: userData.empresa_id,
-      tabId: newSocket.query?.tabId
-    });
-
-    // Debug: Listener para eventos de conexão
-    newSocket.on('connect', () => {
-      // Re-entrar no grupo de notificações ao reconectar
+    // Função auxiliar para entrar no grupo (chamada múltiplas vezes se necessário)
+    const joinGroup = () => {
+      // Proteção contra múltiplas chamadas simultâneas
+      if (joiningGroupRef.current) {
+        console.log('⚠️ [FECHAMENTO] Join já em andamento, ignorando chamada duplicada');
+        return;
+      }
+      
+      if (!newSocket.connected) {
+        console.warn('⚠️ [FECHAMENTO] Socket não conectado, aguardando conexão...');
+        return;
+      }
+      
+      joiningGroupRef.current = true;
+      
+      console.log('📢 [SOCKET.IO] Entrando no grupo incorporadora-notifications:', {
+        socketId: newSocket.id,
+        userId: userData.id,
+        empresaId: userData.empresa_id,
+        connected: newSocket.connected,
+        deviceId: newSocket.query?.deviceId,
+        timestamp: new Date().toISOString()
+      });
+      
       newSocket.emit('join-incorporadora-notifications', {
         userType: 'admin',
         userId: userData.id,
-        empresaId: userData.empresa_id,
-        tabId: newSocket.query?.tabId
+        empresaId: userData.empresa_id
       });
+      
+      // Resetar flag após um tempo para permitir nova tentativa se necessário
+      setTimeout(() => {
+        joiningGroupRef.current = false;
+      }, 2000);
+    };
+
+    // CRÍTICO: Adicionar listener ANTES de entrar no grupo
+    // Isso garante que eventos sejam capturados mesmo se a conexão já estiver estabelecida
+    const handleNewFechamento = (data) => {
+      try {
+        console.log('🔔🔔🔔 [FECHAMENTO NOTIFICATIONS] Recebido evento new-fechamento-incorporadora:', {
+          fechamentoId: data.fechamentoId,
+          paciente_nome: data.paciente_nome,
+          corretor_nome: data.corretor_nome,
+          valor_fechado: data.valor_fechado,
+          socketId: newSocket.id,
+          deviceId: newSocket.query?.deviceId,
+          tabId: newSocket.query?.tabId,
+          userId: userData.id,
+          empresaId: userData.empresa_id,
+          connected: newSocket.connected,
+          timestamp: new Date().toISOString(),
+          url: window.location.href
+        });
+        
+        // CRÍTICO: Resetar estado ANTES de processar nova notificação
+        audioStartedRef.current = false;
+        
+        // Parar música anterior se estiver tocando
+        if (audioInstanceRef.current && !audioInstanceRef.current.paused) {
+          console.log('🛑 [FECHAMENTO] Parando música anterior para nova notificação');
+          audioInstanceRef.current.pause();
+          audioInstanceRef.current.currentTime = 0;
+        }
+        
+        // Limpar timer anterior se existir
+        if (modalTimerRef.current) {
+          clearTimeout(modalTimerRef.current);
+          modalTimerRef.current = null;
+        }
+        
+        // Fechar modal anterior se estiver aberto
+        setShowFechamentoModal(false);
+        setFechamentoData(null);
+        
+        // Pré-carregar áudio ANTES de mostrar modal
+        const audioSource = data.corretor_musica || `${process.env.PUBLIC_URL || ''}/audioNovoLead.mp3`;
+        try {
+          const preloadAudio = new Audio(audioSource);
+          preloadAudio.preload = 'auto';
+          preloadAudio.volume = 0.6;
+          preloadAudio.load();
+          preloadedAudioRef.current = preloadAudio;
+          console.log('📦 [FECHAMENTO] Áudio pré-carregado:', audioSource);
+        } catch (e) {
+          console.log('⚠️ [FECHAMENTO] Erro ao pré-carregar áudio:', e);
+        }
+        
+        // Pequeno delay para garantir que o estado anterior foi limpo
+        setTimeout(() => {
+          setFechamentoData(data);
+          setShowFechamentoModal(true);
+          previousModalStateRef.current = false;
+          playFechamentoSound(data.corretor_musica);
+          console.log('✅ [SOCKET.IO] Notificação de fechamento processada e modal deve aparecer');
+        }, 100);
+      } catch (error) {
+        console.error('❌ [SOCKET.IO] Erro ao processar fechamento:', error);
+      }
+    };
+    
+    newSocket.on('new-fechamento-incorporadora', handleNewFechamento);
+
+    // CRÍTICO: Entrar no grupo IMEDIATAMENTE quando socket já está conectado
+    // Não esperar timeout - isso causa notificações perdidas!
+    if (newSocket.connected) {
+      console.log('⚡ [SOCKET.IO] Socket já conectado, entrando no grupo IMEDIATAMENTE');
+      joinGroup();
+    }
+
+    // Listener para confirmação de entrada no grupo
+    newSocket.on('joined-incorporadora-notifications', (data) => {
+      if (data.success) {
+        console.log('✅ [SOCKET.IO] Confirmado: Entrou no grupo incorporadora-notifications:', {
+          socketId: data.socketId,
+          deviceId: newSocket.query?.deviceId,
+          tabId: newSocket.query?.tabId,
+          userId: userData.id,
+          empresaId: userData.empresa_id,
+          timestamp: data.timestamp,
+          url: window.location.href
+        });
+        joiningGroupRef.current = false;
+      } else {
+        console.error('❌ [SOCKET.IO] Falha ao entrar no grupo:', {
+          motivo: data.motivo,
+          socketId: newSocket.id,
+          deviceId: newSocket.query?.deviceId,
+          timestamp: data.timestamp
+        });
+        joiningGroupRef.current = false;
+      }
+    });
+
+    // Log de conexão/desconexão - MELHORADO para produção
+    newSocket.on('connect', () => {
+      console.log('✅ [SOCKET.IO] Socket conectado:', {
+        socketId: newSocket.id,
+        userId: userData.id,
+        empresaId: userData.empresa_id,
+        timestamp: new Date().toISOString()
+      });
+      
+      // CRÍTICO: Re-entrar no grupo IMEDIATAMENTE ao reconectar
+      // Não esperar - isso causa notificações perdidas!
+      if (newSocket.connected && !joiningGroupRef.current) {
+        console.log('⚡ [SOCKET.IO] Entrando no grupo IMEDIATAMENTE após connect');
+        joinGroup();
+      }
+    });
+
+    newSocket.on('reconnect', (attemptNumber) => {
+      console.log('🔄 [SOCKET.IO] Reconectado após', attemptNumber, 'tentativas:', {
+        socketId: newSocket.id,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Re-entrar no grupo IMEDIATAMENTE após reconexão (com proteção)
+      if (newSocket.connected && !joiningGroupRef.current) {
+        console.log('⚡ [SOCKET.IO] Entrando no grupo IMEDIATAMENTE após reconnect');
+        joinGroup();
+      }
     });
 
     newSocket.on('connect_error', (error) => {
       console.error('❌ [FECHAMENTO] Erro de conexão:', error);
     });
 
-    // Listener para novos fechamentos
-    newSocket.on('new-fechamento-incorporadora', (data) => {
-      try {
-        // Debounce: evitar refresh se outro refresh aconteceu há menos de 2 segundos
-        const lastRefresh = localStorage.getItem('last_notification_refresh');
-        const now = Date.now();
-        const timeSinceLastRefresh = lastRefresh ? now - parseInt(lastRefresh) : Infinity;
-        
-        // IMPORTANTE: Fazer refresh ANTES de mostrar a notificação para garantir sockets ativos
-        // Salvar dados da notificação no localStorage para recuperar após reload
-        const notificationData = {
-          type: 'fechamento',
-          data: data,
-          timestamp: now
-        };
-        
-        // Se houver outra notificação pendente, mesclar (manter a mais recente)
-        const existingNotification = localStorage.getItem('pending_notification');
-        if (existingNotification && timeSinceLastRefresh < 2000) {
-          try {
-            const existing = JSON.parse(existingNotification);
-            // Manter a mais recente (normalmente a atual)
-            if (existing.timestamp && existing.timestamp > notificationData.timestamp) {
-              return;
-            }
-          } catch (e) {
-            // Se erro ao parsear, sobrescrever
-          }
-        }
-        
-        localStorage.setItem('pending_notification', JSON.stringify(notificationData));
-        localStorage.setItem('last_notification_refresh', now.toString());
-        
-        // Forçar sincronização do localStorage (alguns navegadores precisam disso)
-        if (window.localStorage) {
-          window.dispatchEvent(new Event('storage'));
-        }
-        
-        // Reload imediato - localStorage é síncrono
-        window.location.reload();
-        
-        // Não executar o resto do código pois a página vai recarregar
-        return;
-      } catch (error) {
-        console.error('❌ [FECHAMENTO] Erro ao processar fechamento:', error);
-      }
+    newSocket.on('disconnect', (reason) => {
+      console.log('❌ [SOCKET.IO] Desconectado:', {
+        reason,
+        socketId: newSocket.id,
+        timestamp: new Date().toISOString()
+      });
+      joiningGroupRef.current = false;
     });
 
-    // Cleanup apenas quando componente for desmontado - NÃO limpar timer aqui
+    // Heartbeat: ping/pong para manter conexão ativa
+    const heartbeatInterval = setInterval(() => {
+      if (newSocket.connected) {
+        newSocket.emit('ping', { timestamp: Date.now() });
+        
+        // Verificar se ainda está no grupo periodicamente
+        const now = Date.now();
+        if (now - lastJoinCheckRef.current > 60000) { // A cada 1 minuto
+          lastJoinCheckRef.current = now;
+          if (!joiningGroupRef.current) {
+            joinGroup();
+          }
+        }
+      }
+    }, 30000); // A cada 30 segundos
+
+    // Cleanup apenas quando componente for desmontado
     return () => {
-      // NÃO limpar timer no cleanup do socket - ele será limpo quando:
-      // 1. O timer executar (após 20s)
-      // 2. A música terminar (evento 'ended')
-      // 3. O modal fechar manualmente
+      clearInterval(heartbeatInterval);
       
       // Parar música apenas se não houver modal ativo
       if (!showFechamentoModal && audioInstanceRef.current) {
@@ -374,10 +465,17 @@ const useFechamentoNotifications = () => {
         audioInstanceRef.current = null;
       }
       
-      newSocket.disconnect();
-      isInitializedRef.current = false;
+      // Remover todos os listeners antes de desconectar
+      if (newSocket) {
+        newSocket.removeAllListeners();
+        // Só desconectar se for o socket atual
+        if (socketRef.current === newSocket) {
+          newSocket.disconnect();
+          socketRef.current = null;
+        }
+      }
     };
-  }, [userData, playFechamentoSound, stopFechamentoSound]);
+  }, [userData?.id, userData?.tipo, userData?.empresa_id, playFechamentoSound, stopFechamentoSound]);
 
   // useLayoutEffect para criar timer e tocar música APÓS renderização do modal
   useLayoutEffect(() => {
