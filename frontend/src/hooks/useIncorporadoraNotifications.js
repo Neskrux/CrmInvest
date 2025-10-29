@@ -1,16 +1,102 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from '../components/Toast';
 import io from 'socket.io-client';
 import logoBrasao from '../images/logobrasaopreto.png';
 
 const useIncorporadoraNotifications = () => {
   const { user, isIncorporadora } = useAuth();
-  const { showSuccessToast, showInfoToast } = useToast();
   const [socket, setSocket] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [showNewLeadModal, setShowNewLeadModal] = useState(false);
   const [newLeadData, setNewLeadData] = useState(null);
+  const audioInstanceRef = useRef(null);
+  const modalTimerRef = useRef(null);
+
+  // Função para parar música - usar useCallback para garantir que sempre tenha acesso ao ref atual
+  const stopNotificationSound = useCallback(() => {
+    if (audioInstanceRef.current) {
+      console.log('🔇 [AUDIO] Parando música');
+      audioInstanceRef.current.pause();
+      audioInstanceRef.current.currentTime = 0;
+      audioInstanceRef.current = null;
+    }
+  }, []);
+
+  // Função para tocar som de notificação - usar useCallback para garantir que sempre tenha acesso ao ref atual
+  const playNotificationSound = useCallback((musicaUrl) => {
+    try {
+      console.log('🔊 [AUDIO] Iniciando música de notificação', { musicaUrl });
+      
+      // Parar áudio anterior se existir
+      if (audioInstanceRef.current) {
+        audioInstanceRef.current.pause();
+        audioInstanceRef.current.currentTime = 0;
+        audioInstanceRef.current = null;
+      }
+      
+      // Usar música personalizada do corretor se disponível, senão usar áudio padrão
+      const audioSource = musicaUrl || `${process.env.PUBLIC_URL || ''}/audioNovoLead.mp3`;
+      const audio = new Audio(audioSource);
+      audio.volume = 1.0; // Volume máximo
+      audio.loop = true; // MÚSICA EM LOOP ATÉ CAPTURAR!
+      
+      audioInstanceRef.current = audio;
+      
+      // Tentar tocar música
+      const playPromise = audio.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('✅ [AUDIO] Música tocando em LOOP!');
+          })
+          .catch(error => {
+            // Erro de autoplay policy - normal, não bloquear o modal
+            // A música tentará tocar quando o usuário interagir com a página
+            console.log('ℹ️ [AUDIO] Áudio aguardando interação do usuário');
+            
+            // Adicionar listener de clique para tentar tocar após interação
+            const tryPlayOnInteraction = () => {
+              if (audioInstanceRef.current && audioInstanceRef.current.paused) {
+                audioInstanceRef.current.play()
+                  .then(() => {
+                    console.log('✅ [AUDIO] Música iniciada após interação');
+                    document.removeEventListener('click', tryPlayOnInteraction);
+                    document.removeEventListener('touchstart', tryPlayOnInteraction);
+                  })
+                  .catch(() => {
+                    // Ignorar erro silenciosamente
+                  });
+              }
+            };
+            
+            document.addEventListener('click', tryPlayOnInteraction, { once: true });
+            document.addEventListener('touchstart', tryPlayOnInteraction, { once: true });
+          });
+      }
+    } catch (error) {
+      // Erro silencioso - não bloquear o modal se o áudio falhar
+      console.log('ℹ️ [AUDIO] Não foi possível criar áudio');
+    }
+  }, []);
+
+  // useEffect para parar música quando o modal for fechado
+  useEffect(() => {
+    // Só executar quando o modal mudar de true para false
+    if (!showNewLeadModal) {
+      // Limpar timer se existir
+      if (modalTimerRef.current) {
+        clearTimeout(modalTimerRef.current);
+        modalTimerRef.current = null;
+      }
+      
+      // Parar música se estiver tocando
+      if (audioInstanceRef.current) {
+        console.log('🛑 [AUDIO] Modal fechado, parando música automaticamente');
+        stopNotificationSound();
+      }
+    }
+  }, [showNewLeadModal, stopNotificationSound]);
 
   useEffect(() => {
     // Permitir entrada APENAS para admin da incorporadora
@@ -80,28 +166,35 @@ const useIncorporadoraNotifications = () => {
         socketId: newSocket.id
       });
       
-      // Tocar música personalizada do corretor
-      playNotificationSound(data.corretor_musica);
-      
-      // Mostrar toast
-      showSuccessToast(
-        `🎯 Novo ${isIncorporadora ? 'cliente' : 'lead'} disponível - ${data.nome}`,
-        6000
-      );
-      
-      // Mostrar modal (apenas visualização)
-      setNewLeadData(data);
-      setShowNewLeadModal(true);
-      
-      // Adicionar à lista de notificações
-      setNotifications(prev => [...prev, {
-        id: Date.now(),
-        type: 'new-lead',
-        data,
-        timestamp: new Date()
-      }]);
-      
-      console.log('✅ [SOCKET.IO] Processamento do evento new-lead-incorporadora concluído');
+      try {
+        // Tocar música personalizada do corretor
+        playNotificationSound(data.corretor_musica);
+        
+        // Mostrar modal (apenas visualização)
+        setNewLeadData(data);
+        setShowNewLeadModal(true);
+        
+        // Timer para fechar automaticamente após 20 segundos
+        const timer = setTimeout(() => {
+          console.log('⏰ [TIMER] Fechando modal de novo lead após 20 segundos...');
+          stopNotificationSound();
+          setShowNewLeadModal(false);
+          setNewLeadData(null);
+        }, 20000);
+        modalTimerRef.current = timer;
+        
+        // Adicionar à lista de notificações
+        setNotifications(prev => [...prev, {
+          id: Date.now(),
+          type: 'new-lead',
+          data,
+          timestamp: new Date()
+        }]);
+        
+        console.log('✅ [SOCKET.IO] Processamento do evento new-lead-incorporadora concluído');
+      } catch (error) {
+        console.error('❌ [SOCKET.IO] Erro ao processar novo lead:', error);
+      }
     });
 
     // Listener para lead capturado (fechar modal em todos os clientes)
@@ -116,11 +209,12 @@ const useIncorporadoraNotifications = () => {
       if (showNewLeadModal && newLeadData && newLeadData.leadId === data.leadId) {
         console.log('✅ [SOCKET.IO] Fechando modal de lead capturado');
         stopNotificationSound();
+        if (modalTimerRef.current) {
+          clearTimeout(modalTimerRef.current);
+          modalTimerRef.current = null;
+        }
         setShowNewLeadModal(false);
         setNewLeadData(null);
-        
-        // Mostrar toast informando que o lead foi capturado
-        showInfoToast(`Lead capturado por ${data.sdrNome}`, 3000);
       }
     });
 
@@ -139,14 +233,6 @@ const useIncorporadoraNotifications = () => {
       
       // Música removida temporariamente para agendamentos
       // playNotificationSound();
-      
-      // Mostrar toast personalizado com nome do SDR apenas se não for freelancer
-      if (!user.is_freelancer) {
-        showSuccessToast(
-          `📅 Novo agendamento criado por ${data.sdr_nome} - ${data.paciente_nome}`,
-          6000
-        );
-      }
       
       // Adicionar à lista de notificações
       setNotifications(prev => [...prev, {
@@ -167,6 +253,13 @@ const useIncorporadoraNotifications = () => {
         empresaId: user.empresa_id,
         timestamp: new Date().toISOString()
       });
+      
+      // Re-entrar no grupo de notificações ao reconectar
+      newSocket.emit('join-incorporadora-notifications', {
+        userType: 'admin',
+        userId: user.id,
+        empresaId: user.empresa_id
+      });
     });
 
     newSocket.on('disconnect', () => {
@@ -175,6 +268,22 @@ const useIncorporadoraNotifications = () => {
         userId: user.id,
         empresaId: user.empresa_id,
         timestamp: new Date().toISOString()
+      });
+    });
+
+    newSocket.on('reconnect', () => {
+      console.log('🔄 [SOCKET.IO] Socket reconectado - Incorporadora:', {
+        socketId: newSocket.id,
+        userId: user.id,
+        empresaId: user.empresa_id,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Re-entrar no grupo de notificações ao reconectar
+      newSocket.emit('join-incorporadora-notifications', {
+        userType: 'admin',
+        userId: user.id,
+        empresaId: user.empresa_id
       });
     });
 
@@ -195,53 +304,23 @@ const useIncorporadoraNotifications = () => {
         empresaId: user.empresa_id,
         timestamp: new Date().toISOString()
       });
-      newSocket.disconnect();
-    };
-  }, [user?.id, user?.empresa_id, user?.tipo, showSuccessToast, showInfoToast]);
-
-  // Estado do áudio
-  const [audioInstance, setAudioInstance] = useState(null);
-
-  // Função para tocar som de notificação
-  const playNotificationSound = () => {
-    try {
-      console.log('🔊 [AUDIO] Iniciando música de notificação');
       
-      // Parar áudio anterior se existir
-      if (audioInstance) {
-        audioInstance.pause();
-        audioInstance.currentTime = 0;
+      // Limpar timer se existir
+      if (modalTimerRef.current) {
+        clearTimeout(modalTimerRef.current);
+        modalTimerRef.current = null;
       }
       
-      const audio = new Audio(`${process.env.PUBLIC_URL || ''}/audioNovoLead.mp3`);
-      audio.volume = 1.0; // Volume máximo
-      audio.loop = true; // MÚSICA EM LOOP ATÉ CAPTURAR!
+      // Parar música se estiver tocando
+      if (audioInstanceRef.current) {
+        audioInstanceRef.current.pause();
+        audioInstanceRef.current.currentTime = 0;
+        audioInstanceRef.current = null;
+      }
       
-      setAudioInstance(audio);
-      
-      audio.play().then(() => {
-        console.log('✅ [AUDIO] Música tocando em LOOP!');
-      }).catch(error => {
-        console.error('❌ [AUDIO] Erro ao tocar música:', error);
-        // Tentar novamente
-        setTimeout(() => {
-          audio.play().catch(e => console.error('❌ [AUDIO] Segunda tentativa falhou:', e));
-        }, 100);
-      });
-    } catch (error) {
-      console.error('❌ [AUDIO] Erro ao criar áudio:', error);
-    }
-  };
-
-  // Função para parar música
-  const stopNotificationSound = () => {
-    if (audioInstance) {
-      console.log('🔇 [AUDIO] Parando música');
-      audioInstance.pause();
-      audioInstance.currentTime = 0;
-      setAudioInstance(null);
-    }
-  };
+      newSocket.disconnect();
+    };
+  }, [user?.id, user?.empresa_id, user?.tipo, playNotificationSound, stopNotificationSound]);
 
   // Função para limpar notificações
   const clearNotifications = () => {
@@ -250,14 +329,6 @@ const useIncorporadoraNotifications = () => {
       timestamp: new Date().toISOString()
     });
     setNotifications([]);
-  };
-
-  // Função para fechar modal e dispensar notificação
-  const fecharModalLead = () => {
-    console.log('❌ [SOCKET.IO] Dispensando notificação de lead');
-    stopNotificationSound(); // Parar o som
-    setShowNewLeadModal(false);
-    setNewLeadData(null);
   };
 
   // Componente da Modal
@@ -429,46 +500,6 @@ const useIncorporadoraNotifications = () => {
             </div>
           </div>
 
-          {/* Botão de fechar */}
-          <div style={{
-            display: 'flex',
-            gap: '1rem',
-            justifyContent: 'center',
-            alignItems: 'center'
-          }}>
-            <button
-              onClick={fecharModalLead}
-              style={{
-                background: 'rgba(107, 114, 128, 0.1)',
-                color: '#6b7280',
-                padding: '0.6rem 1.5rem',
-                borderRadius: '6px',
-                border: '1px solid rgba(107, 114, 128, 0.2)',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = 'rgba(107, 114, 128, 0.2)';
-                e.target.style.borderColor = 'rgba(107, 114, 128, 0.3)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = 'rgba(107, 114, 128, 0.1)';
-                e.target.style.borderColor = 'rgba(107, 114, 128, 0.2)';
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-              Fechar
-            </button>
-          </div>
-          
           <p style={{
             marginTop: '1.5rem',
             fontSize: '0.875rem',
@@ -527,7 +558,6 @@ const useIncorporadoraNotifications = () => {
     stopNotificationSound,
     showNewLeadModal,
     newLeadData,
-    fecharModalLead,
     NewLeadModal
   };
 };

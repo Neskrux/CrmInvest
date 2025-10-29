@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import useBranding from '../hooks/useBranding';
+import useFechamentoNotifications from '../hooks/useFechamentoNotifications';
+import useAgendamentoNotifications from '../hooks/useAgendamentoNotifications';
+import useIncorporadoraNotifications from '../hooks/useIncorporadoraNotifications';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, Area, ReferenceLine, ComposedChart } from 'recharts';
 import { TrendingUp, Calendar, BarChart3, CheckCircle, XCircle, RotateCcw } from 'lucide-react';
 
@@ -10,6 +13,23 @@ const Dashboard = () => {
   
   // Hook de autenticação - DEVE vir antes dos useEffect que dependem dele
   const { makeRequest, user, isAdmin, isConsultorInterno, podeVerTodosDados, isClinica, isFreelancer, isIncorporadora } = useAuth();
+  
+  // Hooks de notificações para verificar se há modais ativos
+  const { showFechamentoModal } = useFechamentoNotifications();
+  const { showAgendamentoModal } = useAgendamentoNotifications();
+  const { showNewLeadModal } = useIncorporadoraNotifications();
+  
+  // Refs para armazenar os valores atuais dos modais (evita problemas de closure)
+  const fechamentoModalRef = useRef(showFechamentoModal);
+  const agendamentoModalRef = useRef(showAgendamentoModal);
+  const newLeadModalRef = useRef(showNewLeadModal);
+  
+  // Atualizar refs sempre que os valores mudarem
+  useEffect(() => {
+    fechamentoModalRef.current = showFechamentoModal;
+    agendamentoModalRef.current = showAgendamentoModal;
+    newLeadModalRef.current = showNewLeadModal;
+  }, [showFechamentoModal, showAgendamentoModal, showNewLeadModal]);
   
   // Estado separado para KPIs principais (dados filtrados)
   const [kpisPrincipais, setKpisPrincipais] = useState({
@@ -1575,6 +1595,38 @@ const Dashboard = () => {
       setRankingTab('freelancers');
     }
   }, [isFreelancer]);
+
+  // Refresh automático para TV do escritório (admin da incorporadora)
+  // Isso garante que os sockets de notificação sejam reinicializados
+  // IMPORTANTE: Não faz refresh se houver notificações ativas (modais abertos)
+  useEffect(() => {
+    // Apenas para admin da incorporadora (empresa_id === 5)
+    if (user?.tipo === 'admin' && user?.empresa_id === 5) {
+      // Refresh automático a cada 10 segundos para manter sockets ativos
+      const refreshInterval = setInterval(() => {
+        // Verificar se há alguma notificação ativa antes de fazer refresh
+        // Usar refs para garantir que sempre temos os valores mais recentes
+        const hasActiveNotification = fechamentoModalRef.current || agendamentoModalRef.current || newLeadModalRef.current;
+        
+        if (hasActiveNotification) {
+          console.log('⏸️ [DASHBOARD] Refresh cancelado - notificação ativa:', {
+            fechamento: fechamentoModalRef.current,
+            agendamento: agendamentoModalRef.current,
+            lead: newLeadModalRef.current
+          });
+          return; // Cancelar refresh se houver notificação ativa
+        }
+        
+        console.log('🔄 [DASHBOARD] Refresh automático para TV do escritório - reinicializando sockets');
+        window.location.reload();
+      }, 10000); // 10 segundos
+
+      // Cleanup ao desmontar
+      return () => {
+        clearInterval(refreshInterval);
+      };
+    }
+  }, [user?.tipo, user?.empresa_id]);
 
   const fetchRegioesDisponiveis = async () => {
     try {

@@ -1,17 +1,81 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from '../components/Toast';
 import io from 'socket.io-client';
 import logoBrasao from '../images/logobrasaopreto.png';
 
 const useAgendamentoNotifications = () => {
   const { user, isIncorporadora } = useAuth();
-  const { showSuccessToast, showInfoToast } = useToast();
   const [socket, setSocket] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [showAgendamentoModal, setShowAgendamentoModal] = useState(false);
   const [agendamentoData, setAgendamentoData] = useState(null);
-  const [audioInstance, setAudioInstance] = useState(null);
+  const audioInstanceRef = useRef(null);
+  const modalTimerRef = useRef(null);
+
+  // Função para parar música - usar useCallback para garantir que sempre tenha acesso ao ref atual
+  const stopAgendamentoSound = useCallback(() => {
+    if (audioInstanceRef.current) {
+      audioInstanceRef.current.pause();
+      audioInstanceRef.current.currentTime = 0;
+      audioInstanceRef.current = null;
+    }
+  }, []);
+
+  // Função para tocar música - usar useCallback para garantir que sempre tenha acesso ao ref atual
+  const playAgendamentoSound = useCallback((musicaUrl) => {
+    try {
+      // Parar áudio anterior se existir
+      if (audioInstanceRef.current) {
+        audioInstanceRef.current.pause();
+        audioInstanceRef.current.currentTime = 0;
+        audioInstanceRef.current = null;
+      }
+      
+      // Usar música personalizada do SDR se disponível, senão usar áudio padrão
+      const audioSource = musicaUrl || `${process.env.PUBLIC_URL || ''}/audioNovoLead.mp3`;
+      const audio = new Audio(audioSource);
+      audio.volume = 1.0; // Volume máximo
+      audio.loop = true; // Música em loop
+      
+      audioInstanceRef.current = audio;
+      
+      // Tentar tocar música
+      const playPromise = audio.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('✅ [AGENDAMENTO] Música tocando em LOOP!');
+          })
+          .catch(error => {
+            // Erro de autoplay policy - normal, não bloquear o modal
+            // A música tentará tocar quando o usuário interagir com a página
+            console.log('ℹ️ [AGENDAMENTO] Áudio aguardando interação do usuário');
+            
+            // Adicionar listener de clique para tentar tocar após interação
+            const tryPlayOnInteraction = () => {
+              if (audioInstanceRef.current && audioInstanceRef.current.paused) {
+                audioInstanceRef.current.play()
+                  .then(() => {
+                    console.log('✅ [AGENDAMENTO] Música iniciada após interação');
+                    document.removeEventListener('click', tryPlayOnInteraction);
+                    document.removeEventListener('touchstart', tryPlayOnInteraction);
+                  })
+                  .catch(() => {
+                    // Ignorar erro silenciosamente
+                  });
+              }
+            };
+            
+            document.addEventListener('click', tryPlayOnInteraction, { once: true });
+            document.addEventListener('touchstart', tryPlayOnInteraction, { once: true });
+          });
+      }
+    } catch (error) {
+      // Erro silencioso - não bloquear o modal se o áudio falhar
+      console.log('ℹ️ [AGENDAMENTO] Não foi possível criar áudio');
+    }
+  }, []);
 
   useEffect(() => {
     // Permitir entrada APENAS para admin da incorporadora
@@ -59,76 +123,103 @@ const useAgendamentoNotifications = () => {
         socketId: newSocket.id
       });
       
-      // Mostrar toast
-      showSuccessToast(
-        `📅 Novo agendamento criado por ${data.sdr_nome} - ${data.paciente_nome}`,
-        6000
-      );
+      try {
+        // Tocar música personalizada do SDR
+        playAgendamentoSound(data.sdr_musica);
+        
+        // Mostrar modal
+        setAgendamentoData(data);
+        setShowAgendamentoModal(true);
+        
+        // Timer para fechar automaticamente após 20 segundos
+        const timer = setTimeout(() => {
+          console.log('⏰ [TIMER] Fechando modal de agendamento após 20 segundos...');
+          stopAgendamentoSound();
+          setShowAgendamentoModal(false);
+          setAgendamentoData(null);
+        }, 20000);
+        modalTimerRef.current = timer;
 
-      // Mostrar modal
-      setAgendamentoData(data);
-      setShowAgendamentoModal(true);
-
-      // Adicionar à lista de notificações
-      setNotifications(prev => [...prev, {
-        id: Date.now(),
-        type: 'new-agendamento',
-        data,
-        timestamp: new Date()
-      }]);
-      
-      console.log('✅ [SOCKET.IO] Processamento do evento new-agendamento-incorporadora concluído');
+        // Adicionar à lista de notificações
+        setNotifications(prev => [...prev, {
+          id: Date.now(),
+          type: 'new-agendamento',
+          data,
+          timestamp: new Date()
+        }]);
+        
+        console.log('✅ [SOCKET.IO] Processamento do evento new-agendamento-incorporadora concluído');
+      } catch (error) {
+        console.error('❌ [SOCKET.IO] Erro ao processar agendamento:', error);
+      }
     });
 
     // Log de conexão/desconexão
     newSocket.on('connect', () => {
-      // Conectado
+      console.log('✅ [AGENDAMENTO] Socket conectado com sucesso:', newSocket.id);
+      
+      // Re-entrar no grupo de notificações ao reconectar
+      newSocket.emit('join-incorporadora-notifications', {
+        userType: 'admin',
+        userId: user.id,
+        empresaId: user.empresa_id
+      });
     });
 
     newSocket.on('disconnect', () => {
-      // Desconectado
+      console.log('❌ [AGENDAMENTO] Socket desconectado');
+    });
+
+    newSocket.on('reconnect', () => {
+      console.log('🔄 [AGENDAMENTO] Socket reconectado');
+      
+      // Re-entrar no grupo de notificações ao reconectar
+      newSocket.emit('join-incorporadora-notifications', {
+        userType: 'admin',
+        userId: user.id,
+        empresaId: user.empresa_id
+      });
     });
 
     newSocket.on('connect_error', (error) => {
-      // Erro de conexão
+      console.error('❌ [AGENDAMENTO] Erro de conexão:', error);
     });
 
     // Cleanup
     return () => {
+      // Limpar timer se existir
+      if (modalTimerRef.current) {
+        clearTimeout(modalTimerRef.current);
+        modalTimerRef.current = null;
+      }
+      
+      // Parar música se estiver tocando
+      if (audioInstanceRef.current) {
+        audioInstanceRef.current.pause();
+        audioInstanceRef.current.currentTime = 0;
+        audioInstanceRef.current = null;
+      }
+      
       newSocket.disconnect();
     };
-  }, [user, showSuccessToast, showInfoToast]);
+  }, [user, playAgendamentoSound, stopAgendamentoSound]);
 
-  // Tocar música quando o modal aparecer
+  // useEffect para parar música quando o modal for fechado
   useEffect(() => {
-    if (showAgendamentoModal && agendamentoData?.sdr_musica) {
-      const audio = new Audio(agendamentoData.sdr_musica);
-      audio.volume = 1.0;
-      audio.loop = false; // Sem loop - apenas uma vez
+    // Só executar quando o modal mudar de true para false
+    if (!showAgendamentoModal) {
+      // Limpar timer se existir
+      if (modalTimerRef.current) {
+        clearTimeout(modalTimerRef.current);
+        modalTimerRef.current = null;
+      }
       
-      setAudioInstance(audio);
-      
-      // Tocar música
-      audio.play().catch(() => {
-        // Erro ao tocar música
-      });
-      
-      // Fechar modal quando a música acabar
-      audio.addEventListener('ended', () => {
-        setShowAgendamentoModal(false);
-        setAgendamentoData(null);
-        setAudioInstance(null);
-      });
-      
-      // Cleanup ao desmontar
-      return () => {
-        if (audio) {
-          audio.pause();
-          audio.currentTime = 0;
-        }
-      };
+      // Parar música se estiver tocando
+      if (audioInstanceRef.current) {
+        stopAgendamentoSound();
+      }
     }
-  }, [showAgendamentoModal, agendamentoData]);
+  }, [showAgendamentoModal, stopAgendamentoSound]);
 
   // Função para limpar notificações
   const clearNotifications = () => {

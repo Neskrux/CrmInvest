@@ -1,12 +1,10 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from '../components/Toast';
 import io from 'socket.io-client';
 import logoBrasao from '../images/logobrasaopreto.png';
 
 const useFechamentoNotifications = () => {
   const { user } = useAuth();
-  const { showSuccessToast } = useToast();
   const [showFechamentoModal, setShowFechamentoModal] = useState(false);
   const [fechamentoData, setFechamentoData] = useState(null);
   const audioInstanceRef = useRef(null);
@@ -38,11 +36,41 @@ const useFechamentoNotifications = () => {
       
       audioInstanceRef.current = audio;
       
-      audio.play().catch(error => {
-        console.error('Erro ao tocar música:', error);
-      });
+      // Tentar tocar música
+      const playPromise = audio.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('✅ [FECHAMENTO] Música tocando em LOOP!');
+          })
+          .catch(error => {
+            // Erro de autoplay policy - normal, não bloquear o modal
+            // A música tentará tocar quando o usuário interagir com a página
+            console.log('ℹ️ [FECHAMENTO] Áudio aguardando interação do usuário');
+            
+            // Adicionar listener de clique para tentar tocar após interação
+            const tryPlayOnInteraction = () => {
+              if (audioInstanceRef.current && audioInstanceRef.current.paused) {
+                audioInstanceRef.current.play()
+                  .then(() => {
+                    console.log('✅ [FECHAMENTO] Música iniciada após interação');
+                    document.removeEventListener('click', tryPlayOnInteraction);
+                    document.removeEventListener('touchstart', tryPlayOnInteraction);
+                  })
+                  .catch(() => {
+                    // Ignorar erro silenciosamente
+                  });
+              }
+            };
+            
+            document.addEventListener('click', tryPlayOnInteraction, { once: true });
+            document.addEventListener('touchstart', tryPlayOnInteraction, { once: true });
+          });
+      }
     } catch (error) {
-      console.error('Erro ao criar áudio:', error);
+      // Erro silencioso - não bloquear o modal se o áudio falhar
+      console.log('ℹ️ [FECHAMENTO] Não foi possível criar áudio');
     }
   }, [stopFechamentoSound]);
 
@@ -115,10 +143,30 @@ const useFechamentoNotifications = () => {
     // Debug: Listener para eventos de conexão
     newSocket.on('connect', () => {
       console.log('✅ [FECHAMENTO] Socket conectado com sucesso:', newSocket.id);
+      
+      // Re-entrar no grupo de notificações ao reconectar
+      newSocket.emit('join-incorporadora-notifications', {
+        userType: 'admin',
+        userId: userData.id,
+        empresaId: userData.empresa_id,
+        tabId: newSocket.query?.tabId
+      });
     });
 
     newSocket.on('disconnect', () => {
       console.log('❌ [FECHAMENTO] Socket desconectado');
+    });
+
+    newSocket.on('reconnect', () => {
+      console.log('🔄 [FECHAMENTO] Socket reconectado');
+      
+      // Re-entrar no grupo de notificações ao reconectar
+      newSocket.emit('join-incorporadora-notifications', {
+        userType: 'admin',
+        userId: userData.id,
+        empresaId: userData.empresa_id,
+        tabId: newSocket.query?.tabId
+      });
     });
 
     // Listener para novos fechamentos
@@ -129,27 +177,25 @@ const useFechamentoNotifications = () => {
         data: data
       });
       
-      // Tocar música personalizada do corretor
-      playFechamentoSound(data.corretor_musica);
-      
-      // Mostrar toast
-      showSuccessToast(
-        `💰 Fechamento realizado por ${data.corretor_nome} - R$ ${data.valor_fechado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-        8000
-      );
-      
-      // Mostrar modal
-      setFechamentoData(data);
-      setShowFechamentoModal(true);
-      
-      // Timer para fechar automaticamente após 20 segundos
-      const timer = setTimeout(() => {
-        console.log('⏰ [TIMER] Fechando modal após 20 segundos...');
-        stopFechamentoSound();
-        setShowFechamentoModal(false);
-        setFechamentoData(null);
-      }, 20000);
-      modalTimerRef.current = timer;
+      try {
+        // Tocar música personalizada do corretor
+        playFechamentoSound(data.corretor_musica);
+        
+        // Mostrar modal
+        setFechamentoData(data);
+        setShowFechamentoModal(true);
+        
+        // Timer para fechar automaticamente após 20 segundos
+        const timer = setTimeout(() => {
+          console.log('⏰ [TIMER] Fechando modal de fechamento após 20 segundos...');
+          stopFechamentoSound();
+          setShowFechamentoModal(false);
+          setFechamentoData(null);
+        }, 20000);
+        modalTimerRef.current = timer;
+      } catch (error) {
+        console.error('❌ [FECHAMENTO] Erro ao processar fechamento:', error);
+      }
     });
 
     // Cleanup apenas quando componente for desmontado
@@ -170,7 +216,24 @@ const useFechamentoNotifications = () => {
       newSocket.disconnect();
       isInitializedRef.current = false;
     };
-  }, [userData]); // Executar quando userData mudar
+  }, [userData, playFechamentoSound, stopFechamentoSound]);
+
+  // useEffect para parar música quando o modal for fechado
+  useEffect(() => {
+    // Só executar quando o modal mudar de true para false
+    if (!showFechamentoModal) {
+      // Limpar timer se existir
+      if (modalTimerRef.current) {
+        clearTimeout(modalTimerRef.current);
+        modalTimerRef.current = null;
+      }
+      
+      // Parar música se estiver tocando
+      if (audioInstanceRef.current) {
+        stopFechamentoSound();
+      }
+    }
+  }, [showFechamentoModal, stopFechamentoSound]);
 
   // Componente da Modal - SEM ANIMAÇÕES
   const FechamentoModal = () => {
