@@ -201,6 +201,8 @@ if (!process.env.VERCEL && !process.env.DISABLE_WEBSOCKET) {
         'http://localhost:3000',
         'https://localhost:3000',
         process.env.FRONTEND_URL,
+        'https://www.solumn.com.br', // ✅ Domínio de produção
+        'https://solumn.com.br', // ✅ Domínio de produção sem www
         /\.vercel\.app$/
       ],
       methods: ['GET', 'POST']
