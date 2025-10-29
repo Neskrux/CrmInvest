@@ -329,6 +329,27 @@ if (io) {
     
     // Handler para join-incorporadora-notifications
     socket.on('join-incorporadora-notifications', (data) => {
+      // Verificar se já está no grupo antes de tentar entrar novamente
+      const room = io.sockets.adapter.rooms.get('incorporadora-notifications');
+      const alreadyInRoom = room && room.has(socket.id);
+      
+      if (alreadyInRoom) {
+        console.log('♻️ [SOCKET.IO] Socket já está no grupo, ignorando entrada duplicada:', {
+          socketId: socket.id,
+          userId: data.userId,
+          empresaId: data.empresaId
+        });
+        
+        // Confirmar mesmo assim para evitar tentativas múltiplas
+        socket.emit('joined-incorporadora-notifications', {
+          success: true,
+          socketId: socket.id,
+          alreadyInRoom: true,
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
+      
       console.log('📢 [SOCKET.IO] Tentativa de entrada no grupo de notificações da incorporadora:', {
         socketId: socket.id,
         userType: data.userType,

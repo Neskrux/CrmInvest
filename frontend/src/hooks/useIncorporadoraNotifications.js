@@ -17,6 +17,7 @@ const useIncorporadoraNotifications = () => {
   const preloadedAudioRef = useRef(null); // Áudio pré-carregado para iniciar mais rápido
   const socketRef = useRef(null); // Ref para rastrear socket sem causar re-renders
   const lastJoinCheckRef = useRef(0); // Ref para rastrear último check de join sem usar localStorage
+  const joiningGroupRef = useRef(false); // Ref para evitar múltiplas chamadas simultâneas de joinGroup
 
   // Função para parar música - usar useCallback para garantir que sempre tenha acesso ao ref atual
   const stopNotificationSound = useCallback(() => {
@@ -263,16 +264,30 @@ const useIncorporadoraNotifications = () => {
         timestamp: new Date().toISOString()
       });
       
-      // Garantir que está no grupo periodicamente
+      // Garantir que está no grupo periodicamente (com proteção)
       const ensureInGroup = () => {
+        if (joiningGroupRef.current) {
+          return; // Já está tentando entrar
+        }
+        
         if (socketRef.current && socketRef.current.connected) {
+          joiningGroupRef.current = true;
+          
           socketRef.current.emit('join-incorporadora-notifications', {
             userType: 'admin',
             userId: user.id,
             empresaId: user.empresa_id
           });
+          
+          // Resetar flag após um tempo
+          setTimeout(() => {
+            joiningGroupRef.current = false;
+          }, 2000);
         }
       };
+      
+      // Entrar no grupo imediatamente se já conectado
+      ensureInGroup();
       
       // Verificar se está no grupo periodicamente
       const checkInterval = setInterval(() => {
@@ -345,36 +360,65 @@ const useIncorporadoraNotifications = () => {
 
     // Função auxiliar para entrar no grupo (chamada múltiplas vezes se necessário)
     const joinGroup = () => {
-      if (newSocket.connected) {
-        console.log('📢 [SOCKET.IO] Entrando no grupo incorporadora-notifications:', {
-          socketId: newSocket.id,
-          userId: user.id,
-          empresaId: user.empresa_id,
-          connected: newSocket.connected
-        });
-        
-        newSocket.emit('join-incorporadora-notifications', {
-          userType: 'admin',
-          userId: user.id,
-          empresaId: user.empresa_id
-        });
-      } else {
-        console.warn('⚠️ [SOCKET.IO] Socket não conectado, aguardando conexão...');
+      // Proteção contra múltiplas chamadas simultâneas
+      if (joiningGroupRef.current) {
+        console.log('⚠️ [SOCKET.IO] Join já em andamento, ignorando chamada duplicada');
+        return;
       }
+      
+      if (!newSocket.connected) {
+        console.warn('⚠️ [SOCKET.IO] Socket não conectado, aguardando conexão...');
+        return;
+      }
+      
+      joiningGroupRef.current = true;
+      
+      console.log('📢 [SOCKET.IO] Entrando no grupo incorporadora-notifications:', {
+        socketId: newSocket.id,
+        userId: user.id,
+        empresaId: user.empresa_id,
+        connected: newSocket.connected,
+        deviceId: newSocket.query?.deviceId,
+        timestamp: new Date().toISOString()
+      });
+      
+      newSocket.emit('join-incorporadora-notifications', {
+        userType: 'admin',
+        userId: user.id,
+        empresaId: user.empresa_id
+      });
+      
+      // Resetar flag após um tempo para permitir nova tentativa se necessário
+      setTimeout(() => {
+        joiningGroupRef.current = false;
+      }, 2000);
     };
 
     // Listener para confirmação de entrada no grupo
     newSocket.on('joined-incorporadora-notifications', (data) => {
+      joiningGroupRef.current = false; // Resetar flag quando receber confirmação
+      
       if (data.success) {
-        console.log('✅ [SOCKET.IO] Confirmado: Entrou no grupo incorporadora-notifications:', {
-          socketId: data.socketId,
-          deviceId: newSocket.query?.deviceId,
-          tabId: newSocket.query?.tabId,
-          userId: user.id,
-          empresaId: user.empresa_id,
-          timestamp: data.timestamp,
-          url: window.location.href
-        });
+        if (data.alreadyInRoom) {
+          console.log('♻️ [SOCKET.IO] Socket já estava no grupo (confirmação):', {
+            socketId: data.socketId,
+            deviceId: newSocket.query?.deviceId,
+            tabId: newSocket.query?.tabId,
+            userId: user.id,
+            empresaId: user.empresa_id,
+            timestamp: data.timestamp
+          });
+        } else {
+          console.log('✅ [SOCKET.IO] Confirmado: Entrou no grupo incorporadora-notifications:', {
+            socketId: data.socketId,
+            deviceId: newSocket.query?.deviceId,
+            tabId: newSocket.query?.tabId,
+            userId: user.id,
+            empresaId: user.empresa_id,
+            timestamp: data.timestamp,
+            url: window.location.href
+          });
+        }
       } else {
         console.error('❌ [SOCKET.IO] Falha ao entrar no grupo:', {
           motivo: data.motivo,
@@ -382,19 +426,26 @@ const useIncorporadoraNotifications = () => {
           deviceId: newSocket.query?.deviceId,
           timestamp: data.timestamp
         });
-        // Tentar novamente após delay
-        setTimeout(() => {
-          if (newSocket.connected) {
-            console.log('🔄 [SOCKET.IO] Tentando entrar no grupo novamente após falha...');
-            joinGroup();
-          }
-        }, 2000);
+        // Tentar novamente após delay apenas se não estava no grupo
+        if (!data.alreadyInRoom) {
+          setTimeout(() => {
+            if (newSocket.connected && !joiningGroupRef.current) {
+              console.log('🔄 [SOCKET.IO] Tentando entrar no grupo novamente após falha...');
+              joinGroup();
+            }
+          }, 2000);
+        }
       }
     });
 
-    // Entrar no grupo quando conectado
+    // Entrar no grupo quando conectado (apenas se já estiver conectado ao criar o socket)
+    // Aguardar um pouco para garantir que os listeners estão configurados
     if (newSocket.connected) {
-      joinGroup();
+      setTimeout(() => {
+        if (newSocket.connected && !joiningGroupRef.current) {
+          joinGroup();
+        }
+      }, 150);
     }
 
     // Listener para novos leads/clientes - REMOVIDO RELOAD AUTOMÁTICO
@@ -495,7 +546,7 @@ const useIncorporadoraNotifications = () => {
       // CRÍTICO: Re-entrar no grupo de notificações ao reconectar
       // Aguardar um pouco para garantir que a conexão está estável
       setTimeout(() => {
-        if (newSocket.connected) {
+        if (newSocket.connected && !joiningGroupRef.current) {
           joinGroup();
         }
       }, 100);
@@ -529,8 +580,12 @@ const useIncorporadoraNotifications = () => {
         timestamp: new Date().toISOString()
       });
       
-      // Re-entrar no grupo após reconexão
-      joinGroup();
+      // Re-entrar no grupo após reconexão (com proteção)
+      setTimeout(() => {
+        if (newSocket.connected && !joiningGroupRef.current) {
+          joinGroup();
+        }
+      }, 200);
     });
 
     newSocket.on('reconnect_attempt', (attemptNumber) => {
