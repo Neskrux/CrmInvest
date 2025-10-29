@@ -213,176 +213,294 @@ const useAgendamentoNotifications = () => {
     }
   }, [stopAgendamentoSound]);
 
-  // Verificar e processar notificação pendente do localStorage (após refresh)
-  useEffect(() => {
-    // Aguardar user estar disponível
-    if (!user || !user.id || user.tipo !== 'admin' || user.empresa_id !== 5) {
-      return;
-    }
-
-    const pendingNotification = localStorage.getItem('pending_notification');
-
-    if (pendingNotification) {
-      try {
-        const notification = JSON.parse(pendingNotification);
-        
-        // Verificar se é uma notificação deste hook (agendamento)
-        if (notification.type === 'agendamento' && notification.data) {
-          console.log('✅ [NOTIFICAÇÃO] Processando agendamento pendente');
-          
-          // Limpar do localStorage imediatamente para evitar processar novamente
-          localStorage.removeItem('pending_notification');
-          
-          // PRÉ-CARREGAR áudio ANTES de mostrar modal (para ter mais tempo de carregar)
-          const audioSource = notification.data.sdr_musica || `${process.env.PUBLIC_URL || ''}/audioNovoLead.mp3`;
-          try {
-            const preloadAudio = new Audio(audioSource);
-            preloadAudio.preload = 'auto';
-            preloadAudio.volume = 1.0;
-            preloadAudio.load(); // Forçar início do carregamento
-            preloadedAudioRef.current = preloadAudio;
-            console.log('📦 [AGENDAMENTO] Áudio pré-carregado:', audioSource);
-          } catch (e) {
-            console.log('⚠️ [AGENDAMENTO] Erro ao pré-carregar áudio:', e);
-          }
-          
-          // Processar a notificação: mostrar modal
-          setAgendamentoData(notification.data);
-          setShowAgendamentoModal(true);
-          previousModalStateRef.current = true;
-          audioStartedRef.current = false;
-          
-          // Tocar música será feito no useLayoutEffect após renderização
-          // Timer será criado no useLayoutEffect separado
-          
-          // Adicionar à lista de notificações
-          setNotifications(prev => [...prev, {
-            id: Date.now(),
-            type: 'new-agendamento',
-            data: notification.data,
-            timestamp: new Date()
-          }]);
-        }
-      } catch (error) {
-        console.error('❌ [NOTIFICAÇÃO] Erro ao processar notificação:', error);
-        localStorage.removeItem('pending_notification');
-      }
-    }
-  }, [user?.id, user?.tipo, user?.empresa_id]);
+  // REMOVIDO: useEffect para notificações pendentes do localStorage
+  // Não é mais necessário pois removemos o reload automático
+  // As notificações agora são processadas diretamente quando o evento Socket.IO chega
 
   useEffect(() => {
     // Permitir entrada APENAS para admin da incorporadora
     if (user?.tipo !== 'admin' || user?.empresa_id !== 5) {
+      console.log('⚠️ [SOCKET.IO] Usuário não autorizado:', {
+        tipo: user?.tipo,
+        empresa_id: user?.empresa_id
+      });
       return;
     }
 
-    // Configurar URL do backend
-    const API_BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000';
+    // Configurar URL do backend - CORRIGIDO para produção
+    let API_BASE_URL;
+    if (process.env.REACT_APP_API_URL) {
+      API_BASE_URL = process.env.REACT_APP_API_URL.replace('/api', '');
+    } else if (process.env.NODE_ENV === 'production') {
+      // Em produção, usar backend do Fly.dev
+      API_BASE_URL = 'https://crminvest-backend.fly.dev';
+    } else {
+      API_BASE_URL = 'http://localhost:5000';
+    }
     
-    // Conectar ao Socket.IO com configurações para múltiplas abas
+    console.log('🔗 [SOCKET.IO] Conectando ao backend:', {
+      API_BASE_URL,
+      NODE_ENV: process.env.NODE_ENV,
+      REACT_APP_API_URL: process.env.REACT_APP_API_URL
+    });
+    
+    // Conectar ao Socket.IO com configurações ROBUSTAS para produção
     const newSocket = io(API_BASE_URL, {
-      transports: ['websocket', 'polling'],
-      forceNew: true, // Forçar nova conexão
+      transports: ['websocket', 'polling'], // Tentar websocket primeiro, fallback para polling
+      forceNew: false, // NÃO forçar nova conexão - reutilizar se possível
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: Infinity, // Tentar reconectar infinitamente
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
       timeout: 20000,
       // Adicionar identificador único para cada aba
       query: {
         tabId: `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        userId: user.id
-      }
+        userId: user.id,
+        empresaId: user.empresa_id
+      },
+      // Configurações adicionais para produção
+      upgrade: true,
+      rememberUpgrade: true,
+      autoConnect: true
     });
     
     setSocket(newSocket);
 
-    // Entrar no grupo de notificações da incorporadora
-    newSocket.emit('join-incorporadora-notifications', {
-      userType: 'admin',
-      userId: user.id,
-      empresaId: user.empresa_id
+    // Função auxiliar para entrar no grupo (chamada múltiplas vezes se necessário)
+    const joinGroup = () => {
+      if (newSocket.connected) {
+        console.log('📢 [SOCKET.IO] Entrando no grupo incorporadora-notifications:', {
+          socketId: newSocket.id,
+          userId: user.id,
+          empresaId: user.empresa_id,
+          connected: newSocket.connected
+        });
+        
+        newSocket.emit('join-incorporadora-notifications', {
+          userType: 'admin',
+          userId: user.id,
+          empresaId: user.empresa_id
+        });
+      } else {
+        console.warn('⚠️ [SOCKET.IO] Socket não conectado, aguardando conexão...');
+      }
+    };
+
+    // Listener para confirmação de entrada no grupo
+    newSocket.on('joined-incorporadora-notifications', (data) => {
+      if (data.success) {
+        console.log('✅ [SOCKET.IO] Confirmado: Entrou no grupo incorporadora-notifications:', {
+          socketId: data.socketId,
+          timestamp: data.timestamp
+        });
+      } else {
+        console.error('❌ [SOCKET.IO] Falha ao entrar no grupo:', {
+          motivo: data.motivo,
+          timestamp: data.timestamp
+        });
+        // Tentar novamente após delay
+        setTimeout(() => {
+          if (newSocket.connected) {
+            joinGroup();
+          }
+        }, 2000);
+      }
     });
 
-    // Listener para novos agendamentos
+    // Entrar no grupo quando conectado
+    if (newSocket.connected) {
+      joinGroup();
+    }
+
+    // Listener para novos agendamentos - REMOVIDO RELOAD AUTOMÁTICO
     newSocket.on('new-agendamento-incorporadora', (data) => {
       try {
-        // Debounce: evitar refresh se outro refresh aconteceu há menos de 2 segundos
-        const lastRefresh = localStorage.getItem('last_notification_refresh');
-        const now = Date.now();
-        const timeSinceLastRefresh = lastRefresh ? now - parseInt(lastRefresh) : Infinity;
+        console.log('🔔 [SOCKET.IO] Recebido evento new-agendamento-incorporadora:', {
+          agendamentoId: data.agendamentoId,
+          paciente_nome: data.paciente_nome,
+          sdr_nome: data.sdr_nome,
+          data_agendamento: data.data_agendamento,
+          horario: data.horario,
+          socketId: newSocket.id,
+          connected: newSocket.connected,
+          timestamp: new Date().toISOString()
+        });
         
-        // IMPORTANTE: Fazer refresh ANTES de mostrar a notificação para garantir sockets ativos
-        // Salvar dados da notificação no localStorage para recuperar após reload
-        const notificationData = {
-          type: 'agendamento',
-          data: data,
-          timestamp: now
-        };
+        // REMOVIDO: Reload automático causa problemas em produção
+        // Mostrar modal diretamente sem reload
         
-        // Se houver outra notificação pendente, mesclar (manter a mais recente)
-        const existingNotification = localStorage.getItem('pending_notification');
-        if (existingNotification && timeSinceLastRefresh < 2000) {
-          try {
-            const existing = JSON.parse(existingNotification);
-            // Manter a mais recente (normalmente a atual)
-            if (existing.timestamp && existing.timestamp > notificationData.timestamp) {
-              return;
-            }
-          } catch (e) {
-            // Se erro ao parsear, sobrescrever
-          }
+        // Pré-carregar áudio ANTES de mostrar modal
+        const audioSource = data.sdr_musica || `${process.env.PUBLIC_URL || ''}/audioNovoLead.mp3`;
+        try {
+          const preloadAudio = new Audio(audioSource);
+          preloadAudio.preload = 'auto';
+          preloadAudio.volume = 1.0;
+          preloadAudio.load();
+          preloadedAudioRef.current = preloadAudio;
+          console.log('📦 [AGENDAMENTO] Áudio pré-carregado:', audioSource);
+        } catch (e) {
+          console.log('⚠️ [AGENDAMENTO] Erro ao pré-carregar áudio:', e);
         }
         
-        localStorage.setItem('pending_notification', JSON.stringify(notificationData));
-        localStorage.setItem('last_notification_refresh', now.toString());
+        // Mostrar modal diretamente
+        setAgendamentoData(data);
+        setShowAgendamentoModal(true);
+        previousModalStateRef.current = false; // Será atualizado para true no useLayoutEffect
         
-        // Forçar sincronização do localStorage (alguns navegadores precisam disso)
-        if (window.localStorage) {
-          window.dispatchEvent(new Event('storage'));
-        }
+        // CRÍTICO: Tocar música IMEDIATAMENTE quando evento chegar
+        // Não esperar pela renderização do modal
+        console.log('🔊 [AGENDAMENTO] Tocando música imediatamente ao receber evento...');
+        playAgendamentoSound(data.sdr_musica);
         
-        // Reload imediato - localStorage é síncrono
-        window.location.reload();
+        // Marcar que áudio foi iniciado para evitar duplicação no useLayoutEffect
+        audioStartedRef.current = true;
         
-        // Não executar o resto do código pois a página vai recarregar
-        return;
+        // Adicionar à lista de notificações
+        setNotifications(prev => [...prev, {
+          id: Date.now(),
+          type: 'new-agendamento',
+          data,
+          timestamp: new Date()
+        }]);
+        
+        console.log('✅ [SOCKET.IO] Notificação de agendamento processada e modal deve aparecer');
       } catch (error) {
         console.error('❌ [SOCKET.IO] Erro ao processar agendamento:', error);
       }
     });
 
-    // Log de conexão/desconexão
+    // Log de conexão/desconexão - MELHORADO para produção
     newSocket.on('connect', () => {
-      // Re-entrar no grupo de notificações ao reconectar
-      newSocket.emit('join-incorporadora-notifications', {
-        userType: 'admin',
+      console.log('✅ [SOCKET.IO] Socket conectado:', {
+        socketId: newSocket.id,
         userId: user.id,
-        empresaId: user.empresa_id
+        empresaId: user.empresa_id,
+        timestamp: new Date().toISOString()
       });
+      
+      // CRÍTICO: Re-entrar no grupo de notificações ao reconectar
+      // Aguardar um pouco para garantir que a conexão está estável
+      setTimeout(() => {
+        if (newSocket.connected) {
+          joinGroup();
+        }
+      }, 100);
+    });
+
+    newSocket.on('disconnect', (reason) => {
+      console.warn('⚠️ [SOCKET.IO] Socket desconectado:', {
+        reason,
+        socketId: newSocket.id,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Tentar reconectar se não foi desconexão intencional
+      if (reason === 'io server disconnect') {
+        // Servidor desconectou, reconectar manualmente
+        newSocket.connect();
+      }
     });
 
     newSocket.on('connect_error', (error) => {
-      console.error('❌ [AGENDAMENTO] Erro de conexão:', error);
+      console.error('❌ [SOCKET.IO] Erro de conexão:', {
+        error: error.message,
+        type: error.type,
+        timestamp: new Date().toISOString()
+      });
     });
 
-    // Cleanup - NÃO limpar timer aqui, apenas socket
-    return () => {
-      // NÃO limpar timer no cleanup do socket - ele será limpo quando:
-      // 1. O timer executar (após 20s)
-      // 2. A música terminar (evento 'ended')
-      // 3. O modal fechar manualmente
+    newSocket.on('reconnect', (attemptNumber) => {
+      console.log('🔄 [SOCKET.IO] Reconectado após', attemptNumber, 'tentativas:', {
+        socketId: newSocket.id,
+        timestamp: new Date().toISOString()
+      });
       
-      // Parar música apenas se não houver modal ativo E música já começou a tocar
-      // Não pausar durante a inicialização (quando audioStartedRef é false)
-      if (!showAgendamentoModal && audioInstanceRef.current && audioStartedRef.current) {
+      // Re-entrar no grupo após reconexão
+      joinGroup();
+    });
+
+    newSocket.on('reconnect_attempt', (attemptNumber) => {
+      console.log('🔄 [SOCKET.IO] Tentativa de reconexão #' + attemptNumber);
+    });
+
+    newSocket.on('reconnect_error', (error) => {
+      console.error('❌ [SOCKET.IO] Erro ao reconectar:', error.message);
+    });
+
+    newSocket.on('reconnect_failed', () => {
+      console.error('❌ [SOCKET.IO] Falha ao reconectar após todas as tentativas');
+      // Tentar reconectar manualmente após delay
+      setTimeout(() => {
+        console.log('🔄 [SOCKET.IO] Tentando reconectar manualmente...');
+        newSocket.connect();
+      }, 5000);
+    });
+
+    // Listener para pong (resposta do heartbeat)
+    newSocket.on('pong', (data) => {
+      const latency = Date.now() - data.receivedTimestamp;
+      console.log('💓 [SOCKET.IO] Heartbeat OK - Latência:', latency + 'ms');
+    });
+
+    // Heartbeat: Verificar conexão periodicamente (a cada 30 segundos)
+    const heartbeatInterval = setInterval(() => {
+      if (newSocket && !newSocket.connected) {
+        console.warn('⚠️ [SOCKET.IO] Conexão perdida detectada, tentando reconectar...');
+        newSocket.connect();
+      } else if (newSocket && newSocket.connected) {
+        // Verificar se ainda está no grupo (ping)
+        newSocket.emit('ping', { timestamp: Date.now() });
+        
+        // Verificar se ainda está no grupo - re-entrar se necessário
+        // Isso garante que mesmo se houver algum problema, re-entra automaticamente
+        const lastJoinCheck = localStorage.getItem('last_join_check_agendamento');
+        const now = Date.now();
+        if (!lastJoinCheck || (now - parseInt(lastJoinCheck)) > 60000) { // A cada 1 minuto
+          joinGroup();
+          localStorage.setItem('last_join_check_agendamento', now.toString());
+        }
+      }
+    }, 30000); // 30 segundos
+
+    // Cleanup - melhorado para produção
+    return () => {
+      console.log('🧹 [SOCKET.IO] Limpando conexão Socket.IO:', {
+        socketId: newSocket.id,
+        connected: newSocket.connected,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Limpar heartbeat
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+      }
+      
+      // Remover todos os listeners antes de desconectar
+      newSocket.off('new-agendamento-incorporadora');
+      newSocket.off('joined-incorporadora-notifications');
+      newSocket.off('pong');
+      newSocket.off('connect');
+      newSocket.off('disconnect');
+      newSocket.off('connect_error');
+      newSocket.off('reconnect');
+      newSocket.off('reconnect_attempt');
+      newSocket.off('reconnect_error');
+      newSocket.off('reconnect_failed');
+      
+      // Parar música apenas se não houver modal ativo
+      if (!showAgendamentoModal && audioInstanceRef.current) {
         audioInstanceRef.current.pause();
         audioInstanceRef.current.currentTime = 0;
         audioInstanceRef.current = null;
       }
       
-      newSocket.disconnect();
+      // Desconectar socket
+      if (newSocket.connected) {
+        newSocket.disconnect();
+      }
     };
-  }, [user, playAgendamentoSound, stopAgendamentoSound]);
+  }, [user?.id, user?.empresa_id, user?.tipo, playAgendamentoSound, stopAgendamentoSound]);
 
   // useLayoutEffect para criar timer e tocar música APÓS renderização do modal
   useLayoutEffect(() => {
@@ -429,18 +547,19 @@ const useAgendamentoNotifications = () => {
       modalTimerRef.current = mainTimer;
       console.log('✅ [TIMER] Timer de 20s criado (timestamp:', timerCreatedAt, ')');
       
-      // Tocar música imediatamente e também após delays pequenos
-      if (showAgendamentoModal && agendamentoData && !audioStartedRef.current) {
-        console.log('🔊 [AGENDAMENTO] Tentando tocar música após renderização...');
-        playAgendamentoSound(agendamentoData.sdr_musica);
-        
-        // Tentar novamente após pequenos delays como backup
-        [100, 200, 300].forEach((delay) => {
-          setTimeout(() => {
-            if (showAgendamentoModal && agendamentoData && !audioStartedRef.current && audioInstanceRef.current) {
-              console.log(`🔄 [AGENDAMENTO] Retry backup após ${delay}ms...`);
-              try {
-                if (audioInstanceRef.current.paused) {
+      // Verificar se música já está tocando (pode ter sido iniciada quando evento chegou)
+      // Se não estiver tocando, tentar tocar agora como backup
+      if (showAgendamentoModal && agendamentoData) {
+        if (!audioStartedRef.current || (audioInstanceRef.current && audioInstanceRef.current.paused)) {
+          console.log('🔊 [AGENDAMENTO] Música não está tocando, tentando tocar após renderização...');
+          playAgendamentoSound(agendamentoData.sdr_musica);
+          
+          // Tentar novamente após pequenos delays como backup
+          [100, 200, 300].forEach((delay) => {
+            setTimeout(() => {
+              if (showAgendamentoModal && agendamentoData && audioInstanceRef.current && audioInstanceRef.current.paused) {
+                console.log(`🔄 [AGENDAMENTO] Retry backup após ${delay}ms...`);
+                try {
                   audioInstanceRef.current.play()
                     .then(() => {
                       audioStartedRef.current = true;
@@ -449,13 +568,15 @@ const useAgendamentoNotifications = () => {
                     .catch(() => {
                       // Silencioso - já está tentando no retry interno
                     });
+                } catch (e) {
+                  // Silencioso
                 }
-              } catch (e) {
-                // Silencioso
               }
-            }
-          }, delay);
-        });
+            }, delay);
+          });
+        } else {
+          console.log('✅ [AGENDAMENTO] Música já está tocando, não tentar novamente');
+        }
       }
     }
     

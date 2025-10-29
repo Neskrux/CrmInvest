@@ -245,79 +245,150 @@ const useIncorporadoraNotifications = () => {
   useEffect(() => {
     // Permitir entrada APENAS para admin da incorporadora
     if (user?.tipo !== 'admin' || user?.empresa_id !== 5) {
+      console.log('⚠️ [SOCKET.IO] Usuário não autorizado:', {
+        tipo: user?.tipo,
+        empresa_id: user?.empresa_id
+      });
       return;
     }
 
-    // Configurar URL do backend
-    const API_BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000';
+    // Configurar URL do backend - CORRIGIDO para produção
+    let API_BASE_URL;
+    if (process.env.REACT_APP_API_URL) {
+      API_BASE_URL = process.env.REACT_APP_API_URL.replace('/api', '');
+    } else if (process.env.NODE_ENV === 'production') {
+      // Em produção, usar backend do Fly.dev
+      API_BASE_URL = 'https://crminvest-backend.fly.dev';
+    } else {
+      API_BASE_URL = 'http://localhost:5000';
+    }
     
-    // Conectar ao Socket.IO com configurações para múltiplas abas
+    console.log('🔗 [SOCKET.IO] Conectando ao backend:', {
+      API_BASE_URL,
+      NODE_ENV: process.env.NODE_ENV,
+      REACT_APP_API_URL: process.env.REACT_APP_API_URL
+    });
+    
+    // Conectar ao Socket.IO com configurações ROBUSTAS para produção
     const newSocket = io(API_BASE_URL, {
-      transports: ['websocket', 'polling'],
-      forceNew: true, // Forçar nova conexão
+      transports: ['websocket', 'polling'], // Tentar websocket primeiro, fallback para polling
+      forceNew: false, // NÃO forçar nova conexão - reutilizar se possível
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: Infinity, // Tentar reconectar infinitamente
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
       timeout: 20000,
       // Adicionar identificador único para cada aba
       query: {
         tabId: `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        userId: user.id
-      }
+        userId: user.id,
+        empresaId: user.empresa_id
+      },
+      // Configurações adicionais para produção
+      upgrade: true,
+      rememberUpgrade: true,
+      autoConnect: true
     });
     
     setSocket(newSocket);
 
-    // Entrar no grupo de notificações da incorporadora
-    newSocket.emit('join-incorporadora-notifications', {
-      userType: 'admin',
-      userId: user.id,
-      empresaId: user.empresa_id
+    // Função auxiliar para entrar no grupo (chamada múltiplas vezes se necessário)
+    const joinGroup = () => {
+      if (newSocket.connected) {
+        console.log('📢 [SOCKET.IO] Entrando no grupo incorporadora-notifications:', {
+          socketId: newSocket.id,
+          userId: user.id,
+          empresaId: user.empresa_id,
+          connected: newSocket.connected
+        });
+        
+        newSocket.emit('join-incorporadora-notifications', {
+          userType: 'admin',
+          userId: user.id,
+          empresaId: user.empresa_id
+        });
+      } else {
+        console.warn('⚠️ [SOCKET.IO] Socket não conectado, aguardando conexão...');
+      }
+    };
+
+    // Listener para confirmação de entrada no grupo
+    newSocket.on('joined-incorporadora-notifications', (data) => {
+      if (data.success) {
+        console.log('✅ [SOCKET.IO] Confirmado: Entrou no grupo incorporadora-notifications:', {
+          socketId: data.socketId,
+          timestamp: data.timestamp
+        });
+      } else {
+        console.error('❌ [SOCKET.IO] Falha ao entrar no grupo:', {
+          motivo: data.motivo,
+          timestamp: data.timestamp
+        });
+        // Tentar novamente após delay
+        setTimeout(() => {
+          if (newSocket.connected) {
+            joinGroup();
+          }
+        }, 2000);
+      }
     });
 
-    // Listener para novos leads/clientes
+    // Entrar no grupo quando conectado
+    if (newSocket.connected) {
+      joinGroup();
+    }
+
+    // Listener para novos leads/clientes - REMOVIDO RELOAD AUTOMÁTICO
     newSocket.on('new-lead-incorporadora', (data) => {
       try {
-        // Debounce: evitar refresh se outro refresh aconteceu há menos de 2 segundos
-        const lastRefresh = localStorage.getItem('last_notification_refresh');
-        const now = Date.now();
-        const timeSinceLastRefresh = lastRefresh ? now - parseInt(lastRefresh) : Infinity;
+        console.log('🔔 [SOCKET.IO] Recebido evento new-lead-incorporadora:', {
+          leadId: data.leadId,
+          nome: data.nome,
+          cidade: data.cidade,
+          estado: data.estado,
+          socketId: newSocket.id,
+          connected: newSocket.connected,
+          timestamp: new Date().toISOString()
+        });
         
-        // IMPORTANTE: Fazer refresh ANTES de mostrar a notificação para garantir sockets ativos
-        // Salvar dados da notificação no localStorage para recuperar após reload
-        const notificationData = {
+        // REMOVIDO: Reload automático causa problemas em produção
+        // Mostrar modal diretamente sem reload
+        
+        // Pré-carregar áudio ANTES de mostrar modal
+        const audioSource = data.corretor_musica || `${process.env.PUBLIC_URL || ''}/audioNovoLead.mp3`;
+        try {
+          const preloadAudio = new Audio(audioSource);
+          preloadAudio.preload = 'auto';
+          preloadAudio.volume = 1.0;
+          preloadAudio.load();
+          preloadedAudioRef.current = preloadAudio;
+          console.log('📦 [NOTIFICAÇÃO] Áudio pré-carregado:', audioSource);
+        } catch (e) {
+          console.log('⚠️ [NOTIFICAÇÃO] Erro ao pré-carregar áudio:', e);
+        }
+        
+        // Mostrar modal diretamente
+        setNewLeadData(data);
+        setShowNewLeadModal(true);
+        previousModalStateRef.current = false; // Será atualizado para true no useLayoutEffect
+        
+        // CRÍTICO: Tocar música IMEDIATAMENTE quando evento chegar
+        // Não esperar pela renderização do modal
+        console.log('🔊 [NOTIFICAÇÃO] Tocando música imediatamente ao receber evento...');
+        playNotificationSound(data.corretor_musica);
+        
+        // Marcar que áudio foi iniciado para evitar duplicação no useLayoutEffect
+        audioStartedRef.current = true;
+        
+        // Adicionar à lista de notificações
+        setNotifications(prev => [...prev, {
+          id: Date.now(),
           type: 'new-lead',
-          data: data,
-          timestamp: now
-        };
+          data,
+          timestamp: new Date()
+        }]);
         
-        // Se houver outra notificação pendente, mesclar (manter a mais recente)
-        const existingNotification = localStorage.getItem('pending_notification');
-        if (existingNotification && timeSinceLastRefresh < 2000) {
-          try {
-            const existing = JSON.parse(existingNotification);
-            // Manter a mais recente (normalmente a atual)
-            if (existing.timestamp && existing.timestamp > notificationData.timestamp) {
-              return;
-            }
-          } catch (e) {
-            // Se erro ao parsear, sobrescrever
-          }
-        }
-        
-        localStorage.setItem('pending_notification', JSON.stringify(notificationData));
-        localStorage.setItem('last_notification_refresh', now.toString());
-        
-        // Forçar sincronização do localStorage (alguns navegadores precisam disso)
-        if (window.localStorage) {
-          window.dispatchEvent(new Event('storage'));
-        }
-        
-        // Reload imediato - localStorage é síncrono
-        window.location.reload();
-        
-        // Não executar o resto do código pois a página vai recarregar
-        return;
+        console.log('✅ [SOCKET.IO] Notificação processada e modal deve aparecer');
       } catch (error) {
         console.error('❌ [SOCKET.IO] Erro ao processar novo lead:', error);
       }
@@ -348,26 +419,125 @@ const useIncorporadoraNotifications = () => {
       }]);
     });
 
-    // Log de conexão/desconexão
+    // Log de conexão/desconexão - MELHORADO para produção
     newSocket.on('connect', () => {
-      // Re-entrar no grupo de notificações ao reconectar
-      newSocket.emit('join-incorporadora-notifications', {
-        userType: 'admin',
+      console.log('✅ [SOCKET.IO] Socket conectado:', {
+        socketId: newSocket.id,
         userId: user.id,
-        empresaId: user.empresa_id
+        empresaId: user.empresa_id,
+        timestamp: new Date().toISOString()
       });
+      
+      // CRÍTICO: Re-entrar no grupo de notificações ao reconectar
+      // Aguardar um pouco para garantir que a conexão está estável
+      setTimeout(() => {
+        if (newSocket.connected) {
+          joinGroup();
+        }
+      }, 100);
+    });
+
+    newSocket.on('disconnect', (reason) => {
+      console.warn('⚠️ [SOCKET.IO] Socket desconectado:', {
+        reason,
+        socketId: newSocket.id,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Tentar reconectar se não foi desconexão intencional
+      if (reason === 'io server disconnect') {
+        // Servidor desconectou, reconectar manualmente
+        newSocket.connect();
+      }
     });
 
     newSocket.on('connect_error', (error) => {
-      console.error('❌ [SOCKET.IO] Erro de conexão:', error);
+      console.error('❌ [SOCKET.IO] Erro de conexão:', {
+        error: error.message,
+        type: error.type,
+        timestamp: new Date().toISOString()
+      });
     });
 
-    // Cleanup - NÃO limpar timer aqui, apenas socket
+    newSocket.on('reconnect', (attemptNumber) => {
+      console.log('🔄 [SOCKET.IO] Reconectado após', attemptNumber, 'tentativas:', {
+        socketId: newSocket.id,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Re-entrar no grupo após reconexão
+      joinGroup();
+    });
+
+    newSocket.on('reconnect_attempt', (attemptNumber) => {
+      console.log('🔄 [SOCKET.IO] Tentativa de reconexão #' + attemptNumber);
+    });
+
+    newSocket.on('reconnect_error', (error) => {
+      console.error('❌ [SOCKET.IO] Erro ao reconectar:', error.message);
+    });
+
+    newSocket.on('reconnect_failed', () => {
+      console.error('❌ [SOCKET.IO] Falha ao reconectar após todas as tentativas');
+      // Tentar reconectar manualmente após delay
+      setTimeout(() => {
+        console.log('🔄 [SOCKET.IO] Tentando reconectar manualmente...');
+        newSocket.connect();
+      }, 5000);
+    });
+
+    // Listener para pong (resposta do heartbeat)
+    newSocket.on('pong', (data) => {
+      const latency = Date.now() - data.receivedTimestamp;
+      console.log('💓 [SOCKET.IO] Heartbeat OK - Latência:', latency + 'ms');
+    });
+
+    // Heartbeat: Verificar conexão periodicamente (a cada 30 segundos)
+    const heartbeatInterval = setInterval(() => {
+      if (newSocket && !newSocket.connected) {
+        console.warn('⚠️ [SOCKET.IO] Conexão perdida detectada, tentando reconectar...');
+        newSocket.connect();
+      } else if (newSocket && newSocket.connected) {
+        // Verificar se ainda está no grupo (ping)
+        newSocket.emit('ping', { timestamp: Date.now() });
+        
+        // Verificar se ainda está no grupo - re-entrar se necessário
+        // Isso garante que mesmo se houver algum problema, re-entra automaticamente
+        const lastJoinCheck = localStorage.getItem('last_join_check');
+        const now = Date.now();
+        if (!lastJoinCheck || (now - parseInt(lastJoinCheck)) > 60000) { // A cada 1 minuto
+          joinGroup();
+          localStorage.setItem('last_join_check', now.toString());
+        }
+      }
+    }, 30000); // 30 segundos
+
+    // Cleanup - melhorado para produção
     return () => {
-      // NÃO limpar timer no cleanup do socket - ele será limpo quando:
-      // 1. O timer executar (após 20s)
-      // 2. A música terminar (evento 'ended')
-      // 3. O modal fechar manualmente
+      console.log('🧹 [SOCKET.IO] Limpando conexão Socket.IO:', {
+        socketId: newSocket.id,
+        connected: newSocket.connected,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Limpar heartbeat
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+      }
+      
+      // Remover todos os listeners antes de desconectar
+      newSocket.off('new-lead-incorporadora');
+      newSocket.off('lead-capturado-incorporadora');
+      newSocket.off('new-agendamento-incorporadora');
+      newSocket.off('joined-incorporadora-notifications');
+      newSocket.off('pong');
+      newSocket.off('connect');
+      newSocket.off('disconnect');
+      newSocket.off('connect_error');
+      newSocket.off('reconnect');
+      newSocket.off('reconnect_attempt');
+      newSocket.off('reconnect_error');
+      newSocket.off('reconnect_failed');
       
       // Parar música apenas se não houver modal ativo
       if (!showNewLeadModal && audioInstanceRef.current) {
@@ -376,7 +546,10 @@ const useIncorporadoraNotifications = () => {
         audioInstanceRef.current = null;
       }
       
-      newSocket.disconnect();
+      // Desconectar socket
+      if (newSocket.connected) {
+        newSocket.disconnect();
+      }
     };
   }, [user?.id, user?.empresa_id, user?.tipo, playNotificationSound, stopNotificationSound]);
 
@@ -425,18 +598,19 @@ const useIncorporadoraNotifications = () => {
       modalTimerRef.current = mainTimer;
       console.log('✅ [TIMER] Timer de 20s criado (timestamp:', timerCreatedAt, ')');
       
-      // Tocar música imediatamente e também após delays pequenos
-      if (showNewLeadModal && newLeadData && !audioStartedRef.current) {
-        console.log('🔊 [NOTIFICAÇÃO] Tentando tocar música após renderização...');
-        playNotificationSound(newLeadData.corretor_musica);
-        
-        // Tentar novamente após pequenos delays como backup
-        [100, 200, 300].forEach((delay) => {
-          setTimeout(() => {
-            if (showNewLeadModal && newLeadData && !audioStartedRef.current && audioInstanceRef.current) {
-              console.log(`🔄 [NOTIFICAÇÃO] Retry backup após ${delay}ms...`);
-              try {
-                if (audioInstanceRef.current.paused) {
+      // Verificar se música já está tocando (pode ter sido iniciada quando evento chegou)
+      // Se não estiver tocando, tentar tocar agora como backup
+      if (showNewLeadModal && newLeadData) {
+        if (!audioStartedRef.current || (audioInstanceRef.current && audioInstanceRef.current.paused)) {
+          console.log('🔊 [NOTIFICAÇÃO] Música não está tocando, tentando tocar após renderização...');
+          playNotificationSound(newLeadData.corretor_musica);
+          
+          // Tentar novamente após pequenos delays como backup
+          [100, 200, 300].forEach((delay) => {
+            setTimeout(() => {
+              if (showNewLeadModal && newLeadData && audioInstanceRef.current && audioInstanceRef.current.paused) {
+                console.log(`🔄 [NOTIFICAÇÃO] Retry backup após ${delay}ms...`);
+                try {
                   audioInstanceRef.current.play()
                     .then(() => {
                       audioStartedRef.current = true;
@@ -445,13 +619,15 @@ const useIncorporadoraNotifications = () => {
                     .catch(() => {
                       // Silencioso - já está tentando no retry interno
                     });
+                } catch (e) {
+                  // Silencioso
                 }
-              } catch (e) {
-                // Silencioso
               }
-            }
-          }, delay);
-        });
+            }, delay);
+          });
+        } else {
+          console.log('✅ [NOTIFICAÇÃO] Música já está tocando, não tentar novamente');
+        }
       }
     }
     

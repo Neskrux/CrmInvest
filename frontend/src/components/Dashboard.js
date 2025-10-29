@@ -4,8 +4,9 @@ import useBranding from '../hooks/useBranding';
 import useFechamentoNotifications from '../hooks/useFechamentoNotifications';
 import useAgendamentoNotifications from '../hooks/useAgendamentoNotifications';
 import useIncorporadoraNotifications from '../hooks/useIncorporadoraNotifications';
+import { useToast } from '../components/Toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, Area, ReferenceLine, ComposedChart } from 'recharts';
-import { TrendingUp, Calendar, BarChart3, CheckCircle, XCircle, RotateCcw } from 'lucide-react';
+import { TrendingUp, Calendar, BarChart3, CheckCircle, XCircle, RotateCcw, UserPlus } from 'lucide-react';
 
 const Dashboard = () => {
   // Hook para textos dinâmicos baseados no empresa_id
@@ -18,6 +19,12 @@ const Dashboard = () => {
   const { showFechamentoModal, FechamentoModal } = useFechamentoNotifications();
   const { showAgendamentoModal, AgendamentoModal } = useAgendamentoNotifications();
   const { showNewLeadModal, NewLeadModal } = useIncorporadoraNotifications();
+  
+  // Hook de toast
+  const { showSuccessToast, showErrorToast } = useToast();
+  
+  // Estado para botão de teste
+  const [criandoClienteTeste, setCriandoClienteTeste] = useState(false);
   
   // Ref para controlar debounce de refresh quando notificação chega
   const lastRefreshTimeRef = useRef(0);
@@ -1734,6 +1741,68 @@ const Dashboard = () => {
     return colors[status] || '#6b7280';
   };
 
+  // Função para criar cliente teste
+  const criarClienteTeste = async () => {
+    if (!isIncorporadora) return; // Apenas para incorporadora
+    
+    setCriandoClienteTeste(true);
+    
+    try {
+      // Gerar dados aleatórios para o cliente teste
+      const nomes = ['João Silva', 'Maria Santos', 'Pedro Oliveira', 'Ana Costa', 'Carlos Souza', 'Juliana Lima', 'Roberto Alves', 'Fernanda Rocha'];
+      const emails = ['teste1@email.com', 'teste2@email.com', 'teste3@email.com', 'teste4@email.com', 'teste5@email.com'];
+      const cidades = ['Curitiba', 'São Paulo', 'Rio de Janeiro', 'Belo Horizonte', 'Porto Alegre'];
+      const estados = ['PR', 'SP', 'RJ', 'MG', 'RS'];
+      
+      const nomeAleatorio = nomes[Math.floor(Math.random() * nomes.length)];
+      const emailAleatorio = emails[Math.floor(Math.random() * emails.length)];
+      const cidadeAleatoria = cidades[Math.floor(Math.random() * cidades.length)];
+      const estadoAleatorio = estados[Math.floor(Math.random() * estados.length)];
+      
+      // Gerar telefone único usando timestamp (últimos 9 dígitos + DDD 41)
+      const timestamp = Date.now().toString();
+      const ultimosDigitos = timestamp.slice(-9); // Pega últimos 9 dígitos do timestamp
+      const telefoneNumeros = `41${ultimosDigitos}`; // 41 (DDD) + 9 dígitos = 11 dígitos total
+      const telefoneFormatado = `(${telefoneNumeros.slice(0, 2)}) ${telefoneNumeros.slice(2, 7)}-${telefoneNumeros.slice(7)}`;
+      
+      const dadosCliente = {
+        nome: `${nomeAleatorio} Teste`,
+        telefone: telefoneFormatado,
+        email: `teste${timestamp}@teste.com`,
+        cidade: cidadeAleatoria,
+        estado: estadoAleatorio,
+        cpf: `${Math.floor(Math.random() * 900) + 100}.${Math.floor(Math.random() * 900) + 100}.${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 90) + 10}`,
+        observacoes: 'Cliente de teste criado pelo Dashboard'
+      };
+      
+      console.log('📝 Criando cliente teste:', dadosCliente);
+      
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+      const response = await fetch(`${API_BASE_URL}/leads/cadastro`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(dadosCliente)
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Cliente teste criado com sucesso:', result);
+        showSuccessToast(`✅ Cliente teste "${result.nome}" criado com sucesso! Aguarde a notificação em tempo real...`, 5000);
+      } else {
+        const error = await response.json();
+        console.error('❌ Erro ao criar cliente teste:', error);
+        showErrorToast(`Erro ao criar cliente teste: ${error.error || 'Erro desconhecido'}`);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao criar cliente teste:', error);
+      showErrorToast(`Erro de conexão ao criar cliente teste: ${error.message}`);
+    } finally {
+      setCriandoClienteTeste(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="loading">
@@ -1746,7 +1815,7 @@ const Dashboard = () => {
     <>
     <div>
       <div className="page-header" style={{padding: '1.5rem'}}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h1 className="page-title">Dashboard</h1>
             <p className="page-subtitle">
@@ -1766,6 +1835,47 @@ const Dashboard = () => {
               )}
             </p>
           </div>
+          
+          {/* Botão de Criar Cliente Teste - Apenas para Incorporadora */}
+          {isIncorporadora && (
+            <button
+              onClick={criarClienteTeste}
+              disabled={criandoClienteTeste}
+              className="btn btn-primary"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1.5rem',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                backgroundColor: criandoClienteTeste ? '#9ca3af' : '#3b82f6',
+                cursor: criandoClienteTeste ? 'not-allowed' : 'pointer',
+                border: 'none',
+                borderRadius: '8px',
+                color: 'white',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => {
+                if (!criandoClienteTeste) {
+                  e.target.style.backgroundColor = '#2563eb';
+                  e.target.style.transform = 'translateY(-1px)';
+                  e.target.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.15)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!criandoClienteTeste) {
+                  e.target.style.backgroundColor = '#3b82f6';
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                }
+              }}
+            >
+              <UserPlus size={18} />
+              {criandoClienteTeste ? 'Criando...' : '🧪 Criar Cliente Teste'}
+            </button>
+          )}
         </div>
       </div>
 
