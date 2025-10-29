@@ -438,20 +438,17 @@ const useIncorporadoraNotifications = () => {
       }
     });
 
-    // Entrar no grupo quando conectado (apenas se já estiver conectado ao criar o socket)
-    // Aguardar um pouco para garantir que os listeners estão configurados
+    // CRÍTICO: Entrar no grupo IMEDIATAMENTE quando socket já está conectado
+    // Não esperar timeout - isso causa notificações perdidas!
     if (newSocket.connected) {
-      setTimeout(() => {
-        if (newSocket.connected && !joiningGroupRef.current) {
-          joinGroup();
-        }
-      }, 150);
+      console.log('⚡ [SOCKET.IO] Socket já conectado, entrando no grupo IMEDIATAMENTE');
+      joinGroup();
     }
 
     // Listener para novos leads/clientes - REMOVIDO RELOAD AUTOMÁTICO
     newSocket.on('new-lead-incorporadora', (data) => {
       try {
-        console.log('🔔 [SOCKET.IO] Recebido evento new-lead-incorporadora:', {
+        console.log('🔔🔔🔔 [INCORPORADORA NOTIFICATIONS] Recebido evento new-lead-incorporadora:', {
           leadId: data.leadId,
           nome: data.nome,
           cidade: data.cidade,
@@ -543,13 +540,12 @@ const useIncorporadoraNotifications = () => {
         timestamp: new Date().toISOString()
       });
       
-      // CRÍTICO: Re-entrar no grupo de notificações ao reconectar
-      // Aguardar um pouco para garantir que a conexão está estável
-      setTimeout(() => {
-        if (newSocket.connected && !joiningGroupRef.current) {
-          joinGroup();
-        }
-      }, 100);
+      // CRÍTICO: Re-entrar no grupo IMEDIATAMENTE ao reconectar
+      // Não esperar - isso causa notificações perdidas!
+      if (newSocket.connected && !joiningGroupRef.current) {
+        console.log('⚡ [SOCKET.IO] Entrando no grupo IMEDIATAMENTE após connect');
+        joinGroup();
+      }
     });
 
     newSocket.on('disconnect', (reason) => {
@@ -580,12 +576,11 @@ const useIncorporadoraNotifications = () => {
         timestamp: new Date().toISOString()
       });
       
-      // Re-entrar no grupo após reconexão (com proteção)
-      setTimeout(() => {
-        if (newSocket.connected && !joiningGroupRef.current) {
-          joinGroup();
-        }
-      }, 200);
+      // Re-entrar no grupo IMEDIATAMENTE após reconexão (com proteção)
+      if (newSocket.connected && !joiningGroupRef.current) {
+        console.log('⚡ [SOCKET.IO] Entrando no grupo IMEDIATAMENTE após reconnect');
+        joinGroup();
+      }
     });
 
     newSocket.on('reconnect_attempt', (attemptNumber) => {

@@ -394,7 +394,7 @@ const useAgendamentoNotifications = () => {
     // Isso garante que eventos sejam capturados mesmo se a conexão já estiver estabelecida
     const handleNewAgendamento = (data) => {
       try {
-        console.log('🔔 [SOCKET.IO] Recebido evento new-agendamento-incorporadora:', {
+        console.log('🔔🔔🔔 [AGENDAMENTO NOTIFICATIONS] Recebido evento new-agendamento-incorporadora:', {
           agendamentoId: data.agendamentoId,
           paciente_nome: data.paciente_nome,
           sdr_nome: data.sdr_nome,
@@ -519,14 +519,11 @@ const useAgendamentoNotifications = () => {
       }
     });
 
-    // Entrar no grupo quando conectado (apenas se já estiver conectado ao criar o socket)
-    // Aguardar um pouco para garantir que os listeners estão configurados
+    // CRÍTICO: Entrar no grupo IMEDIATAMENTE quando socket já está conectado
+    // Não esperar timeout - isso causa notificações perdidas!
     if (newSocket.connected) {
-      setTimeout(() => {
-        if (newSocket.connected && !joiningGroupRef.current) {
-          joinGroup();
-        }
-      }, 150);
+      console.log('⚡ [SOCKET.IO] Socket já conectado, entrando no grupo IMEDIATAMENTE');
+      joinGroup();
     }
 
     // Log de conexão/desconexão - MELHORADO para produção
@@ -538,13 +535,12 @@ const useAgendamentoNotifications = () => {
         timestamp: new Date().toISOString()
       });
       
-      // CRÍTICO: Re-entrar no grupo de notificações ao reconectar
-      // Aguardar um pouco para garantir que a conexão está estável
-      setTimeout(() => {
-        if (newSocket.connected && !joiningGroupRef.current) {
-          joinGroup();
-        }
-      }, 100);
+      // CRÍTICO: Re-entrar no grupo IMEDIATAMENTE ao reconectar
+      // Não esperar - isso causa notificações perdidas!
+      if (newSocket.connected && !joiningGroupRef.current) {
+        console.log('⚡ [SOCKET.IO] Entrando no grupo IMEDIATAMENTE após connect');
+        joinGroup();
+      }
     });
 
     newSocket.on('disconnect', (reason) => {
@@ -575,12 +571,11 @@ const useAgendamentoNotifications = () => {
         timestamp: new Date().toISOString()
       });
       
-      // Re-entrar no grupo após reconexão (com proteção)
-      setTimeout(() => {
-        if (newSocket.connected && !joiningGroupRef.current) {
-          joinGroup();
-        }
-      }, 200);
+      // Re-entrar no grupo IMEDIATAMENTE após reconexão (com proteção)
+      if (newSocket.connected && !joiningGroupRef.current) {
+        console.log('⚡ [SOCKET.IO] Entrando no grupo IMEDIATAMENTE após reconnect');
+        joinGroup();
+      }
     });
 
     newSocket.on('reconnect_attempt', (attemptNumber) => {
