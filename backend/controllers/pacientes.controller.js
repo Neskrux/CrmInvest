@@ -1389,6 +1389,23 @@ const cadastroPublicoLead = async (req, res) => {
         console.log('ℹ️ [SOCKET.IO] Lead sem consultor atribuído - notificação será enviada mesmo assim');
       }
 
+      // CRÍTICO: Verificar quantos clientes estão no grupo ANTES de emitir
+      const ioInstance = req.app.locals.io || req.io;
+      if (ioInstance && ioInstance.sockets) {
+        try {
+          const room = ioInstance.sockets.adapter.rooms.get('incorporadora-notifications');
+          if (room) {
+            const clients = Array.from(room);
+            console.log('📊 [SOCKET.IO] Total de clientes no grupo antes de emitir new-lead:', clients.length);
+            console.log('📋 [SOCKET.IO] IDs dos clientes que receberão notificação:', clients);
+          } else {
+            console.log('📊 [SOCKET.IO] Nenhum cliente no grupo incorporadora-notifications antes de emitir');
+          }
+        } catch (error) {
+          console.error('❌ [SOCKET.IO] Erro ao verificar clientes no grupo:', error);
+        }
+      }
+
       req.io.to('incorporadora-notifications').emit('new-lead-incorporadora', {
         leadId: data[0].id,
         nome: data[0].nome,

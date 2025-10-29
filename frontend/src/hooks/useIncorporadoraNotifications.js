@@ -272,15 +272,16 @@ const useIncorporadoraNotifications = () => {
     // Conectar ao Socket.IO com configurações ROBUSTAS para produção
     const newSocket = io(API_BASE_URL, {
       transports: ['websocket', 'polling'], // Tentar websocket primeiro, fallback para polling
-      forceNew: false, // NÃO forçar nova conexão - reutilizar se possível
+      forceNew: true, // ✅ FORÇAR nova conexão - cada dispositivo precisa da sua própria!
       reconnection: true,
       reconnectionAttempts: Infinity, // Tentar reconectar infinitamente
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: 20000,
-      // Adicionar identificador único para cada aba
+      // Adicionar identificador único para cada aba/dispositivo
       query: {
         tabId: `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        deviceId: `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId: user.id,
         empresaId: user.empresa_id
       },
