@@ -315,48 +315,51 @@ const cadastroPublico = async (req, res) => {
     // Normalizar email antes de salvar
     const emailNormalizado = normalizarEmail(email);
     
-    // Validar se email já existe na mesma empresa
-    const { data: emailExistente, error: emailError } = await supabaseAdmin
-      .from('consultores')
-      .select('id, empresa_id')
-      .eq('email', emailNormalizado)
-      .eq('empresa_id', empresaIdFinal)
-      .limit(1);
+    // Quando cliente=incorporadora, empresa_id sempre será 5
+    // Usar empresa_id diretamente (já vem do frontend como 5 para incorporadora)
+    const empresaId = empresa_id || null;
+    
+    // Validar se email já existe na mesma empresa (apenas se empresa_id fornecida)
+    if (empresaId) {
+      const { data: emailExistente, error: emailError } = await supabaseAdmin
+        .from('consultores')
+        .select('id, empresa_id')
+        .eq('email', emailNormalizado)
+        .eq('empresa_id', empresaId)
+        .limit(1);
 
-    if (emailError) throw emailError;
-    
-    if (emailExistente && emailExistente.length > 0) {
-      return res.status(400).json({ 
-        error: 'Email já cadastrado', 
-        message: 'Este email já está sendo usado por outro consultor nesta empresa. Por favor, use um email diferente ou entre em contato com o administrador.',
-        field: 'email'
-      });
-    }
-    
-    // Validar se CPF já existe na mesma empresa
-    const { data: cpfExistente, error: cpfError } = await supabaseAdmin
-      .from('consultores')
-      .select('id, empresa_id')
-      .eq('cpf', cpf)
-      .eq('empresa_id', empresaIdFinal)
-      .limit(1);
+      if (emailError) throw emailError;
+      
+      if (emailExistente && emailExistente.length > 0) {
+        return res.status(400).json({ 
+          error: 'Email já cadastrado', 
+          message: 'Este email já está sendo usado por outro consultor nesta empresa. Por favor, use um email diferente ou entre em contato com o administrador.',
+          field: 'email'
+        });
+      }
+      
+      // Validar se CPF já existe na mesma empresa
+      const { data: cpfExistente, error: cpfError } = await supabaseAdmin
+        .from('consultores')
+        .select('id, empresa_id')
+        .eq('cpf', cpf)
+        .eq('empresa_id', empresaId)
+        .limit(1);
 
-    if (cpfError) throw cpfError;
-    
-    if (cpfExistente && cpfExistente.length > 0) {
-      return res.status(400).json({ 
-        error: 'CPF já cadastrado', 
-        message: 'Este CPF já está sendo usado por outro consultor nesta empresa. Verifique se o CPF está correto ou entre em contato com o administrador.',
-        field: 'cpf'
-      });
+      if (cpfError) throw cpfError;
+      
+      if (cpfExistente && cpfExistente.length > 0) {
+        return res.status(400).json({ 
+          error: 'CPF já cadastrado', 
+          message: 'Este CPF já está sendo usado por outro consultor nesta empresa. Verifique se o CPF está correto ou entre em contato com o administrador.',
+          field: 'cpf'
+        });
+      }
     }
     
     // Hash da senha
     const saltRounds = 10;
     const senhaHash = await bcrypt.hash(senha, saltRounds);
-    
-    // Definir empresa_id, is_freelancer e tipo_consultor baseado nos dados recebidos
-    const empresaIdFinal = empresa_id || 3; // Default para empresa 3 se não especificado
     
     // Determinar tipo_consultor e is_freelancer
     let tipoConsultorFinal = tipo_consultor || 'freelancer';
@@ -370,7 +373,7 @@ const cadastroPublico = async (req, res) => {
       tipoConsultorFinal = is_freelancer ? 'freelancer' : 'corretor';
     }
     
-    console.log('🏢 Definindo empresa_id =', empresaIdFinal, 'para cadastro público de consultor');
+    console.log('🏢 Cadastrando consultor com empresa_id =', empresaId);
     console.log('👤 is_freelancer =', isFreelancerFinal, 'tipo_consultor =', tipoConsultorFinal);
     
     // Inserir consultor
@@ -389,7 +392,7 @@ const cadastroPublico = async (req, res) => {
         ativo: true,
         is_freelancer: isFreelancerFinal,
         tipo_consultor: tipoConsultorFinal,
-        empresa_id: empresaIdFinal
+        empresa_id: empresaId
       }])
       .select();
 
@@ -720,4 +723,3 @@ module.exports = {
   getConsultorById,
   getSDRsIncorporadora
 };
-
