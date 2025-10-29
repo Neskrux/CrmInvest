@@ -721,125 +721,185 @@ const useAgendamentoNotifications = () => {
         right: 0,
         bottom: 0,
         background: 'rgba(15, 23, 42, 0.95)',
-        backdropFilter: 'blur(8px)',
+        backdropFilter: 'blur(12px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 9999
       }}>
+        <style>{`
+          @keyframes slideDown {
+            0% { transform: translateY(-100px) scale(0.8); opacity: 0; }
+            100% { transform: translateY(0) scale(1); opacity: 1; }
+          }
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+          }
+          @keyframes glow {
+            0% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.6), 0 0 80px rgba(16, 185, 129, 0.4), 0 0 120px rgba(239, 68, 68, 0.3); }
+            50% { box-shadow: 0 0 60px rgba(59, 130, 246, 0.9), 0 0 120px rgba(16, 185, 129, 0.6), 0 0 180px rgba(239, 68, 68, 0.5); }
+            100% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.6), 0 0 80px rgba(16, 185, 129, 0.4), 0 0 120px rgba(239, 68, 68, 0.3); }
+          }
+          @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+          }
+          @keyframes rotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
+        
         <div style={{
-          background: 'white',
-          borderRadius: '12px',
-          padding: '2rem',
-          maxWidth: '400px',
-          width: '90%',
-          boxShadow: '0 12px 24px -6px rgba(0, 0, 0, 0.25)',
-          position: 'relative'
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          borderRadius: '24px',
+          padding: '3rem 2.5rem',
+          maxWidth: '900px',
+          width: '95%',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+          position: 'relative',
+          animation: 'slideDown 0.6s ease-out, pulse 3s ease-in-out infinite, glow 2s ease-in-out infinite',
+          border: '4px solid #3b82f6'
         }}>
-          {/* Logo no topo */}
+          {/* Logo no topo - MUITO MAIOR */}
           <div style={{
             position: 'absolute',
-            top: '-20px',
+            top: '-50px',
             left: '50%',
             transform: 'translateX(-50%)',
-            width: '40px',
-            height: '40px',
-            background: 'white',
+            width: '100px',
+            height: '100px',
+            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
-            border: '3px solid #e5e7eb'
+            boxShadow: '0 10px 40px rgba(59, 130, 246, 0.5), 0 0 0 8px rgba(255, 255, 255, 1)',
+            border: '6px solid #ffffff',
+            animation: 'bounce 2s ease-in-out infinite'
           }}>
             <img 
               src={logoBrasao}
               alt="IM Solumn" 
               style={{
-                width: '40px',
-                height: '40px',
-                objectFit: 'contain'
+                width: '70px',
+                height: '70px',
+                objectFit: 'contain',
+                filter: 'brightness(0) invert(1)'
               }}
             />
           </div>
           
-          {/* Foto do SDR */}
+          {/* Foto do SDR - MUITO MAIOR */}
           {agendamentoData.sdr_foto && (
             <div style={{
               display: 'flex',
               justifyContent: 'center',
-              marginBottom: '1rem',
-              marginTop: '1.5rem'
+              marginBottom: '2rem',
+              marginTop: '2rem'
             }}>
-              <img 
-                src={agendamentoData.sdr_foto} 
-                alt={agendamentoData.sdr_nome}
-                style={{
-                  width: '80px',
-                  height: '80px',
+              <div style={{
+                position: 'relative',
+                animation: 'pulse 2s ease-in-out infinite'
+              }}>
+                <img 
+                  src={agendamentoData.sdr_foto} 
+                  alt={agendamentoData.sdr_nome}
+                  style={{
+                    width: '200px',
+                    height: '200px',
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    border: '6px solid #3b82f6',
+                    boxShadow: '0 15px 50px rgba(59, 130, 246, 0.5), 0 0 0 8px rgba(59, 130, 246, 0.1)'
+                  }}
+                />
+                <div style={{
+                  position: 'absolute',
+                  top: '-10px',
+                  right: '-10px',
+                  width: '50px',
+                  height: '50px',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                   borderRadius: '50%',
-                  objectFit: 'cover',
-                  border: '3px solid #3b82f6'
-                }}
-              />
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 20px rgba(16, 185, 129, 0.5)',
+                  border: '4px solid #ffffff',
+                  animation: 'bounce 1.5s ease-in-out infinite'
+                }}>
+                  <span style={{ fontSize: '1.5rem' }}>✨</span>
+                </div>
+              </div>
             </div>
           )}
           
-          {/* Título */}
+          {/* Título - MUITO MAIOR */}
           <h2 style={{
-            fontSize: '1.5rem',
-            fontWeight: '800',
+            fontSize: '3.5rem',
+            fontWeight: '900',
             textAlign: 'center',
-            marginBottom: '0.5rem',
-            color: '#1e293b'
+            marginBottom: '1rem',
+            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            textTransform: 'uppercase',
+            letterSpacing: '2px',
+            textShadow: '0 4px 20px rgba(59, 130, 246, 0.3)'
           }}>
-            Novo Agendamento!
+            📅 Novo Agendamento!
           </h2>
           
           <p style={{
             textAlign: 'center',
             color: '#64748b',
-            marginBottom: '1.2rem',
-            fontSize: '1,5rem'
+            marginBottom: '2rem',
+            fontSize: '1.75rem',
+            fontWeight: '700'
           }}>
-            Agendado por <strong>{agendamentoData.sdr_nome}</strong>
+            Agendado por <strong style={{ color: '#3b82f6', fontSize: '2rem' }}>{agendamentoData.sdr_nome}</strong>
           </p>
           
-          {/* Dados do agendamento */}
+          {/* Dados do agendamento - MUITO MAIOR */}
           <div style={{
-            background: '#f8fafc',
-            padding: '1rem',
-            borderRadius: '8px',
-            marginBottom: '1.5rem'
+            background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)',
+            padding: '2.5rem',
+            borderRadius: '20px',
+            marginBottom: '2rem',
+            border: '3px solid #3b82f6',
+            boxShadow: '0 10px 40px rgba(59, 130, 246, 0.2), inset 0 0 20px rgba(59, 130, 246, 0.05)'
           }}>
-            <div style={{ marginBottom: '0.75rem' }}>
-              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>
-                Cliente
+            <div style={{ marginBottom: '2rem' }}>
+              <div style={{ fontSize: '1.25rem', color: '#64748b', marginBottom: '0.75rem', fontWeight: '600' }}>
+                👤 Cliente
               </div>
-              <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1e293b' }}>
+              <div style={{ fontSize: '2.5rem', fontWeight: '900', color: '#1e293b', textShadow: '0 2px 10px rgba(0, 0, 0, 0.1)' }}>
                 {agendamentoData.paciente_nome}
               </div>
             </div>
             
-            <div style={{ marginBottom: '0.75rem' }}>
-              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>
-                Data e Horário
+            <div>
+              <div style={{ fontSize: '1.25rem', color: '#64748b', marginBottom: '0.75rem', fontWeight: '600' }}>
+                📅 Data e Horário
               </div>
-              <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1e293b' }}>
+              <div style={{ fontSize: '2.5rem', fontWeight: '900', color: '#10b981', textShadow: '0 2px 10px rgba(16, 185, 129, 0.3)' }}>
                 {new Date(agendamentoData.data_agendamento).toLocaleDateString('pt-BR')} às {agendamentoData.horario}
               </div>
             </div>
           </div>
 
-          {/* Música tocando */}
+          {/* Música tocando - MAIOR */}
           <p style={{
             textAlign: 'center',
             color: '#10b981',
             marginTop: '1rem',
-            fontSize: '0.875rem',
-            fontWeight: '600'
+            fontSize: '1.5rem',
+            fontWeight: '700',
+            textShadow: '0 2px 10px rgba(16, 185, 129, 0.3)'
           }}>
-            🎵 Reproduzindo música do {agendamentoData.sdr_nome}...
+            🎵 Reproduzindo música do {agendamentoData.sdr_nome}... 🎵
           </p>
         </div>
       </div>

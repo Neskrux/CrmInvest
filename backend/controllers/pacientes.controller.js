@@ -1294,28 +1294,82 @@ const cadastroPublicoLead = async (req, res) => {
     // Inserir lead/paciente
     console.log('💾 Inserindo lead com consultor_id:', consultorId, 'sdr_id:', sdr_id, 'status:', statusInicial, 'e empresa_id: 5 (Incorporadora)');
     
-    const { data, error } = await supabaseAdmin
-      .from('pacientes')
-      .insert([{ 
-        nome: nome.trim(), 
-        telefone: telefoneNumeros, // Usar telefone normalizado (apenas números)
-        email: email ? email.trim() : null,
-        cpf: cpfNumeros,
-        tipo_tratamento: tipo_tratamento || null,
-        empreendimento_id: empreendimento_id || null, // ID do empreendimento de interesse
-        status: statusInicial, 
-        observacoes: observacoes || null,
-        cidade: cidade ? cidade.trim() : null,
-        estado: estado ? estado.trim() : null,
-        grau_parentesco: grau_parentesco || null, // Grau de parentesco do indicador
-        consultor_id: consultorId, // Atribuir ao consultor se encontrado pelo código de referência
-        sdr_id: sdr_id || null, // Atribuir ao SDR se selecionado
-        empresa_id: 5 // Incorporadora - todos os leads do formulário CapturaClientes vêm para empresa_id=5
-      }])
-      .select();
+    let data, error;
+    let retryCount = 0;
+    const maxRetries = 2;
+
+    while (retryCount <= maxRetries) {
+      const { data: insertData, error: insertError } = await supabaseAdmin
+        .from('pacientes')
+        .insert([{ 
+          nome: nome.trim(), 
+          telefone: telefoneNumeros, // Usar telefone normalizado (apenas números)
+          email: email ? email.trim() : null,
+          cpf: cpfNumeros,
+          tipo_tratamento: tipo_tratamento || null,
+          empreendimento_id: empreendimento_id || null, // ID do empreendimento de interesse
+          status: statusInicial, 
+          observacoes: observacoes || null,
+          cidade: cidade ? cidade.trim() : null,
+          estado: estado ? estado.trim() : null,
+          grau_parentesco: grau_parentesco || null, // Grau de parentesco do indicador
+          consultor_id: consultorId, // Atribuir ao consultor se encontrado pelo código de referência
+          sdr_id: sdr_id || null, // Atribuir ao SDR se selecionado
+          empresa_id: 5 // Incorporadora - todos os leads do formulário CapturaClientes vêm para empresa_id=5
+        }])
+        .select();
+
+      data = insertData;
+      error = insertError;
+
+      // Se não há erro ou não é erro de chave duplicada, sair do loop
+      if (!error || error.code !== '23505') {
+        break;
+      }
+
+      // Se é erro de chave duplicada (23505), corrigir a sequência
+      console.log('⚠️ Erro de chave duplicada detectado. Tentativa:', retryCount + 1);
+      console.log('🔧 Corrigindo sequência do PostgreSQL...');
+
+      try {
+        // Tentar usar função RPC do Supabase se disponível (similar ao agendamentos)
+        const { error: rpcError } = await supabaseAdmin.rpc('reset_pacientes_sequence');
+        
+        if (rpcError) {
+          console.log('⚠️ Função RPC não disponível, tentando método alternativo...');
+          
+          // Método alternativo: buscar o maior ID e tentar inserir com delay
+          const { data: maxIdData, error: maxIdError } = await supabaseAdmin
+            .from('pacientes')
+            .select('id')
+            .order('id', { ascending: false })
+            .limit(1);
+
+          if (maxIdError) {
+            console.error('❌ Erro ao buscar maior ID:', maxIdError);
+          } else {
+            const maxId = maxIdData && maxIdData.length > 0 ? maxIdData[0].id : 0;
+            console.log(`📊 Maior ID encontrado: ${maxId}`);
+          }
+          
+          // Aguardar um pouco antes de tentar novamente
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } else {
+          console.log('✅ Sequência corrigida via RPC com sucesso!');
+          // Aguardar um pouco antes de tentar inserir novamente
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+      } catch (seqError) {
+        console.error('❌ Erro ao tentar corrigir sequência:', seqError);
+        // Aguardar antes de tentar novamente mesmo com erro
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      retryCount++;
+    }
 
     if (error) {
-      console.error('❌ Erro ao inserir lead:', error);
+      console.error('❌ Erro ao inserir lead após tentativas:', error);
       throw error;
     }
     

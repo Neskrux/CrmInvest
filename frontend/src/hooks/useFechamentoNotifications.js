@@ -490,7 +490,7 @@ const useFechamentoNotifications = () => {
   }, [showFechamentoModal, stopFechamentoSound]);
 
 
-  // Componente da Modal - SEM ANIMAÇÕES
+  // Componente da Modal - SUPER CHAMATIVO
   const FechamentoModal = () => {
     if (!showFechamentoModal || !fechamentoData) return null;
 
@@ -501,172 +501,237 @@ const useFechamentoNotifications = () => {
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(0, 0, 0, 0.8)',
+        background: 'rgba(15, 23, 42, 0.95)',
+        backdropFilter: 'blur(12px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 9999
       }}>
+        <style>{`
+          @keyframes slideDown {
+            0% { transform: translateY(-100px) scale(0.8); opacity: 0; }
+            100% { transform: translateY(0) scale(1); opacity: 1; }
+          }
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+          }
+          @keyframes glow {
+            0% { box-shadow: 0 0 40px rgba(16, 185, 129, 0.6), 0 0 80px rgba(16, 185, 129, 0.4), 0 0 120px rgba(16, 185, 129, 0.3); }
+            50% { box-shadow: 0 0 60px rgba(16, 185, 129, 0.9), 0 0 120px rgba(16, 185, 129, 0.6), 0 0 180px rgba(16, 185, 129, 0.5); }
+            100% { box-shadow: 0 0 40px rgba(16, 185, 129, 0.6), 0 0 80px rgba(16, 185, 129, 0.4), 0 0 120px rgba(16, 185, 129, 0.3); }
+          }
+          @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+          }
+          @keyframes celebration {
+            0%, 100% { transform: rotate(0deg) scale(1); }
+            25% { transform: rotate(-5deg) scale(1.05); }
+            75% { transform: rotate(5deg) scale(1.05); }
+          }
+        `}</style>
+        
         <div style={{
-          background: 'white',
-          borderRadius: '8px',
-          padding: '1rem',
-          maxWidth: '320px',
-          width: '85%',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+          background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)',
+          borderRadius: '24px',
+          padding: '3rem 2.5rem',
+          maxWidth: '900px',
+          width: '95%',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)',
           textAlign: 'center',
           position: 'relative',
-          border: '2px solid #e5e7eb'
+          overflow: 'visible',
+          animation: 'slideDown 0.6s ease-out, pulse 3s ease-in-out infinite, glow 2s ease-in-out infinite',
+          border: '4px solid #10b981'
         }}>
-          {/* Logo no topo */}
+          {/* Logo no topo - MUITO MAIOR */}
           <div style={{
             position: 'absolute',
-            top: '-15px',
+            top: '-50px',
             left: '50%',
             transform: 'translateX(-50%)',
-            width: '30px',
-            height: '30px',
-            background: 'white',
+            width: '100px',
+            height: '100px',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-            border: '2px solid #e5e7eb'
+            boxShadow: '0 10px 40px rgba(16, 185, 129, 0.5), 0 0 0 8px rgba(255, 255, 255, 1)',
+            border: '6px solid #ffffff',
+            animation: 'bounce 2s ease-in-out infinite'
           }}>
             <img 
               src={logoBrasao}
               alt="Invest Money" 
               style={{
-                width: '30px',
-                height: '30px',
-                objectFit: 'contain'
+                width: '70px',
+                height: '70px',
+                objectFit: 'contain',
+                filter: 'brightness(0) invert(1)'
               }}
             />
           </div>
           
-          {/* Badge de celebração */}
+          {/* Badge de celebração - MUITO MAIOR */}
           <div style={{
             position: 'absolute',
-            top: '10px',
-            right: '15px',
-            background: '#10b981',
+            top: '30px',
+            right: '30px',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)',
             color: 'white',
-            padding: '0.3rem 0.8rem',
-            borderRadius: '15px',
-            fontSize: '0.75rem',
-            fontWeight: '600'
+            padding: '1rem 2.5rem',
+            borderRadius: '50px',
+            fontSize: '1.5rem',
+            fontWeight: '900',
+            boxShadow: '0 8px 30px rgba(16, 185, 129, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.3)',
+            textTransform: 'uppercase',
+            letterSpacing: '3px',
+            border: '3px solid #ffffff',
+            animation: 'celebration 1s ease-in-out infinite'
           }}>
-            FECHAMENTO!
+            🎉 FECHAMENTO! 🎉
           </div>
           
-          {/* Título */}
+          {/* Título - MUITO MAIOR */}
           <h1 style={{
-            fontSize: '1.25rem',
-            fontWeight: '800',
-            color: '#10b981',
-            marginTop: '1rem',
-            marginBottom: '0.25rem',
+            fontSize: '3.5rem',
+            fontWeight: '900',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            marginTop: '3rem',
+            marginBottom: '1rem',
             textTransform: 'uppercase',
-            letterSpacing: '0.25px'
+            letterSpacing: '2px',
+            textShadow: '0 4px 20px rgba(16, 185, 129, 0.3)'
           }}>
-            Novo Fechamento!
+            🎊 Novo Fechamento! 🎊
           </h1>
           
           <p style={{
-            fontSize: '0.8rem',
-            fontWeight: '600',
+            fontSize: '1.75rem',
+            fontWeight: '700',
             color: '#10b981',
-            marginBottom: '0.5rem'
+            marginBottom: '2rem',
+            textShadow: '0 2px 10px rgba(16, 185, 129, 0.3)'
           }}>
-            Parabéns pela venda!
+            🏆 Parabéns pela venda! 🏆
           </p>
           
-          {/* Foto do corretor */}
+          {/* Foto do corretor - MUITO MAIOR */}
           {fechamentoData.corretor_foto && (
             <div style={{
-              marginBottom: '0.75rem',
+              marginBottom: '2rem',
               display: 'flex',
               justifyContent: 'center'
             }}>
               <div style={{
-                width: '60px',
-                height: '60px',
-                borderRadius: '50%',
-                overflow: 'hidden',
-                border: '2px solid #10b981',
-                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+                position: 'relative',
+                animation: 'pulse 2s ease-in-out infinite'
               }}>
-                <img 
-                  src={fechamentoData.corretor_foto}
-                  alt={fechamentoData.corretor_nome}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover'
-                  }}
-                />
+                <div style={{
+                  width: '200px',
+                  height: '200px',
+                  borderRadius: '50%',
+                  overflow: 'hidden',
+                  border: '6px solid #10b981',
+                  boxShadow: '0 15px 50px rgba(16, 185, 129, 0.5), 0 0 0 8px rgba(16, 185, 129, 0.1)'
+                }}>
+                  <img 
+                    src={fechamentoData.corretor_foto}
+                    alt={fechamentoData.corretor_nome}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover'
+                    }}
+                  />
+                </div>
+                <div style={{
+                  position: 'absolute',
+                  top: '-10px',
+                  right: '-10px',
+                  width: '50px',
+                  height: '50px',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 20px rgba(245, 158, 11, 0.5)',
+                  border: '4px solid #ffffff',
+                  animation: 'bounce 1.5s ease-in-out infinite'
+                }}>
+                  <span style={{ fontSize: '1.5rem' }}>⭐</span>
+                </div>
               </div>
             </div>
           )}
           
-          {/* Card com informações */}
+          {/* Card com informações - MUITO MAIOR */}
           <div style={{
-            background: '#f0fdf4',
-            borderRadius: '6px',
-            padding: '0.6rem',
-            marginBottom: '0.6rem',
-            border: '1px solid #bbf7d0'
+            background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
+            borderRadius: '20px',
+            padding: '2.5rem',
+            marginBottom: '2rem',
+            border: '3px solid #10b981',
+            boxShadow: '0 10px 40px rgba(16, 185, 129, 0.2), inset 0 0 20px rgba(16, 185, 129, 0.05)'
           }}>
             <div style={{
-              fontSize: '0.9rem',
+              fontSize: '2rem',
               color: '#1e293b',
-              lineHeight: '1.6'
+              lineHeight: '2'
             }}>
               <div style={{ 
-                marginBottom: '0.6rem',
-                paddingBottom: '0.6rem',
-                borderBottom: '1px solid #bbf7d0'
+                marginBottom: '2rem',
+                paddingBottom: '2rem',
+                borderBottom: '3px solid #bbf7d0'
               }}>
-                <p style={{ color: '#64748b', marginBottom: '0.2rem', fontSize: '0.7rem' }}>Corretor</p>
+                <p style={{ color: '#64748b', marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: '600' }}>👤 Corretor</p>
                 <p style={{ 
-                  fontSize: '0.9rem', 
-                  fontWeight: '700',
-                  color: '#1e293b'
+                  fontSize: '2.5rem', 
+                  fontWeight: '900',
+                  color: '#1e293b',
+                  textShadow: '0 2px 10px rgba(0, 0, 0, 0.1)'
                 }}>{fechamentoData.corretor_nome}</p>
               </div>
               
               <div style={{ 
-                marginBottom: '0.6rem',
-                paddingBottom: '0.6rem',
-                borderBottom: '1px solid #bbf7d0'
+                marginBottom: '2rem',
+                paddingBottom: '2rem',
+                borderBottom: '3px solid #bbf7d0'
               }}>
-                <p style={{ color: '#64748b', marginBottom: '0.2rem', fontSize: '0.7rem' }}>Cliente</p>
+                <p style={{ color: '#64748b', marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: '600' }}>👥 Cliente</p>
                 <p style={{ 
-                  fontSize: '0.9rem', 
-                  fontWeight: '600',
-                  color: '#1e293b'
+                  fontSize: '2.5rem', 
+                  fontWeight: '900',
+                  color: '#1e293b',
+                  textShadow: '0 2px 10px rgba(0, 0, 0, 0.1)'
                 }}>{fechamentoData.paciente_nome}</p>
               </div>
               
               <div style={{ 
-                marginBottom: '0.6rem',
-                paddingBottom: '0.6rem',
-                borderBottom: '1px solid #bbf7d0'
+                marginBottom: '2rem',
+                paddingBottom: '2rem',
+                borderBottom: '3px solid #bbf7d0'
               }}>
-                <p style={{ color: '#64748b', marginBottom: '0.2rem', fontSize: '0.7rem' }}>Valor Fechado</p>
+                <p style={{ color: '#64748b', marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: '600' }}>💰 Valor Fechado</p>
                 <p style={{ 
-                  fontSize: '1.1rem', 
-                  fontWeight: '700',
-                  color: '#10b981'
+                  fontSize: '3.5rem', 
+                  fontWeight: '900',
+                  color: '#10b981',
+                  textShadow: '0 4px 20px rgba(16, 185, 129, 0.4)'
                 }}>R$ {fechamentoData.valor_fechado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
               </div>
               
               <div>
-                <p style={{ color: '#64748b', marginBottom: '0.2rem', fontSize: '0.7rem' }}>Data</p>
+                <p style={{ color: '#64748b', marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: '600' }}>📅 Data</p>
                 <p style={{ 
-                  fontSize: '0.8rem', 
-                  fontWeight: '600',
+                  fontSize: '2rem', 
+                  fontWeight: '800',
                   color: '#1e293b'
                 }}>{new Date(fechamentoData.data_fechamento).toLocaleDateString('pt-BR')}</p>
               </div>
@@ -674,47 +739,45 @@ const useFechamentoNotifications = () => {
           </div>
 
           <p style={{
-            marginTop: '1rem',
-            fontSize: '0.75rem',
-            fontWeight: '500',
-            color: '#64748b',
+            marginTop: '2rem',
+            fontSize: '1.5rem',
+            fontWeight: '700',
+            color: '#10b981',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '0.4rem'
+            gap: '1rem',
+            textShadow: '0 2px 10px rgba(16, 185, 129, 0.3)'
           }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-              <path d="M2 17l10 5 10-5"></path>
-              <path d="M2 12l10 5 10-5"></path>
-            </svg>
-            Parabéns pela conquista!
+            <span style={{ fontSize: '2rem' }}>🎉</span>
+            <span>Parabéns pela conquista!</span>
+            <span style={{ fontSize: '2rem' }}>🎉</span>
           </p>
           
           {/* Footer com marca */}
           <div style={{
-            marginTop: '1.2rem',
-            paddingTop: '1rem',
-            borderTop: '1px solid #e5e7eb',
+            marginTop: '3rem',
+            paddingTop: '2rem',
+            borderTop: '3px solid #e5e7eb',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '0.5rem',
-            opacity: 0.7
+            gap: '1rem',
+            opacity: 0.8
           }}>
             <img 
               src={logoBrasao}
               alt="Invest Money" 
               style={{
-                width: '20px',
-                height: '20px',
+                width: '50px',
+                height: '50px',
                 objectFit: 'contain'
               }}
             />
             <span style={{
-              fontSize: '0.75rem',
+              fontSize: '1.25rem',
               color: '#64748b',
-              fontWeight: '500'
+              fontWeight: '600'
             }}>
               IM Solumn
             </span>

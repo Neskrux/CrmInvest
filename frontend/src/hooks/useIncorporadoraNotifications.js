@@ -707,196 +707,210 @@ const useIncorporadoraNotifications = () => {
       }}>
         <style>{`
           @keyframes slideDown {
-            0% { transform: translateY(-50px); opacity: 0; }
-            100% { transform: translateY(0); opacity: 1; }
+            0% { transform: translateY(-100px) scale(0.8); opacity: 0; }
+            100% { transform: translateY(0) scale(1); opacity: 1; }
           }
           @keyframes pulse {
             0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
+            50% { transform: scale(1.02); }
           }
           @keyframes glow {
-            0% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
-            50% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.8), 0 0 60px rgba(16, 185, 129, 0.4); }
-            100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
+            0% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.6), 0 0 80px rgba(16, 185, 129, 0.4), 0 0 120px rgba(239, 68, 68, 0.3); }
+            50% { box-shadow: 0 0 60px rgba(59, 130, 246, 0.9), 0 0 120px rgba(16, 185, 129, 0.6), 0 0 180px rgba(239, 68, 68, 0.5); }
+            100% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.6), 0 0 80px rgba(16, 185, 129, 0.4), 0 0 120px rgba(239, 68, 68, 0.3); }
           }
-          @keyframes shimmer {
-            0% { background-position: -200% center; }
-            100% { background-position: 200% center; }
+          @keyframes flash {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+          }
+          @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
           }
         `}</style>
         
         <div style={{
-          background: 'white',
-          borderRadius: '12px',
-          padding: '1.25rem',
-          maxWidth: '320px',
-          width: '90%',
-          boxShadow: '0 12px 24px -6px rgba(0, 0, 0, 0.25)',
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          borderRadius: '24px',
+          padding: '3rem 2.5rem',
+          maxWidth: '900px',
+          width: '95%',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)',
           textAlign: 'center',
           position: 'relative',
           overflow: 'visible',
-          animation: 'slideDown 0.5s ease-out, pulse 2s ease-in-out infinite',
-          border: '2px solid #e5e7eb'
+          animation: 'slideDown 0.6s ease-out, pulse 3s ease-in-out infinite, glow 2s ease-in-out infinite',
+          border: '4px solid #3b82f6'
         }}>
-          {/* Logo no topo */}
+          {/* Logo no topo - MUITO MAIOR */}
           <div style={{
             position: 'absolute',
-            top: '-20px',
+            top: '-50px',
             left: '50%',
             transform: 'translateX(-50%)',
-            width: '40px',
-            height: '40px',
-            background: 'white',
+            width: '100px',
+            height: '100px',
+            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
-            border: '3px solid #e5e7eb'
+            boxShadow: '0 10px 40px rgba(59, 130, 246, 0.5), 0 0 0 8px rgba(255, 255, 255, 1)',
+            border: '6px solid #ffffff',
+            animation: 'bounce 2s ease-in-out infinite'
           }}>
             <img 
               src={logoBrasao}
               alt="Invest Money" 
               style={{
-                width: '40px',
-                height: '40px',
-                objectFit: 'contain'
+                width: '70px',
+                height: '70px',
+                objectFit: 'contain',
+                filter: 'brightness(0) invert(1)'
               }}
             />
           </div>
           
-          {/* Badge de urgência */}
+          {/* Badge de urgência - MUITO MAIOR E CHAMATIVO */}
           <div style={{
             position: 'absolute',
-            top: '15px',
-            right: '20px',
-            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+            top: '30px',
+            right: '30px',
+            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%)',
             color: 'white',
-            padding: '0.4rem 1.2rem',
-            borderRadius: '20px',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            boxShadow: '0 2px 10px rgba(239, 68, 68, 0.3)'
+            padding: '1rem 2.5rem',
+            borderRadius: '50px',
+            fontSize: '1.5rem',
+            fontWeight: '900',
+            boxShadow: '0 8px 30px rgba(239, 68, 68, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.3)',
+            textTransform: 'uppercase',
+            letterSpacing: '3px',
+            animation: 'flash 1s ease-in-out infinite',
+            border: '3px solid #ffffff'
           }}>
-            URGENTE
+            ⚡ URGENTE ⚡
           </div>
           
-          {/* Título */}
+          {/* Título - MUITO MAIOR */}
           <h1 style={{
-            fontSize: '1.5rem',
-            fontWeight: '800',
-            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+            fontSize: '3.5rem',
+            fontWeight: '900',
+            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
-            marginTop: '1.5rem',
-            marginBottom: '0.25rem',
+            marginTop: '3rem',
+            marginBottom: '1rem',
             textTransform: 'uppercase',
-            letterSpacing: '0.25px'
+            letterSpacing: '2px',
+            textShadow: '0 4px 20px rgba(59, 130, 246, 0.3)'
           }}>
-            Novo Lead Chegou!
+            🎯 Novo Lead Chegou!
           </h1>
           
           <p style={{
-            fontSize: '0.9rem',
-            fontWeight: '600',
+            fontSize: '1.75rem',
+            fontWeight: '700',
             color: '#10b981',
-            marginBottom: '0.75rem'
+            marginBottom: '2rem',
+            textShadow: '0 2px 10px rgba(16, 185, 129, 0.3)'
           }}>
-            Captura disponível agora!
+            ⚡ Captura disponível agora! ⚡
           </p>
           
-          {/* Card com informações */}
+          {/* Card com informações - MUITO MAIOR */}
           <div style={{
-            background: '#f8fafc',
-            borderRadius: '8px',
-            padding: '0.75rem',
-            marginBottom: '0.75rem',
-            border: '1px solid #e5e7eb',
-            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+            background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)',
+            borderRadius: '20px',
+            padding: '2.5rem',
+            marginBottom: '2rem',
+            border: '3px solid #3b82f6',
+            boxShadow: '0 10px 40px rgba(59, 130, 246, 0.2), inset 0 0 20px rgba(59, 130, 246, 0.05)'
           }}>
             <div style={{
-              fontSize: '1.125rem',
+              fontSize: '2rem',
               color: '#1e293b',
-              lineHeight: '1.8'
+              lineHeight: '2'
             }}>
               <div style={{ 
-                marginBottom: '1rem',
-                paddingBottom: '1rem',
-                borderBottom: '1px solid #e5e7eb'
+                marginBottom: '2rem',
+                paddingBottom: '2rem',
+                borderBottom: '3px solid #e5e7eb'
               }}>
-                <p style={{ color: '#64748b', marginBottom: '0.25rem', fontSize: '0.875rem' }}>Nome do Cliente</p>
+                <p style={{ color: '#64748b', marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: '600' }}>Nome do Cliente</p>
                 <p style={{ 
-                  fontSize: '1.5rem', 
-                  fontWeight: '700',
-                  color: '#1e293b'
+                  fontSize: '3rem', 
+                  fontWeight: '900',
+                  color: '#1e293b',
+                  textShadow: '0 2px 10px rgba(0, 0, 0, 0.1)'
                 }}>{newLeadData.nome}</p>
               </div>
               
               <div style={{ 
-                marginBottom: '1rem',
-                paddingBottom: '1rem',
-                borderBottom: '1px solid #e5e7eb'
+                marginBottom: '2rem',
+                paddingBottom: '2rem',
+                borderBottom: '3px solid #e5e7eb'
               }}>
-                <p style={{ color: '#64748b', marginBottom: '0.25rem', fontSize: '0.875rem' }}>Telefone</p>
+                <p style={{ color: '#64748b', marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: '600' }}>📞 Telefone</p>
                 <p style={{ 
-                  fontSize: '1.25rem', 
-                  fontWeight: '600',
-                  color: '#1e293b'
+                  fontSize: '2.5rem', 
+                  fontWeight: '800',
+                  color: '#3b82f6',
+                  textShadow: '0 2px 10px rgba(59, 130, 246, 0.3)'
                 }}>{newLeadData.telefone}</p>
               </div>
               
               <div>
-                <p style={{ color: '#64748b', marginBottom: '0.25rem', fontSize: '0.875rem' }}>Localização</p>
+                <p style={{ color: '#64748b', marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: '600' }}>📍 Localização</p>
                 <p style={{ 
-                  fontSize: '1.25rem', 
-                  fontWeight: '600',
-                  color: '#1e293b'
+                  fontSize: '2.5rem', 
+                  fontWeight: '800',
+                  color: '#10b981',
+                  textShadow: '0 2px 10px rgba(16, 185, 129, 0.3)'
                 }}>{newLeadData.cidade}/{newLeadData.estado}</p>
               </div>
             </div>
           </div>
 
           <p style={{
-            marginTop: '1.5rem',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            color: '#64748b',
+            marginTop: '2rem',
+            fontSize: '1.5rem',
+            fontWeight: '700',
+            color: '#ef4444',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '0.5rem'
+            gap: '1rem',
+            textShadow: '0 2px 10px rgba(239, 68, 68, 0.3)'
           }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polyline points="12 6 12 12 16 14"></polyline>
-            </svg>
-            Seja rápido! Lead disponível para captura
+            <span style={{ fontSize: '2rem' }}>⏰</span>
+            <span>Seja rápido! Lead disponível para captura</span>
+            <span style={{ fontSize: '2rem' }}>⏰</span>
           </p>
           
           {/* Footer com marca */}
           <div style={{
-            marginTop: '2rem',
-            paddingTop: '1.5rem',
-            borderTop: '1px solid #e5e7eb',
+            marginTop: '3rem',
+            paddingTop: '2rem',
+            borderTop: '3px solid #e5e7eb',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '0.75rem',
-            opacity: 0.7
+            gap: '1rem',
+            opacity: 0.8
           }}>
             <img 
               src={logoBrasao}
               alt="Invest Money" 
               style={{
-                width: '24px',
-                height: '24px',
+                width: '50px',
+                height: '50px',
                 objectFit: 'contain'
               }}
             />
             <span style={{
-              fontSize: '0.875rem',
+              fontSize: '1.25rem',
               color: '#64748b',
-              fontWeight: '500'
+              fontWeight: '600'
             }}>
               IM Solumn
             </span>
