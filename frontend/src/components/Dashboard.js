@@ -25,6 +25,7 @@ const Dashboard = () => {
   const newLeadModalRef = useRef(showNewLeadModal);
   const refreshBlockedUntilRef = useRef(null); // Timestamp até quando o refresh está bloqueado (null = não bloqueado)
   const refreshBlockTimerRef = useRef(null); // Timer do bloqueio
+  const pendingRefreshTimerRef = useRef(null); // Timer do refresh pendente (para permitir cancelamento)
   
   // Atualizar refs sempre que os valores mudarem
   useEffect(() => {
@@ -40,6 +41,13 @@ const Dashboard = () => {
       const blockUntil = Date.now() + 25000; // Bloquear por 25 segundos
       refreshBlockedUntilRef.current = blockUntil;
       console.log('🔒 [DASHBOARD] Notificação recebida - bloqueando refresh até', new Date(blockUntil).toLocaleTimeString());
+      
+      // CANCELAR qualquer refresh pendente imediatamente
+      if (pendingRefreshTimerRef.current) {
+        clearTimeout(pendingRefreshTimerRef.current);
+        pendingRefreshTimerRef.current = null;
+        console.log('🚫 [DASHBOARD] Refresh pendente cancelado - notificação recebida');
+      }
       
       // Limpar timer anterior se existir
       if (refreshBlockTimerRef.current) {
@@ -1652,8 +1660,14 @@ const Dashboard = () => {
   useEffect(() => {
     // Apenas para admin da incorporadora (empresa_id === 5)
     if (user?.tipo === 'admin' && user?.empresa_id === 5) {
-      // Refresh automático a cada 10 segundos para manter sockets ativos
-      const refreshInterval = setInterval(() => {
+      // Função para verificar e executar refresh com delay de segurança
+      const attemptRefresh = () => {
+        // Limpar qualquer refresh pendente anterior
+        if (pendingRefreshTimerRef.current) {
+          clearTimeout(pendingRefreshTimerRef.current);
+          pendingRefreshTimerRef.current = null;
+        }
+        
         // Verificação dupla para garantir que não faça refresh durante notificação:
         // 1. Verificar se há notificação ativa (modal aberto)
         // 2. Verificar se o refresh está bloqueado (após receber notificação recente)
@@ -1669,22 +1683,50 @@ const Dashboard = () => {
             agendamento: agendamentoModalRef.current,
             lead: newLeadModalRef.current
           });
-          return; // Cancelar refresh se houver notificação ativa
+          return false; // Cancelar refresh se houver notificação ativa
         }
         
         if (isRefreshBlocked) {
           const remainingSeconds = Math.ceil((refreshBlockedUntilRef.current - now) / 1000);
           console.log(`🔒 [DASHBOARD] Refresh bloqueado - ainda faltam ${remainingSeconds}s`);
-          return; // Cancelar refresh se estiver bloqueado por notificação recente
+          return false; // Cancelar refresh se estiver bloqueado por notificação recente
         }
         
-        console.log('🔄 [DASHBOARD] Refresh automático para TV do escritório - reinicializando sockets');
-        window.location.reload();
+        // Adicionar delay de 500ms antes de fazer reload para garantir que eventos pendentes sejam processados
+        console.log('⏳ [DASHBOARD] Iniciando refresh em 500ms (aguardando eventos pendentes)...');
+        
+        pendingRefreshTimerRef.current = setTimeout(() => {
+          // Verificar NOVAMENTE antes de realmente fazer o reload (proteção contra eventos recebidos durante o delay)
+          const hasActiveNotificationNow = fechamentoModalRef.current || agendamentoModalRef.current || newLeadModalRef.current;
+          const nowCheck = Date.now();
+          const isRefreshBlockedNow = refreshBlockedUntilRef.current !== null && nowCheck < refreshBlockedUntilRef.current;
+          
+          if (hasActiveNotificationNow || isRefreshBlockedNow) {
+            console.log('🚫 [DASHBOARD] Refresh cancelado no último momento - notificação recebida durante o delay');
+            pendingRefreshTimerRef.current = null;
+            return;
+          }
+          
+          console.log('🔄 [DASHBOARD] Refresh automático para TV do escritório - reinicializando sockets');
+          pendingRefreshTimerRef.current = null;
+          window.location.reload();
+        }, 500); // 500ms de delay para garantir que eventos pendentes sejam processados
+        
+        return true;
+      };
+      
+      // Refresh automático a cada 10 segundos para manter sockets ativos
+      const refreshInterval = setInterval(() => {
+        attemptRefresh();
       }, 10000); // 10 segundos
 
       // Cleanup ao desmontar
       return () => {
         clearInterval(refreshInterval);
+        if (pendingRefreshTimerRef.current) {
+          clearTimeout(pendingRefreshTimerRef.current);
+          pendingRefreshTimerRef.current = null;
+        }
         if (refreshBlockTimerRef.current) {
           clearTimeout(refreshBlockTimerRef.current);
           refreshBlockTimerRef.current = null;
