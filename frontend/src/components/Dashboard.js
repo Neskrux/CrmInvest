@@ -23,12 +23,62 @@ const Dashboard = () => {
   const fechamentoModalRef = useRef(showFechamentoModal);
   const agendamentoModalRef = useRef(showAgendamentoModal);
   const newLeadModalRef = useRef(showNewLeadModal);
+  const refreshBlockedUntilRef = useRef(null); // Timestamp até quando o refresh está bloqueado (null = não bloqueado)
+  const refreshBlockTimerRef = useRef(null); // Timer do bloqueio
   
   // Atualizar refs sempre que os valores mudarem
   useEffect(() => {
+    // Atualizar refs PRIMEIRO para manter sincronizado
+    const hadModalBefore = fechamentoModalRef.current || agendamentoModalRef.current || newLeadModalRef.current;
     fechamentoModalRef.current = showFechamentoModal;
     agendamentoModalRef.current = showAgendamentoModal;
     newLeadModalRef.current = showNewLeadModal;
+    const hasModalNow = showFechamentoModal || showAgendamentoModal || showNewLeadModal;
+    
+    // Se uma notificação apareceu (não tinha modal antes, mas tem agora)
+    if (!hadModalBefore && hasModalNow) {
+      const blockUntil = Date.now() + 25000; // Bloquear por 25 segundos
+      refreshBlockedUntilRef.current = blockUntil;
+      console.log('🔒 [DASHBOARD] Notificação recebida - bloqueando refresh até', new Date(blockUntil).toLocaleTimeString());
+      
+      // Limpar timer anterior se existir
+      if (refreshBlockTimerRef.current) {
+        clearTimeout(refreshBlockTimerRef.current);
+        refreshBlockTimerRef.current = null;
+      }
+      
+      // Liberar bloqueio após 25 segundos (20s da notificação + 5s de margem de segurança)
+      refreshBlockTimerRef.current = setTimeout(() => {
+        // Verificar novamente antes de liberar (para evitar race conditions)
+        if (!fechamentoModalRef.current && !agendamentoModalRef.current && !newLeadModalRef.current) {
+          refreshBlockedUntilRef.current = null;
+          refreshBlockTimerRef.current = null;
+          console.log('🔓 [DASHBOARD] Bloqueio de refresh liberado após 25 segundos');
+        } else {
+          console.log('⏸️ [DASHBOARD] Bloqueio mantido - notificação ainda ativa');
+        }
+      }, 25000);
+    }
+    
+    // Se TODAS as notificações fecharam, liberar bloqueio imediatamente
+    if (hadModalBefore && !hasModalNow) {
+      console.log('🔓 [DASHBOARD] Todas as notificações fecharam - liberando bloqueio imediatamente');
+      refreshBlockedUntilRef.current = null;
+      
+      // Limpar timer se existir
+      if (refreshBlockTimerRef.current) {
+        clearTimeout(refreshBlockTimerRef.current);
+        refreshBlockTimerRef.current = null;
+      }
+    }
+    
+    // Cleanup do timer quando componente desmontar
+    return () => {
+      if (refreshBlockTimerRef.current) {
+        clearTimeout(refreshBlockTimerRef.current);
+        refreshBlockTimerRef.current = null;
+      }
+    };
   }, [showFechamentoModal, showAgendamentoModal, showNewLeadModal]);
   
   // Estado separado para KPIs principais (dados filtrados)
@@ -1604,9 +1654,14 @@ const Dashboard = () => {
     if (user?.tipo === 'admin' && user?.empresa_id === 5) {
       // Refresh automático a cada 10 segundos para manter sockets ativos
       const refreshInterval = setInterval(() => {
-        // Verificar se há alguma notificação ativa antes de fazer refresh
-        // Usar refs para garantir que sempre temos os valores mais recentes
+        // Verificação dupla para garantir que não faça refresh durante notificação:
+        // 1. Verificar se há notificação ativa (modal aberto)
+        // 2. Verificar se o refresh está bloqueado (após receber notificação recente)
         const hasActiveNotification = fechamentoModalRef.current || agendamentoModalRef.current || newLeadModalRef.current;
+        
+        // Verificar bloqueio usando timestamp (mais confiável que flag booleana)
+        const now = Date.now();
+        const isRefreshBlocked = refreshBlockedUntilRef.current !== null && now < refreshBlockedUntilRef.current;
         
         if (hasActiveNotification) {
           console.log('⏸️ [DASHBOARD] Refresh cancelado - notificação ativa:', {
@@ -1617,6 +1672,12 @@ const Dashboard = () => {
           return; // Cancelar refresh se houver notificação ativa
         }
         
+        if (isRefreshBlocked) {
+          const remainingSeconds = Math.ceil((refreshBlockedUntilRef.current - now) / 1000);
+          console.log(`🔒 [DASHBOARD] Refresh bloqueado - ainda faltam ${remainingSeconds}s`);
+          return; // Cancelar refresh se estiver bloqueado por notificação recente
+        }
+        
         console.log('🔄 [DASHBOARD] Refresh automático para TV do escritório - reinicializando sockets');
         window.location.reload();
       }, 10000); // 10 segundos
@@ -1624,6 +1685,10 @@ const Dashboard = () => {
       // Cleanup ao desmontar
       return () => {
         clearInterval(refreshInterval);
+        if (refreshBlockTimerRef.current) {
+          clearTimeout(refreshBlockTimerRef.current);
+          refreshBlockTimerRef.current = null;
+        }
       };
     }
   }, [user?.tipo, user?.empresa_id]);
