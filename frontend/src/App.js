@@ -4,9 +4,6 @@ import './App.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './components/Toast';
 import useBranding from './hooks/useBranding';
-import useIncorporadoraNotifications from './hooks/useIncorporadoraNotifications';
-import useAgendamentoNotifications from './hooks/useAgendamentoNotifications';
-import useFechamentoNotifications from './hooks/useFechamentoNotifications';
 import { HelpCircle } from 'lucide-react';
 import CadastroConsultor from './components/CadastroConsultor';
 import CadastroSucesso from './components/CadastroSucesso';
@@ -72,32 +69,6 @@ const AppContent = () => {
   const navRef = React.useRef(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
-  
-  // Hook de notificações da incorporadora (para admins e consultores)
-  const {
-    socket,
-    notifications,
-    clearNotifications,
-    playNotificationSound,
-    stopNotificationSound,
-    showNewLeadModal,
-    newLeadData,
-    fecharModalLead,
-    NewLeadModal
-  } = useIncorporadoraNotifications();
-  
-  // Hook de notificações de agendamento (para admins e consultores)
-  const {
-    socket: agendamentoSocket,
-    notifications: agendamentoNotifications,
-    clearNotifications: clearAgendamentoNotifications,
-    AgendamentoModal
-  } = useAgendamentoNotifications();
-
-  // Hook de notificações de fechamento (para admins e consultores)
-  const {
-    FechamentoModal
-  } = useFechamentoNotifications();
 
   // Função para fechar sidebar ao navegar no mobile
   const handleMobileNavigation = () => {
@@ -1143,16 +1114,7 @@ const AppContent = () => {
           {RenderContent()}
         </div>
       </main>
-      
-      {/* Modal de notificações da incorporadora */}
-      <NewLeadModal />
-      
-      {/* Modal de notificações de agendamento */}
-      <AgendamentoModal />
-      
-      {/* Modal de notificações de fechamento */}
-      <FechamentoModal />
-      
+
       {/* Botão Flutuante WhatsApp - Apenas para consultores */}
       {user?.tipo === 'consultor' && (
         <a
