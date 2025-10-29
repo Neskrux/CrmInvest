@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import io from 'socket.io-client';
 import logoBrasao from '../images/logobrasaopreto.png';
@@ -11,11 +11,14 @@ const useIncorporadoraNotifications = () => {
   const [newLeadData, setNewLeadData] = useState(null);
   const audioInstanceRef = useRef(null);
   const modalTimerRef = useRef(null);
+  const previousModalStateRef = useRef(false); // Rastrear estado anterior do modal para detectar transições
+  const audioStartedRef = useRef(false); // Rastrear se a música já começou a tocar
+  const timerCreatedAtRef = useRef(null); // Timestamp de quando o timer foi criado para proteção
+  const preloadedAudioRef = useRef(null); // Áudio pré-carregado para iniciar mais rápido
 
   // Função para parar música - usar useCallback para garantir que sempre tenha acesso ao ref atual
   const stopNotificationSound = useCallback(() => {
     if (audioInstanceRef.current) {
-      console.log('🔇 [AUDIO] Parando música');
       audioInstanceRef.current.pause();
       audioInstanceRef.current.currentTime = 0;
       audioInstanceRef.current = null;
@@ -24,102 +27,229 @@ const useIncorporadoraNotifications = () => {
 
   // Função para tocar som de notificação - usar useCallback para garantir que sempre tenha acesso ao ref atual
   const playNotificationSound = useCallback((musicaUrl) => {
+    // Se já começou a tocar, não tentar novamente (evitar duplicatas)
+    if (audioStartedRef.current && audioInstanceRef.current && !audioInstanceRef.current.paused) {
+      console.log('🔊 [AUDIO] Música já está tocando, ignorando nova tentativa');
+      return;
+    }
+
     try {
-      console.log('🔊 [AUDIO] Iniciando música de notificação', { musicaUrl });
-      
-      // Parar áudio anterior se existir
-      if (audioInstanceRef.current) {
-        audioInstanceRef.current.pause();
-        audioInstanceRef.current.currentTime = 0;
-        audioInstanceRef.current = null;
+      // Tentar reutilizar áudio pré-carregado se disponível
+      const expectedSource = musicaUrl || `${process.env.PUBLIC_URL || ''}/audioNovoLead.mp3`;
+      if (preloadedAudioRef.current) {
+        // Verificar se é o mesmo arquivo (URL completa ou apenas nome do arquivo)
+        const preloadSrc = preloadedAudioRef.current.src || '';
+        const isSameFile = preloadSrc.includes(musicaUrl || 'audioNovoLead.mp3') || 
+                          (musicaUrl && preloadSrc.includes(musicaUrl.split('/').pop()));
+        if (isSameFile) {
+          console.log('♻️ [AUDIO] Reutilizando áudio pré-carregado');
+          audioInstanceRef.current = preloadedAudioRef.current;
+          preloadedAudioRef.current = null; // Limpar ref após usar
+        } else {
+          // Descarta pré-carregado se for arquivo diferente
+          preloadedAudioRef.current = null;
+        }
       }
       
-      // Usar música personalizada do corretor se disponível, senão usar áudio padrão
-      const audioSource = musicaUrl || `${process.env.PUBLIC_URL || ''}/audioNovoLead.mp3`;
-      const audio = new Audio(audioSource);
-      audio.volume = 1.0; // Volume máximo
-      audio.loop = true; // MÚSICA EM LOOP ATÉ CAPTURAR!
-      
-      audioInstanceRef.current = audio;
-      
-      // Tentar tocar música
-      const playPromise = audio.play();
-      
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            console.log('✅ [AUDIO] Música tocando em LOOP!');
-          })
-          .catch(error => {
-            // Erro de autoplay policy - normal, não bloquear o modal
-            // A música tentará tocar quando o usuário interagir com a página
-            console.log('ℹ️ [AUDIO] Áudio aguardando interação do usuário');
-            
-            // Adicionar listener de clique para tentar tocar após interação
-            const tryPlayOnInteraction = () => {
-              if (audioInstanceRef.current && audioInstanceRef.current.paused) {
-                audioInstanceRef.current.play()
-                  .then(() => {
-                    console.log('✅ [AUDIO] Música iniciada após interação');
-                    document.removeEventListener('click', tryPlayOnInteraction);
-                    document.removeEventListener('touchstart', tryPlayOnInteraction);
-                  })
-                  .catch(() => {
-                    // Ignorar erro silenciosamente
-                  });
-              }
-            };
-            
-            document.addEventListener('click', tryPlayOnInteraction, { once: true });
-            document.addEventListener('touchstart', tryPlayOnInteraction, { once: true });
-          });
+      // Se não reutilizou, criar novo
+      if (!audioInstanceRef.current) {
+        // Usar música personalizada do corretor se disponível, senão usar áudio padrão
+        const audioSource = musicaUrl || `${process.env.PUBLIC_URL || ''}/audioNovoLead.mp3`;
+        const audio = new Audio(audioSource);
+        audio.volume = 1.0; // Volume máximo
+        audio.loop = false; // Música toca uma vez e para
+        audio.preload = 'auto';
+        
+        audioInstanceRef.current = audio;
       }
+      
+      audioStartedRef.current = false;
+      
+      // Garantir que temos a referência do áudio
+      const currentAudio = audioInstanceRef.current;
+      if (!currentAudio) return;
+      
+      // Listener para quando a música terminar - fechar modal automaticamente
+      const handleAudioEnded = () => {
+        console.log('🎵 [AUDIO] Música terminou - fechando modal automaticamente');
+        audioStartedRef.current = false;
+        stopNotificationSound();
+        setShowNewLeadModal(false);
+        setNewLeadData(null);
+        if (modalTimerRef.current) {
+          clearTimeout(modalTimerRef.current);
+          modalTimerRef.current = null;
+        }
+        timerCreatedAtRef.current = null;
+        // Remover o listener após usar
+        if (currentAudio) {
+          currentAudio.removeEventListener('ended', handleAudioEnded);
+        }
+      };
+      
+      currentAudio.addEventListener('ended', handleAudioEnded);
+      
+      // Tentar tocar música quando o áudio estiver pronto
+      const tryPlay = (attemptNumber = 0) => {
+        if (!audioInstanceRef.current) return;
+        
+        const playPromise = audioInstanceRef.current.play();
+        
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              audioStartedRef.current = true;
+              console.log(`✅ [AUDIO] Música tocando! (tentativa ${attemptNumber + 1})`);
+            })
+            .catch(error => {
+              // Erro de autoplay policy - tentar novamente com pequenos delays
+              // Estratégia de retry mais agressiva: tentar tocar após pequenos delays
+              const retryDelays = [50, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000, 2500, 3000]; // Mais tentativas com delays menores
+              let retryCount = 0;
+              
+              const tryPlayAgain = () => {
+                if (retryCount < retryDelays.length && audioInstanceRef.current) {
+                  const delay = retryDelays[retryCount];
+                  
+                  setTimeout(() => {
+                    if (audioInstanceRef.current && audioInstanceRef.current.paused && !audioStartedRef.current) {
+                      audioInstanceRef.current.play()
+                        .then(() => {
+                          audioStartedRef.current = true;
+                          console.log(`✅ [AUDIO] Música tocando após retry ${retryCount + 1}!`);
+                        })
+                        .catch((err) => {
+                          retryCount++;
+                          if (retryCount < retryDelays.length) {
+                            tryPlayAgain();
+                          } else {
+                            console.log('⚠️ [AUDIO] Música não tocará - todas as tentativas falharam');
+                          }
+                        });
+                    }
+                  }, delay);
+                }
+              };
+              
+              tryPlayAgain();
+            });
+        }
+      };
+      
+      // Tentar tocar imediatamente
+      tryPlay(0);
+      
+      // Múltiplas tentativas iniciais com delays pequenos
+      const immediateRetries = [25, 50, 75, 100, 150, 200];
+      immediateRetries.forEach((delay, index) => {
+        setTimeout(() => {
+          if (audioInstanceRef.current && audioInstanceRef.current.paused && !audioStartedRef.current) {
+            tryPlay(index + 1);
+          }
+        }, delay);
+      });
+      
+      // Tentar também quando o áudio começar a carregar
+      audioInstanceRef.current.addEventListener('loadstart', () => {
+        if (audioInstanceRef.current && audioInstanceRef.current.paused && !audioStartedRef.current) {
+          console.log('🔄 [AUDIO] Áudio iniciando carregamento - tentando tocar...');
+          tryPlay(100);
+        }
+      }, { once: true });
+      
+      // Tentar também quando houver dados suficientes para tocar
+      audioInstanceRef.current.addEventListener('loadeddata', () => {
+        if (audioInstanceRef.current && audioInstanceRef.current.paused && !audioStartedRef.current) {
+          console.log('📥 [AUDIO] Áudio carregado - tentando tocar...');
+          tryPlay(101);
+        }
+      }, { once: true });
+
+      // Tentar também quando o áudio estiver pronto para tocar
+      audioInstanceRef.current.addEventListener('canplay', () => {
+        if (audioInstanceRef.current && audioInstanceRef.current.paused && !audioStartedRef.current) {
+          console.log('▶️ [AUDIO] Áudio pronto - tentando tocar...');
+          tryPlay(102);
+        }
+      }, { once: true });
+
+      // Tentar quando o áudio pode tocar sem interrupção
+      audioInstanceRef.current.addEventListener('canplaythrough', () => {
+        if (audioInstanceRef.current && audioInstanceRef.current.paused && !audioStartedRef.current) {
+          console.log('🎯 [AUDIO] Áudio totalmente carregado - tentando tocar...');
+          tryPlay(103);
+        }
+      }, { once: true });
     } catch (error) {
-      // Erro silencioso - não bloquear o modal se o áudio falhar
-      console.log('ℹ️ [AUDIO] Não foi possível criar áudio');
+      console.error('❌ [AUDIO] Erro ao criar áudio:', error);
     }
   }, []);
 
-  // useEffect para parar música quando o modal for fechado
+
+  // Verificar e processar notificação pendente do localStorage (após refresh)
   useEffect(() => {
-    // Só executar quando o modal mudar de true para false
-    if (!showNewLeadModal) {
-      // Limpar timer se existir
-      if (modalTimerRef.current) {
-        clearTimeout(modalTimerRef.current);
-        modalTimerRef.current = null;
-      }
-      
-      // Parar música se estiver tocando
-      if (audioInstanceRef.current) {
-        console.log('🛑 [AUDIO] Modal fechado, parando música automaticamente');
-        stopNotificationSound();
+    if (!user || !user.id || user.tipo !== 'admin' || user.empresa_id !== 5) {
+      return;
+    }
+
+    const pendingNotification = localStorage.getItem('pending_notification');
+
+    if (pendingNotification) {
+      try {
+        const notification = JSON.parse(pendingNotification);
+        
+        // Verificar se é uma notificação deste hook (new-lead)
+        if (notification.type === 'new-lead' && notification.data) {
+          console.log('✅ [NOTIFICAÇÃO] Processando novo lead pendente');
+          
+          // Limpar do localStorage imediatamente para evitar processar novamente
+          localStorage.removeItem('pending_notification');
+          
+          // PRÉ-CARREGAR áudio ANTES de mostrar modal (para ter mais tempo de carregar)
+          const audioSource = notification.data.corretor_musica || `${process.env.PUBLIC_URL || ''}/audioNovoLead.mp3`;
+          try {
+            const preloadAudio = new Audio(audioSource);
+            preloadAudio.preload = 'auto';
+            preloadAudio.volume = 1.0;
+            preloadAudio.load(); // Forçar início do carregamento
+            preloadedAudioRef.current = preloadAudio;
+            console.log('📦 [NOTIFICAÇÃO] Áudio pré-carregado:', audioSource);
+          } catch (e) {
+            console.log('⚠️ [NOTIFICAÇÃO] Erro ao pré-carregar áudio:', e);
+          }
+          
+          // Processar a notificação: mostrar modal
+          setNewLeadData(notification.data);
+          setShowNewLeadModal(true);
+          previousModalStateRef.current = true;
+          audioStartedRef.current = false;
+          
+          // Tocar música será feito no useLayoutEffect após renderização
+          // Timer será criado no useLayoutEffect separado
+          
+          // Adicionar à lista de notificações
+          setNotifications(prev => [...prev, {
+            id: Date.now(),
+            type: 'new-lead',
+            data: notification.data,
+            timestamp: new Date()
+          }]);
+        }
+      } catch (error) {
+        console.error('❌ [NOTIFICAÇÃO] Erro ao processar notificação:', error);
+        localStorage.removeItem('pending_notification');
       }
     }
-  }, [showNewLeadModal, stopNotificationSound]);
+  }, [user?.id, user?.tipo, user?.empresa_id, playNotificationSound, stopNotificationSound]);
 
   useEffect(() => {
     // Permitir entrada APENAS para admin da incorporadora
     if (user?.tipo !== 'admin' || user?.empresa_id !== 5) {
-      console.log('⚠️ [SOCKET.IO] Hook não inicializado - usuário não é admin da incorporadora:', {
-        empresaId: user?.empresa_id,
-        userTipo: user?.tipo,
-        userId: user?.id,
-        timestamp: new Date().toISOString()
-      });
       return;
     }
 
-    console.log('🚀 [SOCKET.IO] Inicializando hook de notificações:', {
-      userId: user.id,
-      userType: user.tipo,
-      empresaId: user.empresa_id,
-      timestamp: new Date().toISOString()
-    });
-
     // Configurar URL do backend
     const API_BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000';
-    console.log('🔗 [SOCKET.IO] Conectando ao backend:', API_BASE_URL);
     
     // Conectar ao Socket.IO com configurações para múltiplas abas
     const newSocket = io(API_BASE_URL, {
@@ -137,7 +267,6 @@ const useIncorporadoraNotifications = () => {
     });
     
     setSocket(newSocket);
-    console.log('🔌 [SOCKET.IO] Socket criado:', newSocket.id);
 
     // Entrar no grupo de notificações da incorporadora
     newSocket.emit('join-incorporadora-notifications', {
@@ -145,53 +274,50 @@ const useIncorporadoraNotifications = () => {
       userId: user.id,
       empresaId: user.empresa_id
     });
-    console.log('📢 [SOCKET.IO] Emitindo join-incorporadora-notifications:', {
-      userType: 'admin',
-      userTipoOriginal: user.tipo,
-      userId: user.id,
-      empresaId: user.empresa_id
-    });
-
-    console.log('🔔 [SOCKET.IO] Conectado às notificações');
 
     // Listener para novos leads/clientes
     newSocket.on('new-lead-incorporadora', (data) => {
-      console.log('🔔 [SOCKET.IO] Recebido evento new-lead-incorporadora:', {
-        leadId: data.leadId,
-        nome: data.nome,
-        cidade: data.cidade,
-        estado: data.estado,
-        consultor_nome: data.consultor_nome,
-        timestamp: data.timestamp,
-        socketId: newSocket.id
-      });
-      
       try {
-        // Tocar música personalizada do corretor
-        playNotificationSound(data.corretor_musica);
+        // Debounce: evitar refresh se outro refresh aconteceu há menos de 2 segundos
+        const lastRefresh = localStorage.getItem('last_notification_refresh');
+        const now = Date.now();
+        const timeSinceLastRefresh = lastRefresh ? now - parseInt(lastRefresh) : Infinity;
         
-        // Mostrar modal (apenas visualização)
-        setNewLeadData(data);
-        setShowNewLeadModal(true);
-        
-        // Timer para fechar automaticamente após 20 segundos
-        const timer = setTimeout(() => {
-          console.log('⏰ [TIMER] Fechando modal de novo lead após 20 segundos...');
-          stopNotificationSound();
-          setShowNewLeadModal(false);
-          setNewLeadData(null);
-        }, 20000);
-        modalTimerRef.current = timer;
-        
-        // Adicionar à lista de notificações
-        setNotifications(prev => [...prev, {
-          id: Date.now(),
+        // IMPORTANTE: Fazer refresh ANTES de mostrar a notificação para garantir sockets ativos
+        // Salvar dados da notificação no localStorage para recuperar após reload
+        const notificationData = {
           type: 'new-lead',
-          data,
-          timestamp: new Date()
-        }]);
+          data: data,
+          timestamp: now
+        };
         
-        console.log('✅ [SOCKET.IO] Processamento do evento new-lead-incorporadora concluído');
+        // Se houver outra notificação pendente, mesclar (manter a mais recente)
+        const existingNotification = localStorage.getItem('pending_notification');
+        if (existingNotification && timeSinceLastRefresh < 2000) {
+          try {
+            const existing = JSON.parse(existingNotification);
+            // Manter a mais recente (normalmente a atual)
+            if (existing.timestamp && existing.timestamp > notificationData.timestamp) {
+              return;
+            }
+          } catch (e) {
+            // Se erro ao parsear, sobrescrever
+          }
+        }
+        
+        localStorage.setItem('pending_notification', JSON.stringify(notificationData));
+        localStorage.setItem('last_notification_refresh', now.toString());
+        
+        // Forçar sincronização do localStorage (alguns navegadores precisam disso)
+        if (window.localStorage) {
+          window.dispatchEvent(new Event('storage'));
+        }
+        
+        // Reload imediato - localStorage é síncrono
+        window.location.reload();
+        
+        // Não executar o resto do código pois a página vai recarregar
+        return;
       } catch (error) {
         console.error('❌ [SOCKET.IO] Erro ao processar novo lead:', error);
       }
@@ -199,15 +325,8 @@ const useIncorporadoraNotifications = () => {
 
     // Listener para lead capturado (fechar modal em todos os clientes)
     newSocket.on('lead-capturado-incorporadora', (data) => {
-      console.log('🎯 [SOCKET.IO] Lead capturado por outro usuário:', {
-        leadId: data.leadId,
-        sdrNome: data.sdrNome,
-        timestamp: data.timestamp
-      });
-      
       // Se a modal estiver aberta com esse lead, fechar
       if (showNewLeadModal && newLeadData && newLeadData.leadId === data.leadId) {
-        console.log('✅ [SOCKET.IO] Fechando modal de lead capturado');
         stopNotificationSound();
         if (modalTimerRef.current) {
           clearTimeout(modalTimerRef.current);
@@ -220,20 +339,6 @@ const useIncorporadoraNotifications = () => {
 
     // Listener para novos agendamentos
     newSocket.on('new-agendamento-incorporadora', (data) => {
-      console.log('🔔 [SOCKET.IO] Recebido evento new-agendamento-incorporadora:', {
-        agendamentoId: data.agendamentoId,
-        paciente_nome: data.paciente_nome,
-        data_agendamento: data.data_agendamento,
-        horario: data.horario,
-        sdr_nome: data.sdr_nome,
-        sdr_foto: data.sdr_foto ? 'Disponível' : 'Não disponível',
-        timestamp: data.timestamp,
-        socketId: newSocket.id
-      });
-      
-      // Música removida temporariamente para agendamentos
-      // playNotificationSound();
-      
       // Adicionar à lista de notificações
       setNotifications(prev => [...prev, {
         id: Date.now(),
@@ -241,44 +346,10 @@ const useIncorporadoraNotifications = () => {
         data,
         timestamp: new Date()
       }]);
-      
-      console.log('✅ [SOCKET.IO] Processamento do evento new-agendamento-incorporadora concluído');
     });
 
     // Log de conexão/desconexão
     newSocket.on('connect', () => {
-      console.log('✅ [SOCKET.IO] Socket conectado - Incorporadora:', {
-        socketId: newSocket.id,
-        userId: user.id,
-        empresaId: user.empresa_id,
-        timestamp: new Date().toISOString()
-      });
-      
-      // Re-entrar no grupo de notificações ao reconectar
-      newSocket.emit('join-incorporadora-notifications', {
-        userType: 'admin',
-        userId: user.id,
-        empresaId: user.empresa_id
-      });
-    });
-
-    newSocket.on('disconnect', () => {
-      console.log('❌ [SOCKET.IO] Socket desconectado - Incorporadora:', {
-        socketId: newSocket.id,
-        userId: user.id,
-        empresaId: user.empresa_id,
-        timestamp: new Date().toISOString()
-      });
-    });
-
-    newSocket.on('reconnect', () => {
-      console.log('🔄 [SOCKET.IO] Socket reconectado - Incorporadora:', {
-        socketId: newSocket.id,
-        userId: user.id,
-        empresaId: user.empresa_id,
-        timestamp: new Date().toISOString()
-      });
-      
       // Re-entrar no grupo de notificações ao reconectar
       newSocket.emit('join-incorporadora-notifications', {
         userType: 'admin',
@@ -288,31 +359,18 @@ const useIncorporadoraNotifications = () => {
     });
 
     newSocket.on('connect_error', (error) => {
-      console.error('❌ [SOCKET.IO] Erro de conexão - Incorporadora:', {
-        error: error.message,
-        userId: user.id,
-        empresaId: user.empresa_id,
-        timestamp: new Date().toISOString()
-      });
+      console.error('❌ [SOCKET.IO] Erro de conexão:', error);
     });
 
-    // Cleanup
+    // Cleanup - NÃO limpar timer aqui, apenas socket
     return () => {
-      console.log('🧹 [SOCKET.IO] Limpando conexão Socket.IO:', {
-        socketId: newSocket.id,
-        userId: user.id,
-        empresaId: user.empresa_id,
-        timestamp: new Date().toISOString()
-      });
+      // NÃO limpar timer no cleanup do socket - ele será limpo quando:
+      // 1. O timer executar (após 20s)
+      // 2. A música terminar (evento 'ended')
+      // 3. O modal fechar manualmente
       
-      // Limpar timer se existir
-      if (modalTimerRef.current) {
-        clearTimeout(modalTimerRef.current);
-        modalTimerRef.current = null;
-      }
-      
-      // Parar música se estiver tocando
-      if (audioInstanceRef.current) {
+      // Parar música apenas se não houver modal ativo
+      if (!showNewLeadModal && audioInstanceRef.current) {
         audioInstanceRef.current.pause();
         audioInstanceRef.current.currentTime = 0;
         audioInstanceRef.current = null;
@@ -322,12 +380,118 @@ const useIncorporadoraNotifications = () => {
     };
   }, [user?.id, user?.empresa_id, user?.tipo, playNotificationSound, stopNotificationSound]);
 
+  // useLayoutEffect para criar timer e tocar música APÓS renderização do modal
+  useLayoutEffect(() => {
+    // Só executar quando modal abrir (mudar de false para true)
+    const wasClosed = !previousModalStateRef.current;
+    const isNowOpen = showNewLeadModal && newLeadData;
+    
+    // Se modal acabou de abrir, criar timer e tocar música
+    if (wasClosed && isNowOpen) {
+      // Proteção: se já existe timer recente (< 2 segundos), não criar novo (proteção contra StrictMode)
+      const existingTimerAge = timerCreatedAtRef.current ? Date.now() - timerCreatedAtRef.current : Infinity;
+      if (existingTimerAge < 2000 && modalTimerRef.current) {
+        console.log('⚠️ [NOTIFICAÇÃO] Timer já existe e é recente, ignorando criação duplicada');
+        previousModalStateRef.current = showNewLeadModal;
+        return;
+      }
+      
+      console.log('📱 [NOTIFICAÇÃO] Modal aberto - criando timer e tocando música');
+      
+      // Limpar timer anterior se existir
+      if (modalTimerRef.current) {
+        clearTimeout(modalTimerRef.current);
+        modalTimerRef.current = null;
+      }
+      
+      // Criar timer de 20 segundos
+      const timerCreatedAt = Date.now();
+      timerCreatedAtRef.current = timerCreatedAt;
+      
+      const mainTimer = setTimeout(() => {
+        // Verificar se o timer ainda é válido (não foi substituído)
+        if (modalTimerRef.current === mainTimer && timerCreatedAtRef.current === timerCreatedAt) {
+          console.log('⏰ [TIMER] 20 segundos - fechando modal');
+          audioStartedRef.current = false;
+          stopNotificationSound();
+          setShowNewLeadModal(false);
+          setNewLeadData(null);
+          previousModalStateRef.current = false;
+          modalTimerRef.current = null;
+          timerCreatedAtRef.current = null;
+        }
+      }, 20000); // 20 segundos - sempre fecha
+      
+      modalTimerRef.current = mainTimer;
+      console.log('✅ [TIMER] Timer de 20s criado (timestamp:', timerCreatedAt, ')');
+      
+      // Tocar música imediatamente e também após delays pequenos
+      if (showNewLeadModal && newLeadData && !audioStartedRef.current) {
+        console.log('🔊 [NOTIFICAÇÃO] Tentando tocar música após renderização...');
+        playNotificationSound(newLeadData.corretor_musica);
+        
+        // Tentar novamente após pequenos delays como backup
+        [100, 200, 300].forEach((delay) => {
+          setTimeout(() => {
+            if (showNewLeadModal && newLeadData && !audioStartedRef.current && audioInstanceRef.current) {
+              console.log(`🔄 [NOTIFICAÇÃO] Retry backup após ${delay}ms...`);
+              try {
+                if (audioInstanceRef.current.paused) {
+                  audioInstanceRef.current.play()
+                    .then(() => {
+                      audioStartedRef.current = true;
+                      console.log(`✅ [NOTIFICAÇÃO] Música iniciada no retry backup!`);
+                    })
+                    .catch(() => {
+                      // Silencioso - já está tentando no retry interno
+                    });
+                }
+              } catch (e) {
+                // Silencioso
+              }
+            }
+          }, delay);
+        });
+      }
+    }
+    
+    // Atualizar ref do estado anterior APÓS processar
+    previousModalStateRef.current = showNewLeadModal;
+  }, [showNewLeadModal, newLeadData, playNotificationSound, stopNotificationSound]);
+
+  // useEffect para limpar timer e música quando modal fechar (transição true -> false)
+  useEffect(() => {
+    const wasOpen = previousModalStateRef.current;
+    const isNowClosed = !showNewLeadModal;
+    
+    // Atualizar ref do estado anterior
+    previousModalStateRef.current = showNewLeadModal;
+    
+    // Só limpar se estava aberto e agora está fechado (transição true -> false)
+    if (wasOpen && isNowClosed) {
+      console.log('🛑 [NOTIFICAÇÃO] Modal fechado - limpando timer e música');
+      
+      // Proteger contra limpar timer muito recente (< 1 segundo)
+      const timerAge = timerCreatedAtRef.current ? Date.now() - timerCreatedAtRef.current : Infinity;
+      if (timerAge > 1000) {
+        if (modalTimerRef.current) {
+          clearTimeout(modalTimerRef.current);
+          modalTimerRef.current = null;
+        }
+        timerCreatedAtRef.current = null;
+      } else {
+        console.log('⚠️ [NOTIFICAÇÃO] Timer muito recente, não limpando (idade:', timerAge, 'ms)');
+      }
+      
+      audioStartedRef.current = false;
+      if (audioInstanceRef.current) {
+        stopNotificationSound();
+      }
+    }
+  }, [showNewLeadModal, stopNotificationSound]);
+
   // Função para limpar notificações
   const clearNotifications = () => {
-    console.log('🧹 [SOCKET.IO] Limpando notificações:', {
-      quantidadeAntes: notifications.length,
-      timestamp: new Date().toISOString()
-    });
     setNotifications([]);
   };
 
