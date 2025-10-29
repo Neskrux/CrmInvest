@@ -27,7 +27,13 @@ const useAgendamentoNotifications = () => {
 
   // Função para tocar música - usar useCallback para garantir que sempre tenha acesso ao ref atual
   const playAgendamentoSound = useCallback((musicaUrl) => {
-    // Se já começou a tocar, não tentar novamente (evitar duplicatas)
+    // CRÍTICO: Resetar audioStartedRef se não há áudio tocando
+    // Isso garante que novas notificações possam tocar música
+    if (!audioInstanceRef.current || audioInstanceRef.current.paused) {
+      audioStartedRef.current = false;
+    }
+    
+    // Se já começou a tocar E está realmente tocando, não tentar novamente (evitar duplicatas)
     if (audioStartedRef.current && audioInstanceRef.current && !audioInstanceRef.current.paused) {
       console.log('🔊 [AGENDAMENTO] Música já está tocando, ignorando nova tentativa');
       return;
@@ -41,6 +47,17 @@ const useAgendamentoNotifications = () => {
     }
 
     try {
+      // Limpar áudio anterior se existir
+      if (audioInstanceRef.current) {
+        try {
+          audioInstanceRef.current.pause();
+          audioInstanceRef.current.currentTime = 0;
+        } catch (e) {
+          // Ignorar erros ao limpar áudio anterior
+        }
+        audioInstanceRef.current = null;
+      }
+      
       // Tentar reutilizar áudio pré-carregado se disponível
       const expectedSource = musicaUrl || `${process.env.PUBLIC_URL || ''}/audioNovoLead.mp3`;
       if (preloadedAudioRef.current) {
@@ -227,6 +244,29 @@ const useAgendamentoNotifications = () => {
       return;
     }
 
+    // CRÍTICO: Garantir que só há uma conexão Socket.IO
+    // Se já existe socket conectado, reutilizar ao invés de criar novo
+    if (socket && socket.connected) {
+      console.log('♻️ [SOCKET.IO] Reutilizando conexão Socket.IO existente:', socket.id);
+      // Apenas garantir que está no grupo
+      const joinGroup = () => {
+        if (socket.connected) {
+          socket.emit('join-incorporadora-notifications', {
+            userType: 'admin',
+            userId: user.id,
+            empresaId: user.empresa_id
+          });
+        }
+      };
+      
+      // Verificar se já está no grupo, se não, entrar
+      setTimeout(() => {
+        joinGroup();
+      }, 100);
+      
+      return; // Não criar nova conexão
+    }
+
     // Configurar URL do backend - CORRIGIDO para produção
     let API_BASE_URL;
     if (process.env.REACT_APP_API_URL) {
@@ -327,8 +367,29 @@ const useAgendamentoNotifications = () => {
           timestamp: new Date().toISOString()
         });
         
-        // REMOVIDO: Reload automático causa problemas em produção
-        // Mostrar modal diretamente sem reload
+        // CRÍTICO: Resetar estado ANTES de processar nova notificação
+        // Isso garante que cada notificação seja processada independentemente
+        audioStartedRef.current = false;
+        
+        // Parar música anterior se estiver tocando
+        if (audioInstanceRef.current && !audioInstanceRef.current.paused) {
+          console.log('🛑 [AGENDAMENTO] Parando música anterior para nova notificação');
+          audioInstanceRef.current.pause();
+          audioInstanceRef.current.currentTime = 0;
+        }
+        
+        // Limpar timer anterior se existir
+        if (modalTimerRef.current) {
+          clearTimeout(modalTimerRef.current);
+          modalTimerRef.current = null;
+        }
+        
+        // Fechar modal anterior se estiver aberto
+        if (showAgendamentoModal) {
+          console.log('🛑 [AGENDAMENTO] Fechando modal anterior para nova notificação');
+          setShowAgendamentoModal(false);
+          setAgendamentoData(null);
+        }
         
         // Pré-carregar áudio ANTES de mostrar modal
         const audioSource = data.sdr_musica || `${process.env.PUBLIC_URL || ''}/audioNovoLead.mp3`;
@@ -343,28 +404,28 @@ const useAgendamentoNotifications = () => {
           console.log('⚠️ [AGENDAMENTO] Erro ao pré-carregar áudio:', e);
         }
         
-        // Mostrar modal diretamente
-        setAgendamentoData(data);
-        setShowAgendamentoModal(true);
-        previousModalStateRef.current = false; // Será atualizado para true no useLayoutEffect
-        
-        // CRÍTICO: Tocar música IMEDIATAMENTE quando evento chegar
-        // Não esperar pela renderização do modal
-        console.log('🔊 [AGENDAMENTO] Tocando música imediatamente ao receber evento...');
-        playAgendamentoSound(data.sdr_musica);
-        
-        // Marcar que áudio foi iniciado para evitar duplicação no useLayoutEffect
-        audioStartedRef.current = true;
-        
-        // Adicionar à lista de notificações
-        setNotifications(prev => [...prev, {
-          id: Date.now(),
-          type: 'new-agendamento',
-          data,
-          timestamp: new Date()
-        }]);
-        
-        console.log('✅ [SOCKET.IO] Notificação de agendamento processada e modal deve aparecer');
+        // Pequeno delay para garantir que o estado anterior foi limpo
+        setTimeout(() => {
+          // Mostrar modal diretamente
+          setAgendamentoData(data);
+          setShowAgendamentoModal(true);
+          previousModalStateRef.current = false; // Será atualizado para true no useLayoutEffect
+          
+          // CRÍTICO: Tocar música IMEDIATAMENTE quando evento chegar
+          // Não esperar pela renderização do modal
+          console.log('🔊 [AGENDAMENTO] Tocando música imediatamente ao receber evento...');
+          playAgendamentoSound(data.sdr_musica);
+          
+          // Adicionar à lista de notificações
+          setNotifications(prev => [...prev, {
+            id: Date.now(),
+            type: 'new-agendamento',
+            data,
+            timestamp: new Date()
+          }]);
+          
+          console.log('✅ [SOCKET.IO] Notificação de agendamento processada e modal deve aparecer');
+        }, 100); // Pequeno delay para garantir limpeza do estado
       } catch (error) {
         console.error('❌ [SOCKET.IO] Erro ao processar agendamento:', error);
       }
@@ -593,9 +654,11 @@ const useAgendamentoNotifications = () => {
     previousModalStateRef.current = showAgendamentoModal;
     
     // Só limpar se estava aberto e agora está fechado (transição true -> false)
-    // E também verificar se existe timer para evitar limpeza no StrictMode quando modal está abrindo
-    if (wasOpen && isNowClosed && modalTimerRef.current) {
+    if (wasOpen && isNowClosed) {
       console.log('🛑 [AGENDAMENTO] Modal fechado - limpando timer e música');
+      
+      // CRÍTICO: Resetar TODOS os estados para garantir que próxima notificação funcione
+      audioStartedRef.current = false;
       
       // Proteger contra limpar timer muito recente (< 1 segundo)
       const timerAge = timerCreatedAtRef.current ? Date.now() - timerCreatedAtRef.current : Infinity;
@@ -609,10 +672,18 @@ const useAgendamentoNotifications = () => {
         console.log('⚠️ [AGENDAMENTO] Timer muito recente, não limpando (idade:', timerAge, 'ms)');
       }
       
-      audioStartedRef.current = false;
+      // Parar música
       if (audioInstanceRef.current) {
         stopAgendamentoSound();
       }
+      
+      // Limpar dados do agendamento
+      setAgendamentoData(null);
+      
+      // Limpar áudio pré-carregado
+      preloadedAudioRef.current = null;
+      
+      console.log('✅ [AGENDAMENTO] Estado completamente resetado para próxima notificação');
     }
   }, [showAgendamentoModal, stopAgendamentoSound]);
 
