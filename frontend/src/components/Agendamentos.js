@@ -56,6 +56,7 @@ const Agendamentos = () => {
   const [observacoesFechamento, setObservacoesFechamento] = useState('');
   const [dataFechamento, setDataFechamento] = useState(new Date().toISOString().split('T')[0]);
   const [empreendimentoFechamento, setEmpreendimentoFechamento] = useState('');
+  const [empreendimentoExternoFechamento, setEmpreendimentoExternoFechamento] = useState('');
   const [valorParcelaFechamento, setValorParcelaFechamento] = useState('');
   const [valorParcelaFormatado, setValorParcelaFormatado] = useState('');
   const [numeroParcelasFechamento, setNumeroParcelasFechamento] = useState('');
@@ -537,10 +538,13 @@ const Agendamentos = () => {
         formData.append('paciente_id', agendamentoParaFechar.paciente_id);
         formData.append('consultor_id', agendamentoParaFechar.consultor_id || '');
         
-        // Para incorporadora (empresa_id = 5), usar empreendimento_id selecionado no modal
+        // Para incorporadora (empresa_id = 5), usar empreendimento_id ou empreendimento_externo
         if (user?.empresa_id === 5) {
-          if (empreendimentoFechamento) {
-            formData.append('empreendimento_id', empreendimentoFechamento);
+          if (empreendimentoFechamento === 'externo') {
+            const nomeExterno = (empreendimentoExternoFechamento || '').trim() || 'Empreendimento Externo';
+            formData.append('empreendimento_externo', nomeExterno);
+          } else if (empreendimentoFechamento) {
+            formData.append('empreendimento_id', parseInt(empreendimentoFechamento));
           }
         } else {
           // Para securitizadora, usar clinica_id e não enviar empreendimento_id
@@ -1024,29 +1028,26 @@ const Agendamentos = () => {
                       <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{agendamento.sdr_nome || '-'}</td>
                       <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{agendamento.consultor_interno_nome || '-'}</td>
                       <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', maxWidth: '150px' }}>
-                        {user?.empresa_id === 5 ? (
-                          // Para incorporadora, mostrar empreendimento baseado no empreendimento_id ou clinica_id
-                          (agendamento.empreendimento_id || agendamento.clinica_id) ? (
-                            (() => {
-                              const empreendimentoMap = {
-                                4: 'Laguna Sky Garden',
-                                5: 'Residencial Girassol',
-                                6: 'Sintropia Sky Garden',
-                                7: 'Residencial Lotus',
-                                8: 'River Sky Garden',
-                                9: 'Condomínio Figueira Garcia'
-                              };
-                              const empreendimentoId = agendamento.empreendimento_id || agendamento.clinica_id;
-                              const nomeCompleto = empreendimentoMap[empreendimentoId] || '-';
-                              // Limitar caracteres e adicionar quebra de linha
-                              return nomeCompleto.length > 15 ? (
-                                <div style={{ fontSize: '0.8rem', lineHeight: '1.2' }}>
-                                  {nomeCompleto.substring(0, 15)}...
-                                </div>
-                              ) : nomeCompleto;
-                            })()
-                          ) : '-'
-                        ) : (
+                      {user?.empresa_id === 5 ? (
+                        // Para incorporadora, mostrar empreendimento baseado em externo ou id com truncamento (sempre com fallback)
+                        (() => {
+                          const empreendimentoMap = {
+                            4: 'Laguna Sky Garden',
+                            5: 'Residencial Girassol',
+                            6: 'Sintropia Sky Garden',
+                            7: 'Residencial Lotus',
+                            8: 'River Sky Garden',
+                            9: 'Condomínio Figueira Garcia'
+                          };
+                          const externoNome = (agendamento.empreendimento_externo || '').trim();
+                          const nomeBase = externoNome || empreendimentoMap[agendamento.empreendimento_id || agendamento.clinica_id] || 'Empreendimento Externo';
+                          return nomeBase.length > 15 ? (
+                            <div style={{ fontSize: '0.8rem', lineHeight: '1.2' }}>
+                              {nomeBase.substring(0, 15)}...
+                            </div>
+                          ) : nomeBase;
+                        })()
+                      ) : (
                           // Para outras empresas, mostrar nome da clínica
                           agendamento.clinica_nome ? (
                             agendamento.clinica_nome.length > 15 ? (
@@ -1775,7 +1776,19 @@ const Agendamentos = () => {
                     <option value="7">Residencial Lotus</option>
                     <option value="8">River Sky Garden</option>
                     <option value="9">Condomínio Figueira Garcia</option>
+                    <option value="externo">Empreendimento Externo</option>
                   </select>
+                  {empreendimentoFechamento === 'externo' && (
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={empreendimentoExternoFechamento}
+                      onChange={(e) => setEmpreendimentoExternoFechamento(e.target.value)}
+                      style={{ marginTop: '0.5rem' }}
+                      placeholder="Digite o nome do empreendimento externo"
+                      required
+                    />
+                  )}
                 </div>
               )}
 

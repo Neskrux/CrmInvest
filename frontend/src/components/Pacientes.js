@@ -315,6 +315,8 @@ const Pacientes = () => {
     cpf: '',
     cidade: '',
     estado: '',
+    empreendimento_id: '',
+    empreendimento_externo: '',
     tipo_tratamento: '',
     observacoes: '',
     // Dados do fechamento
@@ -797,7 +799,6 @@ const Pacientes = () => {
       console.error('Erro ao carregar agendamentos:', error);
     }
   };
-
   const fetchFechamentos = async () => {
     try {
       const response = await makeRequest('/fechamentos');
@@ -2807,6 +2808,12 @@ const Pacientes = () => {
         [name]: value,
         cidade: ''
       }));
+    } else if (name === 'empreendimento_id') {
+      setDadosCompletosClinica(prev => ({
+        ...prev,
+        [name]: value,
+        empreendimento_externo: value === 'externo' ? prev.empreendimento_externo : ''
+      }));
     } else {
       setDadosCompletosClinica(prev => ({
         ...prev,
@@ -2856,6 +2863,11 @@ const Pacientes = () => {
     // Validações básicas
     if (!dados.nome || !dados.telefone || !dados.cpf) {
       showErrorToast('Por favor, preencha nome, telefone e CPF!');
+      return;
+    }
+    // Para incorporadora, empreendimento é obrigatório
+    if (empresaId === 5 && !dados.empreendimento_id) {
+      showErrorToast('Selecione o empreendimento ou "Empreendimento Externo".');
       return;
     }
     
@@ -2931,17 +2943,20 @@ const Pacientes = () => {
       
       const pacienteCriado = await pacienteResponse.json();
       
-      // 2. Criar o fechamento com contrato (sem agendamento automático)
+    // 2. Criar o fechamento com contrato (sem agendamento automático)
       const fechamentoFormData = new FormData();
       fechamentoFormData.append('paciente_id', pacienteCriado.id);
       fechamentoFormData.append('consultor_id', pacienteCriado.consultor_id || '');
       
-      // Para incorporadora (empresa_id = 5), usar empreendimento_id do paciente
-      if (empresaId === 5) {
-        if (pacienteCriado.empreendimento_id) {
-          fechamentoFormData.append('clinica_id', pacienteCriado.empreendimento_id); // Backend espera clinica_id mesmo para empreendimentos
-        }
-      } else {
+    // Para incorporadora (empresa_id = 5), usar seleção do modal
+    if (empresaId === 5) {
+      if (dados.empreendimento_id === 'externo') {
+        const nomeExterno = (dados.empreendimento_externo || '').trim() || 'Empreendimento Externo';
+        fechamentoFormData.append('empreendimento_externo', nomeExterno);
+      } else if (dados.empreendimento_id) {
+        fechamentoFormData.append('empreendimento_id', parseInt(dados.empreendimento_id));
+      }
+    } else {
         // Para securitizadora, usar clinica_id
         fechamentoFormData.append('clinica_id', clinicaId);
         fechamentoFormData.append('tipo_tratamento', dados.tipo_tratamento || '');
@@ -2995,7 +3010,6 @@ const Pacientes = () => {
       setSalvandoCadastroCompleto(false);
     }
   };
-
   const resetForm = () => {
     setFormData({
       nome: '',
@@ -3458,7 +3472,7 @@ const Pacientes = () => {
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>SDR</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Corretor' : 'Consultor'}</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Empreendimento' : 'Tipo'}</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
+                      
                       <th>
                         Status
                         {!podeAlterarStatus && (
@@ -3560,27 +3574,26 @@ const Pacientes = () => {
                               </span>
                             )}
                           </td>
-                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', maxWidth: '180px' }}>
                             {isIncorporadora ? (
-                              // Para incorporadora, mostrar empreendimento
-                              paciente.empreendimento_id ? (
-                                (() => {
-                                  const empreendimentoMap = {
-                                    4: 'Laguna Sky Garden',
-                                    5: 'Residencial Girassol',
-                                    6: 'Sintropia Sky Garden',
-                                    7: 'Residencial Lotus',
-                                    8: 'River Sky Garden',
-                                    9: 'Condomínio Figueira Garcia'
-                                  };
-                                  const nomeEmpreendimento = empreendimentoMap[paciente.empreendimento_id] || '-';
-                                  return (
-                                    <span title={nomeEmpreendimento}>
-                                      {limitarCaracteres(nomeEmpreendimento, 18)}
-                                    </span>
-                                  );
-                                })()
-                              ) : '-'
+                              // Para incorporadora, mostrar empreendimento (prioriza externo)
+                              (() => {
+                                const empreendimentoMap = {
+                                  4: 'Laguna Sky Garden',
+                                  5: 'Residencial Girassol',
+                                  6: 'Sintropia Sky Garden',
+                                  7: 'Residencial Lotus',
+                                  8: 'River Sky Garden',
+                                  9: 'Condomínio Figueira Garcia'
+                                };
+                                const externo = (paciente.empreendimento_externo || '').trim();
+                                const nomeBase = externo || empreendimentoMap[paciente.empreendimento_id] || 'Externo';
+                                return (
+                                  <div style={{ fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={nomeBase}>
+                                    {nomeBase}
+                                  </div>
+                                );
+                              })()
                             ) : (
                               // Para clínicas, mostrar tipo de tratamento
                               paciente.tipo_tratamento && (
@@ -3593,9 +3606,7 @@ const Pacientes = () => {
                               )
                             )}
                           </td>
-                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                            {formatarData(paciente.created_at)}
-                          </td>
+                          
                           <td>
                             <select
                               value={statusTemporario[paciente.id] || paciente.status}
@@ -3749,7 +3760,7 @@ const Pacientes = () => {
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', width: '120px', minWidth: '120px' }}>{isIncorporadora ? 'Corretor' : 'Consultor'}</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', width: '120px', minWidth: '120px' }}>{isIncorporadora ? 'Empreendimento' : 'Tipo'}</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', width: '100px', minWidth: '100px' }}>Status</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', width: '100px', minWidth: '100px' }}>Cadastrado</th>
+                      
                       <th style={{ width: '150px', minWidth: '150px' }}>Ações</th>
                     </tr>
                   </thead>
@@ -3833,9 +3844,15 @@ const Pacientes = () => {
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{lead.consultor_interno_nome || '-'}</td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                             {isIncorporadora ? (
-                              // Para incorporadora, mostrar empreendimento
-                              lead.empreendimento_id ? (
-                                (() => {
+                              // Para incorporadora, mostrar empreendimento (prioriza externo)
+                              (() => {
+                                const externo = (lead.empreendimento_externo || '').trim();
+                                if (externo) {
+                                  return externo.length > 15 ? (
+                                    <span style={{ fontSize: '0.9rem' }}>{externo.substring(0, 15)}...</span>
+                                  ) : externo;
+                                }
+                                if (lead.empreendimento_id) {
                                   const empreendimentoMap = {
                                     4: 'Laguna Sky Garden',
                                     5: 'Residencial Girassol',
@@ -3844,9 +3861,17 @@ const Pacientes = () => {
                                     8: 'River Sky Garden',
                                     9: 'Condomínio Figueira Garcia'
                                   };
-                                  return empreendimentoMap[lead.empreendimento_id] || '-';
-                                })()
-                              ) : '-'
+                                  const nome = empreendimentoMap[lead.empreendimento_id] || 'Externo';
+                                  return nome.length > 15 ? (
+                                    <span style={{ fontSize: '0.9rem' }}>{nome.substring(0, 15)}...</span>
+                                  ) : nome;
+                                }
+                                return (
+                                  <span style={{ fontSize: '0.9rem' }}>
+                                    {'Empreendimento Externo'}
+                                  </span>
+                                );
+                              })()
                             ) : (
                               // Para clínicas, mostrar tipo de tratamento
                               lead.tipo_tratamento && (
@@ -3907,7 +3932,7 @@ const Pacientes = () => {
                               </span>
                             )}
                           </td>
-                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarData(lead.created_at)}</td>
+                          
                           <td style={{ 
                             padding: '0.5rem', 
                             width: '150px',
@@ -4137,7 +4162,7 @@ const Pacientes = () => {
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Corretor' : 'Consultor'}</th>
                       <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Empreendimento' : 'Tipo'}</th>
                       <th>Status</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Cadastrado</th>
+                      
                       <th style={{ width: '80px' }}>Ações</th>
                     </tr>
                   </thead>
@@ -4221,20 +4246,22 @@ const Pacientes = () => {
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{lead.consultor_interno_nome || '-'}</td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                             {isIncorporadora ? (
-                              // Para incorporadora, mostrar empreendimento
-                              lead.empreendimento_id ? (
-                                (() => {
-                                  const empreendimentoMap = {
-                                    4: 'Laguna Sky Garden',
-                                    5: 'Residencial Girassol',
-                                    6: 'Sintropia Sky Garden',
-                                    7: 'Residencial Lotus',
-                                    8: 'River Sky Garden',
-                                    9: 'Condomínio Figueira Garcia'
-                                  };
-                                  return empreendimentoMap[lead.empreendimento_id] || '-';
-                                })()
-                              ) : '-'
+                              // Para incorporadora, mostrar empreendimento (prioriza externo)
+                              (() => {
+                                const empreendimentoMap = {
+                                  4: 'Laguna Sky Garden',
+                                  5: 'Residencial Girassol',
+                                  6: 'Sintropia Sky Garden',
+                                  7: 'Residencial Lotus',
+                                  8: 'River Sky Garden',
+                                  9: 'Condomínio Figueira Garcia'
+                                };
+                                const externoNome = (lead.empreendimento_externo || '').trim();
+                                const nomeBase = externoNome || empreendimentoMap[lead.empreendimento_id] || 'Externo';
+                                return nomeBase.length > 15 ? (
+                                  <span style={{ fontSize: '0.9rem' }}>{nomeBase.substring(0, 15)}...</span>
+                                ) : nomeBase;
+                              })()
                             ) : (
                               // Para clínicas, mostrar tipo de tratamento
                               lead.tipo_tratamento && (
@@ -4295,7 +4322,7 @@ const Pacientes = () => {
                               </span>
                             )}
                           </td>
-                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarData(lead.created_at)}</td>
+                          
                           <td style={{ padding: '0.5rem' }}>
                             <div style={{ 
                               display: 'flex', 
@@ -4357,7 +4384,6 @@ const Pacientes = () => {
           </div>
         </>
       )}
-
       {/* Conteúdo da aba Leads (apenas para clínicas) */}
       {activeTab === 'leads-clinica' && isClinica && (
         <>
@@ -4452,9 +4478,15 @@ const Pacientes = () => {
                                 <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarTelefone(paciente.telefone)}</td>
                                 <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                                   {isIncorporadora ? (
-                                    // Para incorporadora, mostrar empreendimento
-                                    paciente.empreendimento_id ? (
-                                      (() => {
+                                    // Para incorporadora, mostrar empreendimento (prioriza externo)
+                                    (() => {
+                                      const externo = (paciente.empreendimento_externo || '').trim();
+                                      if (externo) {
+                                        return externo.length > 15 ? (
+                                          <span style={{ fontSize: '0.9rem' }}>{externo.substring(0, 15)}...</span>
+                                        ) : externo;
+                                      }
+                                      if (paciente.empreendimento_id) {
                                         const empreendimentoMap = {
                                           4: 'Laguna Sky Garden',
                                           5: 'Residencial Girassol',
@@ -4463,9 +4495,17 @@ const Pacientes = () => {
                                           8: 'River Sky Garden',
                                           9: 'Condomínio Figueira Garcia'
                                         };
-                                        return empreendimentoMap[paciente.empreendimento_id] || '-';
-                                      })()
-                                    ) : '-'
+                                        const nome = empreendimentoMap[paciente.empreendimento_id] || 'Externo';
+                                        return nome.length > 15 ? (
+                                          <span style={{ fontSize: '0.9rem' }}>{nome.substring(0, 15)}...</span>
+                                        ) : nome;
+                                      }
+                                return (
+                                  <span style={{ fontSize: '0.9rem' }}>
+                                    {'Externo'}
+                                  </span>
+                                );
+                                    })()
                                   ) : (
                                     // Para clínicas, mostrar tipo de tratamento
                                     paciente.tipo_tratamento && (
@@ -5076,7 +5116,6 @@ const Pacientes = () => {
           )}
         </>
       )}
-
       {/* Conteúdo da aba Carteira Existente para Admin - Visualizar solicitações */}
       {activeTab === 'carteira-existente' && isAdmin && (
         <>
@@ -5696,7 +5735,6 @@ const Pacientes = () => {
           </div>
         </div>
       )}
-
       {/* Modal de Cadastro - Formulário Completo (para admins e internos) */}
       {showModal && !editingPaciente && (isAdmin || isConsultorInterno || !isConsultor) && (
         <div className="modal-overlay">
@@ -6025,7 +6063,7 @@ const Pacientes = () => {
                         <option value="7">Residencial Lotus</option>
                         <option value="8">River Sky Garden</option>
                         <option value="9">Condomínio Figueira Garcia</option>
-                        <option value="externo">Empreendimento Externo</option>
+                        <option value="externo">Externo</option>
                       </select>
                       {formData.empreendimento_id === 'externo' && (
                         <input
@@ -6098,7 +6136,6 @@ const Pacientes = () => {
           </div>
         </div>
       )}
-
       {/* Modal de visualização com abas */}
       {showViewModal && viewPaciente && (
         <div className="modal-overlay">
@@ -6278,9 +6315,15 @@ const Pacientes = () => {
                       </label>
                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
         {isIncorporadora ? (
-          // Para incorporadora, mostrar empreendimento (mapeamento hardcoded)
-          viewPaciente.empreendimento_id ? (
-            (() => {
+          // Para incorporadora, mostrar empreendimento (prioriza externo)
+          (() => {
+            const externo = (viewPaciente.empreendimento_externo || '').trim();
+            if (externo) {
+              return externo.length > 15 ? (
+                <span style={{ fontSize: '0.9rem' }}>{externo.substring(0, 15)}...</span>
+              ) : externo;
+            }
+            if (viewPaciente.empreendimento_id) {
               const empreendimentoMap = {
                 4: 'Laguna Sky Garden',
                 5: 'Residencial Girassol',
@@ -6289,9 +6332,15 @@ const Pacientes = () => {
                 8: 'River Sky Garden',
                 9: 'Condomínio Figueira Garcia'
               };
-              return empreendimentoMap[viewPaciente.empreendimento_id] || '-';
-            })()
-          ) : '-'
+              const nome = empreendimentoMap[viewPaciente.empreendimento_id] || 'Externo';
+              return nome.length > 15 ? (
+                <span style={{ fontSize: '0.9rem' }}>{nome.substring(0, 15)}...</span>
+              ) : nome;
+            }
+                                      return (
+                                        <span style={{ fontSize: '0.9rem' }}>Externo</span>
+                                      );
+          })()
         ) : (
                           // Para clínicas, mostrar tipo de tratamento
                           viewPaciente.tipo_tratamento ? (
@@ -7646,7 +7695,7 @@ const Pacientes = () => {
                       <option value="7">Residencial Lotus</option>
                       <option value="8">River Sky Garden</option>
                       <option value="9">Condomínio Figueira Garcia</option>
-                      <option value="externo">Empreendimento Externo</option>
+                      <option value="externo">Externo</option>
                     </select>
                     {agendamentoData.empreendimento_id === 'externo' && (
                       <input
@@ -7800,7 +7849,6 @@ const Pacientes = () => {
                   Como consultor freelancer, você não pode alterar o status dos pacientes, aguarde que iremos atualizar o status conforme a negociação avançar.
                 </p>
               </div>
-              
               <div style={{ marginBottom: '1rem' }}>
                 <h3 style={{ color: '#374151', marginBottom: '0.5rem', fontSize: '1rem' }}>
                   Quem pode alterar status?
@@ -8140,28 +8188,81 @@ const Pacientes = () => {
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
-                      {t.tipoTratamento} *
-                    </label>
-                    <select
-                      name="tipo_tratamento"
-                      value={dadosCompletosClinica.tipo_tratamento}
-                      onChange={handleInputChangeCadastroCompleto}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.875rem',
-                        border: '2px solid #e2e8f0',
-                        borderRadius: '8px',
-                        fontSize: '1rem',
-                        outline: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value="">Selecione</option>
-                      <option value="Estético">Estético</option>
-                      <option value="Odontológico">Odontológico</option>
-                    </select>
+                    {empresaId === 5 ? (
+                      <>
+                        <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                          Empreendimento *
+                        </label>
+                        <select
+                          name="empreendimento_id"
+                          value={dadosCompletosClinica.empreendimento_id || ''}
+                          onChange={handleInputChangeCadastroCompleto}
+                          required
+                          style={{
+                            width: '100%',
+                            padding: '0.875rem',
+                            border: '2px solid #e2e8f0',
+                            borderRadius: '8px',
+                            fontSize: '1rem',
+                            outline: 'none',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <option value="">Selecione</option>
+                          <option value="4">Laguna Sky Garden</option>
+                          <option value="5">Residencial Girassol</option>
+                          <option value="6">Sintropia Sky Garden</option>
+                          <option value="7">Residencial Lotus</option>
+                          <option value="8">River Sky Garden</option>
+                          <option value="9">Condomínio Figueira Garcia</option>
+                          <option value="externo">Externo</option>
+                        </select>
+                        {dadosCompletosClinica.empreendimento_id === 'externo' && (
+                          <input
+                            type="text"
+                            name="empreendimento_externo"
+                            value={dadosCompletosClinica.empreendimento_externo || ''}
+                            onChange={handleInputChangeCadastroCompleto}
+                            style={{
+                              width: '100%',
+                              marginTop: '0.5rem',
+                              padding: '0.875rem',
+                              border: '2px solid #e2e8f0',
+                              borderRadius: '8px',
+                              fontSize: '1rem',
+                              outline: 'none'
+                            }}
+                            placeholder="Digite o nome do empreendimento externo"
+                            required
+                          />
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                          {t.tipoTratamento} *
+                        </label>
+                        <select
+                          name="tipo_tratamento"
+                          value={dadosCompletosClinica.tipo_tratamento}
+                          onChange={handleInputChangeCadastroCompleto}
+                          required
+                          style={{
+                            width: '100%',
+                            padding: '0.875rem',
+                            border: '2px solid #e2e8f0',
+                            borderRadius: '8px',
+                            fontSize: '1rem',
+                            outline: 'none',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <option value="">Selecione</option>
+                          <option value="Estético">Estético</option>
+                          <option value="Odontológico">Odontológico</option>
+                        </select>
+                      </>
+                    )}
                   </div>
 
                   <div>

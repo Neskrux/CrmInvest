@@ -513,8 +513,18 @@ const Fechamentos = () => {
         formData.append('consultor_id', parseInt(novoFechamento.consultor_id));
       }
       
-      if (novoFechamento.clinica_id && novoFechamento.clinica_id !== '') {
-        formData.append('clinica_id', parseInt(novoFechamento.clinica_id));
+      if (empresaId === 5) {
+        // Para Incorporadora, enviar empreendimento_id ou empreendimento_externo
+        if (novoFechamento.clinica_id === 'externo') {
+          const nomeExterno = (novoFechamento.empreendimento_externo || '').trim() || 'Empreendimento Externo';
+          formData.append('empreendimento_externo', nomeExterno);
+        } else if (novoFechamento.clinica_id && novoFechamento.clinica_id !== '') {
+          formData.append('empreendimento_id', parseInt(novoFechamento.clinica_id));
+        }
+      } else {
+        if (novoFechamento.clinica_id && novoFechamento.clinica_id !== '') {
+          formData.append('clinica_id', parseInt(novoFechamento.clinica_id));
+        }
       }
       
       // Validar e enviar valor_fechado
@@ -1444,10 +1454,18 @@ const Fechamentos = () => {
                                 8: 'River Sky Garden',
                                 9: 'Condomínio Figueira Garcia'
                               };
+                              // Prioriza nome externo
+                              const externo = (fechamento.empreendimento_externo || '').trim();
+                              if (externo) {
+                                return externo.length > 15 ? (
+                                  <div style={{ fontSize: '0.8rem', lineHeight: '1.2' }}>
+                                    {externo.substring(0, 15)}...
+                                  </div>
+                                ) : externo;
+                              }
                               // Usar empreendimento_id do paciente ou clinica_id do fechamento como fallback
                               const empreendimentoId = fechamento.paciente_empreendimento_id || fechamento.clinica_id;
-                              const nomeCompleto = empreendimentoMap[empreendimentoId] || '-';
-                              // Limitar caracteres e adicionar quebra de linha
+                              const nomeCompleto = empreendimentoMap[empreendimentoId] || 'Empreendimento Externo';
                               return nomeCompleto.length > 15 ? (
                                 <div style={{ fontSize: '0.8rem', lineHeight: '1.2' }}>
                                   {nomeCompleto.substring(0, 15)}...
