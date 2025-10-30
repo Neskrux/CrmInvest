@@ -603,8 +603,8 @@ const getRankingSDRs = async (req, res) => {
       };
     });
 
-    // Ordenar por maior número de agendamentos
-    sdrStats.sort((a, b) => b.total_agendamentos - a.total_agendamentos);
+    // Ordenar por maior número de agendamentos do mês atual
+    sdrStats.sort((a, b) => b.mes_atual - a.mes_atual);
 
     res.json(sdrStats);
   } catch (error) {
@@ -666,10 +666,10 @@ const getRankingInternos = async (req, res) => {
       };
     });
 
-    // Ordenar por: 1) Maior valor fechado, 2) Maior quantidade
+    // Ordenar por: 1) Maior valor fechado do mês, 2) Maior quantidade do mês
     internoStats.sort((a, b) => {
-      if (b.valor_fechado !== a.valor_fechado) return b.valor_fechado - a.valor_fechado;
-      return b.total_fechamentos - a.total_fechamentos;
+      if (b.valor_mes !== a.valor_mes) return b.valor_mes - a.valor_mes;
+      return b.mes_atual - a.mes_atual;
     });
 
     res.json(internoStats);
@@ -740,8 +740,8 @@ const getRankingFreelancers = async (req, res) => {
       };
     });
 
-    // Ordenar por maior valor de comissões
-    freelancerStats.sort((a, b) => b.total_comissoes - a.total_comissoes);
+    // Ordenar por maior valor de comissões do mês atual
+    freelancerStats.sort((a, b) => b.comissoes_mes - a.comissoes_mes);
 
     res.json(freelancerStats);
   } catch (error) {
