@@ -698,7 +698,11 @@ const Agendamentos = () => {
   };
 
   // Aplicar filtros
-  const agendamentosFiltrados = agendamentos.filter(agendamento => {
+  const baseAgendamentos = isIncorporadora && user?.consultor_id
+    ? agendamentos.filter(a => [a.consultor_id, a.consultor_interno_id, a.sdr_id].map(v => String(v || '')).includes(String(user.consultor_id)))
+    : agendamentos;
+
+  const agendamentosFiltrados = baseAgendamentos.filter(agendamento => {
     // Filtro por consultor
     const matchConsultor = !filtroConsultor || agendamento.consultor_id.toString() === filtroConsultor;
     
@@ -1179,7 +1183,11 @@ const Agendamentos = () => {
                   required
                 >
                   <option value="">Selecione um {t.paciente.toLowerCase()}</option>
-                  {pacientes.filter(paciente => 
+                  {(
+                    (isIncorporadora && user?.consultor_id)
+                      ? pacientes.filter(p => [p.consultor_id, p.consultor_interno_id, p.sdr_id].map(v => String(v || '')).includes(String(user.consultor_id)))
+                      : pacientes
+                  ).filter(paciente => 
                     // Mostrar apenas pacientes com status apropriados para agendamento
                     ['lead', 'em_conversa', 'cpf_aprovado', 'sem_cedente', 'agendado', 'compareceu', 'nao_compareceu', 'reagendado'].includes(paciente.status)
                   ).map(paciente => (

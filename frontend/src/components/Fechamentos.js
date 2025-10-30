@@ -183,7 +183,10 @@ const Fechamentos = () => {
     if (!Array.isArray(fechamentos)) {
       return [];
     }
-    return fechamentos.filter(fechamento => {
+    const base = (isIncorporadora && user?.consultor_id)
+      ? fechamentos.filter(f => [f.consultor_id, f.consultor_interno_id, f.sdr_id].map(v => String(v || '')).includes(String(user.consultor_id)))
+      : fechamentos;
+    return base.filter(fechamento => {
       const consultorMatch = !filtroConsultor || fechamento.consultor_id === parseInt(filtroConsultor);
       
       // Para incorporadora, filtrar por empreendimento (clinica_id contém empreendimento_id)

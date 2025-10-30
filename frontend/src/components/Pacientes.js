@@ -32,6 +32,11 @@ const Pacientes = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingPaciente, setEditingPaciente] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Filtros para Novos Leads (isIncorporadora): Nome, Status, Empreendimento
+  const [mostrarFiltrosNovosLeads, setMostrarFiltrosNovosLeads] = useState(false);
+  const [filtroNomeLeads, setFiltroNomeLeads] = useState('');
+  const [filtroStatusLeads, setFiltroStatusLeads] = useState('');
+  const [filtroEmpreendimentoLeads, setFiltroEmpreendimentoLeads] = useState('');
   
   // Verificar se está na rota de cálculo de carteira
   const isCalculoCarteira = location.pathname === '/calculo-carteira';
@@ -401,6 +406,132 @@ const Pacientes = () => {
     { sigla: 'SE', nome: 'Sergipe' },
     { sigla: 'TO', nome: 'Tocantins' }
   ];
+
+  // Cadastro manual (Incorporadora)
+  const [showNovoClienteModal, setShowNovoClienteModal] = useState(false);
+  const [novoClienteLoading, setNovoClienteLoading] = useState(false);
+  const [novoClienteErrors, setNovoClienteErrors] = useState({});
+  const [cidadeCustomizadaNovo, setCidadeCustomizadaNovo] = useState(false);
+  const [sdrsIncorporadora, setSdrsIncorporadora] = useState([]);
+  const [novoClienteForm, setNovoClienteForm] = useState({
+    nome: '',
+    email: '',
+    telefone: '',
+    empreendimento_id: '',
+    cidade: '',
+    estado: '',
+    observacoes: '',
+    melhor_dia1: '',
+    melhor_horario1: '',
+    melhor_dia2: '',
+    melhor_horario2: '',
+    sdr_id: ''
+  });
+
+  useEffect(() => {
+    if (!isIncorporadora) return;
+    (async () => {
+      try {
+        const API_BASE_URL = process.env.NODE_ENV === 'production' ? 'https://crminvest-backend.fly.dev/api' : 'http://localhost:5000/api';
+        const res = await fetch(`${API_BASE_URL}/consultores/sdrs-incorporadora`);
+        if (res.ok) {
+          const data = await res.json();
+          setSdrsIncorporadora(Array.isArray(data) ? data : []);
+        }
+      } catch (_) {}
+    })();
+  }, [isIncorporadora]);
+
+  const handleNovoClienteChange = (e) => {
+    const { name, value } = e.target;
+    if (name === 'telefone') {
+      const numbersOnly = value.replace(/\D/g, '');
+      const formatted = numbersOnly ? maskTelefone(numbersOnly) : '';
+      setNovoClienteForm(prev => ({ ...prev, [name]: formatted }));
+    } else if (name === 'cidade') {
+      const formatted = formatarCidade(value);
+      setNovoClienteForm(prev => ({ ...prev, [name]: formatted }));
+    } else if (name === 'estado') {
+      setNovoClienteForm(prev => ({ ...prev, [name]: value, cidade: '' }));
+      setCidadeCustomizadaNovo(false);
+    } else {
+      setNovoClienteForm(prev => ({ ...prev, [name]: value }));
+    }
+    if (novoClienteErrors[name]) {
+      setNovoClienteErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const handleNovoClienteNomeBlur = (e) => {
+    const { value } = e.target;
+    if (value && value.trim()) {
+      const nomeFormatado = formatarNome(value);
+      setNovoClienteForm(prev => ({ ...prev, nome: nomeFormatado }));
+    }
+  };
+
+  const formatarDataMascara = (val) => {
+    const numbers = (val || '').replace(/\D/g, '');
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 4) return `${numbers.substring(0,2)}/${numbers.substring(2)}`;
+    return `${numbers.substring(0,2)}/${numbers.substring(2,4)}/${numbers.substring(4,8)}`;
+  };
+
+  const validarDataDDMMYYYY = (data) => {
+    if (!data || data.length < 10) return '';
+    const [d,m,y] = data.split('/');
+    const dt = new Date(`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+    return isNaN(dt.getTime()) ? '' : data;
+  };
+
+  const handleNovoClienteDataInput = (e) => {
+    const { name, value } = e.target;
+    setNovoClienteForm(prev => ({ ...prev, [name]: formatarDataMascara(value) }));
+  };
+
+  const handleNovoClienteDataBlur = (e) => {
+    const { name, value } = e.target;
+    const validada = validarDataDDMMYYYY(value);
+    if (!validada && value) {
+      setNovoClienteForm(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const validarNovoCliente = () => {
+    const errs = {};
+    if (!novoClienteForm.nome.trim()) errs.nome = 'Nome é obrigatório';
+    if (!novoClienteForm.telefone.trim() || novoClienteForm.telefone.replace(/\D/g,'').length < 10) errs.telefone = 'Telefone inválido';
+    setNovoClienteErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const submitNovoCliente = async (e) => {
+    e.preventDefault();
+    if (!validarNovoCliente()) return;
+    setNovoClienteLoading(true);
+    try {
+      const response = await makeRequest('/leads/cadastro', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...novoClienteForm,
+          origem_formulario: 'captura-clientes'
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) {
+        showSuccessToast('Cliente criado com sucesso!');
+        setShowNovoClienteModal(false);
+        setNovoClienteForm({ nome:'', email:'', telefone:'', empreendimento_id:'', cidade:'', estado:'', observacoes:'', melhor_dia1:'', melhor_horario1:'', melhor_dia2:'', melhor_horario2:'', sdr_id:'' });
+        await Promise.allSettled([fetchPacientes?.(), fetchNovosLeads?.()]);
+      } else {
+        showErrorToast(data.error || 'Erro ao criar cliente');
+      }
+    } catch (err) {
+      showErrorToast('Erro ao criar cliente');
+    } finally {
+      setNovoClienteLoading(false);
+    }
+  };
 
   // Principais cidades por estado
   const cidadesPorEstado = {
@@ -3214,6 +3345,134 @@ const Pacientes = () => {
          )}
         </div>
       )}
+      {/* Modal de Cadastro Manual - Incorporadora */}
+      {isIncorporadora && showNovoClienteModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '720px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Novo Cliente</h2>
+              <button className="close-btn" onClick={() => setShowNovoClienteModal(false)}>×</button>
+            </div>
+            <form onSubmit={submitNovoCliente} autoComplete="off">
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">Nome *</label>
+                  <input type="text" name="nome" className={`form-input ${novoClienteErrors.nome ? 'error' : ''}`} value={novoClienteForm.nome} onChange={handleNovoClienteChange} onBlur={handleNovoClienteNomeBlur} placeholder="Digite o nome completo" />
+                  {novoClienteErrors.nome && <span className="field-error">{novoClienteErrors.nome}</span>}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email (opcional)</label>
+                  <input type="email" name="email" className="form-input" value={novoClienteForm.email} onChange={handleNovoClienteChange} placeholder="email@exemplo.com" />
+                </div>
+              </div>
+
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">WhatsApp *</label>
+                  <input type="tel" name="telefone" className={`form-input ${novoClienteErrors.telefone ? 'error' : ''}`} value={novoClienteForm.telefone} onChange={handleNovoClienteChange} placeholder="(11) 99999-9999" />
+                  {novoClienteErrors.telefone && <span className="field-error">{novoClienteErrors.telefone}</span>}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Empreendimento (opcional)</label>
+                  <select name="empreendimento_id" className="form-select" value={novoClienteForm.empreendimento_id} onChange={handleNovoClienteChange}>
+                    <option value="">Selecione</option>
+                    <option value="4">Laguna Sky Garden</option>
+                    <option value="5">Residencial Girassol</option>
+                    <option value="6">Sintropia Sky Garden</option>
+                    <option value="7">Residencial Lotus</option>
+                    <option value="8">River Sky Garden</option>
+                    <option value="9">Condomínio Figueira Garcia</option>
+                    <option value="">Ainda não decidi</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">Estado</label>
+                  <select name="estado" className="form-select" value={novoClienteForm.estado} onChange={handleNovoClienteChange}>
+                    <option value="">Selecione seu estado</option>
+                    {estadosBrasileiros.map(estado => (
+                      <option key={estado.sigla} value={estado.sigla}>{estado.sigla} - {estado.nome}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Cidade</label>
+                  {novoClienteForm.estado && !cidadeCustomizadaNovo ? (
+                    <select name="cidade" className="form-select" value={novoClienteForm.cidade} onChange={(e) => {
+                      if (e.target.value === 'OUTRA') { setCidadeCustomizadaNovo(true); setNovoClienteForm(prev => ({ ...prev, cidade: '' })); }
+                      else { handleNovoClienteChange(e); }
+                    }}>
+                      <option value="">Digite ou selecione a cidade</option>
+                      <option value="OUTRA">Outra cidade</option>
+                    </select>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <input type="text" name="cidade" className="form-input" value={novoClienteForm.cidade} onChange={handleNovoClienteChange} placeholder="Digite a cidade" disabled={!novoClienteForm.estado} />
+                      {novoClienteForm.estado && (
+                        <button type="button" className="btn btn-secondary" style={{ whiteSpace: 'nowrap', fontSize: '0.875rem', padding: '0.5rem' }} onClick={() => { setCidadeCustomizadaNovo(false); setNovoClienteForm(prev => ({ ...prev, cidade: '' })); }}>Voltar</button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">1ª Opção - Melhor dia</label>
+                  <input type="text" name="melhor_dia1" className="form-input" value={novoClienteForm.melhor_dia1} onChange={handleNovoClienteDataInput} onBlur={handleNovoClienteDataBlur} placeholder="DD/MM/YYYY" maxLength="10" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">1ª Opção - Melhor horário</label>
+                  <select name="melhor_horario1" className="form-select" value={novoClienteForm.melhor_horario1} onChange={handleNovoClienteChange}>
+                    <option value="">Selecione</option>
+                    {['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00'].map(h => (
+                      <option key={h} value={h}>{h}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">2ª Opção - Melhor dia</label>
+                  <input type="text" name="melhor_dia2" className="form-input" value={novoClienteForm.melhor_dia2} onChange={handleNovoClienteDataInput} onBlur={handleNovoClienteDataBlur} placeholder="DD/MM/YYYY" maxLength="10" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">2ª Opção - Melhor horário</label>
+                  <select name="melhor_horario2" className="form-select" value={novoClienteForm.melhor_horario2} onChange={handleNovoClienteChange}>
+                    <option value="">Selecione</option>
+                    {['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00'].map(h => (
+                      <option key={h} value={h}>{h}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">SDR (opcional)</label>
+                <select name="sdr_id" className="form-select" value={novoClienteForm.sdr_id} onChange={handleNovoClienteChange}>
+                  <option value="">Selecione um atendente</option>
+                  {sdrsIncorporadora.map(sdr => (
+                    <option key={sdr.id} value={sdr.id}>{sdr.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Observações</label>
+                <textarea name="observacoes" className="form-textarea" rows="3" value={novoClienteForm.observacoes} onChange={handleNovoClienteChange} placeholder="Informações adicionais"></textarea>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowNovoClienteModal(false)} disabled={novoClienteLoading}>Cancelar</button>
+                <button type="submit" className="btn btn-primary" disabled={novoClienteLoading}>{novoClienteLoading ? 'Salvando...' : 'Criar Cliente'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       
       {/* Para Clínicas - Abas especiais */}
       {isClinica && (
@@ -3451,6 +3710,18 @@ const Pacientes = () => {
                   {pacientesFiltrados.length} {t.paciente.toLowerCase()}(s)
                 </div>
               </div>
+              {isIncorporadora && (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setShowNovoClienteModal(true)}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 6 }}>
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  Cadastrar Cliente
+                </button>
+              )}
             </div>
 
             {loading ? (
@@ -3734,12 +4005,73 @@ const Pacientes = () => {
       {activeTab === 'novos-leads' && (
         <>
           <div className="card">
-            <div className="card-header">
-              <h2 className="card-title">Novos Leads</h2>
-              <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                {novosLeads.length} lead(s)
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 className="card-title">Novos Leads</h2>
+                <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                  {novosLeads.length} lead(s)
+                </div>
               </div>
+              <button className="btn btn-secondary" onClick={() => setMostrarFiltrosNovosLeads(!mostrarFiltrosNovosLeads)}>
+                {mostrarFiltrosNovosLeads ? 'Ocultar Filtros' : 'Filtros'}
+              </button>
             </div>
+            {mostrarFiltrosNovosLeads && (
+              <div style={{ padding: '1.5rem', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                <div className="grid grid-3" style={{ gap: '1rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Nome</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={filtroNomeLeads}
+                      onChange={e => setFiltroNomeLeads(e.target.value)}
+                      placeholder="Buscar por nome"
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Status</label>
+                    <select
+                      className="form-select"
+                      value={filtroStatusLeads}
+                      onChange={e => setFiltroStatusLeads(e.target.value)}
+                    >
+                      <option value="">Todos</option>
+                      {statusOptions
+                        .filter(option => {
+                          const statusNegativos = [
+                            'lead', 'nao_existe', 'nao_tem_interesse', 'nao_reconhece',
+                            'nao_responde', 'nao_passou_cpf', 'nao_tem_outro_cpf', 'cpf_reprovado'
+                          ];
+                          if (user?.empresa_id === 5 && option.value === 'sem_clinica') {
+                            return false;
+                          }
+                          return statusNegativos.includes(option.value);
+                        })
+                        .map(option => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Empreendimento</label>
+                    <select
+                      className="form-select"
+                      value={filtroEmpreendimentoLeads}
+                      onChange={e => setFiltroEmpreendimentoLeads(e.target.value)}
+                    >
+                      <option value="">Todos</option>
+                      <option value="Laguna Sky Garden">Laguna Sky Garden</option>
+                      <option value="Residencial Girassol">Residencial Girassol</option>
+                      <option value="Sintropia Sky Garden">Sintropia Sky Garden</option>
+                      <option value="Residencial Lotus">Residencial Lotus</option>
+                      <option value="River Sky Garden">River Sky Garden</option>
+                      <option value="Condomínio Figueira Garcia">Condomínio Figueira Garcia</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {loading ? (
               <div className="loading">
@@ -3765,13 +4097,30 @@ const Pacientes = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {novosLeads.filter(lead => {
-                      // Para incorporadora, remover status 'sem_clinica'
-                      if (user?.empresa_id === 5 && lead.status === 'sem_clinica') {
-                        return false;
-                      }
-                      return true;
-                    }).map(lead => {
+                    {novosLeads
+                      .filter(lead => {
+                        // Para incorporadora, remover status 'sem_clinica'
+                        if (user?.empresa_id === 5 && lead.status === 'sem_clinica') {
+                          return false;
+                        }
+                        return true;
+                      })
+                      .filter(lead => {
+                        const matchNome = !filtroNomeLeads || (lead.nome || '').toLowerCase().includes(filtroNomeLeads.toLowerCase());
+                        const matchStatus = !filtroStatusLeads || lead.status === filtroStatusLeads;
+                        const empreendimentoNome = (() => {
+                          const externo = (lead.empreendimento_externo || '').trim();
+                          if (externo) return externo;
+                          if (lead.empreendimento_id) {
+                            const map = { 4:'Laguna Sky Garden', 5:'Residencial Girassol', 6:'Sintropia Sky Garden', 7:'Residencial Lotus', 8:'River Sky Garden', 9:'Condomínio Figueira Garcia' };
+                            return map[lead.empreendimento_id] || '';
+                          }
+                          return '';
+                        })();
+                        const matchEmp = !filtroEmpreendimentoLeads || empreendimentoNome === filtroEmpreendimentoLeads;
+                        return matchNome && matchStatus && matchEmp;
+                      })
+                      .map(lead => {
                       const statusInfo = getStatusInfo(lead.status);
                       const consultorAtribuido = consultores.find(c => c.id === lead.consultor_id);
                       const sdrAtribuido = consultores.find(c => c.id === lead.sdr_id);
