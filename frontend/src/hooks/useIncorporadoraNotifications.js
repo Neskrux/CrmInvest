@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useState, useRef, useCallback } from 'react
 import { useAuth } from '../contexts/AuthContext';
 import { getSupabaseClient } from '../lib/supabaseClient';
 import { notificationQueue } from '../lib/notificationQueue';
-import { AlertCircle, Phone, MapPin, User, Zap, Clock } from 'lucide-react';
+import { AlertCircle, Phone, MapPin, User, Clock } from 'lucide-react';
 import logoBrasao from '../images/logobrasaopreto.png';
 
 const useIncorporadoraNotifications = () => {
@@ -47,7 +47,7 @@ const useIncorporadoraNotifications = () => {
 
   const playNotificationSound = useCallback((musicaUrl) => {
     if (audioStartedRef.current && audioInstanceRef.current && !audioInstanceRef.current.paused) {
-      return;
+      return Promise.resolve(true);
     }
 
     try {
@@ -77,7 +77,7 @@ const useIncorporadoraNotifications = () => {
       audioStartedRef.current = false;
       
       const currentAudio = audioInstanceRef.current;
-      if (!currentAudio) return;
+      if (!currentAudio) return Promise.resolve(false);
       
       const handleAudioEnded = () => {
         audioStartedRef.current = false;
@@ -96,82 +96,59 @@ const useIncorporadoraNotifications = () => {
       
       currentAudio.addEventListener('ended', handleAudioEnded);
       
-      const tryPlay = (attemptNumber = 0) => {
-        if (!audioInstanceRef.current) return;
-        
-        const playPromise = audioInstanceRef.current.play();
-        
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => {
-              audioStartedRef.current = true;
-            })
-            .catch(error => {
-              const retryDelays = [50, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000, 2500, 3000];
-              let retryCount = 0;
-              
-              const tryPlayAgain = () => {
-                if (retryCount < retryDelays.length && audioInstanceRef.current) {
-                  const delay = retryDelays[retryCount];
-                  
+      return new Promise((resolve) => {
+        let resolved = false;
+        const resolveOnce = (value) => {
+          if (!resolved) {
+            resolved = true;
+            resolve(value);
+          }
+        };
+
+        const onPlaying = () => {
+          audioStartedRef.current = true;
+          currentAudio.removeEventListener('playing', onPlaying);
+          resolveOnce(true);
+        };
+        currentAudio.addEventListener('playing', onPlaying, { once: true });
+
+        const tryPlay = () => {
+          if (!audioInstanceRef.current) return resolveOnce(false);
+          const playPromise = audioInstanceRef.current.play();
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => {
+                // 'playing' listener will resolve; keep as backup after a tick
+                setTimeout(() => resolveOnce(true), 0);
+              })
+              .catch(() => {
+                // simple retry ladder
+                const retryDelays = [50, 100, 150, 200, 300, 500, 750, 1000, 1500];
+                let idx = 0;
+                const retry = () => {
+                  if (!audioInstanceRef.current || audioStartedRef.current) return resolveOnce(audioStartedRef.current);
+                  if (idx >= retryDelays.length) return resolveOnce(false);
+                  const delay = retryDelays[idx++];
                   setTimeout(() => {
                     if (audioInstanceRef.current && audioInstanceRef.current.paused && !audioStartedRef.current) {
-                      audioInstanceRef.current.play()
-                        .then(() => {
-                          audioStartedRef.current = true;
-                        })
-                        .catch((err) => {
-                          retryCount++;
-                          if (retryCount < retryDelays.length) {
-                            tryPlayAgain();
-                          }
-                        });
+                      audioInstanceRef.current.play().then(() => setTimeout(() => resolveOnce(true), 0)).catch(retry);
+                    } else {
+                      resolveOnce(true);
                     }
                   }, delay);
-                }
-              };
-              
-              tryPlayAgain();
-            });
-        }
-      };
-      
-      tryPlay(0);
-      
-      const immediateRetries = [25, 50, 75, 100, 150, 200];
-      immediateRetries.forEach((delay, index) => {
-        setTimeout(() => {
-          if (audioInstanceRef.current && audioInstanceRef.current.paused && !audioStartedRef.current) {
-            tryPlay(index + 1);
+                };
+                retry();
+              });
+          } else {
+            resolveOnce(false);
           }
-        }, delay);
+        };
+
+        tryPlay();
       });
-      
-      audioInstanceRef.current.addEventListener('loadstart', () => {
-        if (audioInstanceRef.current && audioInstanceRef.current.paused && !audioStartedRef.current) {
-          tryPlay(100);
-        }
-      }, { once: true });
-      
-      audioInstanceRef.current.addEventListener('loadeddata', () => {
-        if (audioInstanceRef.current && audioInstanceRef.current.paused && !audioStartedRef.current) {
-          tryPlay(101);
-        }
-      }, { once: true });
-
-      audioInstanceRef.current.addEventListener('canplay', () => {
-        if (audioInstanceRef.current && audioInstanceRef.current.paused && !audioStartedRef.current) {
-          tryPlay(102);
-        }
-      }, { once: true });
-
-      audioInstanceRef.current.addEventListener('canplaythrough', () => {
-        if (audioInstanceRef.current && audioInstanceRef.current.paused && !audioStartedRef.current) {
-          tryPlay(103);
-        }
-      }, { once: true });
     } catch (error) {
       // Ignorar erros
+      return Promise.resolve(false);
     }
   }, []);
 
@@ -224,16 +201,11 @@ const useIncorporadoraNotifications = () => {
             }
             
             setNewLeadData(notification.data);
-            setShowNewLeadModal(true);
-            previousModalStateRef.current = true;
             audioStartedRef.current = false;
-            
-            setNotifications(prev => [...prev, {
-              id: Date.now(),
-              type: 'new-lead',
-              data: notification.data,
-              timestamp: new Date()
-            }]);
+            await playNotificationSound(notification.data.corretor_musica);
+            setShowNewLeadModal(true);
+            previousModalStateRef.current = false;
+            setNotifications(prev => [...prev, { id: Date.now(), type: 'new-lead', data: notification.data, timestamp: new Date() }]);
           })();
         }
       } catch (error) {
@@ -309,17 +281,14 @@ const useIncorporadoraNotifications = () => {
         };
         
         setNewLeadData(leadData);
-        setShowNewLeadModal(true);
-        previousModalStateRef.current = false;
-
-        playNotificationSound(data.corretor_musica);
-
-        setNotifications(prev => [...prev, {
-          id: Date.now(),
-          type: 'new-lead',
-          data: leadData,
-          timestamp: new Date()
-        }]);
+        audioStartedRef.current = false;
+        
+        (async () => {
+          await playNotificationSound(data.corretor_musica);
+          setShowNewLeadModal(true);
+          previousModalStateRef.current = false;
+          setNotifications(prev => [...prev, { id: Date.now(), type: 'new-lead', data: leadData, timestamp: new Date() }]);
+        })();
 
       }));
       } catch (error) {
@@ -404,30 +373,7 @@ const useIncorporadoraNotifications = () => {
       }, 20000);
       
       modalTimerRef.current = mainTimer;
-      
-      if (showNewLeadModal && newLeadData) {
-        if (!audioStartedRef.current || (audioInstanceRef.current && audioInstanceRef.current.paused)) {
-          playNotificationSound(newLeadData.corretor_musica);
-          
-          [100, 200, 300].forEach((delay) => {
-            setTimeout(() => {
-              if (showNewLeadModal && newLeadData && audioInstanceRef.current && audioInstanceRef.current.paused) {
-                try {
-                  audioInstanceRef.current.play()
-                    .then(() => {
-                      audioStartedRef.current = true;
-                    })
-                    .catch(() => {
-                      // Ignorar erros
-                    });
-                } catch (e) {
-                  // Ignorar erros
-                }
-              }
-            }, delay);
-          });
-        }
-      }
+      // Sincronização: o áudio já é iniciado antes de abrir o modal
     }
     
     previousModalStateRef.current = showNewLeadModal;
@@ -557,17 +503,6 @@ const useIncorporadoraNotifications = () => {
               }}>
                 Novo Lead
               </h1>
-              <p style={{
-                fontSize: '0.875rem',
-                color: '#64748b',
-                margin: 0,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem'
-              }}>
-                <Zap size={14} color="#f59e0b" />
-                Captura disponível
-              </p>
             </div>
           </div>
           

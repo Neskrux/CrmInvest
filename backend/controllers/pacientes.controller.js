@@ -623,10 +623,22 @@ const updateStatusPaciente = async (req, res) => {
       console.log('✅ Evidência validada:', evidencia.id);
     }
 
-    // Atualizar status do paciente
+    // Atualizar status do paciente e, se for negativo, atribuir sdr_id do autor da evidência (se ainda não houver)
+    const updateFields = { status };
+    try {
+      if (STATUS_NEGATIVOS.includes(status)) {
+        // Se ainda não há SDR definido, atribuir ao usuário que está realizando a mudança
+        if (!paciente.sdr_id && req.user?.id) {
+          updateFields.sdr_id = req.user.id;
+        }
+      }
+    } catch (_) {
+      // Em caso de qualquer inconsistência, manter apenas a atualização de status
+    }
+
     const { error } = await supabaseAdmin
       .from('pacientes')
-      .update({ status })
+      .update(updateFields)
       .eq('id', id);
 
     if (error) throw error;
