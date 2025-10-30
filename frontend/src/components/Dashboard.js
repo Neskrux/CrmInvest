@@ -2849,8 +2849,8 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Ranking dos {t.consultores} - Ocultar para clínicas */}
-        {!isClinica && (
+        {/* Ranking dos {t.consultores} - Ocultar para clínicas e incorporadora */}
+        {!isClinica && !isIncorporadora && (
         <div className="card" style={{ minWidth: 0, padding: '1.5rem' }}>
           <div className="card-header" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
             <h2 className="card-title" style={{ color: '#1a1d23', fontWeight: '700' }}>
@@ -4044,7 +4044,7 @@ const Dashboard = () => {
                   transition: 'all 0.2s'
                 }}
               >
-                Corretores Internos
+                Corretores
               </button>
               <button
                 onClick={() => setRankingTab('freelancers')}
@@ -4127,7 +4127,7 @@ const Dashboard = () => {
           {!isFreelancer && rankingTab === 'internos' && (
             <div>
               <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1e293b', marginBottom: '1rem' }}>
-                Ranking de Corretores Internos por Fechamentos
+                Ranking de Corretores por Fechamentos
               </h3>
               <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
                 {rankingInternosNovos.map((interno, index) => {
