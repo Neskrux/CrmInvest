@@ -633,7 +633,6 @@ const Pacientes = () => {
       setActiveTab('pacientes');
     }
   }, [podeAlterarStatus, isConsultorInterno, activeTab, isConsultor]);
-
   // Função de polling inteligente
   const pollingCallback = async () => {
     try {
@@ -872,7 +871,16 @@ const Pacientes = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setPacientes(data);
+        const isUserAdmin = Boolean(isAdmin);
+        const currentUserId = Number(user?.id || 0);
+        const currentConsultorId = Number(user?.consultor_id || 0);
+        const filtered = isUserAdmin ? data : (Array.isArray(data) ? data.filter(p => {
+          const sdrMatch = Number(p.sdr_id || 0) === currentUserId;
+          const consultorMatch = Number(p.consultor_id || 0) === currentConsultorId;
+          const consultorInternoMatch = Number(p.consultor_interno_id || 0) === currentConsultorId;
+          return sdrMatch || consultorMatch || consultorInternoMatch;
+        }) : []);
+        setPacientes(filtered);
       } else {
         console.error('Erro ao carregar pacientes:', data.error);
         showErrorToast(`Erro ao carregar ${empresaId === 5 ? 'clientes' : 'pacientes'}: ` + data.error);
@@ -922,7 +930,16 @@ const Pacientes = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setAgendamentos(data);
+        const isUserAdmin = Boolean(isAdmin);
+        const currentUserId = Number(user?.id || 0);
+        const currentConsultorId = Number(user?.consultor_id || 0);
+        const filtered = isUserAdmin ? data : (Array.isArray(data) ? data.filter(a => {
+          const sdrMatch = Number(a.sdr_id || 0) === currentUserId;
+          const consultorMatch = Number(a.consultor_id || 0) === currentConsultorId;
+          const consultorInternoMatch = Number(a.consultor_interno_id || 0) === currentConsultorId;
+          return sdrMatch || consultorMatch || consultorInternoMatch;
+        }) : []);
+        setAgendamentos(filtered);
       } else {
         console.error('Erro ao carregar agendamentos:', data.error);
       }
@@ -936,7 +953,16 @@ const Pacientes = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setFechamentos(data);
+        const isUserAdmin = Boolean(isAdmin);
+        const currentUserId = Number(user?.id || 0);
+        const currentConsultorId = Number(user?.consultor_id || 0);
+        const filtered = isUserAdmin ? data : (Array.isArray(data) ? data.filter(f => {
+          const sdrMatch = Number(f.sdr_id || 0) === currentUserId;
+          const consultorMatch = Number(f.consultor_id || 0) === currentConsultorId;
+          const consultorInternoMatch = Number(f.consultor_interno_id || 0) === currentConsultorId;
+          return sdrMatch || consultorMatch || consultorInternoMatch;
+        }) : []);
+        setFechamentos(filtered);
       } else {
         console.error('Erro ao carregar fechamentos:', data.error);
       }
@@ -952,7 +978,16 @@ const Pacientes = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setNovosLeads(data);
+        const isUserAdmin = Boolean(isAdmin);
+        const currentUserId = Number(user?.id || 0);
+        const currentConsultorId = Number(user?.consultor_id || 0);
+        const filtered = isUserAdmin ? data : (Array.isArray(data) ? data.filter(l => {
+          const sdrMatch = Number(l.sdr_id || 0) === currentUserId;
+          const consultorMatch = Number(l.consultor_id || 0) === currentConsultorId;
+          const consultorInternoMatch = Number(l.consultor_interno_id || 0) === currentConsultorId;
+          return sdrMatch || consultorMatch || consultorInternoMatch;
+        }) : []);
+        setNovosLeads(filtered);
       } else {
         console.error('Erro ao carregar novos leads:', data.error);
         showErrorToast('Erro ao carregar novos leads: ' + data.error);
@@ -969,7 +1004,16 @@ const Pacientes = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setLeadsNegativos(data);
+        const isUserAdmin = Boolean(isAdmin);
+        const currentUserId = Number(user?.id || 0);
+        const currentConsultorId = Number(user?.consultor_id || 0);
+        const filtered = isUserAdmin ? data : (Array.isArray(data) ? data.filter(l => {
+          const sdrMatch = Number(l.sdr_id || 0) === currentUserId;
+          const consultorMatch = Number(l.consultor_id || 0) === currentConsultorId;
+          const consultorInternoMatch = Number(l.consultor_interno_id || 0) === currentConsultorId;
+          return sdrMatch || consultorMatch || consultorInternoMatch;
+        }) : []);
+        setLeadsNegativos(filtered);
       } else {
         console.error('Erro ao carregar leads negativos:', data.error);
       }
@@ -1245,7 +1289,6 @@ const Pacientes = () => {
     setViewPaciente(null);
     setActiveViewTab('informacoes');
   };
-
   // Funções para Carteira Existente
   const adicionarPacienteCarteira = () => {
     const {
@@ -1802,7 +1845,6 @@ const Pacientes = () => {
     
     return combinacoes;
   };
-
   // Função para recalcular carteira com percentual específico (usado pelo admin)
   const calcularCarteiraComPercentual = (pacientes, percentualAlvo = 130) => {
     // Valores fixos conforme especificação
@@ -2427,7 +2469,6 @@ const Pacientes = () => {
       })
       .join(' ');
   }
-
   const handleInputChange = (e) => {
     let { name, value, type, checked } = e.target;
     
@@ -2987,7 +3028,6 @@ const Pacientes = () => {
       }));
     }
   };
-
   const confirmarCadastroCompleto = async () => {
     const dados = dadosCompletosClinica;
     
@@ -3537,7 +3577,6 @@ const Pacientes = () => {
         )}
         </div>
       )}
-
       {/* Conteúdo da aba Pacientes */}
       {activeTab === 'pacientes' && (
         <>
@@ -3837,7 +3876,7 @@ const Pacientes = () => {
                               <span title={paciente.consultor_nome}>{limitarCaracteres(paciente.consultor_nome, 20)}</span>
                             ) : (
                               <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
-                                Não atribuído
+                                -
                               </span>
                             )}
                           </td>
@@ -3846,7 +3885,7 @@ const Pacientes = () => {
                               <span title={paciente.sdr_nome}>{limitarCaracteres(paciente.sdr_nome, 20)}</span>
                             ) : (
                               <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
-                                Não atribuído
+                                -
                               </span>
                             )}
                           </td>
@@ -3855,7 +3894,7 @@ const Pacientes = () => {
                               <span title={paciente.consultor_interno_nome}>{limitarCaracteres(paciente.consultor_interno_nome, 20)}</span>
                             ) : (
                               <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
-                                Não atribuído
+                                -
                               </span>
                             )}
                           </td>
@@ -4185,25 +4224,11 @@ const Pacientes = () => {
                               }}>
                                 {consultorAtribuido?.nome || 'Consultor atribuído'}
                               </span>
-                            ) : temSDR ? (
-                              <span style={{ 
-                                display: 'inline-flex', 
-                                alignItems: 'center', 
-                                gap: '0.25rem',
-                                color: '#3b82f6',
-                                fontWeight: '600',
-                                maxWidth: '100%',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
-                              }}>
-                                {sdrAtribuido?.nome || 'SDR'} (SDR)
-                              </span>
                             ) : (
-                              <span style={{ color: '#6b7280', fontStyle: 'italic' }}>Sem consultor</span>
+                              <span style={{ color: '#6b7280', fontStyle: 'italic' }}>-</span>
                             )}
                           </td>
-                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{lead.sdr_nome || '-'}</td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{lead.sdr_nome || (sdrAtribuido?.nome ?? '-')}</td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{lead.consultor_interno_nome || '-'}</td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                             {isIncorporadora ? (
@@ -4401,7 +4426,6 @@ const Pacientes = () => {
           </div>
         </>
       )}
-
       {activeTab === 'negativas' && (
         <>
           {/* Resumo de Estatísticas - Ocultar para incorporadora */}
@@ -4587,25 +4611,11 @@ const Pacientes = () => {
                               }}>
                                 {consultorAtribuido?.nome || 'Consultor atribuído'}
                               </span>
-                            ) : temSDR ? (
-                              <span style={{ 
-                                display: 'inline-flex', 
-                                alignItems: 'center', 
-                                gap: '0.25rem',
-                                color: '#3b82f6',
-                                fontWeight: '600',
-                                maxWidth: '100%',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
-                              }}>
-                                {sdrAtribuido?.nome || 'SDR'} (SDR)
-                              </span>
                             ) : (
-                              <span style={{ color: '#6b7280', fontStyle: 'italic' }}>Sem consultor</span>
+                              <span style={{ color: '#6b7280', fontStyle: 'italic' }}>-</span>
                             )}
                           </td>
-                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{lead.sdr_nome || '-'}</td>
+                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{lead.sdr_nome || (sdrAtribuido?.nome ?? '-')}</td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{lead.consultor_interno_nome || '-'}</td>
                           <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                             {isIncorporadora ? (
@@ -5107,7 +5117,7 @@ const Pacientes = () => {
                                 <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                                   {paciente.consultor_nome || (
                                     <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
-                                      Não atribuído
+                                      -
                                   </span>
                                 )}
                               </td>
@@ -6789,7 +6799,7 @@ const Pacientes = () => {
                           }
                         }
                         
-                        return <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>Não atribuído</span>;
+                        return <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>-</span>;
                       })()}
                     </p>
               </div>
@@ -7410,7 +7420,6 @@ const Pacientes = () => {
           </div>
         </div>
       )}
-
       {/* Modal de Observações com Evidências */}
       {showObservacoesModal && (
         <div className="modal-overlay">
@@ -8018,7 +8027,6 @@ const Pacientes = () => {
           </div>
         </div>
       )}
-
       {/* Modal de Agendamento */}
       {showAgendamentoModal && (
         <div className="modal-overlay">
@@ -10054,7 +10062,6 @@ const Pacientes = () => {
           </div>
         </div>
       )}
-
       {/* Modal de Gerenciamento de Contratos */}
       {showContratosModal && solicitacaoSelecionada && (
         <div className="modal-overlay">
