@@ -376,20 +376,19 @@ const createFechamento = async (req, res) => {
       // Não falhar a operação principal se houver erro na movimentação
     }
 
-    // Definir consultorInternoIdFinal para uso no Socket.IO
+    // Definir consultorInternoIdFinal para uso na notificação
     const consultorInternoIdFinal = dadosAgendamento?.consultor_interno_id || consultorId;
 
-    // Emitir evento Socket.IO para notificar incorporadora sobre novo fechamento
-    if (req.io && consultorInternoIdFinal && req.user.empresa_id === 5) {
-      console.log('📢 [SOCKET.IO] Emitindo evento new-fechamento-incorporadora:', {
+    // Criar notificação para incorporadora sobre novo fechamento via Supabase Realtime
+    if (consultorInternoIdFinal && req.user.empresa_id === 5) {
+      console.log('📢 [NOTIFICAÇÃO] Criando notificação de novo fechamento:', {
         fechamentoId: data[0].id,
         paciente_id: paciente_id,
         consultorInternoId: consultorInternoIdFinal,
         empresa_id: req.user.empresa_id,
         valor_fechado: valorFechado,
         data_fechamento: data_fechamento,
-        timestamp: new Date().toISOString(),
-        room: 'incorporadora-notifications'
+        timestamp: new Date().toISOString()
       });
       
       // Buscar dados do corretor (consultor interno)
@@ -399,7 +398,7 @@ const createFechamento = async (req, res) => {
         .eq('id', consultorInternoIdFinal)
         .single();
 
-      console.log('👤 [SOCKET.IO] Dados do corretor encontrados:', {
+      console.log('👤 [NOTIFICAÇÃO] Dados do corretor encontrados:', {
         consultorInternoId: consultorInternoIdFinal,
         nome: corretorData?.nome || 'N/A',
         temFoto: !!corretorData?.foto_url,
@@ -413,33 +412,48 @@ const createFechamento = async (req, res) => {
         .eq('id', paciente_id)
         .single();
 
-      console.log('👤 [SOCKET.IO] Dados do paciente encontrados:', {
+      console.log('👤 [NOTIFICAÇÃO] Dados do paciente encontrados:', {
         paciente_id: paciente_id,
         nome: pacienteData?.nome || 'N/A',
         telefone: pacienteData?.telefone || 'N/A'
       });
 
-      req.io.to('incorporadora-notifications').emit('new-fechamento-incorporadora', {
-        fechamentoId: data[0].id,
-        paciente_nome: pacienteData?.nome || 'Cliente',
-        paciente_telefone: pacienteData?.telefone || '',
-        valor_fechado: valorFechado,
-        data_fechamento: data_fechamento,
-        consultor_interno_id: consultorInternoIdFinal,
-        corretor_nome: corretorData?.nome || 'Corretor',
-        corretor_foto: corretorData?.foto_url || null,
-        corretor_musica: corretorData?.musica_url || null,
-        timestamp: new Date().toISOString()
-      });
-      
-      console.log('✅ [SOCKET.IO] Evento new-fechamento-incorporadora enviado para grupo incorporadora-notifications');
+      // Inserir notificação na tabela (Supabase Realtime vai propagar)
+      try {
+        const { data: notificacaoData, error: notificacaoError } = await supabaseAdmin
+          .from('notificacoes_fechamentos')
+          .insert([{
+            fechamento_id: data[0].id,
+            paciente_nome: pacienteData?.nome || 'Cliente',
+            paciente_telefone: pacienteData?.telefone || '',
+            valor_fechado: valorFechado,
+            data_fechamento: data_fechamento,
+            consultor_interno_id: consultorInternoIdFinal,
+            corretor_nome: corretorData?.nome || 'Corretor',
+            corretor_foto: corretorData?.foto_url || null,
+            corretor_musica: corretorData?.musica_url || null,
+            empresa_id: 5,
+            lida: false
+          }])
+          .select()
+          .single();
+
+        if (notificacaoError) {
+          console.error('❌ [NOTIFICAÇÃO] Erro ao criar notificação de fechamento:', notificacaoError);
+        } else {
+          console.log('✅ [NOTIFICAÇÃO] Notificação de fechamento criada via Supabase Realtime:', {
+            notificacaoId: notificacaoData.id,
+            fechamentoId: data[0].id
+          });
+        }
+      } catch (error) {
+        console.error('❌ [NOTIFICAÇÃO] Erro ao inserir notificação no banco:', error);
+      }
     } else {
-      console.log('⚠️ [SOCKET.IO] Evento new-fechamento-incorporadora não enviado:', {
-        temSocketIO: !!req.io,
+      console.log('ℹ️ [NOTIFICAÇÃO] Notificação de fechamento não criada:', {
         temConsultorInternoId: !!consultorInternoIdFinal,
         empresaId: req.user.empresa_id,
-        motivo: !req.io ? 'Socket.IO não disponível' : 
-                !consultorInternoIdFinal ? 'Sem consultorInternoIdFinal' : 
+        motivo: !consultorInternoIdFinal ? 'Sem consultorInternoIdFinal' : 
                 req.user.empresa_id !== 5 ? 'Não é incorporadora' : 'Desconhecido'
       });
     }

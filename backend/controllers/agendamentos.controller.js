@@ -281,17 +281,17 @@ const createAgendamento = async (req, res) => {
       // Não falhar a operação principal se houver erro na movimentação
     }
 
-    // Emitir evento Socket.IO para notificar incorporadora sobre novo agendamento
-    // ATUALIZADO: Agora também emite quando é um corretor que criou o agendamento
+    // Criar notificação para incorporadora sobre novo agendamento via Supabase Realtime
+    // ATUALIZADO: Agora também cria quando é um corretor que criou o agendamento
     const temSDR = !!dadosAgendamento.sdr_id;
     const temCorretor = !!dadosAgendamento.consultor_interno_id;
     
-    if (req.io && (temSDR || temCorretor) && empresa_id === 5) {
+    if ((temSDR || temCorretor) && empresa_id === 5) {
       // Buscar dados do SDR que criou o agendamento
       // Se não há SDR mas há corretor, usar o corretor (caso onde corretor criou diretamente)
       const sdrId = dadosAgendamento.sdr_id || dadosAgendamento.consultor_interno_id;
       
-      console.log('📢 [SOCKET.IO] Emitindo evento new-agendamento-incorporadora:', {
+      console.log('📢 [NOTIFICAÇÃO] Criando notificação de novo agendamento:', {
         agendamentoId: data[0].id,
         paciente_id: paciente_id,
         sdr_id: dadosAgendamento.sdr_id,
@@ -299,8 +299,7 @@ const createAgendamento = async (req, res) => {
         empresa_id: empresa_id,
         data_agendamento: data_agendamento,
         horario: horario,
-        timestamp: new Date().toISOString(),
-        room: 'incorporadora-notifications'
+        timestamp: new Date().toISOString()
       });
       
       // Buscar dados do SDR com foto e música
@@ -310,7 +309,7 @@ const createAgendamento = async (req, res) => {
         .eq('id', sdrId)
         .single();
 
-      console.log(`👤 [SOCKET.IO] Dados do SDR encontrados:`, {
+      console.log(`👤 [NOTIFICAÇÃO] Dados do SDR encontrados:`, {
         id: sdrId,
         nome: sdrData?.nome || 'N/A',
         temFoto: !!sdrData?.foto_url,
@@ -324,68 +323,50 @@ const createAgendamento = async (req, res) => {
         .eq('id', paciente_id)
         .single();
 
-      console.log('👤 [SOCKET.IO] Dados do paciente encontrados:', {
+      console.log('👤 [NOTIFICAÇÃO] Dados do paciente encontrados:', {
         paciente_id: paciente_id,
         nome: pacienteData?.nome || 'N/A',
         telefone: pacienteData?.telefone || 'N/A'
       });
 
-      // CRÍTICO: Verificar quantos clientes estão no grupo ANTES de emitir
-      // Usar io diretamente do app.locals se disponível
-      const ioInstance = req.app.locals.io || req.io;
-      if (ioInstance && ioInstance.sockets) {
-        try {
-          const room = ioInstance.sockets.adapter.rooms.get('incorporadora-notifications');
-          if (room) {
-            const clients = Array.from(room);
-            console.log('📊 [SOCKET.IO] Total de clientes no grupo antes de emitir:', clients.length);
-            console.log('📋 [SOCKET.IO] IDs dos clientes que receberão notificação:', clients);
-          } else {
-            console.log('📊 [SOCKET.IO] Nenhum cliente no grupo incorporadora-notifications antes de emitir');
-          }
-        } catch (error) {
-          console.error('❌ [SOCKET.IO] Erro ao verificar clientes no grupo:', error);
+      // Inserir notificação na tabela (Supabase Realtime vai propagar)
+      try {
+        const { data: notificacaoData, error: notificacaoError } = await supabaseAdmin
+          .from('notificacoes_agendamentos')
+          .insert([{
+            agendamento_id: data[0].id,
+            paciente_nome: pacienteData?.nome || 'Cliente',
+            paciente_telefone: pacienteData?.telefone || '',
+            data_agendamento: data_agendamento,
+            horario: horario,
+            sdr_id: dadosAgendamento.sdr_id || null,
+            sdr_nome: sdrData?.nome || 'SDR',
+            sdr_foto: sdrData?.foto_url || null,
+            sdr_musica: sdrData?.musica_url || null,
+            consultor_interno_id: dadosAgendamento.consultor_interno_id || null,
+            empresa_id: 5,
+            lida: false
+          }])
+          .select()
+          .single();
+
+        if (notificacaoError) {
+          console.error('❌ [NOTIFICAÇÃO] Erro ao criar notificação de agendamento:', notificacaoError);
+        } else {
+          console.log('✅ [NOTIFICAÇÃO] Notificação de agendamento criada via Supabase Realtime:', {
+            notificacaoId: notificacaoData.id,
+            agendamentoId: data[0].id
+          });
         }
-      }
-      
-      req.io.to('incorporadora-notifications').emit('new-agendamento-incorporadora', {
-        agendamentoId: data[0].id,
-        paciente_nome: pacienteData?.nome || 'Cliente',
-        paciente_telefone: pacienteData?.telefone || '',
-        data_agendamento: data_agendamento,
-        horario: horario,
-        sdr_id: dadosAgendamento.sdr_id,
-        sdr_nome: sdrData?.nome || 'SDR',
-        sdr_foto: sdrData?.foto_url || null,
-        sdr_musica: sdrData?.musica_url || null,
-        consultor_interno_id: dadosAgendamento.consultor_interno_id,
-        timestamp: new Date().toISOString()
-      });
-      
-      console.log('✅ [SOCKET.IO] Evento new-agendamento-incorporadora enviado para grupo incorporadora-notifications');
-      
-      // CRÍTICO: Verificar quantos clientes estão no grupo DEPOIS de emitir
-      if (ioInstance && ioInstance.sockets) {
-        try {
-          const room = ioInstance.sockets.adapter.rooms.get('incorporadora-notifications');
-          if (room) {
-            const clients = Array.from(room);
-            console.log('📊 [SOCKET.IO] Total de clientes no grupo após emitir:', clients.length);
-          } else {
-            console.log('📊 [SOCKET.IO] Nenhum cliente no grupo incorporadora-notifications após emitir');
-          }
-        } catch (error) {
-          console.error('❌ [SOCKET.IO] Erro ao verificar clientes no grupo:', error);
-        }
+      } catch (error) {
+        console.error('❌ [NOTIFICAÇÃO] Erro ao inserir notificação no banco:', error);
       }
     } else {
-      console.log('⚠️ [SOCKET.IO] Evento new-agendamento-incorporadora não enviado:', {
-        temSocketIO: !!req.io,
+      console.log('ℹ️ [NOTIFICAÇÃO] Notificação de agendamento não criada:', {
         temSdrId: !!dadosAgendamento.sdr_id,
         temCorretorId: !!dadosAgendamento.consultor_interno_id,
         empresaId: empresa_id,
-        motivo: !req.io ? 'Socket.IO não disponível' : 
-                (!dadosAgendamento.sdr_id && !dadosAgendamento.consultor_interno_id) ? 'Sem sdr_id nem consultor_interno_id' : 
+        motivo: (!dadosAgendamento.sdr_id && !dadosAgendamento.consultor_interno_id) ? 'Sem sdr_id nem consultor_interno_id' : 
                 empresa_id !== 5 ? 'Não é incorporadora' : 'Desconhecido'
       });
     }

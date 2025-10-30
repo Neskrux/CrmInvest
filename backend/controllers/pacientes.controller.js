@@ -1377,6 +1377,8 @@ const cadastroPublicoLead = async (req, res) => {
       id: data[0].id,
       nome: data[0].nome,
       consultor_id: data[0].consultor_id,
+      sdr_id: data[0].sdr_id,
+      empresa_id: data[0].empresa_id,
       status: data[0].status
     });
     
@@ -1410,92 +1412,118 @@ const cadastroPublicoLead = async (req, res) => {
       console.log('⚠️ [SOCKET.IO] Socket.IO não disponível - evento new-lead não enviado');
     }
     
-    // Emitir evento Socket.IO para notificar incorporadora sobre novo lead
-    // Só emitir se NÃO tiver sdr_id pré-atribuído (para evitar notificação desnecessária)
-    if (req.io && data[0].empresa_id === 5 && !sdr_id) {
-      console.log('📢 [SOCKET.IO] Emitindo evento new-lead-incorporadora:', {
+    // Criar notificação para incorporadora sobre novo lead via Supabase Realtime
+    // SEMPRE criar quando for empresa_id = 5, independente de ter sdr_id (a incorporadora precisa saber de todos os novos leads)
+    console.log('🔍 [DEBUG] Verificando se deve criar notificação:', {
+      empresa_id: data[0].empresa_id,
+      deveCriar: data[0].empresa_id === 5
+    });
+    
+    if (data[0].empresa_id === 5) {
+      console.log('📢 [NOTIFICAÇÃO] Criando notificação de novo lead:', {
         leadId: data[0].id,
         nome: data[0].nome,
         cidade: data[0].cidade,
         estado: data[0].estado,
-        consultorId: consultorId,
+        consultor_id: data[0].consultor_id,
+        sdr_id: data[0].sdr_id,
         empresa_id: data[0].empresa_id,
-        timestamp: new Date().toISOString(),
-        room: 'incorporadora-notifications'
-      });
-      
-      // Buscar dados do consultor/SDR se existir
-      let consultorData = null;
-      if (consultorId) {
-        const { data: consultorResult } = await supabaseAdmin
-          .from('consultores')
-          .select('nome, foto_url')
-          .eq('id', consultorId)
-          .single();
-        
-        consultorData = consultorResult;
-        console.log('👤 [SOCKET.IO] Dados do consultor/SDR encontrados:', {
-          consultorId: consultorId,
-          nome: consultorData?.nome || 'N/A',
-          temFoto: !!consultorData?.foto_url
-        });
-      } else {
-        console.log('ℹ️ [SOCKET.IO] Lead sem consultor atribuído - notificação será enviada mesmo assim');
-      }
-
-      // CRÍTICO: Verificar quantos clientes estão no grupo ANTES de emitir
-      const ioInstance = req.app.locals.io || req.io;
-      if (ioInstance && ioInstance.sockets) {
-        try {
-          const room = ioInstance.sockets.adapter.rooms.get('incorporadora-notifications');
-          if (room) {
-            const clients = Array.from(room);
-            console.log('📊 [SOCKET.IO] Total de clientes no grupo antes de emitir:', clients.length);
-            console.log('📋 [SOCKET.IO] IDs dos clientes que receberão notificação:', clients);
-          } else {
-            console.log('📊 [SOCKET.IO] Nenhum cliente no grupo incorporadora-notifications antes de emitir');
-          }
-        } catch (error) {
-          console.error('❌ [SOCKET.IO] Erro ao verificar clientes no grupo:', error);
-        }
-      }
-
-      req.io.to('incorporadora-notifications').emit('new-lead-incorporadora', {
-        leadId: data[0].id,
-        nome: data[0].nome,
-        telefone: data[0].telefone,
-        cidade: data[0].cidade,
-        estado: data[0].estado,
-        empreendimento_id: data[0].empreendimento_id,
-        consultor_nome: consultorData?.nome || 'Sem consultor',
-        consultor_foto: consultorData?.foto_url || null,
         timestamp: new Date().toISOString()
       });
       
-      console.log('✅ [SOCKET.IO] Evento new-lead-incorporadora enviado para grupo incorporadora-notifications');
+      // Buscar dados do consultor (freelancer que indicou) se existir (apenas nome)
+      // NOTA: Foto e música não são incluídas na notificação de leads (apenas nome do consultor)
+      let consultorData = null;
+      const consultorIdFinal = data[0].consultor_id; // Usar o consultor_id do lead inserido (freelancer que indicou)
       
-      // CRÍTICO: Verificar quantos clientes estão no grupo DEPOIS de emitir
-      if (ioInstance && ioInstance.sockets) {
+      console.log('🔍 [DEBUG] Buscando dados do consultor para notificação:', {
+        consultor_id: consultorIdFinal,
+        lead_id: data[0].id
+      });
+      
+      if (consultorIdFinal) {
         try {
-          const room = ioInstance.sockets.adapter.rooms.get('incorporadora-notifications');
-          if (room) {
-            const clients = Array.from(room);
-            console.log('📊 [SOCKET.IO] Total de clientes no grupo após emitir:', clients.length);
+          const { data: consultorResult, error: consultorError } = await supabaseAdmin
+            .from('consultores')
+            .select('nome')
+            .eq('id', consultorIdFinal)
+            .single();
+          
+          if (consultorError) {
+            console.error('⚠️ [NOTIFICAÇÃO] Erro ao buscar dados do consultor:', consultorError);
           } else {
-            console.log('📊 [SOCKET.IO] Nenhum cliente no grupo incorporadora-notifications após emitir');
+            consultorData = consultorResult;
+            console.log('👤 [NOTIFICAÇÃO] Dados do consultor (freelancer que indicou) encontrados:', {
+              consultorId: consultorIdFinal,
+              nome: consultorData?.nome || 'N/A'
+            });
           }
         } catch (error) {
-          console.error('❌ [SOCKET.IO] Erro ao verificar clientes no grupo:', error);
+          console.error('❌ [NOTIFICAÇÃO] Erro ao buscar consultor:', error);
+          // Continuar mesmo com erro - notificação será criada sem dados do consultor
         }
+      } else {
+        console.log('ℹ️ [NOTIFICAÇÃO] Lead sem consultor atribuído (indicação pública) - notificação será enviada mesmo assim');
+      }
+
+      // Inserir notificação na tabela (Supabase Realtime vai propagar)
+      // IMPORTANTE: Criar notificação SEMPRE, mesmo se consultor não for encontrado
+      // NOTA: Tabela notificacoes_leads NÃO tem colunas de foto e música (apenas nome)
+      try {
+        // Garantir que campos obrigatórios não sejam null
+        const telefoneValue = data[0].telefone || '';
+        const cidadeValue = data[0].cidade || 'Não informado';
+        const estadoValue = data[0].estado || 'Não informado';
+        
+        console.log('💾 [DEBUG] Inserindo notificação na tabela notificacoes_leads:', {
+          lead_id: data[0].id,
+          nome: data[0].nome,
+          telefone: telefoneValue,
+          cidade: cidadeValue,
+          estado: estadoValue,
+          consultor_nome: consultorData?.nome || 'Sem consultor',
+          empresa_id: 5
+        });
+        
+        const { data: notificacaoData, error: notificacaoError } = await supabaseAdmin
+          .from('notificacoes_leads')
+          .insert([{
+            lead_id: data[0].id,
+            nome: data[0].nome || 'Lead sem nome',
+            telefone: telefoneValue,
+            cidade: cidadeValue,
+            estado: estadoValue,
+            empreendimento_id: data[0].empreendimento_id || null,
+            consultor_nome: consultorData?.nome || 'Sem consultor',
+            empresa_id: 5,
+            lida: false
+          }])
+          .select()
+          .single();
+
+        if (notificacaoError) {
+          console.error('❌ [NOTIFICAÇÃO] Erro ao criar notificação de lead:', notificacaoError);
+          console.error('❌ [NOTIFICAÇÃO] Detalhes do erro:', {
+            message: notificacaoError.message,
+            code: notificacaoError.code,
+            details: notificacaoError.details,
+            hint: notificacaoError.hint
+          });
+        } else {
+          console.log('✅ [NOTIFICAÇÃO] Notificação de lead criada via Supabase Realtime:', {
+            notificacaoId: notificacaoData.id,
+            leadId: data[0].id,
+            nome: data[0].nome
+          });
+        }
+      } catch (error) {
+        console.error('❌ [NOTIFICAÇÃO] Erro ao inserir notificação no banco:', error);
+        console.error('❌ [NOTIFICAÇÃO] Stack trace:', error.stack);
       }
     } else {
-      console.log('⚠️ [SOCKET.IO] Evento new-lead-incorporadora não enviado:', {
-        temSocketIO: !!req.io,
+      console.log('ℹ️ [NOTIFICAÇÃO] Notificação de lead não criada:', {
         empresaId: data[0].empresa_id,
-        sdrId: sdr_id,
-        motivo: !req.io ? 'Socket.IO não disponível' : 
-                data[0].empresa_id !== 5 ? 'Não é incorporadora' : 
-                sdr_id ? 'Lead já atribuído a SDR específico' : 'Desconhecido'
+        motivo: 'Não é incorporadora (empresa_id !== 5)'
       });
     }
     
