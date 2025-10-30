@@ -7688,7 +7688,6 @@ const Pacientes = () => {
                     className="form-input"
                     value={agendamentoData.data_agendamento}
                     onChange={(e) => setAgendamentoData({...agendamentoData, data_agendamento: e.target.value})}
-                    min={new Date().toISOString().split('T')[0]}
                   />
                 </div>
 
