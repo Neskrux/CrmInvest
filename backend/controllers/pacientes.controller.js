@@ -1412,21 +1412,22 @@ const cadastroPublicoLead = async (req, res) => {
       console.log('⚠️ [SOCKET.IO] Socket.IO não disponível - evento new-lead não enviado');
     }
     
-    // Criar notificação para incorporadora sobre novo lead via Supabase Realtime
-    // SEMPRE criar quando for empresa_id = 5, independente de ter sdr_id (a incorporadora precisa saber de todos os novos leads)
+    // Criar notificação para incorporadora via Supabase Realtime
+    // NOVA REGRA: Só criar se empresa_id = 5 E o lead ainda NÃO tiver sdr_id (ou seja, disponível)
     console.log('🔍 [DEBUG] Verificando se deve criar notificação:', {
       empresa_id: data[0].empresa_id,
-      deveCriar: data[0].empresa_id === 5
+      sdr_id: data[0].sdr_id,
+      deveCriar: data[0].empresa_id === 5 && (data[0].sdr_id === null || data[0].sdr_id === undefined)
     });
-    
-    if (data[0].empresa_id === 5) {
-      console.log('📢 [NOTIFICAÇÃO] Criando notificação de novo lead:', {
+
+    if (data[0].empresa_id === 5 && (data[0].sdr_id === null || data[0].sdr_id === undefined)) {
+      console.log('📢 [NOTIFICAÇÃO] Criando notificação de novo lead (sem sdr_id):', {
         leadId: data[0].id,
         nome: data[0].nome,
         cidade: data[0].cidade,
         estado: data[0].estado,
         consultor_id: data[0].consultor_id,
-        sdr_id: data[0].sdr_id,
+        sdr_id: null,
         empresa_id: data[0].empresa_id,
         timestamp: new Date().toISOString()
       });
@@ -1467,7 +1468,7 @@ const cadastroPublicoLead = async (req, res) => {
       }
 
       // Inserir notificação na tabela (Supabase Realtime vai propagar)
-      // IMPORTANTE: Criar notificação SEMPRE, mesmo se consultor não for encontrado
+      // Importante: só quando o lead ainda está disponível (sem sdr_id)
       // NOTA: Tabela notificacoes_leads NÃO tem colunas de foto e música (apenas nome)
       try {
         // Garantir que campos obrigatórios não sejam null
