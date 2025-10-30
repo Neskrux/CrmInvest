@@ -1,10 +1,9 @@
 import { useEffect, useLayoutEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getSupabaseClient } from '../lib/supabaseClient';
+import { notificationQueue } from '../lib/notificationQueue';
 import { AlertCircle, Phone, MapPin, User, Zap, Clock } from 'lucide-react';
 import logoBrasao from '../images/logobrasaopreto.png';
-
-// Supabase client is now provided by a shared singleton in ../lib/supabaseClient
 
 const useIncorporadoraNotifications = () => {
   const { user, isIncorporadora } = useAuth();
@@ -17,6 +16,7 @@ const useIncorporadoraNotifications = () => {
   const audioStartedRef = useRef(false);
   const timerCreatedAtRef = useRef(null);
   const preloadedAudioRef = useRef(null);
+  const activeTaskResolveRef = useRef(null);
   const supabaseRef = useRef(null);
   const subscriptionRef = useRef(null);
   const processedNotificationIdsRef = useRef(new Set());
@@ -230,13 +230,15 @@ const useIncorporadoraNotifications = () => {
 
     supabaseRef.current = supabase;
 
-    const processNewLeadNotification = (data) => {
+    const processNewLeadNotification = async (data) => {
       if (processedNotificationIdsRef.current.has(data.id)) {
         return;
       }
       processedNotificationIdsRef.current.add(data.id);
 
       try {
+        await notificationQueue.run(() => new Promise((resolve) => {
+          activeTaskResolveRef.current = resolve;
         audioStartedRef.current = false;
         stopAllAudio();
         
@@ -266,15 +268,17 @@ const useIncorporadoraNotifications = () => {
         setNewLeadData(leadData);
         setShowNewLeadModal(true);
         previousModalStateRef.current = false;
-        
+
         playNotificationSound(data.corretor_musica);
-        
+
         setNotifications(prev => [...prev, {
           id: Date.now(),
           type: 'new-lead',
           data: leadData,
           timestamp: new Date()
         }]);
+
+      }));
       } catch (error) {
         // Ignorar erros
       }
@@ -352,6 +356,7 @@ const useIncorporadoraNotifications = () => {
           previousModalStateRef.current = false;
           modalTimerRef.current = null;
           timerCreatedAtRef.current = null;
+          if (activeTaskResolveRef.current) { activeTaskResolveRef.current(); activeTaskResolveRef.current = null; }
         }
       }, 20000);
       
@@ -391,7 +396,7 @@ const useIncorporadoraNotifications = () => {
     
     previousModalStateRef.current = showNewLeadModal;
     
-    if (wasOpen && isNowClosed) {
+      if (wasOpen && isNowClosed) {
       const timerAge = timerCreatedAtRef.current ? Date.now() - timerCreatedAtRef.current : Infinity;
       if (timerAge > 1000) {
         if (modalTimerRef.current) {
@@ -405,6 +410,7 @@ const useIncorporadoraNotifications = () => {
       if (audioInstanceRef.current) {
         stopNotificationSound();
       }
+        if (activeTaskResolveRef.current) { activeTaskResolveRef.current(); activeTaskResolveRef.current = null; }
     }
   }, [showNewLeadModal, stopNotificationSound]);
 

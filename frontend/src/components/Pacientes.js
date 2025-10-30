@@ -568,14 +568,20 @@ const Pacientes = () => {
 
   const fetchSolicitacoesCarteira = async () => {
     try {
+      console.log('🔄 Frontend: Chamando GET /api/solicitacoes-carteira...');
       const response = await makeRequest('/solicitacoes-carteira');
       const data = await response.json();
       
+      console.log('📥 Frontend: Resposta recebida:', response.status, data?.length || 0, 'solicitações');
+      
       if (response.ok) {
         setSolicitacoesCarteira(data || []);
+        console.log('✅ Frontend: Solicitações carregadas no estado');
+      } else {
+        console.error('❌ Frontend: Erro na resposta:', response.status, data);
       }
     } catch (error) {
-      console.error('Erro ao buscar solicitações de carteira:', error);
+      console.error('❌ Frontend: Erro ao buscar solicitações de carteira:', error);
     }
   };
 
@@ -1968,7 +1974,7 @@ const Pacientes = () => {
       // Se for clínica, criar solicitação de aprovação
       if (isClinica) {
         const solicitacaoData = {
-          clinica_id: user.id,
+          // Não enviar clinica_id - o backend define isso automaticamente
           pacientes_carteira: pacientesCarteira.map(p => ({
             id: p.id,
             cpf: p.cpf,
@@ -9504,54 +9510,27 @@ const Pacientes = () => {
                         });
 
                         if (response.ok) {
-                          showSuccessToast('Solicitação aprovada! Criando pacientes...');
+                          const responseData = await response.json();
+                          const pacientesCriados = responseData.pacientes_criados || 0;
+                          const pacientesErros = responseData.pacientes_erros || [];
                           
-                          // Criar pacientes após aprovação
-                          const promises = (solicitacaoSelecionada.pacientes_carteira || []).map(paciente => {
-                            const pacienteData = {
-                              nome: paciente.nomeCompleto,
-                              cpf: paciente.cpf,
-                              telefone: '',
-                              cidade: '',
-                              estado: '',
-                              tipo_tratamento: 'Carteira Existente',
-                              status: 'fechado',
-                              observacoes: 'Paciente da carteira existente - Aprovado',
-                              carteira_existente: true,
-                              clinica_id: solicitacaoSelecionada.clinica_id,
-                              cadastrado_por_clinica: true,
-                              valor_parcela: paciente.valorParcela,
-                              numero_parcelas_aberto: paciente.numeroParcelasAberto,
-                              primeira_vencimento: paciente.primeiraVencimento,
-                              numero_parcelas_antecipar: paciente.numeroParcelasAntecipar,
-                              fator_am: 0.33,
-                              data_aceite: new Date().toISOString().split('T')[0],
-                              valor_entregue_total: solicitacaoSelecionada.calculos?.valorEntregueTotal || 0,
-                              desagio_total: solicitacaoSelecionada.calculos?.desagioTotal || 0,
-                              valor_face_total: solicitacaoSelecionada.calculos?.valorFaceTotal || 0,
-                              valor_total_operacao: solicitacaoSelecionada.calculos?.valorTotalOperacao || 0,
-                              valor_colateral: solicitacaoSelecionada.calculos?.valorColateral || 0,
-                              percentual_final: solicitacaoSelecionada.calculos?.percentualFinal || 0
-                            };
-
-                            return makeRequest('/pacientes', {
-                              method: 'POST',
-                              body: JSON.stringify(pacienteData)
-                            });
-                          });
-
-                          await Promise.all(promises);
-                          showSuccessToast('Pacientes criados com sucesso!');
+                          if (pacientesErros.length === 0) {
+                            showSuccessToast(`${pacientesCriados} pacientes criados com sucesso!`);
+                          } else {
+                            showInfoToast(`${pacientesCriados} pacientes criados, ${pacientesErros.length} com erro`);
+                          }
                           
                           setShowSolicitacaoModal(false);
                           setSolicitacaoSelecionada(null);
                           fetchSolicitacoesCarteira();
                           fetchPacientes();
                         } else {
-                          showErrorToast('Erro ao aprovar solicitação');
+                          const errorData = await response.json();
+                          showErrorToast(errorData.error || 'Erro ao aprovar solicitação');
                         }
                       } catch (error) {
-                        showErrorToast('Erro ao aprovar solicitação');
+                        console.error('Erro ao aprovar solicitação:', error);
+                        showErrorToast('Erro ao aprovar solicitação: ' + error.message);
                       }
                     }}
                     style={{
