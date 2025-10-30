@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getSupabaseClient } from '../lib/supabaseClient';
+import { notificationQueue } from '../lib/notificationQueue';
 import { CheckCircle, User, DollarSign, Calendar as CalendarIcon, Clock } from 'lucide-react';
 import logoBrasao from '../images/logobrasaopreto.png';
 
@@ -16,6 +17,7 @@ const useFechamentoNotifications = () => {
   const audioStartedRef = useRef(false);
   const timerCreatedAtRef = useRef(null);
   const preloadedAudioRef = useRef(null);
+  const activeTaskResolveRef = useRef(null);
   const supabaseRef = useRef(null);
   const subscriptionRef = useRef(null);
   const processedNotificationIdsRef = useRef(new Set());
@@ -205,13 +207,15 @@ const useFechamentoNotifications = () => {
 
     supabaseRef.current = supabase;
 
-    const processNewFechamentoNotification = (data) => {
+    const processNewFechamentoNotification = async (data) => {
       if (processedNotificationIdsRef.current.has(data.id)) {
         return;
       }
       processedNotificationIdsRef.current.add(data.id);
 
       try {
+        await notificationQueue.run(() => new Promise((resolve) => {
+          activeTaskResolveRef.current = resolve;
         audioStartedRef.current = false;
         stopAllAudio();
         
@@ -252,6 +256,7 @@ const useFechamentoNotifications = () => {
           previousModalStateRef.current = false;
           playFechamentoSound(data.corretor_musica);
         }, 100);
+        }));
       } catch (error) {
         // Ignorar erros
       }
@@ -329,6 +334,7 @@ const useFechamentoNotifications = () => {
           previousModalStateRef.current = false;
           modalTimerRef.current = null;
           timerCreatedAtRef.current = null;
+          if (activeTaskResolveRef.current) { activeTaskResolveRef.current(); activeTaskResolveRef.current = null; }
         }
       }, 20000);
       
@@ -382,6 +388,7 @@ const useFechamentoNotifications = () => {
       if (audioInstanceRef.current) {
         stopFechamentoSound();
       }
+      if (activeTaskResolveRef.current) { activeTaskResolveRef.current(); activeTaskResolveRef.current = null; }
     }
   }, [showFechamentoModal, stopFechamentoSound]);
 

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getSupabaseClient } from '../lib/supabaseClient';
+import { notificationQueue } from '../lib/notificationQueue';
 import { Calendar as CalendarIcon, User, Phone, Clock, CheckCircle, PartyPopper } from 'lucide-react';
 import logoBrasao from '../images/logobrasaopreto.png';
 
@@ -17,6 +18,7 @@ const useAgendamentoNotifications = () => {
   const audioStartedRef = useRef(false);
   const timerCreatedAtRef = useRef(null);
   const preloadedAudioRef = useRef(null);
+  const activeTaskResolveRef = useRef(null);
   const supabaseRef = useRef(null);
   const subscriptionRef = useRef(null);
   const processedNotificationIdsRef = useRef(new Set());
@@ -219,13 +221,15 @@ const useAgendamentoNotifications = () => {
 
     supabaseRef.current = supabase;
 
-    const processNewAgendamentoNotification = (data) => {
+    const processNewAgendamentoNotification = async (data) => {
       if (processedNotificationIdsRef.current.has(data.id)) {
         return;
       }
       processedNotificationIdsRef.current.add(data.id);
 
       try {
+        await notificationQueue.run(() => new Promise((resolve) => {
+          activeTaskResolveRef.current = resolve;
         audioStartedRef.current = false;
         stopAllAudio();
         
@@ -275,6 +279,8 @@ const useAgendamentoNotifications = () => {
             timestamp: new Date()
           }]);
         }, 100);
+          // resolve happens when modal closes (hook effects)
+        }));
       } catch (error) {
         // Ignorar erros
       }
@@ -352,6 +358,7 @@ const useAgendamentoNotifications = () => {
           previousModalStateRef.current = false;
           modalTimerRef.current = null;
           timerCreatedAtRef.current = null;
+          if (activeTaskResolveRef.current) { activeTaskResolveRef.current(); activeTaskResolveRef.current = null; }
         }
       }, 20000);
       
@@ -410,6 +417,7 @@ const useAgendamentoNotifications = () => {
       setAgendamentoData(null);
       
       preloadedAudioRef.current = null;
+      if (activeTaskResolveRef.current) { activeTaskResolveRef.current(); activeTaskResolveRef.current = null; }
     }
   }, [showAgendamentoModal, stopAgendamentoSound]);
 
