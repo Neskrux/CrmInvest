@@ -3405,6 +3405,9 @@ const Pacientes = () => {
                       else { handleNovoClienteChange(e); }
                     }}>
                       <option value="">Digite ou selecione a cidade</option>
+                      {cidadesPorEstado[novoClienteForm.estado] && cidadesPorEstado[novoClienteForm.estado].map((cidade) => (
+                        <option key={cidade} value={cidade}>{cidade}</option>
+                      ))}
                       <option value="OUTRA">Outra cidade</option>
                     </select>
                   ) : (

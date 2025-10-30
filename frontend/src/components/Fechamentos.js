@@ -1765,6 +1765,7 @@ const Fechamentos = () => {
                     className="form-select"
                     value={novoFechamento.consultor_id || ''}
                     onChange={(e) => setNovoFechamento({...novoFechamento, consultor_id: e.target.value})}
+                    required
                     disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                   >
                     <option value="">Selecione um {t.consultor.toLowerCase()}</option>
@@ -1787,6 +1788,7 @@ const Fechamentos = () => {
                           clinica_id: e.target.value,
                           empreendimento_externo: e.target.value === 'externo' ? novoFechamento.empreendimento_externo : ''
                         })}
+                        required
                         disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                       >
                         <option value="">Selecione um empreendimento</option>
@@ -1819,6 +1821,7 @@ const Fechamentos = () => {
                       className="form-select"
                       value={novoFechamento.clinica_id || ''}
                       onChange={(e) => setNovoFechamento({...novoFechamento, clinica_id: e.target.value})}
+                      required
                       disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                     >
                       <option value="">{`Selecione um ${t.clinica.toLowerCase()}`}</option>
@@ -1837,6 +1840,7 @@ const Fechamentos = () => {
                     className="form-input"
                     value={novoFechamento.data_fechamento}
                     onChange={(e) => setNovoFechamento({...novoFechamento, data_fechamento: e.target.value})}
+                    required
                     disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                   />
                 </div>

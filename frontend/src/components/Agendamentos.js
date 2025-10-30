@@ -916,7 +916,7 @@ const Agendamentos = () => {
       <div className="card">
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 className="card-title">Lista de Agendamentos</h2>
-          {isAdmin && (
+          {(isAdmin || isConsultorInterno) && (
             <button className="btn btn-primary" onClick={() => setShowModal(true)}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -1223,23 +1223,6 @@ const Agendamentos = () => {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Consultor Interno</label>
-                  <select
-                    name="consultor_interno_id"
-                    className="form-select"
-                    value={formData.consultor_interno_id || ''}
-                    onChange={handleInputChange}
-                  >
-                    <option value="">Selecione um consultor interno</option>
-                    {consultores.filter(consultor => !consultor.is_freelancer && consultor.empresa_id === user?.empresa_id).map(consultor => (
-                      <option key={consultor.id} value={consultor.id}>
-                        {consultor.nome}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
                   <label className="form-label">{user?.empresa_id === 5 ? 'Empreendimento' : t.clinica}</label>
                   {user?.empresa_id === 5 ? (
                     <>
@@ -1248,7 +1231,7 @@ const Agendamentos = () => {
                         className="form-select"
                         value={formData.clinica_id}
                         onChange={handleInputChange}
-                      >
+                      required>
                         <option value="">Selecione um empreendimento</option>
                         <option value="4">Laguna Sky Garden</option>
                         <option value="5">Residencial Girassol</option>
@@ -1289,7 +1272,7 @@ const Agendamentos = () => {
                 </div>
               </div>
 
-              <div className="grid grid-3">
+              <div className="grid grid-2">
                 <div className="form-group">
                   <label className="form-label">Data do Agendamento *</label>
                   <input
@@ -1314,22 +1297,6 @@ const Agendamentos = () => {
                     required
                     autoComplete="off"
                   />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Status</label>
-                  <select
-                    name="status"
-                    className="form-select"
-                    value={formData.status}
-                    onChange={handleInputChange}
-                  >
-                    {statusOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
                 </div>
               </div>
 

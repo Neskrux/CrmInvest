@@ -53,12 +53,13 @@ const useAgendamentoNotifications = () => {
     }
     
     if (audioStartedRef.current && audioInstanceRef.current && !audioInstanceRef.current.paused) {
-      return;
+      return Promise.resolve(true);
     }
     
     if (audioInstanceRef.current && audioInstanceRef.current.readyState < 2) {
-      setTimeout(() => playAgendamentoSound(musicaUrl), 100);
-      return;
+      return new Promise((resolve) => setTimeout(() => {
+        playAgendamentoSound(musicaUrl).then(resolve).catch(() => resolve(false));
+      }, 100));
     }
 
     try {
@@ -103,7 +104,7 @@ const useAgendamentoNotifications = () => {
       audioStartedRef.current = false;
       
       const currentAudio = audioInstanceRef.current;
-      if (!currentAudio) return;
+      if (!currentAudio) return Promise.resolve(false);
       
       const handleAudioEnded = () => {
         audioStartedRef.current = false;
@@ -121,91 +122,46 @@ const useAgendamentoNotifications = () => {
       
       currentAudio.addEventListener('ended', handleAudioEnded);
       
-      const tryPlay = (attemptNumber = 0) => {
-        if (!audioInstanceRef.current) return;
-        
-        const playPromise = audioInstanceRef.current.play();
-        
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => {
-              audioStartedRef.current = true;
-              if (audioInstanceRef.current && audioInstanceRef.current.paused) {
+      return new Promise((resolve) => {
+        let resolved = false;
+        const resolveOnce = (v) => { if (!resolved) { resolved = true; resolve(v); } };
+        const onPlaying = () => {
+          audioStartedRef.current = true;
+          currentAudio.removeEventListener('playing', onPlaying);
+          resolveOnce(true);
+        };
+        currentAudio.addEventListener('playing', onPlaying, { once: true });
+
+        const tryPlay = () => {
+          if (!audioInstanceRef.current) return resolveOnce(false);
+          const playPromise = audioInstanceRef.current.play();
+          if (playPromise !== undefined) {
+            playPromise.then(() => setTimeout(() => resolveOnce(true), 0)).catch(() => {
+              const retryDelays = [50, 100, 150, 200, 300, 500, 750, 1000, 1500];
+              let i = 0;
+              const retry = () => {
+                if (!audioInstanceRef.current || audioStartedRef.current) return resolveOnce(audioStartedRef.current);
+                if (i >= retryDelays.length) return resolveOnce(false);
+                const d = retryDelays[i++];
                 setTimeout(() => {
-                  if (audioInstanceRef.current && audioInstanceRef.current.paused) {
-                    audioInstanceRef.current.play().catch(err => {
-                      // Ignorar erros
-                    });
+                  if (audioInstanceRef.current && audioInstanceRef.current.paused && !audioStartedRef.current) {
+                    audioInstanceRef.current.play().then(() => setTimeout(() => resolveOnce(true), 0)).catch(retry);
+                  } else {
+                    resolveOnce(true);
                   }
-                }, 50);
-              }
-            })
-            .catch(error => {
-              const retryDelays = [50, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000, 2500, 3000];
-              let retryCount = 0;
-              
-              const tryPlayAgain = () => {
-                if (retryCount < retryDelays.length && audioInstanceRef.current) {
-                  const delay = retryDelays[retryCount];
-                  
-                  setTimeout(() => {
-                    if (audioInstanceRef.current && audioInstanceRef.current.paused && !audioStartedRef.current) {
-                      audioInstanceRef.current.play()
-                        .then(() => {
-                          audioStartedRef.current = true;
-                        })
-                        .catch((err) => {
-                          retryCount++;
-                          if (retryCount < retryDelays.length) {
-                            tryPlayAgain();
-                          }
-                        });
-                    }
-                  }, delay);
-                }
+                }, d);
               };
-              
-              tryPlayAgain();
+              retry();
             });
-        }
-      };
-      
-      tryPlay(0);
-      
-      const immediateRetries = [25, 50, 75, 100, 150, 200];
-      immediateRetries.forEach((delay, index) => {
-        setTimeout(() => {
-          if (audioInstanceRef.current && audioInstanceRef.current.paused && !audioStartedRef.current) {
-            tryPlay(index + 1);
+          } else {
+            resolveOnce(false);
           }
-        }, delay);
+        };
+        tryPlay();
       });
-      
-      audioInstanceRef.current.addEventListener('loadstart', () => {
-        if (audioInstanceRef.current && audioInstanceRef.current.paused && !audioStartedRef.current) {
-          tryPlay(100);
-        }
-      }, { once: true });
-      
-      audioInstanceRef.current.addEventListener('loadeddata', () => {
-        if (audioInstanceRef.current && audioInstanceRef.current.paused && !audioStartedRef.current) {
-          tryPlay(101);
-        }
-      }, { once: true });
-
-      audioInstanceRef.current.addEventListener('canplay', () => {
-        if (audioInstanceRef.current && audioInstanceRef.current.paused && !audioStartedRef.current) {
-          tryPlay(102);
-        }
-      }, { once: true });
-
-      audioInstanceRef.current.addEventListener('canplaythrough', () => {
-        if (audioInstanceRef.current && audioInstanceRef.current.paused && !audioStartedRef.current) {
-          tryPlay(103);
-        }
-      }, { once: true });
     } catch (error) {
       // Ignorar erros
+      return Promise.resolve(false);
     }
   }, [stopAgendamentoSound]);
 
@@ -265,19 +221,13 @@ const useAgendamentoNotifications = () => {
           consultor_interno_id: data.consultor_interno_id
         };
         
-        setTimeout(() => {
+        setTimeout(async () => {
           setAgendamentoData(agendamentoDataFormatted);
+          audioStartedRef.current = false;
+          await playAgendamentoSound(data.sdr_musica);
           setShowAgendamentoModal(true);
           previousModalStateRef.current = false;
-          
-          playAgendamentoSound(data.sdr_musica);
-          
-          setNotifications(prev => [...prev, {
-            id: Date.now(),
-            type: 'new-agendamento',
-            data: agendamentoDataFormatted,
-            timestamp: new Date()
-          }]);
+          setNotifications(prev => [...prev, { id: Date.now(), type: 'new-agendamento', data: agendamentoDataFormatted, timestamp: new Date() }]);
         }, 100);
           // resolve happens when modal closes (hook effects)
         }));
@@ -364,29 +314,7 @@ const useAgendamentoNotifications = () => {
       
       modalTimerRef.current = mainTimer;
       
-      if (showAgendamentoModal && agendamentoData) {
-        if (!audioStartedRef.current || (audioInstanceRef.current && audioInstanceRef.current.paused)) {
-          playAgendamentoSound(agendamentoData.sdr_musica);
-          
-          [100, 200, 300].forEach((delay) => {
-            setTimeout(() => {
-              if (showAgendamentoModal && agendamentoData && audioInstanceRef.current && audioInstanceRef.current.paused) {
-                try {
-                  audioInstanceRef.current.play()
-                    .then(() => {
-                      audioStartedRef.current = true;
-                    })
-                    .catch(() => {
-                      // Ignorar erros
-                    });
-                } catch (e) {
-                  // Ignorar erros
-                }
-              }
-            }, delay);
-          });
-        }
-      }
+      // Sincronização: o áudio já é iniciado antes de abrir o modal
     }
     
     previousModalStateRef.current = showAgendamentoModal;
