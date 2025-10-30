@@ -3861,14 +3861,14 @@ const Pacientes = () => {
                                     8: 'River Sky Garden',
                                     9: 'Condomínio Figueira Garcia'
                                   };
-                                  const nome = empreendimentoMap[lead.empreendimento_id] || 'Externo';
+                                  const nome = empreendimentoMap[lead.empreendimento_id] || 'Empreendimento não catalogado';
                                   return nome.length > 15 ? (
                                     <span style={{ fontSize: '0.9rem' }}>{nome.substring(0, 15)}...</span>
                                   ) : nome;
                                 }
                                 return (
                                   <span style={{ fontSize: '0.9rem' }}>
-                                    {'Empreendimento Externo'}
+                                    {'Não informado'}
                                   </span>
                                 );
                               })()
@@ -4257,10 +4257,20 @@ const Pacientes = () => {
                                   9: 'Condomínio Figueira Garcia'
                                 };
                                 const externoNome = (lead.empreendimento_externo || '').trim();
-                                const nomeBase = externoNome || empreendimentoMap[lead.empreendimento_id] || 'Externo';
-                                return nomeBase.length > 15 ? (
-                                  <span style={{ fontSize: '0.9rem' }}>{nomeBase.substring(0, 15)}...</span>
-                                ) : nomeBase;
+                                if (externoNome) {
+                                  return externoNome.length > 15 ? (
+                                    <span style={{ fontSize: '0.9rem' }}>{externoNome.substring(0, 15)}...</span>
+                                  ) : externoNome;
+                                }
+                                if (lead.empreendimento_id) {
+                                  const nome = empreendimentoMap[lead.empreendimento_id] || 'Empreendimento não catalogado';
+                                  return nome.length > 15 ? (
+                                    <span style={{ fontSize: '0.9rem' }}>{nome.substring(0, 15)}...</span>
+                                  ) : nome;
+                                }
+                                return (
+                                  <span style={{ fontSize: '0.9rem' }}>Não informado</span>
+                                );
                               })()
                             ) : (
                               // Para clínicas, mostrar tipo de tratamento
