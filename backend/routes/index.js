@@ -30,6 +30,9 @@ const movimentacoesRoutes = require('./movimentacoes.routes');
 const documentsRoutes = require('./documents.routes');
 const idsfRoutes = require('./idsf.routes');
 
+// Importar rotas de solicitações de carteira ANTES das outras para evitar conflitos
+const solicitacoesCarteiraRoutes = require('./solicitacoes-carteira.routes');
+
 // Agrupar rotas
 // Nota: Mantendo os caminhos originais para compatibilidade com o frontend
 router.use('/', authRoutes); // /api/login, /api/logout, etc.
@@ -46,16 +49,13 @@ router.use('/', metasRoutes); // /api/metas/*
 router.use('/', novasClinicasRoutes); // /api/novas-clinicas/*
 router.use('/', pacientesFinanceiroRoutes); // /api/pacientes-financeiro/*
 router.use('/', metaAdsRoutes); // /api/meta-ads/*
+router.use('/', solicitacoesCarteiraRoutes); // /api/solicitacoes-carteira/* (ANTES de empreendimentos!)
 router.use('/', empreendimentosRoutes); // /api/empreendimentos/*
 router.use('/', movimentacoesRoutes); // /api/movimentacoes/*
 
 // Rotas de APIs externas
 router.use('/documents', documentsRoutes);
 router.use('/idsf', idsfRoutes);
-
-// Importar rotas de solicitações de carteira (depois das outras para evitar conflitos)
-const solicitacoesCarteiraRoutes = require('./solicitacoes-carteira.routes');
-router.use('/', solicitacoesCarteiraRoutes); // /api/solicitacoes-carteira/*
 
 // Importar rotas de contratos de carteira
 const contratosCarteiraRoutes = require('./contratos-carteira.routes');

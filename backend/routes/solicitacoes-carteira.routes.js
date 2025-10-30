@@ -7,6 +7,8 @@ const { authenticateToken } = require('../middleware/auth');
 router.get('/solicitacoes-carteira', authenticateToken, async (req, res) => {
   try {
     console.log('📋 GET /api/solicitacoes-carteira chamado');
+    console.log('👤 Usuário:', req.user.tipo, 'ID:', req.user.id);
+    console.log('🔍 URL completa:', req.originalUrl);
     
     let query = supabaseAdmin
       .from('solicitacoes_carteira')
@@ -15,21 +17,44 @@ router.get('/solicitacoes-carteira', authenticateToken, async (req, res) => {
 
     // Se for clínica, mostrar apenas suas solicitações
     if (req.user.tipo === 'clinica') {
+      console.log('🔍 Filtrando por clínica ID:', req.user.id);
       query = query.eq('clinica_id', req.user.id);
     }
+    // Admin e consultores veem todas as solicitações (sem filtro de empresa no nível da solicitação)
 
+    console.log('🔄 Executando query no Supabase...');
     const { data, error } = await query;
+    console.log('✅ Query executada');
 
     if (error) {
-      console.error('Erro ao buscar solicitações:', error);
-      throw error;
+      console.error('❌ Erro ao buscar solicitações:', error);
+      console.error('❌ Detalhes do erro:', JSON.stringify(error, null, 2));
+      
+      // Se a tabela não existe ou há problema de schema
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.error('⚠️ ERRO: Tabela solicitacoes_carteira não existe no banco de dados!');
+        return res.status(500).json({ 
+          error: 'Tabela solicitacoes_carteira não encontrada', 
+          details: 'A tabela precisa ser criada no banco de dados',
+          errorCode: error.code 
+        });
+      }
+      
+      return res.status(500).json({ error: 'Erro ao buscar solicitações', details: error.message });
     }
 
     console.log('✅ Solicitações encontradas:', data?.length || 0);
+    
+    // Log de teste para verificar estrutura dos dados
+    if (data && data.length > 0) {
+      console.log('📋 Exemplo de solicitação:', JSON.stringify(data[0], null, 2));
+    }
+    
     res.json(data || []);
   } catch (error) {
     console.error('❌ Erro ao buscar solicitações:', error);
-    res.status(500).json({ error: 'Erro ao buscar solicitações' });
+    console.error('❌ Stack trace:', error.stack);
+    res.status(500).json({ error: 'Erro ao buscar solicitações', details: error.message });
   }
 });
 
@@ -72,27 +97,36 @@ router.post('/solicitacoes-carteira', authenticateToken, async (req, res) => {
       console.log('⚠️ Usando nome do usuário:', clinicaNome);
     }
 
+    // Preparar dados para inserção
+    const insertData = {
+      pacientes_carteira: req.body.pacientes_carteira,
+      calculos: req.body.calculos,
+      percentual_alvo: req.body.percentual_alvo,
+      observacoes_clinica: req.body.observacoes_clinica || '',
+      clinica_id: req.user.id,
+      clinica_nome: clinicaNome,
+      status: 'pendente'
+    };
+
     const { data, error } = await supabaseAdmin
       .from('solicitacoes_carteira')
-      .insert([{
-        ...req.body,
-        clinica_id: req.user.id,
-        clinica_nome: clinicaNome,
-        status: 'pendente'
-      }])
+      .insert([insertData])
       .select()
       .single();
 
     if (error) {
       console.error('❌ Erro ao criar solicitação:', error);
-      throw error;
+      console.error('❌ Detalhes do erro:', JSON.stringify(error, null, 2));
+      console.error('❌ Dados que tentaram ser inseridos:', JSON.stringify(insertData, null, 2));
+      return res.status(500).json({ error: 'Erro ao criar solicitação', details: error.message });
     }
 
     console.log('✅ Solicitação criada:', data);
     res.json(data);
   } catch (error) {
     console.error('❌ Erro ao criar solicitação:', error);
-    res.status(500).json({ error: 'Erro ao criar solicitação' });
+    console.error('❌ Stack trace:', error.stack);
+    res.status(500).json({ error: 'Erro ao criar solicitação', details: error.message });
   }
 });
 
@@ -115,7 +149,7 @@ router.put('/solicitacoes-carteira/:id/status', authenticateToken, async (req, r
       updated_at: new Date().toISOString()
     };
 
-    // Se aprovando, adicionar dados de aprovação
+    // Se aprovando, adicionar dados de aprovação e criar pacientes
     if (status === 'aprovado') {
       updateData.aprovado_por = req.user.id;
       updateData.data_aprovacao = new Date().toISOString();
@@ -134,6 +168,74 @@ router.put('/solicitacoes-carteira/:id/status', authenticateToken, async (req, r
     }
 
     console.log('✅ Status atualizado:', data);
+
+    // Se aprovando, criar pacientes automaticamente
+    if (status === 'aprovado' && data && data.pacientes_carteira && Array.isArray(data.pacientes_carteira)) {
+      console.log('🔄 Criando pacientes da carteira existente...');
+      
+      const pacientesCreated = [];
+      const pacientesErrors = [];
+
+      for (const paciente of data.pacientes_carteira) {
+        try {
+          // Normalizar CPF (remover caracteres não numéricos)
+          const cpfNumeros = paciente.cpf ? paciente.cpf.replace(/\D/g, '') : null;
+
+          const pacienteData = {
+            nome: paciente.nomeCompleto,
+            cpf: cpfNumeros,
+            telefone: '',
+            cidade: '',
+            estado: '',
+            tipo_tratamento: 'Carteira Existente',
+            status: 'fechado',
+            observacoes: 'Paciente da carteira existente - Aprovado',
+            carteira_existente: true,
+            clinica_id: data.clinica_id,
+            cadastrado_por_clinica: true,
+            valor_parcela: paciente.valorParcela,
+            numero_parcelas_aberto: paciente.numeroParcelasAberto,
+            primeira_vencimento: paciente.primeiraVencimento,
+            numero_parcelas_antecipar: paciente.numeroParcelasAntecipar,
+            fator_am: 0.33,
+            data_aceite: new Date().toISOString().split('T')[0],
+            valor_entregue_total: data.calculos?.valorEntregueTotal || 0,
+            desagio_total: data.calculos?.desagioTotal || 0,
+            valor_face_total: data.calculos?.valorFaceTotal || 0,
+            valor_total_operacao: data.calculos?.valorTotalOperacao || 0,
+            valor_colateral: data.calculos?.valorColateral || 0,
+            percentual_final: data.calculos?.percentualFinal || 0,
+            empresa_id: req.user.empresa_id || null
+          };
+
+          const { data: pacienteCriado, error: pacienteError } = await supabaseAdmin
+            .from('pacientes')
+            .insert([pacienteData])
+            .select()
+            .single();
+
+          if (pacienteError) {
+            console.error(`❌ Erro ao criar paciente ${paciente.nomeCompleto}:`, pacienteError);
+            pacientesErrors.push({ paciente: paciente.nomeCompleto, error: pacienteError.message });
+          } else {
+            console.log(`✅ Paciente criado: ${paciente.nomeCompleto} (ID: ${pacienteCriado.id})`);
+            pacientesCreated.push(paciente.nomeCompleto);
+          }
+        } catch (error) {
+          console.error(`❌ Erro ao criar paciente ${paciente.nomeCompleto}:`, error);
+          pacientesErrors.push({ paciente: paciente.nomeCompleto, error: error.message });
+        }
+      }
+
+      console.log(`✅ Criação concluída: ${pacientesCreated.length} criados, ${pacientesErrors.length} erros`);
+      
+      return res.json({
+        ...data,
+        pacientes_criados: pacientesCreated.length,
+        pacientes_erros: pacientesErrors
+      });
+    }
+
     res.json(data);
   } catch (error) {
     console.error('❌ Erro ao atualizar status:', error);

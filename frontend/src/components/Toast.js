@@ -99,22 +99,22 @@ const Toast = ({ toast, onClose }) => {
   const getToastStyles = () => {
     const baseStyles = {
       position: 'relative',
-      minWidth: '450px',
-      maxWidth: '650px',
-      padding: '20px 24px',
-      marginBottom: '12px',
-      borderRadius: '16px',
-      boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.2)',
+      minWidth: '320px',
+      maxWidth: '480px',
+      padding: '12px 14px',
+      marginBottom: '8px',
+      borderRadius: '10px',
+      boxShadow: '0 6px 16px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.1)',
       display: 'flex',
       alignItems: 'center',
-      gap: '16px',
+      gap: '10px',
       fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      fontSize: '18px',
-      lineHeight: '1.5',
+      fontSize: '14px',
+      lineHeight: '1.4',
       fontWeight: '600',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      backdropFilter: 'blur(12px)',
-      border: '2px solid rgba(255, 255, 255, 0.2)',
+      backdropFilter: 'blur(8px)',
+      border: '1px solid rgba(255, 255, 255, 0.2)',
       transform: isExiting ? 'translateX(100%) scale(0.95)' : 'translateX(0) scale(1)',
       opacity: isExiting ? 0 : 1,
       zIndex: 1000
@@ -124,26 +124,26 @@ const Toast = ({ toast, onClose }) => {
       success: {
         background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
         color: 'white',
-        borderLeft: '6px solid #34d399',
-        boxShadow: '0 10px 30px rgba(16, 185, 129, 0.4), 0 0 0 2px rgba(255, 255, 255, 0.1)'
+        borderLeft: '4px solid #34d399',
+        boxShadow: '0 6px 16px rgba(16, 185, 129, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.08)'
       },
       error: {
         background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
         color: 'white',
-        borderLeft: '6px solid #f87171',
-        boxShadow: '0 10px 30px rgba(239, 68, 68, 0.4), 0 0 0 2px rgba(255, 255, 255, 0.1)'
+        borderLeft: '4px solid #f87171',
+        boxShadow: '0 6px 16px rgba(239, 68, 68, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.08)'
       },
       warning: {
         background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
         color: 'white',
-        borderLeft: '6px solid #fbbf24',
-        boxShadow: '0 10px 30px rgba(245, 158, 11, 0.4), 0 0 0 2px rgba(255, 255, 255, 0.1)'
+        borderLeft: '4px solid #fbbf24',
+        boxShadow: '0 6px 16px rgba(245, 158, 11, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.08)'
       },
       info: {
         background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
         color: 'white',
-        borderLeft: '6px solid #60a5fa',
-        boxShadow: '0 10px 30px rgba(59, 130, 246, 0.4), 0 0 0 2px rgba(255, 255, 255, 0.1)'
+        borderLeft: '4px solid #60a5fa',
+        boxShadow: '0 6px 16px rgba(59, 130, 246, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.08)'
       }
     };
 
@@ -155,8 +155,8 @@ const Toast = ({ toast, onClose }) => {
 
   const getIcon = () => {
     const iconStyles = {
-      width: '28px',
-      height: '28px',
+      width: '20px',
+      height: '20px',
       flexShrink: 0,
       opacity: 1
     };
@@ -212,30 +212,30 @@ const Toast = ({ toast, onClose }) => {
           border: 'none',
           color: 'currentColor',
           cursor: 'pointer',
-          padding: '6px',
-          borderRadius: '8px',
-          opacity: 0.8,
+          padding: '4px',
+          borderRadius: '6px',
+          opacity: 0.9,
           transition: 'all 0.2s ease',
-          fontSize: '18px',
+          fontSize: '14px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          width: '32px',
-          height: '32px',
+          width: '26px',
+          height: '26px',
           flexShrink: 0
         }}
         onMouseEnter={(e) => {
           e.target.style.opacity = 1;
-          e.target.style.transform = 'scale(1.15)';
+          e.target.style.transform = 'scale(1.08)';
           e.target.style.background = 'rgba(255, 255, 255, 0.3)';
         }}
         onMouseLeave={(e) => {
-          e.target.style.opacity = 0.8;
+          e.target.style.opacity = 0.9;
           e.target.style.transform = 'scale(1)';
           e.target.style.background = 'rgba(255, 255, 255, 0.2)';
         }}
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
           <line x1="18" y1="6" x2="6" y2="18"></line>
           <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
@@ -252,8 +252,8 @@ const ToastContainer = ({ toasts, removeToast }) => {
     <>
       <div style={{
         position: 'fixed',
-        top: '30px',
-        right: '30px',
+        top: '20px',
+        right: '20px',
         zIndex: 9999,
         pointerEvents: 'none',
         display: 'flex',
@@ -265,7 +265,7 @@ const ToastContainer = ({ toasts, removeToast }) => {
             key={toast.id}
             style={{
               pointerEvents: 'auto',
-              animation: 'toastSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards'
+              animation: 'toastSlideIn 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards'
             }}
           >
             <Toast toast={toast} onClose={removeToast} />
