@@ -187,6 +187,11 @@ const useIncorporadoraNotifications = () => {
         const notification = JSON.parse(pendingNotification);
         
         if (notification.type === 'new-lead' && notification.data) {
+          // Não exibir notificação se já houver sdr_id atribuído
+          if (notification.data.sdr_id) {
+            localStorage.removeItem('pending_notification');
+            return;
+          }
           localStorage.removeItem('pending_notification');
           
           const audioSource = notification.data.corretor_musica || `${process.env.PUBLIC_URL || ''}/audioNovoLead.mp3`;
@@ -231,6 +236,10 @@ const useIncorporadoraNotifications = () => {
     supabaseRef.current = supabase;
 
     const processNewLeadNotification = async (data) => {
+      // Não exibir notificação se já houver sdr_id atribuído
+      if (data?.sdr_id) {
+        return;
+      }
       if (processedNotificationIdsRef.current.has(data.id)) {
         return;
       }

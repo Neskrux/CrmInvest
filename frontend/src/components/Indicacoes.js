@@ -32,7 +32,6 @@ const Indicacoes = () => {
     email: '',
     telefone: '',
     empreendimento_id: '',
-    cpf: '',
     cidade: '',
     estado: '',
     grauParentesco: '',
@@ -213,11 +212,6 @@ const Indicacoes = () => {
     return limitedNumbers;
   };
 
-  const formatarCPF = (value) => {
-    const numbers = value.replace(/\D/g, '');
-    return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-  };
-
   // Função para formatar nome (mesmo padrão da migração do banco)
   const formatarNome = (value) => {
     if (!value) return '';
@@ -370,9 +364,6 @@ const Indicacoes = () => {
     } else if (name === 'telefone') {
       const formattedValue = formatarTelefone(value);
       setFormCliente(prev => ({ ...prev, [name]: formattedValue }));
-    } else if (name === 'cpf') {
-      const formattedValue = formatarCPF(value);
-      setFormCliente(prev => ({ ...prev, [name]: formattedValue }));
     } else if (name === 'cidade') {
       const formattedValue = formatarCidade(value);
       setFormCliente(prev => ({ ...prev, [name]: formattedValue }));
@@ -512,12 +503,6 @@ const Indicacoes = () => {
       newErrors.telefone = 'Telefone deve ter pelo menos 10 dígitos';
     }
     
-    if (!formCliente.cpf.trim()) {
-      newErrors.cpf = 'CPF é obrigatório';
-    } else if (formCliente.cpf.replace(/\D/g, '').length !== 11) {
-      newErrors.cpf = 'CPF deve ter 11 dígitos';
-    }
-    
     if (!formCliente.grauParentesco) {
       newErrors.grauParentesco = 'Sua relação com a pessoa é obrigatória';
     } else if (formCliente.grauParentesco === 'outros' && !formCliente.grauParentescoOutros.trim()) {
@@ -616,7 +601,6 @@ const Indicacoes = () => {
         email: formCliente.email,
         telefone: formCliente.telefone,
         empreendimento_id: formCliente.empreendimento_id,
-        cpf: formCliente.cpf,
         cidade: formCliente.cidade,
         estado: formCliente.estado,
         observacoes: observacoesComDias,
@@ -838,7 +822,7 @@ const Indicacoes = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '1rem' }}>
                 <div className="form-group">
                   <label className="form-label">WhatsApp *</label>
                   <input
@@ -851,21 +835,6 @@ const Indicacoes = () => {
                     disabled={submittingCliente}
                   />
                   {formErrors.telefone && <span className="field-error">{formErrors.telefone}</span>}
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">CPF *</label>
-                  <input
-                    type="text"
-                    name="cpf"
-                    className={`form-input ${formErrors.cpf ? 'error' : ''}`}
-                    value={formCliente.cpf}
-                    onChange={handleClienteInputChange}
-                    placeholder="000.000.000-00"
-                    disabled={submittingCliente}
-                    maxLength="14"
-                  />
-                  {formErrors.cpf && <span className="field-error">{formErrors.cpf}</span>}
                 </div>
               </div>
 
