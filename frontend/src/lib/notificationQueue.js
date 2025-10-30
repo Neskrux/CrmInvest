@@ -29,5 +29,3 @@ class NotificationQueue {
 }
 
 export const notificationQueue = new NotificationQueue();
-
-

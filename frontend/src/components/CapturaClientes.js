@@ -12,7 +12,6 @@ const CapturaClientes = () => {
     email: '',
     telefone: '',
     empreendimento_id: '',
-    cpf: '',
     cidade: '',
     estado: '',
     observacoes: '',
@@ -177,11 +176,6 @@ const CapturaClientes = () => {
     return limitedNumbers;
   };
 
-  const formatarCPF = (value) => {
-    const numbers = value.replace(/\D/g, '');
-    return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-  };
-
   // Função para formatar nome (mesmo padrão da migração do banco)
   const formatarNome = (value) => {
     if (!value) return '';
@@ -274,9 +268,6 @@ const CapturaClientes = () => {
       // Para telefone, permitir apenas números durante a digitação
       const numbersOnly = value.replace(/\D/g, '');
       const formattedValue = numbersOnly.length > 0 ? formatarTelefone(numbersOnly) : '';
-      setFormData(prev => ({ ...prev, [name]: formattedValue }));
-    } else if (name === 'cpf') {
-      const formattedValue = formatarCPF(value);
       setFormData(prev => ({ ...prev, [name]: formattedValue }));
     } else if (name === 'cidade') {
       const formattedValue = formatarCidade(value);
@@ -399,12 +390,6 @@ const CapturaClientes = () => {
       newErrors.telefone = 'Telefone é obrigatório';
     } else if (formData.telefone.replace(/\D/g, '').length < 10) {
       newErrors.telefone = 'Telefone deve ter pelo menos 10 dígitos';
-    }
-    
-    if (!formData.cpf.trim()) {
-      newErrors.cpf = 'CPF é obrigatório';
-    } else if (formData.cpf.replace(/\D/g, '').length !== 11) {
-      newErrors.cpf = 'CPF deve ter 11 dígitos';
     }
     
     setErrors(newErrors);
@@ -575,22 +560,6 @@ const CapturaClientes = () => {
                   <option value="9">Condomínio Figueira Garcia</option>
                   <option value="">Ainda não decidi</option>
                 </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">CPF *</label>
-                <input
-                  type="text"
-                  name="cpf"
-                  className={`form-input ${errors.cpf ? 'error' : ''}`}
-                  value={formData.cpf}
-                  onChange={handleInputChange}
-                  placeholder="000.000.000-00"
-                  disabled={loading}
-                  maxLength="14"
-                />
-                {errors.cpf && <span className="field-error">{errors.cpf}</span>}
-                <span className="cpf-info">Seu CPF está sujeito a uma análise</span>
               </div>
 
               <div className="form-group">
