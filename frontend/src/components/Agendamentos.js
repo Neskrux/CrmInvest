@@ -162,16 +162,26 @@ const Agendamentos = () => {
 
   const fetchAgendamentos = async () => {
     try {
+      setLoading(true);
       const response = await makeRequest('/agendamentos');
       const data = await response.json();
       
       if (response.ok) {
-        setAgendamentos(data);
+        const isUserAdmin = Boolean(isAdmin);
+        const currentUserId = Number(user?.id || 0);
+        const currentConsultorId = Number(user?.consultor_id || 0);
+        const filtered = isUserAdmin ? data : (Array.isArray(data) ? data.filter(a => {
+          const sdrMatch = Number(a.sdr_id || 0) === currentUserId;
+          const consultorMatch = Number(a.consultor_id || 0) === currentConsultorId;
+          const consultorInternoMatch = Number(a.consultor_interno_id || 0) === currentConsultorId;
+          return sdrMatch || consultorMatch || consultorInternoMatch;
+        }) : []);
+        setAgendamentos(filtered);
       } else {
-        showErrorToast('Erro ao carregar agendamentos: ' + data.error);
+        console.error('Erro ao carregar agendamentos:', data.error);
       }
     } catch (error) {
-      showErrorToast('Erro ao conectar com o servidor');
+      console.error('Erro ao carregar agendamentos:', error);
     } finally {
       setLoading(false);
     }

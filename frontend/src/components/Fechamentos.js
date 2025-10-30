@@ -137,45 +137,39 @@ const Fechamentos = () => {
   }, [modalAberto, showObservacoesModal, viewModalOpen, showEvidenciaModal]);
 
   const carregarDados = async () => {
+    setCarregando(true);
     try {
-      setCarregando(true);
-      setErro(null);
-      
-      const [fechamentosRes, pacientesRes, consultoresRes, clinicasRes, agendamentosRes] = await Promise.all([
+      const [fechamentosRes, pacientesRes, consultoresRes] = await Promise.all([
         makeRequest('/fechamentos'),
         makeRequest('/pacientes'),
-        makeRequest('/consultores'),
-        makeRequest('/clinicas'),
-        makeRequest('/agendamentos')
+        makeRequest('/consultores')
       ]);
 
-      if (!fechamentosRes.ok) {
-        throw new Error(`Erro ao carregar fechamentos: ${fechamentosRes.status} - Tabela 'fechamentos' não encontrada. Execute a migração no Supabase.`);
+      const fechamentosJson = await fechamentosRes.json();
+      const pacientesJson = await pacientesRes.json();
+      const consultoresJson = await consultoresRes.json();
+
+      if (fechamentosRes.ok) {
+        const isUserAdmin = Boolean(isAdmin);
+        const currentUserId = Number(user?.id || 0);
+        const currentConsultorId = Number(user?.consultor_id || 0);
+        const filteredFechamentos = isUserAdmin ? fechamentosJson : (Array.isArray(fechamentosJson) ? fechamentosJson.filter(f => {
+          const sdrMatch = Number(f.sdr_id || 0) === currentUserId;
+          const consultorMatch = Number(f.consultor_id || 0) === currentConsultorId;
+          const consultorInternoMatch = Number(f.consultor_interno_id || 0) === currentConsultorId;
+          return sdrMatch || consultorMatch || consultorInternoMatch;
+        }) : []);
+        setFechamentos(filteredFechamentos);
+      } else {
+        setFechamentos([]);
       }
 
-      const fechamentosData = await fechamentosRes.json();
-      const pacientesData = await pacientesRes.json();
-      const consultoresData = await consultoresRes.json();
-      const clinicasData = await clinicasRes.json();
-      const agendamentosData = await agendamentosRes.json();
-
-      setFechamentos(Array.isArray(fechamentosData) ? fechamentosData : []);
-      setPacientes(Array.isArray(pacientesData) ? pacientesData : []);
-      setConsultores(Array.isArray(consultoresData) ? consultoresData : []);
-      setClinicas(Array.isArray(clinicasData) ? clinicasData : []);
-      setAgendamentos(Array.isArray(agendamentosData) ? agendamentosData : []);
-
-      setCarregando(false);
+      if (pacientesRes.ok) setPacientes(pacientesJson || []);
+      if (consultoresRes.ok) setConsultores(consultoresJson || []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
-      setErro(error.message);
+    } finally {
       setCarregando(false);
-      
-      setFechamentos([]);
-      setPacientes([]);
-      setConsultores([]);
-      setClinicas([]);
-      setAgendamentos([]);
     }
   };
 
