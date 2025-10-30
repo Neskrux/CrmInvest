@@ -60,6 +60,11 @@ const Fechamentos = () => {
   const [activeObservacoesTab, setActiveObservacoesTab] = useState('observacoes');
   const [evidenciasFechamento, setEvidenciasFechamento] = useState([]);
   const [fechamentoObservacoes, setFechamentoObservacoes] = useState(null);
+  
+  // Estados para aba de boletos
+  const [boletosFechamento, setBoletosFechamento] = useState([]);
+  const [carregandoBoletos, setCarregandoBoletos] = useState(false);
+  const [gerandoBoletos, setGerandoBoletos] = useState(false);
 
 
   // Estado para modal de explicação de permissões
@@ -464,15 +469,74 @@ const Fechamentos = () => {
     setViewModalOpen(true);
   };
 
+  // Função para buscar boletos do fechamento
+  const buscarBoletosFechamento = async (fechamentoId) => {
+    if (!fechamentoId) return;
+    
+    setCarregandoBoletos(true);
+    try {
+      const response = await makeRequest(`/fechamentos/${fechamentoId}/boletos`, {
+        method: 'GET'
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao buscar boletos');
+      }
+
+      const data = await response.json();
+      setBoletosFechamento(data.boletos || []);
+    } catch (error) {
+      console.error('Erro ao buscar boletos:', error);
+      showErrorToast('Erro ao carregar boletos');
+      setBoletosFechamento([]);
+    } finally {
+      setCarregandoBoletos(false);
+    }
+  };
+
+  const gerarBoletosFechamento = async (fechamentoId) => {
+    if (!fechamentoId) return;
+    
+    setGerandoBoletos(true);
+    try {
+      const response = await makeRequest(`/fechamentos/${fechamentoId}/gerar-boletos`, {
+        method: 'POST'
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || 'Erro ao gerar boletos');
+      }
+
+      showSuccessToast(data.message || `${data.boletos?.length || 0} boleto(s) criado(s) com sucesso!`);
+      
+      // Recarregar lista de boletos
+      await buscarBoletosFechamento(fechamentoId);
+    } catch (error) {
+      console.error('Erro ao gerar boletos:', error);
+      showErrorToast(error.message || 'Erro ao gerar boletos');
+    } finally {
+      setGerandoBoletos(false);
+    }
+  };
+
+  // Quando mudar para aba de boletos, buscar os dados
+  const handleTabChange = (tab) => {
+    setActiveViewTab(tab);
+    
+    // Se mudar para aba de boletos e houver fechamento selecionado, buscar boletos
+    if (tab === 'boletos' && viewingFechamento?.id) {
+      buscarBoletosFechamento(viewingFechamento.id);
+    }
+  };
+
   const fecharViewModal = () => {
     setViewModalOpen(false);
     setViewingFechamento(null);
     setActiveViewTab('informacoes');
     setEvidenciasFechamento([]);
-  };
-
-  const handleTabChange = (tab) => {
-    setActiveViewTab(tab);
+    setBoletosFechamento([]);
   };
 
   const salvarFechamento = async () => {
@@ -487,11 +551,51 @@ const Fechamentos = () => {
 
       if (!novoFechamento.paciente_id) {
         showWarningToast('Por favor, selecione um paciente!');
+        setSalvando(false);
         return;
+      }
+
+      // Validar CPF e Nome do paciente para empresa_id 3 (necessário para gerar boletos)
+      if (empresaId === 3 || user?.empresa_id === 3) {
+        const pacienteSelecionado = pacientes.find(p => p.id === parseInt(novoFechamento.paciente_id));
+        if (pacienteSelecionado) {
+          if (!pacienteSelecionado.cpf || pacienteSelecionado.cpf.trim() === '') {
+            showErrorToast('O paciente deve ter CPF cadastrado para gerar boletos. Por favor, atualize o cadastro do paciente primeiro.');
+            setSalvando(false);
+            return;
+          }
+          if (!pacienteSelecionado.nome || pacienteSelecionado.nome.trim() === '') {
+            showErrorToast('O paciente deve ter nome cadastrado para gerar boletos. Por favor, atualize o cadastro do paciente primeiro.');
+            setSalvando(false);
+            return;
+          }
+        }
+      }
+
+      // Validar data de vencimento para empresa_id 3 (obrigatório para gerar boletos)
+      if ((empresaId === 3 || user?.empresa_id === 3) && !novoFechamento.vencimento) {
+        showWarningToast('Data de Vencimento é obrigatória para gerar boletos. Por favor, informe a data de vencimento.');
+        setSalvando(false);
+        return;
+      }
+
+      // Validar se data de vencimento não está no passado (para empresa_id 3)
+      if ((empresaId === 3 || user?.empresa_id === 3) && novoFechamento.vencimento) {
+        const dataVencimento = new Date(novoFechamento.vencimento);
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        dataVencimento.setHours(0, 0, 0, 0);
+        
+        if (dataVencimento < hoje) {
+          showWarningToast('A data de vencimento não pode ser no passado. Por favor, informe uma data futura.');
+          setSalvando(false);
+          return;
+        }
       }
 
       if (!fechamentoEditando && !contratoSelecionado) {
         showWarningToast('Por favor, selecione o contrato em PDF!');
+        setSalvando(false);
         return;
       }
 
@@ -1927,20 +2031,28 @@ const Fechamentos = () => {
 
                 <div className="grid grid-2" style={{ gap: '1rem' }}>
                   <div className="form-group">
-                    <label className="form-label">Dia do Vencimento</label>
+                    <label className="form-label">
+                      Data de Vencimento
+                      {empresaId === 3 && <span style={{ color: '#dc2626', marginLeft: '0.25rem' }}>*</span>}
+                    </label>
                     <input 
-                      type="number"
+                      type="date"
                       className="form-input"
                       value={novoFechamento.vencimento || ''}
                       onChange={(e) => setNovoFechamento({...novoFechamento, vencimento: e.target.value})}
-                      placeholder="Ex: 15"
-                      min="1"
-                      max="31"
+                      required={empresaId === 3}
                       disabled={isConsultorInterno && !isAdmin && fechamentoEditando}
                     />
-                    <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem', marginBottom: 0 }}>
-                      Digite o dia do mês (1 a 31)
-                    </p>
+                    {empresaId === 3 && (
+                      <p style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '0.25rem', marginBottom: 0 }}>
+                        * Obrigatório para gerar boletos
+                      </p>
+                    )}
+                    {empresaId !== 3 && (
+                      <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem', marginBottom: 0 }}>
+                        Data de vencimento da primeira parcela
+                      </p>
+                    )}
                   </div>
 
                   <div className="form-group">
@@ -2169,6 +2281,26 @@ const Fechamentos = () => {
               >
                 Histórico
               </button>
+              
+              {/* Mostrar aba Boletos apenas para empresa_id 3 (Caixa) */}
+              {empresaId === 3 && (
+                <button
+                  onClick={() => handleTabChange('boletos')}
+                  style={{
+                    padding: '1rem 0',
+                    border: 'none',
+                    background: 'none',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: activeViewTab === 'boletos' ? '#3b82f6' : '#6b7280',
+                    borderBottom: activeViewTab === 'boletos' ? '2px solid #3b82f6' : '2px solid transparent',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Boletos
+                </button>
+              )}
               
               <button
                 onClick={() => handleTabChange('evidencias')}
@@ -3094,6 +3226,299 @@ const Fechamentos = () => {
                       </>
                     );
                   })()}
+                </div>
+              )}
+              
+              {/* Aba de Boletos - Apenas para empresa_id 3 */}
+              {empresaId === 3 && activeViewTab === 'boletos' && (
+                <div>
+                  <h3 style={{ 
+                    fontSize: '1.125rem', 
+                    fontWeight: '700', 
+                    color: '#1a1d23', 
+                    marginBottom: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                      <line x1="16" y1="2" x2="16" y2="6"></line>
+                      <line x1="8" y1="2" x2="8" y2="6"></line>
+                      <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    Boletos do Fechamento
+                  </h3>
+                  
+                  {carregandoBoletos ? (
+                    <div style={{ textAlign: 'center', padding: '3rem' }}>
+                      <div className="spinner" style={{ margin: '0 auto' }}></div>
+                      <p style={{ marginTop: '1rem', color: '#6b7280' }}>Carregando boletos...</p>
+                    </div>
+                  ) : boletosFechamento.length === 0 ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: '0 auto 1rem', opacity: 0.3 }}>
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                      </svg>
+                      <div style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '1rem' }}>
+                        {viewingFechamento?.aprovado === 'aprovado' 
+                          ? 'Nenhum boleto gerado ainda. Clique no botão abaixo para gerar os boletos agora.'
+                          : 'O fechamento precisa estar aprovado para gerar boletos.'}
+                      </div>
+                      {viewingFechamento?.aprovado === 'aprovado' && (isAdmin || isConsultorInterno || isClinica) && (
+                        <button
+                          onClick={() => gerarBoletosFechamento(viewingFechamento.id)}
+                          disabled={gerandoBoletos}
+                          style={{
+                            padding: '0.75rem 1.5rem',
+                            backgroundColor: gerandoBoletos ? '#9ca3af' : '#3b82f6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            cursor: gerandoBoletos ? 'not-allowed' : 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!gerandoBoletos) e.target.style.backgroundColor = '#2563eb';
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!gerandoBoletos) e.target.style.backgroundColor = '#3b82f6';
+                          }}
+                        >
+                          {gerandoBoletos ? (
+                            <>
+                              <div className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }}></div>
+                              Gerando...
+                            </>
+                          ) : (
+                            <>
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                              </svg>
+                              Gerar Boletos
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: '1rem' }}>
+                      {/* Resumo dos boletos */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                        gap: '1rem',
+                        marginBottom: '1rem'
+                      }}>
+                        <div style={{
+                          backgroundColor: '#f0f9ff',
+                          border: '1px solid #bae6fd',
+                          borderRadius: '8px',
+                          padding: '1rem'
+                        }}>
+                          <div style={{ fontSize: '0.875rem', color: '#0369a1', marginBottom: '0.25rem' }}>Total</div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#0c4a6e' }}>
+                            {boletosFechamento.length}
+                          </div>
+                        </div>
+                        <div style={{
+                          backgroundColor: '#fef3c7',
+                          border: '1px solid #fde68a',
+                          borderRadius: '8px',
+                          padding: '1rem'
+                        }}>
+                          <div style={{ fontSize: '0.875rem', color: '#92400e', marginBottom: '0.25rem' }}>Pendentes</div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#78350f' }}>
+                            {boletosFechamento.filter(b => b.status === 'pendente').length}
+                          </div>
+                        </div>
+                        <div style={{
+                          backgroundColor: '#fee2e2',
+                          border: '1px solid #fecaca',
+                          borderRadius: '8px',
+                          padding: '1rem'
+                        }}>
+                          <div style={{ fontSize: '0.875rem', color: '#991b1b', marginBottom: '0.25rem' }}>Vencidos</div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#7f1d1d' }}>
+                            {boletosFechamento.filter(b => b.status === 'vencido').length}
+                          </div>
+                        </div>
+                        <div style={{
+                          backgroundColor: '#d1fae5',
+                          border: '1px solid #a7f3d0',
+                          borderRadius: '8px',
+                          padding: '1rem'
+                        }}>
+                          <div style={{ fontSize: '0.875rem', color: '#065f46', marginBottom: '0.25rem' }}>Pagos</div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#064e3b' }}>
+                            {boletosFechamento.filter(b => b.status === 'pago').length}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Lista de boletos */}
+                      {boletosFechamento.map((boleto) => {
+                        const statusColors = {
+                          pendente: { bg: '#fef3c7', border: '#fde68a', text: '#92400e', badge: '#f59e0b' },
+                          vencido: { bg: '#fee2e2', border: '#fecaca', text: '#991b1b', badge: '#dc2626' },
+                          pago: { bg: '#d1fae5', border: '#a7f3d0', text: '#065f46', badge: '#10b981' },
+                          cancelado: { bg: '#f3f4f6', border: '#d1d5db', text: '#374151', badge: '#6b7280' }
+                        };
+                        const statusInfo = statusColors[boleto.status] || statusColors.pendente;
+                        
+                        return (
+                          <div key={boleto.id} style={{
+                            backgroundColor: statusInfo.bg,
+                            border: `1px solid ${statusInfo.border}`,
+                            borderRadius: '8px',
+                            padding: '1.25rem'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                                  <span style={{
+                                    backgroundColor: statusInfo.badge,
+                                    color: 'white',
+                                    padding: '0.25rem 0.75rem',
+                                    borderRadius: '9999px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600',
+                                    textTransform: 'uppercase'
+                                  }}>
+                                    {boleto.status === 'pendente' ? 'Pendente' : 
+                                     boleto.status === 'vencido' ? 'Vencido' : 
+                                     boleto.status === 'pago' ? 'Pago' : 'Cancelado'}
+                                  </span>
+                                  {boleto.parcela_numero && (
+                                    <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                      Parcela {boleto.parcela_numero}
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ fontWeight: '700', fontSize: '1.25rem', color: statusInfo.text, marginBottom: '0.25rem' }}>
+                                  R$ {boleto.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </div>
+                                <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                  Vencimento: {boleto.data_vencimento ? new Date(boleto.data_vencimento).toLocaleDateString('pt-BR') : 'Não informado'}
+                                </div>
+                                {boleto.nosso_numero && (
+                                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+                                    Nosso Número: {boleto.nosso_numero}
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                {boleto.url && (
+                                  <button
+                                    onClick={() => window.open(boleto.url, '_blank')}
+                                    style={{
+                                      padding: '0.5rem 1rem',
+                                      backgroundColor: '#3b82f6',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontSize: '0.875rem',
+                                      fontWeight: '500',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '0.5rem'
+                                    }}
+                                    onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
+                                    onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
+                                  >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                      <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                    Ver Boleto
+                                  </button>
+                                )}
+                                {boleto.linha_digitavel && (
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(boleto.linha_digitavel);
+                                      showSuccessToast('Linha digitável copiada!');
+                                    }}
+                                    style={{
+                                      padding: '0.5rem 1rem',
+                                      backgroundColor: '#6b7280',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontSize: '0.875rem',
+                                      fontWeight: '500',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '0.5rem'
+                                    }}
+                                    onMouseEnter={(e) => e.target.style.backgroundColor = '#4b5563'}
+                                    onMouseLeave={(e) => e.target.style.backgroundColor = '#6b7280'}
+                                  >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                    </svg>
+                                    Copiar Linha
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {boleto.erro_criacao && (
+                              <div style={{
+                                marginTop: '0.75rem',
+                                padding: '0.75rem',
+                                backgroundColor: '#fee2e2',
+                                border: '1px solid #fecaca',
+                                borderRadius: '6px',
+                                fontSize: '0.875rem',
+                                color: '#991b1b'
+                              }}>
+                                <strong>Erro ao criar boleto:</strong> {boleto.erro_criacao}
+                              </div>
+                            )}
+                            
+                            {boleto.data_hora_pagamento && (
+                              <div style={{
+                                marginTop: '0.75rem',
+                                padding: '0.75rem',
+                                backgroundColor: '#d1fae5',
+                                border: '1px solid #a7f3d0',
+                                borderRadius: '6px',
+                                fontSize: '0.875rem',
+                                color: '#065f46'
+                              }}>
+                                <strong>Pago em:</strong> {new Date(boleto.data_hora_pagamento).toLocaleString('pt-BR')}
+                                {boleto.valor_pago && (
+                                  <span style={{ marginLeft: '0.5rem' }}>
+                                    - Valor pago: R$ {boleto.valor_pago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
               

@@ -4,6 +4,7 @@ const { uploadToSupabase } = require('../middleware/upload');
 const bcrypt = require('bcrypt');
 const transporter = require('../config/email');
 const { criarMovimentacaoFechamentoCriado } = require('./movimentacoes.controller');
+const { criarBoletosCaixa } = require('../utils/caixa-boletos.helper');
 
 // GET /api/fechamentos - Listar fechamentos
 const getAllFechamentos = async (req, res) => {
@@ -203,7 +204,49 @@ const createFechamento = async (req, res) => {
     // Validar e processar campos de parcelamento
     const valorParcela = valor_parcela ? parseFloat(valor_parcela) : null;
     const numeroParcelas = numero_parcelas ? parseInt(numero_parcelas) : null;
-    const vencimentoData = vencimento || null;
+    
+    // Processar vencimento: pode vir como número (dia do mês) ou data completa
+    let vencimentoData = null;
+    if (vencimento) {
+      // Se for um número entre 1-31 (dia do mês antigo), converter para data completa
+      const vencimentoNum = parseInt(vencimento);
+      if (!isNaN(vencimentoNum) && vencimentoNum >= 1 && vencimentoNum <= 31 && vencimento.toString().length <= 2) {
+        // É um número (dia do mês) - converter para data completa
+        const dataBase = data_fechamento ? new Date(data_fechamento) : new Date();
+        const diaMes = vencimentoNum;
+        const mesAtual = dataBase.getMonth();
+        const anoAtual = dataBase.getFullYear();
+        
+        // Criar data usando o dia informado do próximo mês (ou mesmo mês se ainda não passou)
+        const dataVencimento = new Date(anoAtual, mesAtual, diaMes);
+        if (dataVencimento < dataBase) {
+          // Se já passou, usar próximo mês
+          dataVencimento.setMonth(mesAtual + 1);
+        }
+        
+        // Garantir que a data é válida (ajustar se dia não existe no mês)
+        const ultimoDiaMes = new Date(anoAtual, mesAtual + 1, 0).getDate();
+        if (diaMes > ultimoDiaMes) {
+          dataVencimento.setDate(ultimoDiaMes);
+        }
+        
+        vencimentoData = dataVencimento.toISOString().split('T')[0]; // YYYY-MM-DD
+        console.log(`⚠️ [LEGADO] Vencimento convertido de número (${vencimentoNum}) para data: ${vencimentoData}`);
+      } else {
+        // Já é uma data completa (YYYY-MM-DD) ou formato de data válido
+        try {
+          const dataTeste = new Date(vencimento);
+          if (!isNaN(dataTeste.getTime())) {
+            vencimentoData = dataTeste.toISOString().split('T')[0]; // Garantir formato YYYY-MM-DD
+          } else {
+            vencimentoData = vencimento; // Tentar usar como está
+          }
+        } catch (e) {
+          vencimentoData = vencimento; // Tentar usar como está
+        }
+      }
+    }
+    
     const antecipacaoMeses = antecipacao_meses ? parseInt(antecipacao_meses) : null;
     
     // Validar e processar novos campos administrativos
@@ -458,6 +501,58 @@ const createFechamento = async (req, res) => {
       });
     }
 
+    // ============================================
+    // INTEGRAÇÃO COM API CAIXA - Criar boletos
+    // ============================================
+    // Criar boletos automaticamente para empresa_id 3 (após aprovação)
+    // Para incorporadora (empresa_id 5), fechamentos já são criados como aprovados
+    // Para outras empresas, fechamentos começam como pendentes e são aprovados depois
+    if (req.user.empresa_id === 3 && data[0].aprovado === 'aprovado') {
+      try {
+        console.log('🏦 [CAIXA] Iniciando criação de boletos para empresa_id 3');
+        
+        // Buscar dados completos do paciente
+        const { data: pacienteCompleto, error: pacienteError } = await supabaseAdmin
+          .from('pacientes')
+          .select('*')
+          .eq('id', paciente_id)
+          .single();
+
+        if (pacienteError || !pacienteCompleto) {
+          console.error('❌ [CAIXA] Erro ao buscar paciente:', pacienteError);
+        } else {
+          // Obter ID do beneficiário (configurável por empresa)
+          const idBeneficiarioRaw = process.env.CAIXA_ID_BENEFICIARIO;
+          
+          if (!idBeneficiarioRaw) {
+            console.warn('⚠️ [CAIXA] CAIXA_ID_BENEFICIARIO não configurado. Configure no .env');
+          } else {
+            // Normalizar ID do beneficiário (pode vir como "0374/1242669" ou apenas "1242669")
+            const idBeneficiario = idBeneficiarioRaw.includes('/') 
+              ? idBeneficiarioRaw.split('/')[1].trim() 
+              : idBeneficiarioRaw.trim();
+            
+            // Criar boletos na Caixa
+            const boletosCriados = await criarBoletosCaixa(
+              data[0],
+              pacienteCompleto,
+              idBeneficiario
+            );
+            
+            if (boletosCriados.length > 0) {
+              console.log(`✅ [CAIXA] ${boletosCriados.length} boleto(s) criado(s) com sucesso`);
+            } else {
+              console.warn('⚠️ [CAIXA] Nenhum boleto foi criado');
+            }
+          }
+        }
+      } catch (caixaError) {
+        console.error('❌ [CAIXA] Erro ao criar boletos:', caixaError);
+        // Não bloquear o fechamento se houver erro na criação de boletos
+        // Os erros são salvos na tabela boletos_caixa para debug
+      }
+    }
+
     res.json({ 
       id: data[0].id, 
       message: 'Fechamento registrado com sucesso!',
@@ -542,7 +637,49 @@ const updateFechamento = async (req, res) => {
     // Processar campos de parcelamento
     const valorParcelaVal = valor_parcela ? parseFloat(valor_parcela) : null;
     const numeroParcelasVal = numero_parcelas ? parseInt(numero_parcelas) : null;
-    const vencimentoVal = vencimento || null;
+    
+    // Processar vencimento: pode vir como número (dia do mês) ou data completa
+    let vencimentoVal = null;
+    if (vencimento) {
+      // Se for um número entre 1-31 (dia do mês antigo), converter para data completa
+      const vencimentoNum = parseInt(vencimento);
+      if (!isNaN(vencimentoNum) && vencimentoNum >= 1 && vencimentoNum <= 31 && vencimento.toString().length <= 2) {
+        // É um número (dia do mês) - converter para data completa
+        const dataBase = data_fechamento ? new Date(data_fechamento) : new Date();
+        const diaMes = vencimentoNum;
+        const mesAtual = dataBase.getMonth();
+        const anoAtual = dataBase.getFullYear();
+        
+        // Criar data usando o dia informado do próximo mês (ou mesmo mês se ainda não passou)
+        const dataVencimento = new Date(anoAtual, mesAtual, diaMes);
+        if (dataVencimento < dataBase) {
+          // Se já passou, usar próximo mês
+          dataVencimento.setMonth(mesAtual + 1);
+        }
+        
+        // Garantir que a data é válida (ajustar se dia não existe no mês)
+        const ultimoDiaMes = new Date(anoAtual, mesAtual + 1, 0).getDate();
+        if (diaMes > ultimoDiaMes) {
+          dataVencimento.setDate(ultimoDiaMes);
+        }
+        
+        vencimentoVal = dataVencimento.toISOString().split('T')[0]; // YYYY-MM-DD
+        console.log(`⚠️ [LEGADO] Vencimento convertido de número (${vencimentoNum}) para data: ${vencimentoVal}`);
+      } else {
+        // Já é uma data completa (YYYY-MM-DD) ou formato de data válido
+        try {
+          const dataTeste = new Date(vencimento);
+          if (!isNaN(dataTeste.getTime())) {
+            vencimentoVal = dataTeste.toISOString().split('T')[0]; // Garantir formato YYYY-MM-DD
+          } else {
+            vencimentoVal = vencimento; // Tentar usar como está
+          }
+        } catch (e) {
+          vencimentoVal = vencimento; // Tentar usar como está
+        }
+      }
+    }
+    
     const antecipacaoMesesVal = antecipacao_meses ? parseInt(antecipacao_meses) : null;
     
     // Processar campos administrativos
@@ -815,6 +952,9 @@ const aprovarFechamento = async (req, res) => {
       return res.status(404).json({ error: 'Fechamento não encontrado' });
     }
     
+    // Verificar se já está aprovado (evitar criar boletos duplicados)
+    const jaEstaAprovado = fechamento.aprovado === 'aprovado';
+    
     // Tentar atualizar o campo aprovado
     const { data, error } = await supabaseAdmin
       .from('fechamentos')
@@ -825,6 +965,66 @@ const aprovarFechamento = async (req, res) => {
     if (error) {
       // Campo aprovado não existe na tabela, mas continuar
       return res.json({ message: 'Fechamento aprovado com sucesso!' });
+    }
+    
+    // ============================================
+    // INTEGRAÇÃO COM API CAIXA - Criar boletos
+    // ============================================
+    // Criar boletos automaticamente para empresa_id 3 quando aprovado
+    if (!jaEstaAprovado && fechamento.empresa_id === 3 && data && data[0]) {
+      try {
+        console.log('🏦 [CAIXA] Fechamento aprovado - Iniciando criação de boletos para empresa_id 3');
+        
+        // Buscar dados completos do paciente
+        const { data: pacienteCompleto, error: pacienteError } = await supabaseAdmin
+          .from('pacientes')
+          .select('*')
+          .eq('id', fechamento.paciente_id)
+          .single();
+
+        if (pacienteError || !pacienteCompleto) {
+          console.error('❌ [CAIXA] Erro ao buscar paciente:', pacienteError);
+        } else {
+          // Obter ID do beneficiário (configurável por empresa)
+          const idBeneficiarioRaw = process.env.CAIXA_ID_BENEFICIARIO;
+          
+          if (!idBeneficiarioRaw) {
+            console.warn('⚠️ [CAIXA] CAIXA_ID_BENEFICIARIO não configurado. Configure no .env');
+          } else {
+            // Normalizar ID do beneficiário (pode vir como "0374/1242669" ou apenas "1242669")
+            const idBeneficiario = idBeneficiarioRaw.includes('/') 
+              ? idBeneficiarioRaw.split('/')[1].trim() 
+              : idBeneficiarioRaw.trim();
+            
+            // Verificar se já existem boletos para este fechamento
+            const { data: boletosExistentes } = await supabaseAdmin
+              .from('boletos_caixa')
+              .select('id')
+              .eq('fechamento_id', id)
+              .limit(1);
+
+            if (boletosExistentes && boletosExistentes.length > 0) {
+              console.log('ℹ️ [CAIXA] Boletos já existem para este fechamento. Pulando criação.');
+            } else {
+              // Criar boletos na Caixa
+              const boletosCriados = await criarBoletosCaixa(
+                data[0],
+                pacienteCompleto,
+                idBeneficiario
+              );
+              
+              if (boletosCriados.length > 0) {
+                console.log(`✅ [CAIXA] ${boletosCriados.length} boleto(s) criado(s) com sucesso após aprovação`);
+              } else {
+                console.warn('⚠️ [CAIXA] Nenhum boleto foi criado após aprovação');
+              }
+            }
+          }
+        }
+      } catch (caixaError) {
+        console.error('❌ [CAIXA] Erro ao criar boletos após aprovação:', caixaError);
+        // Não bloquear a aprovação se houver erro na criação de boletos
+      }
     }
     
     res.json({ message: 'Fechamento aprovado com sucesso!' });
@@ -1079,6 +1279,206 @@ const criarAcessoFreelancer = async (req, res) => {
   }
 };
 
+// GET /api/fechamentos/:id/boletos - Buscar boletos de um fechamento específico
+const getBoletosFechamento = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const fechamentoId = parseInt(id);
+
+    // Verificar se o fechamento existe e se o usuário tem permissão
+    const { data: fechamento, error: fechamentoError } = await supabaseAdmin
+      .from('fechamentos')
+      .select('id, paciente_id, empresa_id, clinica_id, aprovado')
+      .eq('id', fechamentoId)
+      .single();
+
+    if (fechamentoError || !fechamento) {
+      return res.status(404).json({ error: 'Fechamento não encontrado' });
+    }
+
+    // Verificar permissão: admin pode ver todos, clínica só os seus, paciente só os seus
+    if (req.user.tipo === 'clinica') {
+      const clinicaId = req.user.clinica_id || req.user.id;
+      if (fechamento.clinica_id !== clinicaId) {
+        return res.status(403).json({ error: 'Acesso negado. Você só pode ver boletos dos seus próprios fechamentos.' });
+      }
+    } else if (req.user.tipo === 'paciente') {
+      const pacienteId = req.user.paciente_id || req.user.id;
+      if (fechamento.paciente_id !== pacienteId) {
+        return res.status(403).json({ error: 'Acesso negado. Você só pode ver seus próprios boletos.' });
+      }
+    } else if (req.user.tipo !== 'admin' && req.user.tipo !== 'consultor') {
+      // Verificar se é da mesma empresa
+      if (req.user.empresa_id !== fechamento.empresa_id) {
+        return res.status(403).json({ error: 'Acesso negado.' });
+      }
+    }
+
+    // Buscar boletos da tabela boletos_caixa para este fechamento
+    const { data: boletosCaixa, error: boletosError } = await supabaseAdmin
+      .from('boletos_caixa')
+      .select('*')
+      .eq('fechamento_id', fechamentoId)
+      .order('data_vencimento', { ascending: true });
+
+    if (boletosError) throw boletosError;
+
+    // Calcular status para cada boleto
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const boletosComStatus = (boletosCaixa || []).map(boleto => {
+      let status = boleto.status || 'pendente';
+
+      // Se já tem status explícito (pago, cancelado), manter
+      if (boleto.status === 'pago' || boleto.status === 'cancelado') {
+        status = boleto.status;
+      } else {
+        // Caso contrário, calcular baseado na data de vencimento
+        const vencimento = boleto.data_vencimento ? new Date(boleto.data_vencimento) : null;
+        if (vencimento) {
+          vencimento.setHours(0, 0, 0, 0);
+          if (vencimento < hoje) {
+            status = 'vencido';
+          } else {
+            status = 'pendente';
+          }
+        }
+      }
+
+      return {
+        id: boleto.id,
+        nosso_numero: boleto.nosso_numero,
+        numero_documento: boleto.numero_documento,
+        valor: parseFloat(boleto.valor || 0),
+        valor_pago: boleto.valor_pago ? parseFloat(boleto.valor_pago) : null,
+        data_vencimento: boleto.data_vencimento,
+        data_emissao: boleto.data_emissao,
+        data_hora_pagamento: boleto.data_hora_pagamento,
+        situacao: boleto.situacao,
+        status: status,
+        codigo_barras: boleto.codigo_barras,
+        linha_digitavel: boleto.linha_digitavel,
+        url: boleto.url,
+        qrcode: boleto.qrcode,
+        url_qrcode: boleto.url_qrcode,
+        parcela_numero: boleto.parcela_numero,
+        fechamento_id: boleto.fechamento_id,
+        paciente_id: boleto.paciente_id,
+        erro_criacao: boleto.erro_criacao
+      };
+    });
+
+    return res.json({ 
+      boletos: boletosComStatus,
+      fechamento: {
+        id: fechamento.id,
+        paciente_id: fechamento.paciente_id,
+        aprovado: fechamento.aprovado
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao buscar boletos do fechamento:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// POST /api/fechamentos/:id/gerar-boletos - Gerar boletos manualmente para um fechamento
+const gerarBoletosFechamento = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const fechamentoId = parseInt(id);
+
+    // Verificar se o fechamento existe e se o usuário tem permissão
+    const { data: fechamento, error: fechamentoError } = await supabaseAdmin
+      .from('fechamentos')
+      .select('id, paciente_id, empresa_id, clinica_id, aprovado, numero_parcelas, valor_parcela, valor_fechado, vencimento')
+      .eq('id', fechamentoId)
+      .single();
+
+    if (fechamentoError || !fechamento) {
+      return res.status(404).json({ error: 'Fechamento não encontrado' });
+    }
+
+    // Verificar permissão: admin pode gerar para todos, clínica só para os seus
+    if (req.user.tipo === 'clinica') {
+      const clinicaId = req.user.clinica_id || req.user.id;
+      if (fechamento.clinica_id !== clinicaId) {
+        return res.status(403).json({ error: 'Acesso negado. Você só pode gerar boletos para os seus próprios fechamentos.' });
+      }
+    } else if (req.user.tipo !== 'admin' && req.user.tipo !== 'consultor') {
+      return res.status(403).json({ error: 'Acesso negado. Apenas admin, consultor ou clínica podem gerar boletos.' });
+    }
+
+    // Verificar se é empresa_id 3 (Caixa)
+    if (fechamento.empresa_id !== 3) {
+      return res.status(400).json({ error: 'Este endpoint é apenas para empresa_id 3 (Caixa)' });
+    }
+
+    // Verificar se já existem boletos para este fechamento
+    const { data: boletosExistentes } = await supabaseAdmin
+      .from('boletos_caixa')
+      .select('id')
+      .eq('fechamento_id', fechamentoId)
+      .not('erro_criacao', 'is', null); // Ignorar boletos com erro
+
+    // Buscar dados completos do paciente
+    const { data: pacienteCompleto, error: pacienteError } = await supabaseAdmin
+      .from('pacientes')
+      .select('*')
+      .eq('id', fechamento.paciente_id)
+      .single();
+
+    if (pacienteError || !pacienteCompleto) {
+      return res.status(404).json({ error: 'Paciente não encontrado' });
+    }
+
+    // Obter ID do beneficiário
+    const idBeneficiarioRaw = process.env.CAIXA_ID_BENEFICIARIO;
+    
+    if (!idBeneficiarioRaw) {
+      return res.status(500).json({ error: 'CAIXA_ID_BENEFICIARIO não configurado no servidor' });
+    }
+
+    // Normalizar ID do beneficiário
+    const idBeneficiario = idBeneficiarioRaw.includes('/') 
+      ? idBeneficiarioRaw.split('/')[1].trim() 
+      : idBeneficiarioRaw.trim();
+
+    // Criar boletos na Caixa
+    const boletosCriados = await criarBoletosCaixa(
+      fechamento,
+      pacienteCompleto,
+      idBeneficiario
+    );
+
+    if (boletosCriados.length > 0) {
+      return res.json({
+        success: true,
+        message: `${boletosCriados.length} boleto(s) criado(s) com sucesso`,
+        boletos: boletosCriados.map(b => ({
+          id: b.id,
+          nosso_numero: b.nosso_numero,
+          numero_documento: b.numero_documento,
+          valor: b.valor,
+          data_vencimento: b.data_vencimento,
+          url: b.url,
+          linha_digitavel: b.linha_digitavel
+        }))
+      });
+    } else {
+      return res.status(400).json({
+        error: 'Nenhum boleto foi criado',
+        message: 'Verifique os logs do servidor para mais detalhes. Possíveis causas: paciente sem CPF, erro na API Caixa, ou dados inválidos.'
+      });
+    }
+
+  } catch (error) {
+    console.error('Erro ao gerar boletos do fechamento:', error);
+    res.status(500).json({ error: error.message || 'Erro interno do servidor' });
+  }
+};
+
 module.exports = {
   getAllFechamentos,
   getDashboardFechamentos,
@@ -1088,8 +1488,9 @@ module.exports = {
   getContratoUrl,
   downloadContrato,
   getPrintConfirmacaoUrl,
+  getBoletosFechamento,
   aprovarFechamento,
   reprovarFechamento,
-  criarAcessoFreelancer
+  criarAcessoFreelancer,
+  gerarBoletosFechamento
 };
-

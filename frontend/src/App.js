@@ -34,6 +34,10 @@ import ComoFazer from './components/ComoFazer';
 import MeusDocumentos from './components/MeusDocumentos';
 import Evidencias from './components/Evidencias';
 import Simulador from './components/Simulador';
+import DashboardPaciente from './components/DashboardPaciente';
+import AgendamentosPaciente from './components/AgendamentosPaciente';
+import MeusDocumentosPaciente from './components/MeusDocumentosPaciente';
+import MeusBoletosPaciente from './components/MeusBoletosPaciente';
 import logoBrasao from './images/logobrasao.png';
 import logoHorizontal from './images/logohorizontal.png';
 import logoHorizontalPreto from './images/logohorizontalpreto.png';
@@ -181,7 +185,22 @@ const AppContent = () => {
 
   // Se o usuário está autenticado, mostrar a aplicação principal
   const RenderContent = () => {
-    const { isParceiro, isFreelancer } = useAuth();
+    const { isParceiro, isFreelancer, isPaciente } = useAuth();
+    
+    // Interface simplificada para Pacientes
+    if (isPaciente && user?.tipo === 'paciente') {
+      return (
+        <Routes>
+          <Route path="/dashboard" element={<DashboardPaciente />} />
+          <Route path="/agendamentos" element={<AgendamentosPaciente />} />
+          <Route path="/meus-documentos" element={<MeusDocumentosPaciente />} />
+          <Route path="/meus-boletos" element={<MeusBoletosPaciente />} />
+          {/* Redirecionar qualquer outra rota para dashboard */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      );
+    }
     
     // Interface simplificada para Freelancers Consultores
     if (isFreelancer && user?.tipo === 'consultor') {
@@ -683,8 +702,8 @@ const AppContent = () => {
           )}
 
 
-          {/* Clínicas/Empreendimentos - Não mostrar para usuários tipo clínica */}
-          {user.tipo !== 'clinica' && (
+          {/* Clínicas/Empreendimentos - Não mostrar para usuários tipo clínica e paciente */}
+          {user.tipo !== 'clinica' && user.tipo !== 'paciente' && (
             <div className="nav-item">
               <Link
                 to={isIncorporadora ? "/empreendimentos" : "/clinicas"}
@@ -725,6 +744,76 @@ const AppContent = () => {
             </div>
           )}
 
+          {/* Navegação para Pacientes */}
+          {user.tipo === 'paciente' && (
+            <>
+              <div className="nav-item">
+                <Link
+                  to="/dashboard"
+                  className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`}
+                  onClick={handleMobileNavigation}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="7" height="7" />
+                    <rect x="14" y="3" width="7" height="7" />
+                    <rect x="14" y="14" width="7" height="7" />
+                    <rect x="3" y="14" width="7" height="7" />
+                  </svg>
+                  Dashboard
+                </Link>
+              </div>
+
+              <div className="nav-item">
+                <Link
+                  to="/agendamentos"
+                  className={`nav-link ${activeTab === 'agendamentos' ? 'active' : ''}`}
+                  onClick={handleMobileNavigation}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                  Agendamentos
+                </Link>
+              </div>
+
+              <div className="nav-item">
+                <Link
+                  to="/meus-documentos"
+                  className={`nav-link ${activeTab === 'meus-documentos' ? 'active' : ''}`}
+                  onClick={handleMobileNavigation}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10 9 9 9 8 9" />
+                  </svg>
+                  Meus Documentos
+                </Link>
+              </div>
+
+              <div className="nav-item">
+                <Link
+                  to="/meus-boletos"
+                  className={`nav-link ${activeTab === 'meus-boletos' ? 'active' : ''}`}
+                  onClick={handleMobileNavigation}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <line x1="7" y1="7" x2="17" y2="7" />
+                    <line x1="7" y1="11" x2="17" y2="11" />
+                    <line x1="7" y1="15" x2="17" y2="15" />
+                  </svg>
+                  Meus Boletos
+                </Link>
+              </div>
+            </>
+          )}
+
           {/* Meus Documentos - Apenas para clínicas */}
           {user.tipo === 'clinica' && (
             <div className="nav-item">
@@ -744,8 +833,8 @@ const AppContent = () => {
             </div>
           )}
 
-          {/* Materiais de Apoio - Não mostrar para clínicas e incorporadora */}
-          {user.tipo !== 'clinica' && !isIncorporadora && (
+          {/* Materiais de Apoio - Não mostrar para clínicas, pacientes e incorporadora */}
+          {user.tipo !== 'clinica' && user.tipo !== 'paciente' && !isIncorporadora && (
             <div className="nav-item">
               <Link
                 to="/materiais"
@@ -782,8 +871,8 @@ const AppContent = () => {
             </div>
           )}
 
-          {/* Integração IDSF - Não mostrar para clínicas e incorporadora */}
-          {user.tipo !== 'clinica' && !isIncorporadora && (
+          {/* Integração IDSF - Não mostrar para clínicas, pacientes e incorporadora */}
+          {user.tipo !== 'clinica' && user.tipo !== 'paciente' && !isIncorporadora && (
             <div className="nav-item">
               <Link
                 to="/idsf"
@@ -885,7 +974,11 @@ const AppContent = () => {
             </div>
             <div className="user-details">
               <h3>{user.nome}</h3>
-              <p>{user.tipo === 'admin' ? 'Administrador' : user.tipo === 'parceiro' ? 'Empresa' : user.tipo === 'clinica' ? 'Clínica' : 'Consultor'}</p>
+              <p>{user.tipo === 'admin' ? 'Administrador' : 
+                   user.tipo === 'parceiro' ? 'Empresa' : 
+                   user.tipo === 'clinica' ? 'Clínica' : 
+                   user.tipo === 'paciente' ? 'Paciente' : 
+                   'Consultor'}</p>
             </div>
           </div>
           <Link

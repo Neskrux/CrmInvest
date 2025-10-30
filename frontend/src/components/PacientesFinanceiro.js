@@ -3,9 +3,11 @@ import axios from 'axios';
 import config from '../config';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
+import useBranding from '../hooks/useBranding';
 
 const PacientesFinanceiro = () => {
   const { user } = useAuth();
+  const { empresaId } = useBranding();
   const { error: showErrorToast, success: showSuccessToast } = useToast();
   
   // Função para limitar caracteres e evitar sobreposição
@@ -722,19 +724,27 @@ const PacientesFinanceiro = () => {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Dia do Vencimento</label>
+                  <label className="form-label">
+                    Data de Vencimento
+                    {empresaId === 3 && <span style={{ color: '#dc2626', marginLeft: '0.25rem' }}>*</span>}
+                  </label>
                   <input
-                    type="number"
+                    type="date"
                     className="form-input"
                     value={formData.vencimento}
                     onChange={e => setFormData({...formData, vencimento: e.target.value})}
-                    placeholder="Ex: 15"
-                    min="1"
-                    max="31"
+                    required={empresaId === 3}
                   />
-                  <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem', marginBottom: 0 }}>
-                    Digite o dia do mês (1 a 31)
-                  </p>
+                  {empresaId === 3 && (
+                    <p style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '0.25rem', marginBottom: 0 }}>
+                      * Obrigatório para gerar boletos
+                    </p>
+                  )}
+                  {empresaId !== 3 && (
+                    <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem', marginBottom: 0 }}>
+                      Data de vencimento da primeira parcela
+                    </p>
+                  )}
                 </div>
                 <div className="form-group">
                   <label className="form-label">Valor do Tratamento</label>
