@@ -187,35 +187,54 @@ const useIncorporadoraNotifications = () => {
         const notification = JSON.parse(pendingNotification);
         
         if (notification.type === 'new-lead' && notification.data) {
-          // Não exibir notificação se já houver sdr_id atribuído
-          if (notification.data.sdr_id) {
+          const maybeLeadId = notification.data.lead_id || notification.data.id;
+          const hasSdrInPayload = !!notification.data.sdr_id;
+          const proceedIfUnassigned = async () => {
+            // Não exibir notificação se já houver sdr_id atribuído
+            if (hasSdrInPayload) return false;
+            if (!maybeLeadId) return true; // sem como checar, manter comportamento antigo
+            try {
+              const supabase = getSupabaseClient();
+              if (!supabase) return true;
+              const { data } = await supabase
+                .from('pacientes')
+                .select('id, sdr_id')
+                .eq('id', maybeLeadId)
+                .single();
+              return !data?.sdr_id;
+            } catch (_) {
+              return true;
+            }
+          };
+
+          (async () => {
+            const canShow = await proceedIfUnassigned();
             localStorage.removeItem('pending_notification');
-            return;
-          }
-          localStorage.removeItem('pending_notification');
-          
-          const audioSource = notification.data.corretor_musica || `${process.env.PUBLIC_URL || ''}/audioNovoLead.mp3`;
-          try {
-            const preloadAudio = new Audio(audioSource);
-            preloadAudio.preload = 'auto';
-            preloadAudio.volume = 1.0;
-            preloadAudio.load();
-            preloadedAudioRef.current = preloadAudio;
-          } catch (e) {
-            // Ignorar erros
-          }
-          
-          setNewLeadData(notification.data);
-          setShowNewLeadModal(true);
-          previousModalStateRef.current = true;
-          audioStartedRef.current = false;
-          
-          setNotifications(prev => [...prev, {
-            id: Date.now(),
-            type: 'new-lead',
-            data: notification.data,
-            timestamp: new Date()
-          }]);
+            if (!canShow) return;
+
+            const audioSource = notification.data.corretor_musica || `${process.env.PUBLIC_URL || ''}/audioNovoLead.mp3`;
+            try {
+              const preloadAudio = new Audio(audioSource);
+              preloadAudio.preload = 'auto';
+              preloadAudio.volume = 1.0;
+              preloadAudio.load();
+              preloadedAudioRef.current = preloadAudio;
+            } catch (e) {
+              // Ignorar erros
+            }
+            
+            setNewLeadData(notification.data);
+            setShowNewLeadModal(true);
+            previousModalStateRef.current = true;
+            audioStartedRef.current = false;
+            
+            setNotifications(prev => [...prev, {
+              id: Date.now(),
+              type: 'new-lead',
+              data: notification.data,
+              timestamp: new Date()
+            }]);
+          })();
         }
       } catch (error) {
         localStorage.removeItem('pending_notification');
@@ -236,9 +255,24 @@ const useIncorporadoraNotifications = () => {
     supabaseRef.current = supabase;
 
     const processNewLeadNotification = async (data) => {
-      // Não exibir notificação se já houver sdr_id atribuído
+      // Não exibir notificação se já houver sdr_id atribuído (no payload ou no próprio lead)
       if (data?.sdr_id) {
         return;
+      }
+      try {
+        const supabase = getSupabaseClient();
+        if (supabase && data?.lead_id) {
+          const { data: leadRow } = await supabase
+            .from('pacientes')
+            .select('id, sdr_id')
+            .eq('id', data.lead_id)
+            .single();
+          if (leadRow?.sdr_id) {
+            return; // já atribuído, não notificar
+          }
+        }
+      } catch (_) {
+        // Se falhar a checagem, seguimos com comportamento padrão (mostrar)
       }
       if (processedNotificationIdsRef.current.has(data.id)) {
         return;
