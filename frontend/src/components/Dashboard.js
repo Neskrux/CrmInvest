@@ -2213,9 +2213,12 @@ const Dashboard = () => {
           {/* Conteúdo dos Rankings */}
           {!isFreelancer && rankingTab === 'sdrs' && (
             <div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1e293b', marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1e293b', marginBottom: '0.5rem' }}>
                 Ranking de SDRs por Agendamentos
               </h3>
+              <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '1.5rem' }}>
+                Ordenado por agendamentos realizados no mês atual
+              </p>
               <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
                 {rankingSDRs.map((sdr, index) => {
                   let borderStyle = '1px solid #e5e7eb';
@@ -2234,11 +2237,11 @@ const Dashboard = () => {
                         </div>
                       </div>
                       <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                        <div>
-                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Este mês</div>
-                          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#3b82f6' }}>{sdr.mes_atual}</div>
+                        <div style={{ backgroundColor: '#dbeafe', padding: '0.5rem', borderRadius: '8px', border: '2px solid #3b82f6' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#1e40af', fontWeight: '600' }}>Este mês</div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1e40af' }}>{sdr.mes_atual}</div>
                         </div>
-                        <div>
+                        <div style={{ padding: '0.5rem' }}>
                           <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Total</div>
                           <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b' }}>{sdr.total_agendamentos}</div>
                         </div>
@@ -2252,9 +2255,12 @@ const Dashboard = () => {
 
           {!isFreelancer && rankingTab === 'internos' && (
             <div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1e293b', marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1e293b', marginBottom: '0.5rem' }}>
                 Ranking de Corretores por Fechamentos
               </h3>
+              <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '1.5rem' }}>
+                Ordenado por valor fechado no mês atual
+              </p>
               <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
                 {rankingInternosNovos.map((interno, index) => {
                   let borderStyle = '1px solid #e5e7eb';
@@ -2273,13 +2279,15 @@ const Dashboard = () => {
                         </div>
                       </div>
                       <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                        <div>
-                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Total fechado</div>
-                          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#10b981' }}>{formatCurrency(interno.valor_fechado)}</div>
+                        <div style={{ backgroundColor: '#dcfce7', padding: '0.5rem', borderRadius: '8px', border: '2px solid #10b981' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#059669', fontWeight: '600' }}>Este mês</div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#059669' }}>{formatCurrency(interno.valor_mes)}</div>
+                          <div style={{ fontSize: '0.7rem', color: '#047857', marginTop: '0.25rem' }}>{interno.mes_atual} fechamentos</div>
                         </div>
-                        <div>
-                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Quantidade</div>
-                          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b' }}>{interno.total_fechamentos}</div>
+                        <div style={{ padding: '0.5rem' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Total</div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#10b981' }}>{formatCurrency(interno.valor_fechado)}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>{interno.total_fechamentos} fechamentos</div>
                         </div>
                       </div>
                     </div>
@@ -2289,8 +2297,14 @@ const Dashboard = () => {
             </div>
           )}
 
-          {isFreelancer && (
+          {!isFreelancer && rankingTab === 'freelancers' && (
             <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1e293b', marginBottom: '0.5rem' }}>
+                Ranking de Freelancers por Comissões
+              </h3>
+              <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '1.5rem' }}>
+                Ordenado por comissões geradas no mês atual
+              </p>
               <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
                 {rankingFreelancersNovos.map((freelancer, index) => {
                   let borderStyle = '1px solid #e5e7eb';
@@ -2304,17 +2318,62 @@ const Dashboard = () => {
                         <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>#{index + 1} no ranking</div>
                       </div>
                       <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                        <div>
-                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Comissões</div>
+                        <div style={{ backgroundColor: '#fef3c7', padding: '0.5rem', borderRadius: '8px', border: '2px solid #f59e0b' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#d97706', fontWeight: '600' }}>Este mês</div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#d97706' }}>
+                            {formatCurrency(freelancer.comissoes_mes)}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: '#92400e', marginTop: '0.25rem' }}>{freelancer.indicacoes_mes} indicações</div>
+                        </div>
+                        <div style={{ padding: '0.5rem' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Total</div>
                           <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#d97706' }}>
                             {formatCurrency(freelancer.total_comissoes)}
                           </div>
+                          <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>{freelancer.fechamentos_convertidos} indicações</div>
                         </div>
-                        <div>
-                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Indicações convertidas</div>
-                          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b' }}>
-                            {freelancer.fechamentos_convertidos}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {isFreelancer && (
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1e293b', marginBottom: '0.5rem' }}>
+                Ranking de Freelancers por Comissões
+              </h3>
+              <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '1.5rem' }}>
+                Ordenado por comissões geradas no mês atual
+              </p>
+              <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+                {rankingFreelancersNovos.map((freelancer, index) => {
+                  let borderStyle = '1px solid #e5e7eb';
+                  if (index === 0) borderStyle = '3px solid #FFD700';
+                  else if (index === 1) borderStyle = '3px solid #C0C0C0';
+                  else if (index === 2) borderStyle = '3px solid #CD7F32';
+                  return (
+                    <div key={freelancer.id} style={{ padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '8px', border: borderStyle }}>
+                      <div>
+                        <div style={{ fontWeight: '600', color: '#1e293b' }}>{freelancer.nome}</div>
+                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>#{index + 1} no ranking</div>
+                      </div>
+                      <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div style={{ backgroundColor: '#fef3c7', padding: '0.5rem', borderRadius: '8px', border: '2px solid #f59e0b' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#d97706', fontWeight: '600' }}>Este mês</div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#d97706' }}>
+                            {formatCurrency(freelancer.comissoes_mes)}
                           </div>
+                          <div style={{ fontSize: '0.7rem', color: '#92400e', marginTop: '0.25rem' }}>{freelancer.indicacoes_mes} indicações</div>
+                        </div>
+                        <div style={{ padding: '0.5rem' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Total</div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#d97706' }}>
+                            {formatCurrency(freelancer.total_comissoes)}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>{freelancer.fechamentos_convertidos} indicações</div>
                         </div>
                       </div>
                     </div>
