@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import logoBrasaoPreto from '../images/logohorizontalpreto.png';
+import logoBrasaoPreto from '../../images/logohorizontalpreto.png';
 
 const CadastroConsultor = () => {
   const navigate = useNavigate();
@@ -27,7 +27,7 @@ const CadastroConsultor = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   
-  // Modal de vídeo obrigatório
+  // Modal de vídeo obrigatório (consultores normais)
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [videoTimeWatched, setVideoTimeWatched] = useState(0);
   const [canCloseModal, setCanCloseModal] = useState(false);
@@ -35,6 +35,15 @@ const CadastroConsultor = () => {
   const [showPlayButton, setShowPlayButton] = useState(false);
   const [showControlButton, setShowControlButton] = useState(false);
   const videoRef = React.useRef(null);
+
+  // Modal de vídeo obrigatório (clientes incorporadora)
+  const [showVideoModalIncorporadora, setShowVideoModalIncorporadora] = useState(false);
+  const [videoTimeWatchedIncorporadora, setVideoTimeWatchedIncorporadora] = useState(0);
+  const [canCloseModalIncorporadora, setCanCloseModalIncorporadora] = useState(false);
+  const [videoPlayingIncorporadora, setVideoPlayingIncorporadora] = useState(false);
+  const [showPlayButtonIncorporadora, setShowPlayButtonIncorporadora] = useState(false);
+  const [showControlButtonIncorporadora, setShowControlButtonIncorporadora] = useState(false);
+  const videoRefIncorporadora = React.useRef(null);
 
 
   // Meta Pixel - Carregar script do Facebook
@@ -80,7 +89,24 @@ const CadastroConsultor = () => {
     }
   }, [isClienteIncorporadora]);
 
-  // Bloquear scroll quando modal estiver aberto (apenas para consultores normais)
+  // Modal de vídeo - Abrir na primeira visualização (apenas para clientes incorporadora)
+  useEffect(() => {
+    // Não mostrar vídeo para consultores normais
+    if (!isClienteIncorporadora) {
+      return;
+    }
+    
+    // Verificar se já foi mostrado antes (usando localStorage)
+    const hasSeenVideo = localStorage.getItem('cadastro-consultor-video-incorporadora-seen');
+    
+    if (!hasSeenVideo) {
+      setShowVideoModalIncorporadora(true);
+      setShowControlButtonIncorporadora(true); // Mostrar botão inicial
+      setCanCloseModalIncorporadora(false); // Só pode fechar quando vídeo acabar
+    }
+  }, [isClienteIncorporadora]);
+
+  // Bloquear scroll quando modal estiver aberto (consultores normais)
   useEffect(() => {
     // Não aplicar bloqueio de scroll para clientes da incorporadora
     if (isClienteIncorporadora) {
@@ -101,7 +127,28 @@ const CadastroConsultor = () => {
     };
   }, [showVideoModal, isClienteIncorporadora]);
 
-  // Forçar play do vídeo quando modal abrir (apenas para consultores normais)
+  // Bloquear scroll quando modal estiver aberto (clientes incorporadora)
+  useEffect(() => {
+    // Não aplicar bloqueio de scroll para consultores normais
+    if (!isClienteIncorporadora) {
+      return;
+    }
+    
+    if (showVideoModalIncorporadora) {
+      // Bloquear scroll
+      document.body.style.overflow = 'hidden';
+    } else {
+      // Liberar scroll
+      document.body.style.overflow = 'unset';
+    }
+
+    // Cleanup - sempre liberar scroll quando componente desmontar
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showVideoModalIncorporadora, isClienteIncorporadora]);
+
+  // Forçar play do vídeo quando modal abrir (consultores normais)
   useEffect(() => {
     // Não aplicar para clientes da incorporadora
     if (isClienteIncorporadora) {
@@ -130,6 +177,36 @@ const CadastroConsultor = () => {
       return () => clearTimeout(timer);
     }
   }, [showVideoModal, isClienteIncorporadora]);
+
+  // Forçar play do vídeo quando modal abrir (clientes incorporadora)
+  useEffect(() => {
+    // Não aplicar para consultores normais
+    if (!isClienteIncorporadora) {
+      return;
+    }
+    
+    if (showVideoModalIncorporadora && videoRefIncorporadora.current) {
+      // Pequeno delay para garantir que o vídeo esteja carregado
+      const timer = setTimeout(() => {
+        if (videoRefIncorporadora.current) {
+          // Garantir que o áudio esteja ativado
+          videoRefIncorporadora.current.muted = false;
+          videoRefIncorporadora.current.volume = 1;
+          
+          // Tentar tocar o vídeo
+          videoRefIncorporadora.current.play().then(() => {
+            setVideoPlayingIncorporadora(true);
+            setShowPlayButtonIncorporadora(false);
+          }).catch(error => {
+            setShowPlayButtonIncorporadora(true);
+            setVideoPlayingIncorporadora(false);
+          });
+        }
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [showVideoModalIncorporadora, isClienteIncorporadora]);
 
   // Função para tocar o vídeo manualmente
   const handlePlayVideo = async () => {
@@ -198,12 +275,86 @@ const CadastroConsultor = () => {
     }
   };
 
-  // Função para fechar o modal
+  // Função para fechar o modal (consultores normais)
   const handleCloseModal = () => {
     if (canCloseModal) {
       setShowVideoModal(false);
       // Marcar como visto no localStorage
       localStorage.setItem('cadastro-consultor-video-seen', 'true');
+    }
+  };
+
+  // Funções para vídeo da incorporadora
+  const handlePlayVideoIncorporadora = async () => {
+    if (videoRefIncorporadora.current) {
+      try {
+        videoRefIncorporadora.current.muted = false;
+        videoRefIncorporadora.current.volume = 1;
+        await videoRefIncorporadora.current.play();
+        setVideoPlayingIncorporadora(true);
+        setShowPlayButtonIncorporadora(false);
+        setShowControlButtonIncorporadora(true);
+        
+        // Esconder botão após 2 segundos
+        setTimeout(() => {
+          setShowControlButtonIncorporadora(false);
+        }, 2000);
+      } catch (error) {
+        // Erro ao tocar vídeo
+      }
+    }
+  };
+
+  const handlePauseVideoIncorporadora = () => {
+    if (videoRefIncorporadora.current) {
+      videoRefIncorporadora.current.pause();
+      setVideoPlayingIncorporadora(false);
+      setShowControlButtonIncorporadora(true);
+      
+      // Esconder botão após 2 segundos
+      setTimeout(() => {
+        setShowControlButtonIncorporadora(false);
+      }, 2000);
+    }
+  };
+
+  const handleVideoClickIncorporadora = () => {
+    if (videoRefIncorporadora.current) {
+      if (videoPlayingIncorporadora) {
+        // Se está tocando, pausar
+        videoRefIncorporadora.current.pause();
+        setVideoPlayingIncorporadora(false);
+      } else {
+        // Se está pausado, tocar
+        videoRefIncorporadora.current.play();
+        setVideoPlayingIncorporadora(true);
+      }
+      
+      // Mostrar botão e esconder após 2 segundos
+      setShowControlButtonIncorporadora(true);
+      setTimeout(() => {
+        setShowControlButtonIncorporadora(false);
+      }, 2000);
+    }
+  };
+
+  const handleVideoTimeUpdateIncorporadora = (e) => {
+    const currentTime = e.target.currentTime;
+    setVideoTimeWatchedIncorporadora(currentTime);
+    // Sem bloqueio de tempo para incorporadora - vídeo é curto
+  };
+
+  const handleVideoEndIncorporadora = () => {
+    // Quando vídeo acabar, permitir fechar
+    setCanCloseModalIncorporadora(true);
+  };
+
+  const handleCloseModalIncorporadora = () => {
+    // Só permite fechar quando vídeo terminou
+    if (canCloseModalIncorporadora) {
+      setShowVideoModalIncorporadora(false);
+      // Marcar como visto no localStorage
+      localStorage.setItem('cadastro-consultor-video-incorporadora-seen', 'true');
     }
   };
 
@@ -1274,6 +1425,188 @@ const CadastroConsultor = () => {
                 }}>
                   <button
                     onClick={handlePauseVideo}
+                    style={{
+                      width: '80px',
+                      height: '80px',
+                      borderRadius: '50%',
+                      background: 'rgba(0, 0, 0, 0.8)',
+                      border: 'none',
+                      color: 'white',
+                      fontSize: '2rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.target.style.background = 'rgba(0, 0, 0, 0.9)';
+                      e.target.style.transform = 'scale(1.1)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.target.style.background = 'rgba(0, 0, 0, 0.8)';
+                      e.target.style.transform = 'scale(1)';
+                    }}
+                  >
+                    ⏸
+                  </button>
+                </div>
+              )}
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Vídeo Obrigatório - Incorporadora */}
+      {showVideoModalIncorporadora && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.9)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '2rem'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '2rem',
+            maxWidth: '400px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'hidden',
+            position: 'relative'
+          }}>
+            {/* Header do Modal */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem'
+            }}>
+              <h2 style={{
+                fontSize: '1.2rem',
+                fontWeight: '700',
+                color: '#1a1d23',
+                margin: 0
+              }}>
+                Boas vindas ao Solumn
+              </h2>
+              {canCloseModalIncorporadora && (
+                <button
+                  onClick={handleCloseModalIncorporadora}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '1.2rem',
+                    color: '#6b7280',
+                    cursor: 'pointer',
+                    padding: '0.5rem',
+                    borderRadius: '50%',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                    e.target.style.color = '#374151';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                    e.target.style.color = '#6b7280';
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+              {!canCloseModalIncorporadora && (
+                <div style={{ width: '40px', height: '40px' }}></div>
+              )}
+            </div>
+
+            {/* Vídeo */}
+            <div style={{
+              borderRadius: '8px',
+              overflow: 'hidden',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              position: 'relative'
+            }}>
+               <video
+                 ref={videoRefIncorporadora}
+                 src="/video-produto-incorp.mp4"
+                 controls={false} // Controles sempre desabilitados
+                 autoPlay
+                 muted={false} // Sempre com áudio
+                 onTimeUpdate={handleVideoTimeUpdateIncorporadora}
+                 onPlay={() => setVideoPlayingIncorporadora(true)}
+                 onPause={() => setVideoPlayingIncorporadora(false)}
+                 onEnded={handleVideoEndIncorporadora}
+                 onClick={handleVideoClickIncorporadora}
+                 style={{
+                  width: '80%',
+                  objectFit: 'cover',
+                  cursor: 'pointer' // Cursor de clique
+                }}
+              >
+                Seu navegador não suporta vídeos.
+              </video>
+
+              {/* Botão de Play - quando vídeo está pausado */}
+              {!videoPlayingIncorporadora && showControlButtonIncorporadora && (
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  zIndex: 10
+                }}>
+                  <button
+                    onClick={handlePlayVideoIncorporadora}
+                    style={{
+                      width: '80px',
+                      height: '80px',
+                      borderRadius: '50%',
+                      background: 'rgba(0, 0, 0, 0.8)',
+                      border: 'none',
+                      color: 'white',
+                      fontSize: '2rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.target.style.background = 'rgba(0, 0, 0, 0.9)';
+                      e.target.style.transform = 'scale(1.1)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.target.style.background = 'rgba(0, 0, 0, 0.8)';
+                      e.target.style.transform = 'scale(1)';
+                    }}
+                  >
+                    ▶
+                  </button>
+                </div>
+              )}
+
+              {/* Botão de Pause - quando vídeo está tocando */}
+              {videoPlayingIncorporadora && showControlButtonIncorporadora && (
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  zIndex: 10
+                }}>
+                  <button
+                    onClick={handlePauseVideoIncorporadora}
                     style={{
                       width: '80px',
                       height: '80px',
