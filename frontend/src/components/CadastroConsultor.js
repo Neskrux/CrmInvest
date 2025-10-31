@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import logoBrasaoPreto from '../../images/logohorizontalpreto.png';
+import logoBrasaoPreto from '../images/logohorizontalpreto.png';
 
 const CadastroConsultor = () => {
   const navigate = useNavigate();
