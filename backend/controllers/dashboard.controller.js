@@ -586,10 +586,15 @@ const getRankingSDRs = async (req, res) => {
       
       // Agendamentos do mês atual
       const hoje = new Date();
-      const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      const mesAtual = hoje.getMonth();
+      const anoAtual = hoje.getFullYear();
       const agendamentosMes = agendamentosSDR.filter(a => {
-        const dataAgendamento = new Date(a.data_agendamento);
-        return dataAgendamento >= primeiroDiaMes;
+        // Verificar se tem data válida
+        if (!a.data_agendamento) return false;
+        // Corrigir problema de timezone: interpretar data como local
+        const [ano, mes, dia] = a.data_agendamento.split('-');
+        const data = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+        return data.getMonth() === mesAtual && data.getFullYear() === anoAtual;
       });
 
       return {
@@ -645,10 +650,15 @@ const getRankingInternos = async (req, res) => {
       
       // Fechamentos do mês atual
       const hoje = new Date();
-      const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      const mesAtual = hoje.getMonth();
+      const anoAtual = hoje.getFullYear();
       const fechamentosMes = fechamentosInterno.filter(f => {
-        const dataFechamento = new Date(f.data_fechamento);
-        return dataFechamento >= primeiroDiaMes;
+        // Verificar se tem data válida
+        if (!f.data_fechamento) return false;
+        // Corrigir problema de timezone: interpretar data como local
+        const [ano, mes, dia] = f.data_fechamento.split('-');
+        const data = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+        return data.getMonth() === mesAtual && data.getFullYear() === anoAtual;
       });
 
       const valorTotalGeral = fechamentosInterno.reduce((acc, f) => acc + parseFloat(f.valor_fechado || 0), 0);
@@ -712,10 +722,15 @@ const getRankingFreelancers = async (req, res) => {
       
       // Fechamentos do mês atual
       const hoje = new Date();
-      const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      const mesAtual = hoje.getMonth();
+      const anoAtual = hoje.getFullYear();
       const fechamentosMes = fechamentosFreelancer.filter(f => {
-        const dataFechamento = new Date(f.data_fechamento);
-        return dataFechamento >= primeiroDiaMes;
+        // Verificar se tem data válida
+        if (!f.data_fechamento) return false;
+        // Corrigir problema de timezone: interpretar data como local
+        const [ano, mes, dia] = f.data_fechamento.split('-');
+        const data = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+        return data.getMonth() === mesAtual && data.getFullYear() === anoAtual;
       });
 
       // Calcular comissões
