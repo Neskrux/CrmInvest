@@ -978,16 +978,8 @@ const Pacientes = () => {
       const data = await response.json();
       
       if (response.ok) {
-        const isUserAdmin = Boolean(isAdmin);
-        const currentUserId = Number(user?.id || 0);
-        const currentConsultorId = Number(user?.consultor_id || 0);
-        const filtered = isUserAdmin ? data : (Array.isArray(data) ? data.filter(l => {
-          const sdrMatch = Number(l.sdr_id || 0) === currentUserId;
-          const consultorMatch = Number(l.consultor_id || 0) === currentConsultorId;
-          const consultorInternoMatch = Number(l.consultor_interno_id || 0) === currentConsultorId;
-          return sdrMatch || consultorMatch || consultorInternoMatch;
-        }) : []);
-        setNovosLeads(filtered);
+        // Novos leads devem aparecer para todos, sem filtro por consultor
+        setNovosLeads(data);
       } else {
         console.error('Erro ao carregar novos leads:', data.error);
         showErrorToast('Erro ao carregar novos leads: ' + data.error);
