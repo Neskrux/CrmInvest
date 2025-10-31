@@ -60,7 +60,10 @@ const CadastroConsultor = () => {
       s.parentNode.insertBefore(t,s)}(window, document,'script',
       'https://connect.facebook.net/en_US/fbevents.js');
       fbq('init', '1981637492627156');
-      fbq('track', 'PageView');
+      ${isClienteIncorporadora 
+        ? `fbq('track', 'PageView', { content_name: 'Página Cadastro - Incorporadora' });`
+        : `fbq('track', 'PageView', { content_name: 'Página Cadastro - Consultor' });`
+      }
     `;
     document.head.appendChild(script);
 
@@ -71,7 +74,7 @@ const CadastroConsultor = () => {
         document.head.removeChild(existingScript);
       }
     };
-  }, []);
+  }, [isClienteIncorporadora]);
 
   // Modal de vídeo - Abrir na primeira visualização (apenas para consultores normais)
   useEffect(() => {
@@ -556,10 +559,17 @@ const CadastroConsultor = () => {
     
     // Meta Pixel - Tracking quando usuário inicia preenchimento do formulário
     if (window.fbq && formData.nome === '' && name === 'nome' && value.trim()) {
-      window.fbq('track', 'InitiateCheckout', {
-        content_name: 'Formulário de Cadastro',
-        content_category: 'Lead Generation'
-      });
+      if (isClienteIncorporadora) {
+        window.fbq('track', 'InitiateCheckout', {
+          content_name: 'Formulário de Cadastro - Incorporadora',
+          content_category: 'Lead Generation - Incorporadora'
+        });
+      } else {
+        window.fbq('track', 'InitiateCheckout', {
+          content_name: 'Formulário de Cadastro - Consultor',
+          content_category: 'Lead Generation - Consultor'
+        });
+      }
     }
     
     let formattedValue = value;
@@ -703,12 +713,19 @@ const CadastroConsultor = () => {
       if (response.ok) {
         // Meta Pixel - Evento de cadastro bem-sucedido
         if (window.fbq) {
-          window.fbq('track', 'CompleteRegistration', {
-            content_name: 'Cadastro de Consultor',
-            content_category: 'Lead Generation',
-            value: 50, // Valor da comissão
-            currency: 'BRL'
-          });
+          if (isClienteIncorporadora) {
+            // Evento específico para clientes da incorporadora
+            window.fbq('track', 'CompleteRegistration', {
+              content_name: 'Cadastro Concluído - Incorporadora',
+              content_category: 'Lead Generation - Incorporadora'
+            });
+          } else {
+            // Evento para consultores normais
+            window.fbq('track', 'CompleteRegistration', {
+              content_name: 'Cadastro Concluído - Consultor',
+              content_category: 'Lead Generation - Consultor'
+            });
+          }
         }
         
         if (isClienteIncorporadora) {
@@ -719,10 +736,17 @@ const CadastroConsultor = () => {
       } else {
         // Meta Pixel - Evento de erro no cadastro
         if (window.fbq) {
-          window.fbq('track', 'Lead', {
-            content_name: 'Tentativa de Cadastro - Erro',
-            content_category: 'Lead Generation'
-          });
+          if (isClienteIncorporadora) {
+            window.fbq('track', 'Lead', {
+              content_name: 'Tentativa de Cadastro - Erro - Incorporadora',
+              content_category: 'Lead Generation - Incorporadora'
+            });
+          } else {
+            window.fbq('track', 'Lead', {
+              content_name: 'Tentativa de Cadastro - Erro - Consultor',
+              content_category: 'Lead Generation - Consultor'
+            });
+          }
         }
         
         let errorMsg = data.error || 'Erro ao cadastrar consultor';
