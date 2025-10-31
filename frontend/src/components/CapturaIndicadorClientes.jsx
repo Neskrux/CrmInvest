@@ -9,24 +9,22 @@ const CapturaClientes = () => {
   const location = useLocation();
   const [formData, setFormData] = useState({
     nome: '',
-    email: '',
     telefone: '',
-    empreendimento_id: '',
+    tipo_tratamento: '',
+    cpf: '',
     cidade: '',
     estado: '',
     observacoes: '',
     melhor_dia1: '',
     melhor_horario1: '',
     melhor_dia2: '',
-    melhor_horario2: '',
-    sdr_id: ''
+    melhor_horario2: ''
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
   const [refConsultor, setRefConsultor] = useState(null);
   const [nomeConsultor, setNomeConsultor] = useState(null);
-  const [sdrsIncorporadora, setSdrsIncorporadora] = useState([]);
 
   // Estados brasileiros
   const estadosBrasileiros = [
@@ -128,23 +126,6 @@ const CapturaClientes = () => {
     };
   }, []);
 
-  // Buscar SDRs da incorporadora
-  useEffect(() => {
-    fetchSDRsIncorporadora();
-  }, []);
-
-  const fetchSDRsIncorporadora = async () => {
-    try {
-      const response = await fetch(`${config.API_BASE_URL}/consultores/sdrs-incorporadora`);
-      const data = await response.json();
-      if (response.ok) {
-        setSdrsIncorporadora(data);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar SDRs:', error);
-    }
-  };
-
   // Função para formatar telefone (formato brasileiro correto)
   const formatarTelefone = (value) => {
     if (!value) return '';
@@ -174,6 +155,11 @@ const CapturaClientes = () => {
     }
     
     return limitedNumbers;
+  };
+
+  const formatarCPF = (value) => {
+    const numbers = value.replace(/\D/g, '');
+    return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   };
 
   // Função para formatar nome (mesmo padrão da migração do banco)
@@ -268,6 +254,9 @@ const CapturaClientes = () => {
       // Para telefone, permitir apenas números durante a digitação
       const numbersOnly = value.replace(/\D/g, '');
       const formattedValue = numbersOnly.length > 0 ? formatarTelefone(numbersOnly) : '';
+      setFormData(prev => ({ ...prev, [name]: formattedValue }));
+    } else if (name === 'cpf') {
+      const formattedValue = formatarCPF(value);
       setFormData(prev => ({ ...prev, [name]: formattedValue }));
     } else if (name === 'cidade') {
       const formattedValue = formatarCidade(value);
@@ -392,6 +381,12 @@ const CapturaClientes = () => {
       newErrors.telefone = 'Telefone deve ter pelo menos 10 dígitos';
     }
     
+    if (!formData.cpf.trim()) {
+      newErrors.cpf = 'CPF é obrigatório';
+    } else if (formData.cpf.replace(/\D/g, '').length !== 11) {
+      newErrors.cpf = 'CPF deve ter 11 dígitos';
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -416,9 +411,7 @@ const CapturaClientes = () => {
     const formDataToSend = {
       ...formData,
       observacoes: observacoesComDias,
-      ref_consultor: refConsultor, // Incluir código de referência se existir
-      origem_formulario: 'captura-clientes', // Identificar origem do formulário
-      sdr_id: formData.sdr_id || null // ADICIONAR
+      ref_consultor: refConsultor // Incluir código de referência se existir
     };
 
 
@@ -431,24 +424,10 @@ const CapturaClientes = () => {
         body: JSON.stringify(formDataToSend)
       });
       
-      console.log('📡 Resposta do servidor:', response.status, response.statusText);
-      
-      let data;
-      try {
-        data = await response.json();
-      } catch (jsonError) {
-        console.error('❌ Erro ao parsear JSON:', jsonError);
-        const text = await response.text();
-        console.error('❌ Resposta em texto:', text);
-        setErrors({ general: 'Erro ao processar resposta do servidor.' });
-        setLoading(false);
-        return;
-      }
-      
-      console.log('📦 Dados recebidos:', data);
+      const data = await response.json();
       
       if (response.ok) {
-        navigate('/captura-sucesso-clientes', { 
+        navigate('/captura-sucesso', { 
           state: { 
             nome: data.nome,
             message: data.message,
@@ -456,11 +435,10 @@ const CapturaClientes = () => {
           } 
         });
       } else {
-        console.error('❌ Erro na resposta:', data);
         setErrors({ general: data.error || 'Erro ao enviar cadastro' });
       }
     } catch (error) {
-      console.error('❌ Erro no cadastro:', error);
+      console.error('Erro no cadastro:', error);
       setErrors({ general: 'Erro de conexão. Tente novamente.' });
     } finally {
       setLoading(false);
@@ -515,20 +493,6 @@ const CapturaClientes = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Email (opcional)</label>   
-                <input
-                  type="email"
-                  name="email"
-                  className={`form-input ${errors.email ? 'error' : ''}`}
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  placeholder="Digite um email válido (opcional)"
-                  disabled={loading}
-                />
-                {errors.email && <span className="field-error">{errors.email}</span>}
-              </div>
-
-              <div className="form-group">
                 <label className="form-label">WhatsApp *</label>
                 <input
                   type="tel"
@@ -545,21 +509,33 @@ const CapturaClientes = () => {
               <div className="form-group">
                 <label className="form-label">Escolha um empreendimento de interesse</label>
                 <select
-                  name="empreendimento_id"
+                  name="tipo_tratamento"  //vai ter que mudar para o nome do empreendimento??
                   className="form-select"
-                  value={formData.empreendimento_id}
+                  value={formData.tipo_tratamento}
                   onChange={handleInputChange}
                   disabled={loading}
                 >
                   <option value="">Selecione (opcional)</option>
-                  <option value="4">Laguna Sky Garden</option>
-                  <option value="5">Residencial Girassol</option>
-                  <option value="6">Sintropia Sky Garden</option>
-                  <option value="7">Residencial Lotus</option>
-                  <option value="8">River Sky Garden</option>
-                  <option value="9">Condomínio Figueira Garcia</option>
-                  <option value="">Ainda não decidi</option>
+                  <option value="Estético">Laguna Sky Garden</option>
+                  <option value="Odontológico">Sintropia Sky Garden</option>
+                  <option value="Residencial Girassol">Residencial Girassol</option>    //verificar mudançasde value
                 </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">CPF *</label>
+                <input
+                  type="text"
+                  name="cpf"
+                  className={`form-input ${errors.cpf ? 'error' : ''}`}
+                  value={formData.cpf}
+                  onChange={handleInputChange}
+                  placeholder="000.000.000-00"
+                  disabled={loading}
+                  maxLength="14"
+                />
+                {errors.cpf && <span className="field-error">{errors.cpf}</span>}
+                <span className="cpf-info">Seu CPF está sujeito a uma análise</span>
               </div>
 
               <div className="form-group">
@@ -630,24 +606,6 @@ const CapturaClientes = () => {
                     )}
                   </div>
                 )}
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Quer ser atendido por quem?</label>
-                <select
-                  name="sdr_id"
-                  className="form-select"
-                  value={formData.sdr_id}
-                  onChange={handleInputChange}
-                  disabled={loading}
-                >
-                  <option value="">Selecione um atendente (opcional)</option>
-                  {sdrsIncorporadora.map(sdr => (
-                    <option key={sdr.id} value={sdr.id}>
-                      {sdr.nome}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               <div className="form-group">
@@ -767,7 +725,7 @@ const CapturaClientes = () => {
                   <div className="loading-spinner"></div>
                 ) : (
                   <>
-                    <span>Agendar gratuitamente</span>
+                    <span>Agendar Agendamento Gratuita</span>
                   </>
                 )}
               </button>

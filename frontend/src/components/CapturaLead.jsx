@@ -4,12 +4,13 @@ import { Sparkles, Trophy, Gem, Lock, Check, Star } from 'lucide-react';
 import logoBrasao from '../images/logobrasao-selo.png';
 import config from '../config';
 
-const CapturaClientes = () => {
+const CapturaLead = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
+    email: '',
     tipo_tratamento: '',
     cpf: '',
     cidade: '',
@@ -381,6 +382,12 @@ const CapturaClientes = () => {
       newErrors.telefone = 'Telefone deve ter pelo menos 10 dígitos';
     }
     
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email é obrigatório';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Email deve ter um formato válido';
+    }
+    
     if (!formData.cpf.trim()) {
       newErrors.cpf = 'CPF é obrigatório';
     } else if (formData.cpf.replace(/\D/g, '').length !== 11) {
@@ -411,7 +418,8 @@ const CapturaClientes = () => {
     const formDataToSend = {
       ...formData,
       observacoes: observacoesComDias,
-      ref_consultor: refConsultor // Incluir código de referência se existir
+      ref_consultor: refConsultor, // Incluir código de referência se existir
+      origem_formulario: 'captura-lead' // Identificar origem do formulário
     };
 
 
@@ -453,21 +461,40 @@ const CapturaClientes = () => {
           <div className="captura-header">
             <img src={logoBrasao} alt="Logo" className="captura-logo" />
             <h1 className="captura-title">
-              Realize o sonho do seu <span className="highlight">novo lar</span>
+              Transforme sua <span className="highlight">autoestima</span>
             </h1>
             <p className="captura-subtitle">
-            Descubra um novo padrão de conforto, design e exclusividade.
-            Agende sua visita e veja como é possível conquistar seu espaço dos sonhos com condições facilitadas.
+              Agende sua consulta gratuita aqui e garanta o procedimento dos seus sonhos parcelado no boleto.
             </p>
           </div>
 
-          
-                     
+          {/* Benefícios */}
+                     <div className="captura-benefits">
+             <div className="benefit-item">
+               <div className="benefit-icon">
+                 <Sparkles size={20} />
+               </div>
+               <span>Consulta Gratuita</span>
+             </div>
+             <div className="benefit-item">
+               <div className="benefit-icon">
+                 <Trophy size={20} />
+               </div>
+               <span>Profissionais Qualificados</span>
+             </div>
+             <div className="benefit-item">
+               <div className="benefit-icon">
+                 <Gem size={20} />
+               </div>
+               <span>Tecnologia Avançada</span>
+             </div>
+           </div>
+
           {/* Formulário */}
           <div className="captura-form-container">
             <h2 className="form-title">Preencha seus dados</h2>
             <p className="form-subtitle">
-            Em breve entraremos em contato para agendar sua visita.
+              Entraremos em contato em até 2 horas para agendar sua consulta
             </p>
 
             {errors.general && (
@@ -507,18 +534,32 @@ const CapturaClientes = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Escolha um empreendimento de interesse</label>
+                <label className="form-label">Email *</label>
+                <input
+                  type="email"
+                  name="email"
+                  className={`form-input ${errors.email ? 'error' : ''}`}
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  placeholder="seu@email.com"
+                  disabled={loading}
+                />
+                {errors.email && <span className="field-error">{errors.email}</span>}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Tipo de Tratamento</label>
                 <select
-                  name="tipo_tratamento"  //vai ter que mudar para o nome do empreendimento??
+                  name="tipo_tratamento"
                   className="form-select"
                   value={formData.tipo_tratamento}
                   onChange={handleInputChange}
                   disabled={loading}
                 >
                   <option value="">Selecione (opcional)</option>
-                  <option value="Estético">Laguna Sky Garden</option>
-                  <option value="Odontológico">Sintropia Sky Garden</option>
-                  <option value="Residencial Girassol">Residencial Girassol</option>    //verificar mudançasde value
+                  <option value="Estético">Tratamento Estético</option>
+                  <option value="Odontológico">Tratamento Odontológico</option>
+                  <option value="Ambos">Ambos os Tratamentos</option>
                 </select>
               </div>
 
@@ -725,13 +766,45 @@ const CapturaClientes = () => {
                   <div className="loading-spinner"></div>
                 ) : (
                   <>
-                    <span>Agendar Agendamento Gratuita</span>
+                    <span>Agendar Consulta Gratuita</span>
                   </>
                 )}
               </button>
             </form>
           </div>
 
+          {/* Depoimentos */}
+          <div className="captura-testimonials">
+            <h3 className="testimonials-title">O que nossos pacientes dizem</h3>
+            <div className="testimonials-grid">
+                             <div className="testimonial-card">
+                 <div className="testimonial-stars">
+                   <Star size={16} fill="#ffde34" />
+                   <Star size={16} fill="#ffde34" />
+                   <Star size={16} fill="#ffde34" />
+                   <Star size={16} fill="#ffde34" />
+                   <Star size={16} fill="#ffde34" />
+                 </div>
+                 <p className="testimonial-text">
+                   "Profissionais incríveis! Mudaram completamente meu sorriso e minha autoestima."
+                 </p>
+                 <div className="testimonial-author">- Maria Silva</div>
+               </div>
+               <div className="testimonial-card">
+                 <div className="testimonial-stars">
+                   <Star size={16} fill="#ffde34" />
+                   <Star size={16} fill="#ffde34" />
+                   <Star size={16} fill="#ffde34" />
+                   <Star size={16} fill="#ffde34" />
+                   <Star size={16} fill="#ffde34" />
+                 </div>
+                 <p className="testimonial-text">
+                   "Atendimento excepcional e resultados que superaram minhas expectativas."
+                 </p>
+                 <div className="testimonial-author">- João Santos</div>
+               </div>
+            </div>
+          </div>
 
           {/* Footer */}
           <div className="captura-footer">
@@ -759,7 +832,7 @@ const CapturaClientes = () => {
       <style jsx>{`
         .captura-lead-container {
           min-height: 100vh;
-          background: linear-gradient(135deg, rgb(9, 42, 108) 0%, rgb(7, 50, 116) 100%);
+          background: linear-gradient(135deg, #1a1d23 0%, #0f1114 100%);
           position: relative;
           overflow-x: hidden;
         }
@@ -953,7 +1026,7 @@ const CapturaClientes = () => {
         }
 
         .captura-submit-btn {
-          background: linear-gradient(135deg, rgb(9, 42, 108) 0%, rgb(9, 42, 108) 100%);
+          background: linear-gradient(135deg, #1a1d23 0%, #0f1114 100%);
           color: white;
           border: none;
           padding: 18px 30px;
@@ -1130,4 +1203,4 @@ const CapturaClientes = () => {
   );
 };
 
-export default CapturaClientes; 
+export default CapturaLead; 

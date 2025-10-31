@@ -4,28 +4,29 @@ import { Sparkles, Trophy, Gem, Lock, Check, Star } from 'lucide-react';
 import logoBrasao from '../images/logobrasao-selo.png';
 import config from '../config';
 
-const CapturaLead = () => {
+const CapturaClientes = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [formData, setFormData] = useState({
     nome: '',
-    telefone: '',
     email: '',
-    tipo_tratamento: '',
-    cpf: '',
+    telefone: '',
+    empreendimento_id: '',
     cidade: '',
     estado: '',
     observacoes: '',
     melhor_dia1: '',
     melhor_horario1: '',
     melhor_dia2: '',
-    melhor_horario2: ''
+    melhor_horario2: '',
+    sdr_id: ''
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
   const [refConsultor, setRefConsultor] = useState(null);
   const [nomeConsultor, setNomeConsultor] = useState(null);
+  const [sdrsIncorporadora, setSdrsIncorporadora] = useState([]);
 
   // Estados brasileiros
   const estadosBrasileiros = [
@@ -127,6 +128,23 @@ const CapturaLead = () => {
     };
   }, []);
 
+  // Buscar SDRs da incorporadora
+  useEffect(() => {
+    fetchSDRsIncorporadora();
+  }, []);
+
+  const fetchSDRsIncorporadora = async () => {
+    try {
+      const response = await fetch(`${config.API_BASE_URL}/consultores/sdrs-incorporadora`);
+      const data = await response.json();
+      if (response.ok) {
+        setSdrsIncorporadora(data);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar SDRs:', error);
+    }
+  };
+
   // Função para formatar telefone (formato brasileiro correto)
   const formatarTelefone = (value) => {
     if (!value) return '';
@@ -156,11 +174,6 @@ const CapturaLead = () => {
     }
     
     return limitedNumbers;
-  };
-
-  const formatarCPF = (value) => {
-    const numbers = value.replace(/\D/g, '');
-    return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   };
 
   // Função para formatar nome (mesmo padrão da migração do banco)
@@ -255,9 +268,6 @@ const CapturaLead = () => {
       // Para telefone, permitir apenas números durante a digitação
       const numbersOnly = value.replace(/\D/g, '');
       const formattedValue = numbersOnly.length > 0 ? formatarTelefone(numbersOnly) : '';
-      setFormData(prev => ({ ...prev, [name]: formattedValue }));
-    } else if (name === 'cpf') {
-      const formattedValue = formatarCPF(value);
       setFormData(prev => ({ ...prev, [name]: formattedValue }));
     } else if (name === 'cidade') {
       const formattedValue = formatarCidade(value);
@@ -382,18 +392,6 @@ const CapturaLead = () => {
       newErrors.telefone = 'Telefone deve ter pelo menos 10 dígitos';
     }
     
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email é obrigatório';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Email deve ter um formato válido';
-    }
-    
-    if (!formData.cpf.trim()) {
-      newErrors.cpf = 'CPF é obrigatório';
-    } else if (formData.cpf.replace(/\D/g, '').length !== 11) {
-      newErrors.cpf = 'CPF deve ter 11 dígitos';
-    }
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -419,7 +417,8 @@ const CapturaLead = () => {
       ...formData,
       observacoes: observacoesComDias,
       ref_consultor: refConsultor, // Incluir código de referência se existir
-      origem_formulario: 'captura-lead' // Identificar origem do formulário
+      origem_formulario: 'captura-clientes', // Identificar origem do formulário
+      sdr_id: formData.sdr_id || null // ADICIONAR
     };
 
 
@@ -432,10 +431,24 @@ const CapturaLead = () => {
         body: JSON.stringify(formDataToSend)
       });
       
-      const data = await response.json();
+      console.log('📡 Resposta do servidor:', response.status, response.statusText);
+      
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error('❌ Erro ao parsear JSON:', jsonError);
+        const text = await response.text();
+        console.error('❌ Resposta em texto:', text);
+        setErrors({ general: 'Erro ao processar resposta do servidor.' });
+        setLoading(false);
+        return;
+      }
+      
+      console.log('📦 Dados recebidos:', data);
       
       if (response.ok) {
-        navigate('/captura-sucesso', { 
+        navigate('/captura-sucesso-clientes', { 
           state: { 
             nome: data.nome,
             message: data.message,
@@ -443,10 +456,11 @@ const CapturaLead = () => {
           } 
         });
       } else {
+        console.error('❌ Erro na resposta:', data);
         setErrors({ general: data.error || 'Erro ao enviar cadastro' });
       }
     } catch (error) {
-      console.error('Erro no cadastro:', error);
+      console.error('❌ Erro no cadastro:', error);
       setErrors({ general: 'Erro de conexão. Tente novamente.' });
     } finally {
       setLoading(false);
@@ -461,40 +475,21 @@ const CapturaLead = () => {
           <div className="captura-header">
             <img src={logoBrasao} alt="Logo" className="captura-logo" />
             <h1 className="captura-title">
-              Transforme sua <span className="highlight">autoestima</span>
+              Realize o sonho do seu <span className="highlight">novo lar</span>
             </h1>
             <p className="captura-subtitle">
-              Agende sua consulta gratuita aqui e garanta o procedimento dos seus sonhos parcelado no boleto.
+            Descubra um novo padrão de conforto, design e exclusividade.
+            Agende sua visita e veja como é possível conquistar seu espaço dos sonhos com condições facilitadas.
             </p>
           </div>
 
-          {/* Benefícios */}
-                     <div className="captura-benefits">
-             <div className="benefit-item">
-               <div className="benefit-icon">
-                 <Sparkles size={20} />
-               </div>
-               <span>Consulta Gratuita</span>
-             </div>
-             <div className="benefit-item">
-               <div className="benefit-icon">
-                 <Trophy size={20} />
-               </div>
-               <span>Profissionais Qualificados</span>
-             </div>
-             <div className="benefit-item">
-               <div className="benefit-icon">
-                 <Gem size={20} />
-               </div>
-               <span>Tecnologia Avançada</span>
-             </div>
-           </div>
-
+          
+                     
           {/* Formulário */}
           <div className="captura-form-container">
             <h2 className="form-title">Preencha seus dados</h2>
             <p className="form-subtitle">
-              Entraremos em contato em até 2 horas para agendar sua consulta
+            Em breve entraremos em contato para agendar sua visita.
             </p>
 
             {errors.general && (
@@ -520,6 +515,20 @@ const CapturaLead = () => {
               </div>
 
               <div className="form-group">
+                <label className="form-label">Email (opcional)</label>   
+                <input
+                  type="email"
+                  name="email"
+                  className={`form-input ${errors.email ? 'error' : ''}`}
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  placeholder="Digite um email válido (opcional)"
+                  disabled={loading}
+                />
+                {errors.email && <span className="field-error">{errors.email}</span>}
+              </div>
+
+              <div className="form-group">
                 <label className="form-label">WhatsApp *</label>
                 <input
                   type="tel"
@@ -534,49 +543,23 @@ const CapturaLead = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Email *</label>
-                <input
-                  type="email"
-                  name="email"
-                  className={`form-input ${errors.email ? 'error' : ''}`}
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  placeholder="seu@email.com"
-                  disabled={loading}
-                />
-                {errors.email && <span className="field-error">{errors.email}</span>}
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Tipo de Tratamento</label>
+                <label className="form-label">Escolha um empreendimento de interesse</label>
                 <select
-                  name="tipo_tratamento"
+                  name="empreendimento_id"
                   className="form-select"
-                  value={formData.tipo_tratamento}
+                  value={formData.empreendimento_id}
                   onChange={handleInputChange}
                   disabled={loading}
                 >
                   <option value="">Selecione (opcional)</option>
-                  <option value="Estético">Tratamento Estético</option>
-                  <option value="Odontológico">Tratamento Odontológico</option>
-                  <option value="Ambos">Ambos os Tratamentos</option>
+                  <option value="4">Laguna Sky Garden</option>
+                  <option value="5">Residencial Girassol</option>
+                  <option value="6">Sintropia Sky Garden</option>
+                  <option value="7">Residencial Lotus</option>
+                  <option value="8">River Sky Garden</option>
+                  <option value="9">Condomínio Figueira Garcia</option>
+                  <option value="">Ainda não decidi</option>
                 </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">CPF *</label>
-                <input
-                  type="text"
-                  name="cpf"
-                  className={`form-input ${errors.cpf ? 'error' : ''}`}
-                  value={formData.cpf}
-                  onChange={handleInputChange}
-                  placeholder="000.000.000-00"
-                  disabled={loading}
-                  maxLength="14"
-                />
-                {errors.cpf && <span className="field-error">{errors.cpf}</span>}
-                <span className="cpf-info">Seu CPF está sujeito a uma análise</span>
               </div>
 
               <div className="form-group">
@@ -647,6 +630,24 @@ const CapturaLead = () => {
                     )}
                   </div>
                 )}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Quer ser atendido por quem?</label>
+                <select
+                  name="sdr_id"
+                  className="form-select"
+                  value={formData.sdr_id}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                >
+                  <option value="">Selecione um atendente (opcional)</option>
+                  {sdrsIncorporadora.map(sdr => (
+                    <option key={sdr.id} value={sdr.id}>
+                      {sdr.nome}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="form-group">
@@ -766,45 +767,13 @@ const CapturaLead = () => {
                   <div className="loading-spinner"></div>
                 ) : (
                   <>
-                    <span>Agendar Consulta Gratuita</span>
+                    <span>Agendar gratuitamente</span>
                   </>
                 )}
               </button>
             </form>
           </div>
 
-          {/* Depoimentos */}
-          <div className="captura-testimonials">
-            <h3 className="testimonials-title">O que nossos pacientes dizem</h3>
-            <div className="testimonials-grid">
-                             <div className="testimonial-card">
-                 <div className="testimonial-stars">
-                   <Star size={16} fill="#ffde34" />
-                   <Star size={16} fill="#ffde34" />
-                   <Star size={16} fill="#ffde34" />
-                   <Star size={16} fill="#ffde34" />
-                   <Star size={16} fill="#ffde34" />
-                 </div>
-                 <p className="testimonial-text">
-                   "Profissionais incríveis! Mudaram completamente meu sorriso e minha autoestima."
-                 </p>
-                 <div className="testimonial-author">- Maria Silva</div>
-               </div>
-               <div className="testimonial-card">
-                 <div className="testimonial-stars">
-                   <Star size={16} fill="#ffde34" />
-                   <Star size={16} fill="#ffde34" />
-                   <Star size={16} fill="#ffde34" />
-                   <Star size={16} fill="#ffde34" />
-                   <Star size={16} fill="#ffde34" />
-                 </div>
-                 <p className="testimonial-text">
-                   "Atendimento excepcional e resultados que superaram minhas expectativas."
-                 </p>
-                 <div className="testimonial-author">- João Santos</div>
-               </div>
-            </div>
-          </div>
 
           {/* Footer */}
           <div className="captura-footer">
@@ -832,7 +801,7 @@ const CapturaLead = () => {
       <style jsx>{`
         .captura-lead-container {
           min-height: 100vh;
-          background: linear-gradient(135deg, #1a1d23 0%, #0f1114 100%);
+          background: linear-gradient(135deg, rgb(9, 42, 108) 0%, rgb(7, 50, 116) 100%);
           position: relative;
           overflow-x: hidden;
         }
@@ -1026,7 +995,7 @@ const CapturaLead = () => {
         }
 
         .captura-submit-btn {
-          background: linear-gradient(135deg, #1a1d23 0%, #0f1114 100%);
+          background: linear-gradient(135deg, rgb(9, 42, 108) 0%, rgb(9, 42, 108) 100%);
           color: white;
           border: none;
           padding: 18px 30px;
@@ -1203,4 +1172,4 @@ const CapturaLead = () => {
   );
 };
 
-export default CapturaLead; 
+export default CapturaClientes; 

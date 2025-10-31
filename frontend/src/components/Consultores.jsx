@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import useBranding from '../hooks/useBranding';
-import { useToast } from '../components/Toast';
+import { useToast } from '../hooks/useToast';
 
 const Consultores = () => {
   const { t, shouldShow } = useBranding();

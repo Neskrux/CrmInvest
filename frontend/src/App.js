@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Link, useNavigate } from 'react-router-dom';
 import './App.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { ToastProvider } from './components/Toast';
+import { ToastProvider } from './components/ui/Toast';
 import useBranding from './hooks/useBranding';
 import { HelpCircle } from 'lucide-react';
 import CadastroConsultor from './components/CadastroConsultor';

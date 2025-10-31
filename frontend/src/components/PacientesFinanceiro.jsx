@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import config from '../config';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from '../components/Toast';
+import { useToast } from '../hooks/useToast';
 
 const PacientesFinanceiro = () => {
   const { user } = useAuth();

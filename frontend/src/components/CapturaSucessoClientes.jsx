@@ -9,14 +9,14 @@ const CapturaSucesso = () => {
   const { nome, message, consultor_referencia } = location.state || {};
 
   const handleWhatsApp = () => {
-    const phoneNumber = '5511976631571'; // Número do WhatsApp da clínica
-    const text = `Olá! Acabei de me cadastrar no site como clínica.`;
+    const phoneNumber = '5541997233138'; // Número do WhatsApp da clínica
+    const text = `Olá! Acabei de me cadastrar no site para agendar uma consulta.`;
     const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
 
   const handleVoltar = () => {
-    navigate('/captura-clinica');
+    navigate('/captura-lead');
   };
 
   return (
@@ -28,7 +28,7 @@ const CapturaSucesso = () => {
             Cadastro <span className="highlight">Realizado!</span>
           </h1>
           <p className="sucesso-subtitle">
-            {message || 'Cadastro realizado com sucesso! Entraremos em contato em breve.'}
+            {message || 'Entraremos em contato em breve!'}
           </p>
         </div>
 
@@ -37,8 +37,7 @@ const CapturaSucesso = () => {
             Obrigado por se cadastrar!
           </h2>
           <p className="card-text">
-            Sua solicitação foi enviada com sucesso. Nossa equipe entrará em contato<br />
-            em até <strong>2 horas</strong>.
+            Sua solicitação foi enviada com sucesso. Nossa equipe entrará em contato para marcar seu agendamento gratuito.
           </p>
 
           
@@ -58,65 +57,32 @@ const CapturaSucesso = () => {
               </div>
               <div className="step-item">
                 <div className="step-icon">
+                  <Clock size={20} color="#ffffff" />
+                </div>
+                <div className="step-content">
+                  <strong>Marque seu agendamento gratuito</strong>
+                  <p>Escolha o melhor horário para você</p>
+                </div>
+              </div>
+              <div className="step-item">
+                <div className="step-icon">
                   <Users size={20} color="#ffffff" />
                 </div>
                 <div className="step-content">
-                  <strong>Novos pacientes</strong>
-                  <p>Disponibilizamos uma rede de pacientes para você</p>
+                  <strong>Realize seu agendamento</strong>
+                  <p>Encontre o imóvel ideal com orientação profissional</p>
                 </div>
               </div>
             </div>
           </div>
-
-          <div className="action-buttons">
-            <button 
-              onClick={handleWhatsApp}
-              className="whatsapp-btn"
-            >
-              <MessageCircle size={20} />
-              Falar no WhatsApp Agora
-            </button>
-            <button 
-              onClick={handleVoltar}
-              className="secondary-btn"
-            >
-              <ArrowRight size={20} />
-              Fazer Novo Cadastro
-            </button>
-          </div>
         </div>
 
-        <div className="additional-info">
-          <div className="info-cards">
-            <div className="info-card">
-              <div className="info-icon">
-                <Clock size={32} color="#ffde34" />
-              </div>
-              <h4>Resposta Rápida</h4>
-              <p>Respondemos em<br /> até 2 horas</p>
-            </div>
-            <div className="info-card">
-              <div className="info-icon">
-                <Gift size={32} color="#ffde34" />
-              </div>
-              <h4>Valores Antecipados</h4>
-              <p>Antecipe seus valores à vista de tratamentos parcelados no boleto</p>
-            </div>
-            <div className="info-card">
-              <div className="info-icon">
-                <Star size={32} color="#ffde34" />
-              </div>
-              <h4>Novos Pacientes</h4>
-              <p>Disponibilizamos uma rede de pacientes<br /> para você</p>
-            </div>
-          </div>
-        </div>
       </div>
 
       <style jsx>{`
         .sucesso-container {
           min-height: 100vh;
-          background: linear-gradient(135deg, #1a1d23 0%, #0f1114 100%);
+          background: linear-gradient(135deg,rgb(9, 42, 108) 0%,rgb(7, 50, 116) 100%);
           padding: 20px;
           display: flex;
           align-items: center;
@@ -185,7 +151,7 @@ const CapturaSucesso = () => {
         }
 
         .highlight {
-          background: #ffde34;
+          background:rgb(255, 214, 8);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
@@ -255,7 +221,7 @@ const CapturaSucesso = () => {
         }
 
         .step-icon {
-          background: linear-gradient(135deg, #059669 0%, #047857 100%);
+          background: linear-gradient(135deg, rgb(9, 42, 108) 0%, rgb(9, 42, 108) 100%);
           color: white;
           width: 40px;
           height: 40px;
@@ -264,7 +230,7 @@ const CapturaSucesso = () => {
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
-          box-shadow: 0 4px 15px rgba(5, 150, 105, 0.3);
+          box-shadow: 0 4px 15px rgb(9, 42, 108));
         }
 
         .step-content strong {
@@ -311,8 +277,8 @@ const CapturaSucesso = () => {
 
         .secondary-btn {
           background: transparent;
-          color: #000000;
-          border: 2px solid #000000;
+          color: rgb(9, 42, 108);
+          border: 2px solid rgb(9, 42, 108);
           padding: 15px 25px;
           border-radius: 12px;
           font-size: 1rem;
@@ -326,7 +292,7 @@ const CapturaSucesso = () => {
         }
 
         .secondary-btn:hover {
-          background: #ffde34;
+          background:rgb(180, 150, 0);
           color: #1a1d23;
           transform: translateY(-2px);
         }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from './Toast';
+import { useToast } from '../hooks/useToast';
 import useBranding from '../hooks/useBranding';
 import { FileImage, Calendar, User, Filter, Search, Eye, X, Download } from 'lucide-react';
 

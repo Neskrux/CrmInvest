@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import useBranding from '../hooks/useBranding';
-import { useToast } from '../components/Toast';
+import { useToast } from '../hooks/useToast';
 import ModalEvidencia from './ModalEvidencia';
 import useSmartPolling from '../hooks/useSmartPolling';
 

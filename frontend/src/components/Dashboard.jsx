@@ -4,7 +4,7 @@ import useBranding from '../hooks/useBranding';
 import useFechamentoNotifications from '../hooks/useFechamentoNotifications';
 import useAgendamentoNotifications from '../hooks/useAgendamentoNotifications';
 import useIncorporadoraNotifications from '../hooks/useIncorporadoraNotifications';
-import { useToast } from '../components/Toast';
+import { useToast } from '../hooks/useToast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, Area, ReferenceLine, ComposedChart } from 'recharts';
 import { TrendingUp, Calendar, BarChart3, CheckCircle, XCircle, RotateCcw, UserPlus } from 'lucide-react';
 
