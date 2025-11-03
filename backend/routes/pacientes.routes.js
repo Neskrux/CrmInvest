@@ -20,6 +20,15 @@ router.put('/pacientes/:id', authenticateToken, pacientesController.updatePacien
 // PUT /api/pacientes/:id/status - Atualizar status do paciente
 router.put('/pacientes/:id/status', authenticateToken, pacientesController.updateStatusPaciente);
 
+// POST /api/pacientes/:id/criar-login - Criar login para paciente (apenas clínica)
+router.post('/pacientes/:id/criar-login', authenticateToken, pacientesController.criarLoginPaciente);
+
+// PUT /api/pacientes/:id/atualizar-login - Atualizar login do paciente (apenas clínica)
+router.put('/pacientes/:id/atualizar-login', authenticateToken, pacientesController.atualizarLoginPaciente);
+
+// PUT /api/pacientes/:id/desativar-login - Desativar login do paciente (apenas clínica)
+router.put('/pacientes/:id/desativar-login', authenticateToken, pacientesController.desativarLoginPaciente);
+
 // DELETE /api/pacientes/:id - Excluir paciente (apenas admin)
 router.delete('/pacientes/:id', authenticateToken, pacientesController.deletePaciente);
 

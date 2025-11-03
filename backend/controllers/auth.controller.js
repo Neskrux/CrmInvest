@@ -185,7 +185,7 @@ const login = async (req, res) => {
 
     // Se não encontrou admin, clínica, empresa nem parceiro, tentar login como consultor
     if (!usuario && typeof email === 'string' && email.includes('@')) {
-      if (isDevelopment) console.log('🔍 [5/5] Buscando em CONSULTORES...');
+      if (isDevelopment) console.log('🔍 [5/6] Buscando em CONSULTORES...');
       
       const { data: consultores, error } = await supabaseAdmin
         .from('consultores')
@@ -220,6 +220,44 @@ const login = async (req, res) => {
       }
     }
 
+    // Se não encontrou nenhum tipo anterior, tentar login como paciente
+    if (!usuario && typeof email === 'string' && email.includes('@')) {
+      if (isDevelopment) console.log('🔍 [6/6] Buscando em PACIENTES...');
+      
+      const { data: pacientes, error } = await supabaseAdmin
+        .from('pacientes')
+        .select('*')
+        .eq('email_login', emailNormalizado)
+        .eq('tem_login', true)
+        .eq('login_ativo', true);
+
+      if (error) {
+        logError(error, 'Erro ao buscar em pacientes');
+        throw error;
+      }
+
+      if (isDevelopment) {
+        console.log('🔍 Resultados em PACIENTES:', pacientes ? pacientes.length : 0);
+      }
+
+      if (pacientes && pacientes.length > 0) {
+        if (pacientes.length > 1) {
+          console.error('⚠️ ALERTA CRÍTICO: Múltiplos pacientes com o mesmo email!');
+          if (isDevelopment) {
+            console.error('Detalhes:', pacientes.map(p => ({ id: p.id, nome: p.nome, email: p.email_login })));
+          }
+        }
+        usuario = pacientes[0];
+        tipoLogin = 'paciente';
+        if (isDevelopment) {
+          console.log('✅ Usuário encontrado em: PACIENTE');
+          console.log('📋 ID:', usuario.id, '| Nome:', usuario.nome);
+        }
+      } else {
+        if (isDevelopment) console.log('❌ Não encontrado em pacientes');
+      }
+    }
+
     if (isDevelopment) console.log('📋 Tipo de login detectado:', tipoLogin);
 
     if (!usuario) {
@@ -227,27 +265,45 @@ const login = async (req, res) => {
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
-    // Verificar senha (diferente para clínicas que usam senha_hash)
+    // Verificar senha (diferente para clínicas e pacientes que usam senha_hash)
     let senhaValida = false;
     
-    if (tipoLogin === 'clinica') {
-      // Clínicas usam o campo senha_hash
+    if (tipoLogin === 'clinica' || tipoLogin === 'paciente') {
+      // Clínicas e pacientes usam o campo senha_hash
+      if (isDevelopment) {
+        console.log('🔑 Verificando senha para', tipoLogin);
+        console.log('🔑 senha_hash existe?', !!usuario.senha_hash);
+        console.log('🔑 senha_hash length:', usuario.senha_hash?.length);
+      }
       senhaValida = await bcrypt.compare(senha, usuario.senha_hash);
+      if (isDevelopment) {
+        console.log('🔑 Senha válida?', senhaValida);
+      }
     } else {
       // Outros usuários usam o campo senha
       senhaValida = await bcrypt.compare(senha, usuario.senha);
     }
     
     if (!senhaValida) {
+      if (isDevelopment) {
+        console.log('❌ Senha inválida para', tipoLogin);
+      }
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
-    // Atualizar último login
+    // Atualizar último login (diferente para pacientes)
     try {
-      await supabaseAdmin
-        .from('usuarios')
-        .update({ ultimo_login: new Date().toISOString() })
-        .eq('id', usuario.id);
+      if (tipoLogin === 'paciente') {
+        await supabaseAdmin
+          .from('pacientes')
+          .update({ ultimo_login: new Date().toISOString() })
+          .eq('id', usuario.id);
+      } else {
+        await supabaseAdmin
+          .from('usuarios')
+          .update({ ultimo_login: new Date().toISOString() })
+          .eq('id', usuario.id);
+      }
     } catch (error) {
       logError(error, 'Erro ao atualizar ultimo_login');
     }
@@ -256,14 +312,20 @@ const login = async (req, res) => {
     const payload = {
       id: usuario.id,
       nome: usuario.nome,
-      email: tipoLogin === 'clinica' ? usuario.email_login : usuario.email,
-      tipo: tipoLogin === 'empresa' ? 'empresa' : (tipoLogin === 'parceiro' ? 'parceiro' : (tipoLogin === 'clinica' ? 'clinica' : usuario.tipo)),
+      email: tipoLogin === 'clinica' ? usuario.email_login : 
+             tipoLogin === 'paciente' ? usuario.email_login : 
+             usuario.email,
+      tipo: tipoLogin === 'empresa' ? 'empresa' : 
+            (tipoLogin === 'parceiro' ? 'parceiro' : 
+            (tipoLogin === 'clinica' ? 'clinica' : 
+            (tipoLogin === 'paciente' ? 'paciente' : usuario.tipo))),
       clinica_id: tipoLogin === 'clinica' ? usuario.id : null,
+      paciente_id: tipoLogin === 'paciente' ? usuario.id : null,
       consultor_id: usuario.consultor_id !== undefined ? usuario.consultor_id : (tipoLogin === 'consultor' ? usuario.id : null),
       empresa_id: tipoLogin === 'empresa' ? usuario.id : (usuario.empresa_id || null),
-      podealterarstatus: (tipoLogin === 'empresa' || tipoLogin === 'parceiro' || tipoLogin === 'clinica') ? false : (usuario.podealterarstatus || usuario.tipo === 'admin' || false),
-      pode_ver_todas_novas_clinicas: (tipoLogin === 'empresa' || tipoLogin === 'parceiro' || tipoLogin === 'clinica') ? false : (usuario.pode_ver_todas_novas_clinicas || false),
-      is_freelancer: (tipoLogin === 'admin' || tipoLogin === 'empresa' || tipoLogin === 'parceiro' || tipoLogin === 'clinica') ? false : (usuario.is_freelancer === true)
+      podealterarstatus: (tipoLogin === 'empresa' || tipoLogin === 'parceiro' || tipoLogin === 'clinica' || tipoLogin === 'paciente') ? false : (usuario.podealterarstatus || usuario.tipo === 'admin' || false),
+      pode_ver_todas_novas_clinicas: (tipoLogin === 'empresa' || tipoLogin === 'parceiro' || tipoLogin === 'clinica' || tipoLogin === 'paciente') ? false : (usuario.pode_ver_todas_novas_clinicas || false),
+      is_freelancer: (tipoLogin === 'admin' || tipoLogin === 'empresa' || tipoLogin === 'parceiro' || tipoLogin === 'clinica' || tipoLogin === 'paciente') ? false : (usuario.is_freelancer === true)
     };
 
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
@@ -272,11 +334,12 @@ const login = async (req, res) => {
     delete usuario.senha;
     delete usuario.senha_hash;
 
-    // Garante que usuario.tipo, consultor_id, empresa_id, clinica_id, podealterarstatus, pode_ver_todas_novas_clinicas e is_freelancer também estejam presentes no objeto de resposta
+    // Garante que usuario.tipo, consultor_id, empresa_id, clinica_id, paciente_id, podealterarstatus, pode_ver_todas_novas_clinicas e is_freelancer também estejam presentes no objeto de resposta
     usuario.tipo = payload.tipo;
     usuario.consultor_id = payload.consultor_id;
     usuario.empresa_id = payload.empresa_id;
     usuario.clinica_id = payload.clinica_id;
+    usuario.paciente_id = payload.paciente_id;
     usuario.podealterarstatus = payload.podealterarstatus;
     usuario.pode_ver_todas_novas_clinicas = payload.pode_ver_todas_novas_clinicas;
     usuario.is_freelancer = payload.is_freelancer;
@@ -377,6 +440,20 @@ const verifyToken = async (req, res) => {
         tipo = 'clinica';
         consultor_id = clinicaData.consultor_id || null;
       }
+    } else if (req.user.tipo === 'paciente') {
+      const { data: pacienteData } = await supabaseAdmin
+        .from('pacientes')
+        .select('*')
+        .eq('id', req.user.id)
+        .eq('tem_login', true)
+        .eq('login_ativo', true)
+        .single();
+
+      if (pacienteData) {
+        usuario = pacienteData;
+        tipo = 'paciente';
+        consultor_id = null;
+      }
     }
 
     if (!usuario) {
@@ -389,14 +466,17 @@ const verifyToken = async (req, res) => {
     res.json({
       usuario: {
         ...dadosUsuario,
-        email: tipo === 'clinica' ? usuario.email_login : usuario.email,
+        email: tipo === 'clinica' ? usuario.email_login : 
+               tipo === 'paciente' ? usuario.email_login : 
+               usuario.email,
         tipo,
         consultor_id,
+        paciente_id: tipo === 'paciente' ? usuario.id : null,
         empresa_id: tipo === 'empresa' ? usuario.id : (usuario.empresa_id || null),
         clinica_id: tipo === 'clinica' ? usuario.id : null,
-        podealterarstatus: (tipo === 'empresa' || tipo === 'parceiro' || tipo === 'clinica') ? false : (usuario.podealterarstatus || tipo === 'admin' || false),
-        pode_ver_todas_novas_clinicas: (tipo === 'empresa' || tipo === 'parceiro' || tipo === 'clinica') ? false : (usuario.pode_ver_todas_novas_clinicas || false),
-        is_freelancer: (tipo === 'admin' || tipo === 'empresa' || tipo === 'parceiro' || tipo === 'clinica') ? false : (usuario.is_freelancer === true)
+        podealterarstatus: (tipo === 'empresa' || tipo === 'parceiro' || tipo === 'clinica' || tipo === 'paciente') ? false : (usuario.podealterarstatus || tipo === 'admin' || false),
+        pode_ver_todas_novas_clinicas: (tipo === 'empresa' || tipo === 'parceiro' || tipo === 'clinica' || tipo === 'paciente') ? false : (usuario.pode_ver_todas_novas_clinicas || false),
+        is_freelancer: (tipo === 'admin' || tipo === 'empresa' || tipo === 'parceiro' || tipo === 'clinica' || tipo === 'paciente') ? false : (usuario.is_freelancer === true)
       }
     });
   } catch (error) {

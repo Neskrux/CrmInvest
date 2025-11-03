@@ -5,7 +5,8 @@ const path = require('path');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 const helmet = require('helmet');
-require('dotenv').config();
+// Carregar variáveis de ambiente do arquivo .env no diretório backend
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 // Importar configurações
 const corsConfig = require('./config/cors');

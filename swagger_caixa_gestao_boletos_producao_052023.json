@@ -1,0 +1,1511 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "API Cobranca Bancaria - Gestao de Boletos",
+    "version": "3.2.0",
+    "description": "Gestão da cobrança bancária CAIXA com operações de consulta, inclusão, alteração e baixa de boletos.\n\nAs informacoes trafegadas pela API são de nivel II, confidenciais/restritas.\n\nEquipe de desenvolvimento responsavel: CEDESSP671/SUDEB06",
+    "contact": {
+      "name": "GEFAT - Gerencia Nacional Fabrica de Atacado",
+      "email": "gefat11@caixa.gov.br"
+    }
+  },
+  "host": "api.caixa.gov.br:8443",
+  "basePath": "/cobranca-bancaria",
+  "schemes": [
+    "https"
+  ],
+  "paths": {
+    "/v2/beneficiarios/{id_beneficiario}/boletos/{nosso_numero}/baixar": {
+      "post": {
+        "tags": [
+          "Gestao de Boletos"
+        ],
+        "operationId": "Baixa_Boleto",
+        "responses": {
+          "200": {
+            "description": "Operacao realizada com sucesso. Baixa do Boleto efetuada.",
+            "schema": {
+              "$ref": "#/definitions/baixa_boleto_resposta_v3_Mensagem"
+            }
+          },
+          "400": {
+            "description": "Sintaxe Invalida.",
+            "schema": {
+              "$ref": "#/definitions/resposta_erro_Type"
+            }
+          },
+          "401": {
+            "description": "Nao autorizado.",
+            "schema": {
+              "$ref": "#/definitions/resposta_erro_Type"
+            }
+          },
+          "403": {
+            "description": "Proibido.",
+            "schema": {
+              "$ref": "#/definitions/resposta_erro_Type"
+            }
+          },
+          "404": {
+            "description": "Beneficiario nao encontrado.",
+            "schema": {
+              "$ref": "#/definitions/resposta_erro_Type"
+            }
+          },
+          "500": {
+            "description": "Erro interno servidor.",
+            "schema": {
+              "$ref": "#/definitions/resposta_erro_Type"
+            }
+          }
+        },
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "description": "Baixa Boleto",
+        "parameters": [
+          {
+            "required": true,
+            "name": "id_beneficiario",
+            "in": "path",
+            "type": "integer",
+            "description": "Codigo do Beneficiario."
+          },
+          {
+            "required": true,
+            "name": "nosso_numero",
+            "in": "path",
+            "type": "string",
+            "description": "Nosso Numero."
+          }
+        ]
+      }
+    },
+    "/v4/beneficiarios/{id_beneficiario}/boletos/{nosso_numero}": {
+      "get": {
+        "tags": [
+          "Gestao de Boletos"
+        ],
+        "operationId": "Consulta_Boleto",
+        "responses": {
+          "200": {
+            "description": "Operacao realizada com sucesso. Boleto encontrado.",
+            "schema": {
+              "$ref": "#/definitions/consulta_boleto_resposta_Mensagem_v4"
+            }
+          },
+          "400": {
+            "description": "Sintaxe Invalida.",
+            "schema": {
+              "$ref": "#/definitions/resposta_erro_Type"
+            }
+          },
+          "401": {
+            "description": "Nao autorizado.",
+            "schema": {
+              "$ref": "#/definitions/resposta_erro_Type"
+            }
+          },
+          "403": {
+            "description": "Proibido.",
+            "schema": {
+              "$ref": "#/definitions/resposta_erro_Type"
+            }
+          },
+          "404": {
+            "description": "Beneficiario nao encontrado.",
+            "schema": {
+              "$ref": "#/definitions/resposta_erro_Type"
+            }
+          },
+          "500": {
+            "description": "Erro interno servidor.",
+            "schema": {
+              "$ref": "#/definitions/dados_cadastrais_Type"
+            }
+          }
+        },
+        "produces": [
+          "application/json"
+        ],
+        "description": "Consulta Boleto",
+        "parameters": [
+          {
+            "required": true,
+            "name": "id_beneficiario",
+            "in": "path",
+            "type": "integer",
+            "description": "Codigo do Beneficiario."
+          },
+          {
+            "required": true,
+            "name": "nosso_numero",
+            "in": "path",
+            "type": "string",
+            "description": "Nosso Numero."
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Gestao de Boletos"
+        ],
+        "operationId": "Altera_Boleto",
+        "responses": {
+          "200": {
+            "description": "Operacao realizada com suecesso. Boleto alterado.",
+            "schema": {
+              "$ref": "#/definitions/altera_boleto_resposta_v4_Mensagem"
+            }
+          },
+          "400": {
+            "description": "Sintaxe invalida.",
+            "schema": {
+              "$ref": "#/definitions/resposta_erro_Type"
+            }
+          },
+          "401": {
+            "description": "Nao autorizado.",
+            "schema": {
+              "$ref": "#/definitions/resposta_erro_Type"
+            }
+          },
+          "403": {
+            "description": "Proibido.",
+            "schema": {
+              "$ref": "#/definitions/resposta_erro_Type"
+            }
+          },
+          "404": {
+            "description": "Beneficiario nao encontrado.",
+            "schema": {
+              "$ref": "#/definitions/resposta_erro_Type"
+            }
+          },
+          "500": {
+            "description": "Erro interno servidor.",
+            "schema": {
+              "$ref": "#/definitions/resposta_erro_Type"
+            }
+          }
+        },
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "description": "Altera Boleto",
+        "parameters": [
+          {
+            "required": true,
+            "name": "id_beneficiario",
+            "in": "path",
+            "type": "integer",
+            "description": "Codigo do Beneficiario."
+          },
+          {
+            "required": true,
+            "name": "nosso_numero",
+            "in": "path",
+            "type": "string",
+            "description": "Nosso Numero."
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/altera_boleto_requisicao_v4_Mensagem"
+            },
+            "description": "Corpo da requisicao para a operacao Altera Boleto.",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/v4/beneficiarios/{id_beneficiario}/boletos": {
+      "post": {
+        "tags": [
+          "Gestao de Boletos"
+        ],
+        "operationId": "Inclui_Boleto",
+        "responses": {
+          "200": {
+            "description": "Operacao realizada com sucesso. Boleto incluido.",
+            "schema": {
+              "$ref": "#/definitions/inclui_boleto_resposta_Mensagem_v4"
+            }
+          },
+          "400": {
+            "description": "Sintaxe Invalida.",
+            "schema": {
+              "$ref": "#/definitions/resposta_erro_Type"
+            }
+          },
+          "401": {
+            "description": "Nao Autorizado.",
+            "schema": {
+              "$ref": "#/definitions/resposta_erro_Type"
+            }
+          },
+          "403": {
+            "description": "Proibido.",
+            "schema": {
+              "$ref": "#/definitions/resposta_erro_Type"
+            }
+          },
+          "404": {
+            "description": "Beneficiario nao encontrado.",
+            "schema": {
+              "$ref": "#/definitions/resposta_erro_Type"
+            }
+          },
+          "500": {
+            "description": "Erro interno.",
+            "schema": {
+              "$ref": "#/definitions/resposta_erro_Type"
+            }
+          }
+        },
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "description": "Inclui Boleto",
+        "parameters": [
+          {
+            "required": true,
+            "name": "id_beneficiario",
+            "in": "path",
+            "type": "integer",
+            "description": "Codigo do Beneficiario."
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/inclui_boleto_requisicao_v4_Mensagem"
+            },
+            "description": "Corpo da requisicao para a operacao inclui Boleto",
+            "required": true
+          }
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "dados_cadastrais_Type": {
+      "required": [
+        "numero_documento",
+        "data_vencimento",
+        "valor",
+        "tipo_especie",
+        "flag_aceite",
+        "data_emissao",
+        "valor_abatimento"
+      ],
+      "type": "object",
+      "properties": {
+        "cpf": {
+          "format": "int64",
+          "maximum": 99999999999,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "cnpj": {
+          "format": "int64",
+          "maximum": 99999999999999,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "nosso_numero": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "numero_documento": {
+          "maxLength": 11,
+          "minLength": 1,
+          "type": "string"
+        },
+        "data_vencimento": {
+          "format": "date",
+          "type": "string"
+        },
+        "valor": {
+          "format": "double",
+          "maximum": 9999999999999.99,
+          "minimum": 0,
+          "type": "number"
+        },
+        "tipo_especie": {
+          "maximum": 99,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "flag_aceite": {
+          "enum": [
+            "S",
+            "N"
+          ],
+          "type": "string"
+        },
+        "data_emissao": {
+          "format": "date",
+          "type": "string"
+        },
+        "juros_mora": {
+          "type": "object",
+          "properties": {
+            "tipo": {
+              "enum": [
+                "VALOR_POR_DIA",
+                "TAXA_MENSAL",
+                "ISENTO"
+              ],
+              "type": "string"
+            },
+            "data": {
+              "format": "date",
+              "type": "string"
+            },
+            "valor": {
+              "maximum": 9999999999999.99,
+              "minimum": 0,
+              "type": "number"
+            },
+            "percentual": {
+              "maximum": 9999999999.99999,
+              "minimum": 0,
+              "type": "number"
+            }
+          }
+        },
+        "valor_abatimento": {
+          "maximum": 9999999999999.99,
+          "minimum": 0,
+          "type": "number"
+        },
+        "pos_vencimento": {
+          "type": "object",
+          "properties": {
+            "acao": {
+              "enum": [
+                "PROTESTAR",
+                "DEVOLVER"
+              ],
+              "type": "string"
+            },
+            "numero_dias": {
+              "maximum": 999,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        },
+        "codigo_moeda": {
+          "maximum": 99,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pagador": {
+          "type": "object",
+          "properties": {
+            "pessoa_fisica": {
+              "type": "object",
+              "properties": {
+                "cpf": {
+                  "format": "int64",
+                  "maximum": 99999999999,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "nome": {
+                  "maxLength": 40,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              }
+            },
+            "pessoa_juridica": {
+              "type": "object",
+              "properties": {
+                "cnpj": {
+                  "format": "int64",
+                  "maximum": 99999999999999,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "razao_social": {
+                  "maxLength": 40,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              }
+            },
+            "endereco": {
+              "type": "object",
+              "properties": {
+                "logradouro": {
+                  "maxLength": 40,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "bairro": {
+                  "maxLength": 15,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "cidade": {
+                  "maxLength": 15,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "uf": {
+                  "maxLength": 2,
+                  "minLength": 2,
+                  "type": "string"
+                },
+                "cep": {
+                  "format": "int32",
+                  "maximum": 99999999,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "beneficiario_final": {
+          "type": "object",
+          "properties": {
+            "pessoa_fisica": {
+              "type": "object",
+              "properties": {
+                "cpf": {
+                  "format": "int64",
+                  "maximum": 99999999999,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "nome": {
+                  "maxLength": 40,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              }
+            },
+            "pessoa_juridica": {
+              "type": "object",
+              "properties": {
+                "cnpj": {
+                  "format": "int64",
+                  "maximum": 99999999999999,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "razao_social": {
+                  "maxLength": 40,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "multa": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "format": "date",
+              "type": "string"
+            },
+            "valor": {
+              "maximum": 9999999999999.99,
+              "minimum": 0,
+              "type": "number"
+            },
+            "percentual": {
+              "maximum": 9999999999.99999,
+              "minimum": 0,
+              "type": "number"
+            }
+          }
+        },
+        "descontos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/descontos_Type"
+          }
+        },
+        "valor_iof": {
+          "maximum": 9999999999999.99,
+          "minimum": 0,
+          "type": "number"
+        },
+        "identificacao_empresa": {
+          "maxLength": 25,
+          "minLength": 1,
+          "type": "string"
+        },
+        "ficha_compensacao": {
+          "type": "object",
+          "properties": {
+            "mensagem": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/mensagem_Type"
+              }
+            }
+          }
+        },
+        "recibo_pagador": {
+          "type": "object",
+          "properties": {
+            "mensagem": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/mensagem_Type"
+              }
+            }
+          }
+        },
+        "pagamento": {
+          "type": "object",
+          "properties": {
+            "quantidade_permitida": {
+              "maximum": 99,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "tipo": {
+              "enum": [
+                "ACEITA_QUALQUER_VALOR",
+                "ACEITA_VALORES_ENTRE_MINIMO_MAXIMO",
+                "NAO_ACEITA_VALOR_DIVERGENTE"
+              ],
+              "type": "string"
+            },
+            "valor": {
+              "type": "object",
+              "properties": {
+                "minimo": {
+                  "maximum": 9999999999999.99,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "maximo": {
+                  "maximum": 9999999999999.99,
+                  "minimum": 0,
+                  "type": "number"
+                }
+              }
+            },
+            "percentual": {
+              "type": "object",
+              "properties": {
+                "minimo": {
+                  "maximum": 9999999999.99999,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "maximo": {
+                  "maximum": 9999999999.99999,
+                  "minimum": 0,
+                  "type": "number"
+                }
+              }
+            },
+            "flag_pagamento_parcial": {
+              "enum": [
+                "S",
+                "N"
+              ],
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "dados_complementares_Type": {
+      "type": "object",
+      "properties": {
+        "codigo_barras": {
+          "maxLength": 44,
+          "minLength": 44,
+          "type": "string",
+          "default": "10400001000020000300004000050000600007000080"
+        },
+        "linha_digitavel": {
+          "maxLength": 47,
+          "minLength": 47,
+          "type": "string",
+          "default": "10400001000020000300004000050000600007000080000"
+        },
+        "url": {
+          "maxLength": 255,
+          "minLength": 1,
+          "type": "string"
+        },
+        "nosso_numero": {
+          "format": "int64",
+          "maximum": 100000000000000000,
+          "minimum": 0,
+          "type": "integer"
+        }
+      }
+    },
+    "negocial_Type": {
+      "type": "object",
+      "properties": {
+        "origem": {
+          "maxLength": 50,
+          "minLength": 1,
+          "type": "string"
+        },
+        "codigo": {
+          "maxLength": 5,
+          "minLength": 1,
+          "type": "string"
+        },
+        "mensagem": {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        }
+      }
+    },
+    "integracao_Type": {
+      "type": "object",
+      "properties": {
+        "codigo": {
+          "maxLength": 5,
+          "minLength": 1,
+          "type": "string"
+        },
+        "mensagem": {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        "excecao": {
+          "type": "object"
+        }
+      }
+    },
+    "resposta_erro_Type": {
+      "type": "object",
+      "properties": {
+        "negocial": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/negocial_Type"
+          }
+        },
+        "integracao": {
+          "$ref": "#/definitions/integracao_Type"
+        }
+      }
+    },
+    "consulta_boleto_resposta": {
+      "type": "object",
+      "properties": {
+        "dados_cadastrais": {
+          "$ref": "#/definitions/dados_cadastrais_Type"
+        },
+        "dados_complementares": {
+          "$ref": "#/definitions/dados_complementares_Type"
+        }
+      }
+    },
+    "inclui_boleto_requisicao": {
+      "type": "object",
+      "properties": {
+        "dados_cadastrais": {
+          "$ref": "#/definitions/dados_cadastrais_Type"
+        }
+      }
+    },
+    "inclui_boleto_resposta": {
+      "type": "object",
+      "properties": {
+        "dados_complementares": {
+          "$ref": "#/definitions/dados_complementares_Type"
+        }
+      }
+    },
+    "altera_boleto_resposta": {
+      "type": "object",
+      "properties": {
+        "dados_complementares": {
+          "$ref": "#/definitions/dados_complementares_Type"
+        }
+      }
+    },
+    "descontos_Type": {
+      "type": "object",
+      "properties": {
+        "tipo": {
+          "enum": [
+            "ISENTO",
+            "VALOR_FIXO_ATE_DATA",
+            "PERCENTUAL_ATE_DATA",
+            "VALOR_ANTECIPACAO_DIA_CORRIDO",
+            "VALOR_ANTECIPACAO_DIA_UTIL",
+            "PERCENTUAL_ANTECIPACAO_DIA_CORRIDO",
+            "PERCENTUAL_ANTECIPACAO_DIA_UTIL"
+          ],
+          "type": "string"
+        },
+        "data": {
+          "format": "date",
+          "type": "string"
+        },
+        "valor": {
+          "maximum": 9999999999999.99,
+          "minimum": 0,
+          "type": "number"
+        },
+        "percentual": {
+          "maximum": 9999999999.99999,
+          "minimum": 0,
+          "type": "number"
+        }
+      }
+    },
+    "mensagem_Type": {
+      "type": "object",
+      "properties": {
+        "descricao": {
+          "maxLength": 40,
+          "minLength": 1,
+          "type": "string"
+        }
+      }
+    },
+    "inclui_boleto_requisicao_v2": {
+      "type": "object",
+      "properties": {
+        "dados_cadastrais": {
+          "$ref": "#/definitions/dados_cadastrais_v2_Type"
+        }
+      }
+    },
+    "altera_boleto_requisicao_v2": {
+      "type": "object",
+      "properties": {
+        "dados_cadastrais": {
+          "$ref": "#/definitions/dados_cadastrais_v2_Type"
+        }
+      }
+    },
+    "consulta_boleto_resposta_v2": {
+      "type": "object",
+      "properties": {
+        "dados_cadastrais": {
+          "$ref": "#/definitions/dados_cadastrais_v2_Type"
+        },
+        "dados_complementares": {
+          "$ref": "#/definitions/dados_complementares_Type"
+        }
+      }
+    },
+    "altera_boleto_requisicao": {
+      "type": "object",
+      "properties": {
+        "dados_cadastrais": {
+          "$ref": "#/definitions/dados_cadastrais_Type"
+        }
+      }
+    },
+    "dados_cadastrais_v2_Type": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/dados_cadastrais_Type"
+        },
+        {
+          "properties": {
+            "carteira": {
+              "enum": [
+                "COBRANCA_SIMPLES",
+                "COBRANCA_VINCULADA",
+                "COBRANCA_CAUCIONADA",
+                "COBRANCA_DESCONTADA",
+                "COBRANCA_CESSAO"
+              ],
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "dados_cadastrais_v3_Type": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/dados_cadastrais_v2_Type"
+        },
+        {
+          "properties": {
+            "tipo_boleto": {
+              "type": "string",
+              "enum": [
+                "PADRAO",
+                "HIBRIDO"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "dados_complementares_v3_Type": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/dados_complementares_Type"
+        },
+        {
+          "properties": {
+            "qrcode": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 800
+            },
+            "url_qrcode": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 345
+            }
+          }
+        }
+      ]
+    },
+    "inclui_boleto_requisicao_v3_Mensagem": {
+      "type": "object",
+      "properties": {
+        "dados_cadastrais": {
+          "$ref": "#/definitions/dados_cadastrais_v3_Type"
+        }
+      }
+    },
+    "altera_boleto_requisicao_v3_Mensagem": {
+      "type": "object",
+      "properties": {
+        "dados_cadastrais": {
+          "$ref": "#/definitions/dados_cadastrais_v3_Type"
+        }
+      }
+    },
+    "consulta_boleto_resposta_Mensagem_v3": {
+      "type": "object",
+      "properties": {
+        "dados_cadastrais": {
+          "$ref": "#/definitions/dados_cadastrais_v3_Type"
+        },
+        "dados_complementares": {
+          "$ref": "#/definitions/dados_complementares_v3_Type"
+        }
+      }
+    },
+    "inclui_boleto_resposta_Mensagem_v3": {
+      "type": "object",
+      "properties": {
+        "dados_complementares": {
+          "$ref": "#/definitions/dados_complementares_v3_Type"
+        }
+      }
+    },
+    "altera_boleto_resposta_v3_Mensagem": {
+      "type": "object",
+      "properties": {
+        "dados_complementares": {
+          "$ref": "#/definitions/dados_complementares_v3_Type"
+        }
+      }
+    },
+    "baixa_boleto_resposta_v3_Mensagem": {
+      "type": "object",
+      "properties": {
+        "qrcode": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 800
+        },
+        "url_qrcode": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 345
+        }
+      }
+    },
+    "multa_Type": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "string",
+          "format": "date"
+        },
+        "valor": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 9999999999999.99
+        },
+        "percentual": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 9999999999999.99
+        }
+      }
+    },
+    "juros_Type": {
+      "type": "object",
+      "properties": {
+        "tipo": {
+          "type": "string",
+          "enum": [
+            "VALOR_POR_DIA",
+            "TAXA_MENSAL",
+            "ISENTO"
+          ]
+        },
+        "data": {
+          "type": "string",
+          "format": "date"
+        },
+        "valor": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 9999999999999.99
+        },
+        "percentual": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 9999999999999.99
+        }
+      }
+    },
+    "pagador_devedor_Type": {
+      "type": "object",
+      "properties": {
+        "pessoa_fisica": {
+          "$ref": "#/definitions/pessoa_fisica_Type"
+        },
+        "pessoa_juridica": {
+          "$ref": "#/definitions/pessoa_juridica_Type"
+        },
+        "endereco": {
+          "$ref": "#/definitions/endereco_Type"
+        }
+      }
+    },
+    "pessoa_fisica_Type": {
+      "type": "object",
+      "properties": {
+        "cpf": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0,
+          "maximum": 99999999999
+        },
+        "nome": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        }
+      }
+    },
+    "pessoa_juridica_Type": {
+      "type": "object",
+      "properties": {
+        "cnpj": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0,
+          "maximum": 99999999999999
+        },
+        "razao_social": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        }
+      }
+    },
+    "endereco_Type": {
+      "type": "object",
+      "properties": {
+        "logradouro": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "bairro": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 15
+        },
+        "cidade": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 15
+        },
+        "uf": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 2
+        },
+        "cep": {
+          "type": "integer",
+          "format": "int32",
+          "minimum": 0,
+          "maximum": 99999999
+        }
+      }
+    },
+    "dados_cadastrais_v4_Type": {
+      "required": [
+        "numero_documento",
+        "data_vencimento",
+        "valor",
+        "tipo_especie",
+        "flag_aceite",
+        "data_emissao",
+        "valor_abatimento"
+      ],
+      "type": "object",
+      "properties": {
+        "cpf": {
+          "format": "int64",
+          "maximum": 99999999999,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "cnpj": {
+          "format": "int64",
+          "maximum": 99999999999999,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "nosso_numero": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "numero_documento": {
+          "maxLength": 11,
+          "minLength": 1,
+          "type": "string"
+        },
+        "data_vencimento": {
+          "format": "date",
+          "type": "string"
+        },
+        "valor": {
+          "format": "double",
+          "maximum": 9999999999999.99,
+          "minimum": 0,
+          "type": "number"
+        },
+        "tipo_especie": {
+          "maximum": 99,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "flag_aceite": {
+          "enum": [
+            "S",
+            "N"
+          ],
+          "type": "string"
+        },
+        "data_emissao": {
+          "format": "date",
+          "type": "string"
+        },
+        "juros_mora": {
+          "type": "object",
+          "properties": {
+            "tipo": {
+              "enum": [
+                "VALOR_POR_DIA",
+                "TAXA_MENSAL",
+                "ISENTO"
+              ],
+              "type": "string"
+            },
+            "data": {
+              "format": "date",
+              "type": "string"
+            },
+            "valor": {
+              "maximum": 9999999999999.99,
+              "minimum": 0,
+              "type": "number"
+            },
+            "percentual": {
+              "maximum": 9999999999.99999,
+              "minimum": 0,
+              "type": "number"
+            }
+          }
+        },
+        "valor_abatimento": {
+          "maximum": 9999999999999.99,
+          "minimum": 0,
+          "type": "number"
+        },
+        "pos_vencimento": {
+          "type": "object",
+          "properties": {
+            "acao": {
+              "enum": [
+                "PROTESTAR",
+                "DEVOLVER"
+              ],
+              "type": "string"
+            },
+            "numero_dias": {
+              "maximum": 999,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "prazo_negativacao": {
+              "maximum": 999,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        },
+        "codigo_moeda": {
+          "maximum": 99,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pagador": {
+          "type": "object",
+          "properties": {
+            "pessoa_fisica": {
+              "type": "object",
+              "properties": {
+                "cpf": {
+                  "format": "int64",
+                  "maximum": 99999999999,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "nome": {
+                  "maxLength": 40,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              }
+            },
+            "pessoa_juridica": {
+              "type": "object",
+              "properties": {
+                "cnpj": {
+                  "format": "int64",
+                  "maximum": 99999999999999,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "razao_social": {
+                  "maxLength": 40,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              }
+            },
+            "endereco": {
+              "type": "object",
+              "properties": {
+                "logradouro": {
+                  "maxLength": 40,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "bairro": {
+                  "maxLength": 15,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "cidade": {
+                  "maxLength": 15,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "uf": {
+                  "maxLength": 2,
+                  "minLength": 2,
+                  "type": "string"
+                },
+                "cep": {
+                  "format": "int32",
+                  "maximum": 99999999,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "beneficiario_final": {
+          "type": "object",
+          "properties": {
+            "pessoa_fisica": {
+              "type": "object",
+              "properties": {
+                "cpf": {
+                  "format": "int64",
+                  "maximum": 99999999999,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "nome": {
+                  "maxLength": 40,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              }
+            },
+            "pessoa_juridica": {
+              "type": "object",
+              "properties": {
+                "cnpj": {
+                  "format": "int64",
+                  "maximum": 99999999999999,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "razao_social": {
+                  "maxLength": 40,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "multa": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "format": "date",
+              "type": "string"
+            },
+            "valor": {
+              "maximum": 9999999999999.99,
+              "minimum": 0,
+              "type": "number"
+            },
+            "percentual": {
+              "maximum": 9999999999.99999,
+              "minimum": 0,
+              "type": "number"
+            }
+          }
+        },
+        "descontos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/descontos_Type"
+          }
+        },
+        "valor_iof": {
+          "maximum": 9999999999999.99,
+          "minimum": 0,
+          "type": "number"
+        },
+        "identificacao_empresa": {
+          "maxLength": 25,
+          "minLength": 1,
+          "type": "string"
+        },
+        "ficha_compensacao": {
+          "type": "object",
+          "properties": {
+            "mensagem": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/mensagem_Type"
+              }
+            }
+          }
+        },
+        "recibo_pagador": {
+          "type": "object",
+          "properties": {
+            "mensagem": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/mensagem_Type"
+              }
+            }
+          }
+        },
+        "pagamento": {
+          "type": "object",
+          "properties": {
+            "quantidade_permitida": {
+              "maximum": 99,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "tipo": {
+              "enum": [
+                "ACEITA_QUALQUER_VALOR",
+                "ACEITA_VALORES_ENTRE_MINIMO_MAXIMO",
+                "NAO_ACEITA_VALOR_DIVERGENTE"
+              ],
+              "type": "string"
+            },
+            "valor": {
+              "type": "object",
+              "properties": {
+                "minimo": {
+                  "maximum": 9999999999999.99,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "maximo": {
+                  "maximum": 9999999999999.99,
+                  "minimum": 0,
+                  "type": "number"
+                }
+              }
+            },
+            "percentual": {
+              "type": "object",
+              "properties": {
+                "minimo": {
+                  "maximum": 9999999999.99999,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "maximo": {
+                  "maximum": 9999999999.99999,
+                  "minimum": 0,
+                  "type": "number"
+                }
+              }
+            },
+            "flag_pagamento_parcial": {
+              "enum": [
+                "S",
+                "N"
+              ],
+              "type": "string"
+            }
+          }
+        },
+        "carteira": {
+          "enum": [
+            "COBRANCA_SIMPLES",
+            "COBRANCA_VINCULADA",
+            "COBRANCA_CAUCIONADA",
+            "COBRANCA_DESCONTADA",
+            "COBRANCA_CESSAO"
+          ],
+          "type": "string"
+        },
+        "tipo_boleto": {
+          "type": "string",
+          "enum": [
+            "PADRAO",
+            "HIBRIDO"
+          ]
+        },
+        "valor_pago": {
+          "type": "number",
+          "maximum": 9999999999999.99,
+          "minimum": 0,
+          "description": "Valor que ja foi pago, se houver"
+        },
+        "data_hora_pagamento": {
+          "type": "string",
+          "maxLength": 19,
+          "description": "Data e hora do pagamento, se houver",
+          "default": "yyyy-MM-dd-HH.mm.ss"
+        },
+        "situacao": {
+          "type": "string",
+          "maxLength": 19,
+          "description": "Situacao do Titulo",
+          "default": "EM ABERTO"
+        }
+      }
+    },
+    "inclui_boleto_requisicao_v4_Mensagem": {
+      "type": "object",
+      "properties": {
+        "dados_cadastrais": {
+          "$ref": "#/definitions/dados_cadastrais_v4_Type"
+        }
+      }
+    },
+    "altera_boleto_requisicao_v4_Mensagem": {
+      "type": "object",
+      "properties": {
+        "dados_cadastrais": {
+          "$ref": "#/definitions/dados_cadastrais_v4_Type"
+        }
+      }
+    },
+    "consulta_boleto_resposta_Mensagem_v4": {
+      "type": "object",
+      "properties": {
+        "dados_cadastrais": {
+          "$ref": "#/definitions/dados_cadastrais_v4_Type"
+        },
+        "dados_complementares": {
+          "$ref": "#/definitions/dados_complementares_v3_Type"
+        }
+      }
+    },
+    "inclui_boleto_resposta_Mensagem_v4": {
+      "type": "object",
+      "properties": {
+        "dados_complementares": {
+          "$ref": "#/definitions/dados_complementares_v3_Type"
+        }
+      }
+    },
+    "altera_boleto_resposta_v4_Mensagem": {
+      "type": "object",
+      "properties": {
+        "dados_complementares": {
+          "$ref": "#/definitions/dados_complementares_v3_Type"
+        }
+      }
+    }
+  },
+  "securityDefinitions": {
+    "CustomerAuthorization": {
+      "flow": "password",
+      "tokenUrl": "https://loginservicos.caixa.gov.br/auth/realms/internet/protocol/openid-connect/token",
+      "scopes": {},
+      "type": "oauth2",
+      "description": "Token oAuth2 do cliente CAIXA gerado pelo SSO da CAIXA.\n Neste token de acesso são necessárias as claims **\"preferred_username\"** com o CPF/CNPJ do cliente identificado\n e a claim **\"service_username\"** com o usuário de serviço do sistema consumidor\n com acesso as transações de negócio envolvidas na API."
+    },
+    "ServiceAuthorization": {
+      "type": "oauth2",
+      "flow": "application",
+      "tokenUrl": "https://loginservicos.caixa.gov.br/auth/realms/internet/protocol/openid-connect/token",
+      "scopes": {
+        "openid": ""
+      },
+      "description": "Token Oauth2 utilizado por aplicações Client Credentials autenticados no SSO da CAIXA. Neste token de acesso é necessária a claim **\"service_username\"** com o usuário de serviço do sistema consumidor\n com acesso as transações de negócio envolvidas na API."
+    }
+  },
+  "security": [
+    {
+      "CustomerAuthorization": []
+    },
+    {
+      "ServiceAuthorization": []
+    }
+  ]
+}

@@ -15,6 +15,7 @@ const empresasRoutes = require('./empresas.routes');
 const clinicasRoutes = require('./clinicas.routes');
 const consultoresRoutes = require('./consultores.routes');
 const pacientesRoutes = require('./pacientes.routes');
+const pacienteRoutes = require('./paciente.routes');
 const agendamentosRoutes = require('./agendamentos.routes');
 const fechamentosRoutes = require('./fechamentos.routes');
 const dashboardRoutes = require('./dashboard.routes');
@@ -41,6 +42,7 @@ router.use('/', empresasRoutes); // /api/empresas/perfil
 router.use('/', clinicasRoutes); // /api/clinicas/*
 router.use('/', consultoresRoutes); // /api/consultores/*
 router.use('/', pacientesRoutes); // /api/pacientes/*, /api/novos-leads/*, /api/leads/*
+router.use('/paciente', pacienteRoutes); // /api/paciente/boletos (rotas específicas do paciente logado)
 router.use('/', agendamentosRoutes); // /api/agendamentos/*, /api/evidencias/*
 router.use('/', fechamentosRoutes); // /api/fechamentos/*
 router.use('/', dashboardRoutes); // /api/dashboard/*
@@ -60,6 +62,10 @@ router.use('/idsf', idsfRoutes);
 // Importar rotas de contratos de carteira
 const contratosCarteiraRoutes = require('./contratos-carteira.routes');
 router.use('/', contratosCarteiraRoutes); // /api/contratos-carteira/*
+
+// Rotas estáticas (imagens, etc)
+const staticRoutes = require('./static.routes');
+router.use('/', staticRoutes);
 
 // ✅ TODAS AS ROTAS FORAM REFATORADAS COM SUCESSO!
 // O backend agora está completamente modularizado e organizado.

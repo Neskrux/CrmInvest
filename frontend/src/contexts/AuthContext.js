@@ -279,6 +279,7 @@ export const AuthProvider = ({ children }) => {
     isConsultor: user?.tipo === 'consultor',
     isEmpresa: user?.tipo === 'parceiro',
     isClinica: user?.tipo === 'clinica',
+    isPaciente: user?.tipo === 'paciente',
     isFreelancer: user?.is_freelancer === true,
     // Incorporadora: empresa_id = 5 (textos específicos: clientes, corretores, empreendimentos)
     isIncorporadora: user?.empresa_id === 5,
@@ -290,7 +291,9 @@ export const AuthProvider = ({ children }) => {
     // Deve filtrar por consultor: é consultor mas NÃO é interno (não tem as duas permissões)
     deveFiltrarPorConsultor: user?.tipo === 'consultor' && !(user?.pode_ver_todas_novas_clinicas === true && user?.podealterarstatus === true),
     // Deve filtrar por clínica: é clínica e deve ver apenas seus dados
-    deveFiltrarPorClinica: user?.tipo === 'clinica'
+    deveFiltrarPorClinica: user?.tipo === 'clinica',
+    // ID do paciente logado
+    pacienteId: user?.paciente_id || user?.id || null
   };
 
   return (

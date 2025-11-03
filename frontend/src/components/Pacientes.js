@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import useBranding from '../hooks/useBranding';
 import { useToast } from '../components/Toast';
 import ModalEvidencia from './ModalEvidencia';
+import ModalCriarLoginPaciente from './ModalCriarLoginPaciente';
 import * as XLSX from 'xlsx';
 import useSmartPolling from '../hooks/useSmartPolling';
 
@@ -77,11 +78,19 @@ const Pacientes = () => {
     empreendimento_externo: '',
     status: 'lead',
     observacoes: '',
-    consultor_id: ''
+    consultor_id: '',
+    endereco: '',
+    bairro: '',
+    numero: '',
+    cep: ''
   });
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewPaciente, setViewPaciente] = useState(null);
   const [showObservacoesModal, setShowObservacoesModal] = useState(false);
+  const [showCriarLoginModal, setShowCriarLoginModal] = useState(false);
+  const [showLoginGeradoModal, setShowLoginGeradoModal] = useState(false);
+  const [credenciaisGeradas, setCredenciaisGeradas] = useState(null);
+  const [gerandoLogin, setGerandoLogin] = useState(false);
   const [observacoesAtual, setObservacoesAtual] = useState('');
   const [activeViewTab, setActiveViewTab] = useState('informacoes');
   const [uploadingDocs, setUploadingDocs] = useState({});
@@ -324,6 +333,10 @@ const Pacientes = () => {
     empreendimento_externo: '',
     tipo_tratamento: '',
     observacoes: '',
+    endereco: '',
+    bairro: '',
+    numero: '',
+    cep: '',
     // Dados do fechamento
     valor_fechado: '',
     valor_fechado_formatado: '',
@@ -1237,7 +1250,11 @@ const Pacientes = () => {
       empreendimento_id: paciente.empreendimento_id || '',
       status: paciente.status || 'lead',
       observacoes: paciente.observacoes || '',
-      consultor_id: paciente.consultor_id || ''
+      consultor_id: paciente.consultor_id || '',
+      endereco: paciente.endereco || '',
+      bairro: paciente.bairro || '',
+      numero: paciente.numero || '',
+      cep: paciente.cep || ''
     });
     
     // Verificar se a cidade é customizada (não está na lista de cidades do estado)
@@ -2924,6 +2941,10 @@ const Pacientes = () => {
       estado: '',
       tipo_tratamento: '',
       observacoes: '',
+      endereco: '',
+      bairro: '',
+      numero: '',
+      cep: '',
       // Dados do fechamento
       valor_fechado: '',
       valor_fechado_formatado: '',
@@ -2961,6 +2982,12 @@ const Pacientes = () => {
         value = value;
       } else if (name === 'cidade') {
         value = formatarCidade(value);
+      } else if (name === 'cep') {
+        // Formatar CEP: 00000-000
+        value = value.replace(/\D/g, '');
+        if (value.length > 5) {
+          value = value.substring(0, 5) + '-' + value.substring(5, 8);
+        }
       }
     }
     
@@ -3069,6 +3096,19 @@ const Pacientes = () => {
       showErrorToast('Por favor, informe a data de vencimento!');
       return;
     }
+
+    // Validar se data de vencimento não está no passado (para empresa_id 3)
+    if (empresaId === 3 || user?.empresa_id === 3) {
+      const dataVencimento = new Date(dados.vencimento);
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      dataVencimento.setHours(0, 0, 0, 0);
+      
+      if (dataVencimento < hoje) {
+        showErrorToast('A data de vencimento não pode ser no passado. Por favor, informe uma data futura.');
+        return;
+      }
+    }
     
     if (!dados.antecipacao_meses || dados.antecipacao_meses <= 0) {
       showErrorToast('Por favor, informe quantas parcelas quer antecipar!');
@@ -3091,7 +3131,11 @@ const Pacientes = () => {
         estado: dados.estado,
         tipo_tratamento: dados.tipo_tratamento,
         status: 'fechado', // Já criamos como fechado
-        observacoes: dados.observacoes
+        observacoes: dados.observacoes,
+        endereco: dados.endereco,
+        bairro: dados.bairro,
+        numero: dados.numero,
+        cep: dados.cep
       };
       
       const pacienteResponse = await makeRequest('/pacientes', {
@@ -3186,7 +3230,11 @@ const Pacientes = () => {
       status: 'sem_primeiro_contato',
       observacoes: '',
       // Se for consultor, pré-preenche com o próprio ID
-      consultor_id: isConsultor ? String(user?.consultor_id || user?.id) : ''
+      consultor_id: isConsultor ? String(user?.consultor_id || user?.id) : '',
+      endereco: '',
+      bairro: '',
+      numero: '',
+      cep: ''
     });
     setEditingPaciente(null);
     setShowModal(false);
@@ -6235,6 +6283,58 @@ const Pacientes = () => {
                 </div>
               </div>
 
+              {/* Campos de Endereço */}
+              <div className="form-group">
+                <label className="form-label">Rua</label>
+                <input
+                  type="text"
+                  name="endereco"
+                  className="form-input"
+                  value={formData.endereco}
+                  onChange={handleInputChange}
+                  placeholder="Digite o nome da rua"
+                />
+              </div>
+
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">Bairro</label>
+                  <input
+                    type="text"
+                    name="bairro"
+                    className="form-input"
+                    value={formData.bairro}
+                    onChange={handleInputChange}
+                    placeholder="Digite o bairro"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Número</label>
+                  <input
+                    type="text"
+                    name="numero"
+                    className="form-input"
+                    value={formData.numero}
+                    onChange={handleInputChange}
+                    placeholder="Número"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">CEP</label>
+                <input
+                  type="text"
+                  name="cep"
+                  className="form-input"
+                  value={formData.cep}
+                  onChange={handleInputChange}
+                  placeholder="00000-000"
+                  maxLength="9"
+                />
+              </div>
+
               <div className="grid grid-2">
                 <div className="form-group">
                   <label className="form-label">{empresaId === 5 ? 'Empreendimento *' : 'Tipo de Tratamento *'}</label>
@@ -6417,6 +6517,58 @@ const Pacientes = () => {
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Campos de Endereço */}
+              <div className="form-group">
+                <label className="form-label">Rua</label>
+                <input
+                  type="text"
+                  name="endereco"
+                  className="form-input"
+                  value={formData.endereco}
+                  onChange={handleInputChange}
+                  placeholder="Digite o nome da rua"
+                />
+              </div>
+
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">Bairro</label>
+                  <input
+                    type="text"
+                    name="bairro"
+                    className="form-input"
+                    value={formData.bairro}
+                    onChange={handleInputChange}
+                    placeholder="Digite o bairro"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Número</label>
+                  <input
+                    type="text"
+                    name="numero"
+                    className="form-input"
+                    value={formData.numero}
+                    onChange={handleInputChange}
+                    placeholder="Número"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">CEP</label>
+                <input
+                  type="text"
+                  name="cep"
+                  className="form-input"
+                  value={formData.cep}
+                  onChange={handleInputChange}
+                  placeholder="00000-000"
+                  maxLength="9"
+                />
               </div>
 
               <div className="grid grid-2">
@@ -6819,6 +6971,240 @@ const Pacientes = () => {
                       {viewPaciente.created_at ? formatarData(viewPaciente.created_at) : '-'}
                     </p>
             </div>
+                  
+                  {/* Seção de Login do Paciente (apenas para clínicas) */}
+                  {isClinica && (
+                    <div style={{
+                      marginTop: '1.5rem',
+                      padding: '1rem',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '6px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '0.5rem'
+                      }}>
+                        <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>
+                          Acesso do Paciente
+                        </label>
+                        {viewPaciente.tem_login && viewPaciente.login_ativo && (
+                          <span style={{
+                            padding: '0.25rem 0.75rem',
+                            backgroundColor: '#d1fae5',
+                            color: '#065f46',
+                            borderRadius: '9999px',
+                            fontSize: '0.75rem',
+                            fontWeight: '600'
+                          }}>
+                            Login Ativo
+                          </span>
+                        )}
+                      </div>
+                      {viewPaciente.tem_login && viewPaciente.login_ativo ? (
+                        <div>
+                          <p style={{ margin: '0.5rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>
+                            Email: {viewPaciente.email_login || '-'}
+                          </p>
+                          {viewPaciente.ultimo_login && (
+                            <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>
+                              Último acesso: {formatarData(viewPaciente.ultimo_login)}
+                            </p>
+                          )}
+                          <div style={{ marginTop: '1rem' }}>
+                            <p style={{ margin: '0 0 0.5rem 0', color: '#6b7280', fontSize: '0.875rem' }}>
+                              ⚠️ Gerar um novo login substituirá o login atual. O paciente precisará usar as novas credenciais.
+                            </p>
+                            {!viewPaciente.cpf || viewPaciente.cpf.trim() === '' ? (
+                              <div style={{
+                                padding: '0.75rem',
+                                backgroundColor: '#fef2f2',
+                                border: '1px solid #fecaca',
+                                borderRadius: '6px',
+                                marginBottom: '0.75rem'
+                              }}>
+                                <p style={{ margin: 0, fontSize: '0.875rem', color: '#991b1b' }}>
+                                  ⚠️ É necessário cadastrar o CPF do paciente antes de gerar o login.
+                                </p>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={async () => {
+                                  if (!viewPaciente.cpf || viewPaciente.cpf.trim() === '') {
+                                    showErrorToast('É necessário cadastrar o CPF do paciente antes de gerar o login.');
+                                    return;
+                                  }
+                                  
+                                  // Confirmar antes de recriar
+                                  if (!window.confirm('Deseja gerar um novo login? O login atual será substituído e o paciente precisará usar as novas credenciais.')) {
+                                    return;
+                                  }
+                                  
+                                  setGerandoLogin(true);
+                                  try {
+                                    // Chamar API sem enviar email/senha para gerar automaticamente
+                                    const response = await makeRequest(`/pacientes/${viewPaciente.id}/criar-login`, {
+                                      method: 'POST',
+                                      body: JSON.stringify({
+                                        // Não enviar email e senha para gerar automaticamente
+                                      })
+                                    });
+
+                                    const data = await response.json();
+
+                                    if (response.ok) {
+                                      // Mostrar modal com credenciais geradas
+                                      setCredenciaisGeradas(data.credenciais);
+                                      setShowLoginGeradoModal(true);
+                                      
+                                      // Atualizar o paciente no estado local
+                                      setViewPaciente(prev => ({
+                                        ...prev,
+                                        ...data.paciente,
+                                        tem_login: true,
+                                        login_ativo: true,
+                                        email_login: data.credenciais.email
+                                      }));
+                                      
+                                      // Recarregar lista de pacientes
+                                      fetchPacientes();
+                                      
+                                      if (data.recriado) {
+                                        showSuccessToast('Login recriado com sucesso! As novas credenciais foram geradas.');
+                                      }
+                                    } else {
+                                      showErrorToast(data.error || data.message || 'Erro ao gerar login');
+                                    }
+                                  } catch (error) {
+                                    console.error('Erro ao gerar login:', error);
+                                    showErrorToast('Erro ao conectar com o servidor');
+                                  } finally {
+                                    setGerandoLogin(false);
+                                  }
+                                }}
+                                disabled={gerandoLogin}
+                                style={{
+                                  padding: '0.5rem 1rem',
+                                  backgroundColor: gerandoLogin ? '#9ca3af' : '#f59e0b',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '0.875rem',
+                                  fontWeight: '600',
+                                  cursor: gerandoLogin ? 'not-allowed' : 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!gerandoLogin) {
+                                    e.target.style.backgroundColor = '#d97706';
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!gerandoLogin) {
+                                    e.target.style.backgroundColor = '#f59e0b';
+                                  }
+                                }}
+                              >
+                                {gerandoLogin ? '⏳ Gerando...' : '🔄 Gerar Novo Login'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <p style={{ margin: '0.5rem 0 1rem 0', color: '#6b7280', fontSize: '0.875rem' }}>
+                            Este paciente ainda não possui login para acessar o portal.
+                          </p>
+                          {!viewPaciente.cpf || viewPaciente.cpf.trim() === '' ? (
+                            <div style={{
+                              padding: '0.75rem',
+                              backgroundColor: '#fef2f2',
+                              border: '1px solid #fecaca',
+                              borderRadius: '6px',
+                              marginBottom: '0.75rem'
+                            }}>
+                              <p style={{ margin: 0, fontSize: '0.875rem', color: '#991b1b' }}>
+                                ⚠️ É necessário cadastrar o CPF do paciente antes de gerar o login.
+                              </p>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={async () => {
+                                if (!viewPaciente.cpf || viewPaciente.cpf.trim() === '') {
+                                  showErrorToast('É necessário cadastrar o CPF do paciente antes de gerar o login.');
+                                  return;
+                                }
+                                
+                                setGerandoLogin(true);
+                                try {
+                                  // Chamar API sem enviar email/senha para gerar automaticamente
+                                  const response = await makeRequest(`/pacientes/${viewPaciente.id}/criar-login`, {
+                                    method: 'POST',
+                                    body: JSON.stringify({
+                                      // Não enviar email e senha para gerar automaticamente
+                                    })
+                                  });
+
+                                  const data = await response.json();
+
+                                  if (response.ok) {
+                                    // Mostrar modal com credenciais geradas
+                                    setCredenciaisGeradas(data.credenciais);
+                                    setShowLoginGeradoModal(true);
+                                    
+                                    // Atualizar o paciente no estado local
+                                    setViewPaciente(prev => ({
+                                      ...prev,
+                                      ...data.paciente,
+                                      tem_login: true,
+                                      login_ativo: true,
+                                      email_login: data.credenciais.email
+                                    }));
+                                    
+                                    // Recarregar lista de pacientes
+                                    fetchPacientes();
+                                  } else {
+                                    showErrorToast(data.error || data.message || 'Erro ao gerar login');
+                                  }
+                                } catch (error) {
+                                  console.error('Erro ao gerar login:', error);
+                                  showErrorToast('Erro ao conectar com o servidor');
+                                } finally {
+                                  setGerandoLogin(false);
+                                }
+                              }}
+                              disabled={gerandoLogin}
+                              style={{
+                                padding: '0.5rem 1rem',
+                                backgroundColor: gerandoLogin ? '#9ca3af' : '#1a1d23',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                cursor: gerandoLogin ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!gerandoLogin) {
+                                  e.target.style.backgroundColor = '#374151';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!gerandoLogin) {
+                                  e.target.style.backgroundColor = '#1a1d23';
+                                }
+                              }}
+                            >
+                              {gerandoLogin ? 'Gerando...' : 'Gerar Login Automaticamente'}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
               
@@ -8339,6 +8725,240 @@ const Pacientes = () => {
         nomeRegistro={evidenciaData.pacienteNome}
         empresaId={empresaId}
       />
+      
+      {/* Modal de Credenciais Geradas */}
+      {showLoginGeradoModal && credenciaisGeradas && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            padding: '2rem',
+            maxWidth: '500px',
+            width: '100%',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem'
+            }}>
+              <h2 style={{
+                margin: 0,
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                color: '#1a1d23'
+              }}>
+                Login Gerado com Sucesso!
+              </h2>
+              <button
+                onClick={() => {
+                  setShowLoginGeradoModal(false);
+                  setCredenciaisGeradas(null);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280',
+                  padding: '0.25rem',
+                  lineHeight: 1
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{
+              padding: '1rem',
+              backgroundColor: '#f0fdf4',
+              border: '1px solid #86efac',
+              borderRadius: '6px',
+              marginBottom: '1.5rem'
+            }}>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: '#065f46', fontWeight: '600' }}>
+                ✓ Login criado automaticamente com sucesso!
+              </p>
+            </div>
+
+            <div style={{
+              marginBottom: '1.5rem',
+              padding: '1rem',
+              backgroundColor: '#f9fafb',
+              borderRadius: '6px',
+              border: '1px solid #e5e7eb'
+            }}>
+              <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', color: '#6b7280', fontWeight: '600' }}>
+                Credenciais de Acesso:
+              </p>
+              
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '0.25rem',
+                  fontSize: '0.75rem',
+                  color: '#6b7280',
+                  fontWeight: '600',
+                  textTransform: 'uppercase'
+                }}>
+                  Email/Login:
+                </label>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem',
+                  backgroundColor: 'white',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontFamily: 'monospace',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  color: '#1a1d23'
+                }}>
+                  <span style={{ flex: 1 }}>{credenciaisGeradas.email}</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(credenciaisGeradas.email);
+                      showSuccessToast('Email copiado!');
+                    }}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      backgroundColor: '#f3f4f6',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem'
+                    }}
+                  >
+                    Copiar
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '0.25rem',
+                  fontSize: '0.75rem',
+                  color: '#6b7280',
+                  fontWeight: '600',
+                  textTransform: 'uppercase'
+                }}>
+                  Senha:
+                </label>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem',
+                  backgroundColor: 'white',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontFamily: 'monospace',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  color: '#1a1d23'
+                }}>
+                  <span style={{ flex: 1 }}>{credenciaisGeradas.senha}</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(credenciaisGeradas.senha);
+                      showSuccessToast('Senha copiada!');
+                    }}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      backgroundColor: '#f3f4f6',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem'
+                    }}
+                  >
+                    Copiar
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div style={{
+              padding: '1rem',
+              backgroundColor: '#fef3c7',
+              border: '1px solid #fde68a',
+              borderRadius: '6px',
+              marginBottom: '1.5rem'
+            }}>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: '#92400e' }}>
+                <strong>⚠️ Importante:</strong> Anote essas credenciais e informe ao paciente. 
+                A senha não será exibida novamente após fechar este modal.
+              </p>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              gap: '0.75rem',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => {
+                  setShowLoginGeradoModal(false);
+                  setCredenciaisGeradas(null);
+                }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  border: 'none',
+                  borderRadius: '6px',
+                  backgroundColor: '#1a1d23',
+                  color: 'white',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#374151'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#1a1d23'}
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Modal de Criar Login para Paciente (manual) */}
+      {showCriarLoginModal && viewPaciente && (
+        <ModalCriarLoginPaciente
+          paciente={viewPaciente}
+          onClose={() => {
+            setShowCriarLoginModal(false);
+          }}
+          onSuccess={(pacienteAtualizado) => {
+            // Atualizar o paciente no estado local
+            setViewPaciente(prev => ({
+              ...prev,
+              ...pacienteAtualizado,
+              tem_login: true,
+              login_ativo: true
+            }));
+            // Recarregar lista de pacientes
+            fetchPacientes();
+          }}
+        />
+      )}
+      
       {/* Modal de Cadastro Completo para Clínicas */}
       {showCadastroCompletoModal && isClinica && (
         <div className="modal-overlay">
@@ -8558,6 +9178,94 @@ const Pacientes = () => {
                         )}
                       </div>
                     )}
+                  </div>
+
+                  {/* Campos de Endereço */}
+                  <div>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                      Rua
+                    </label>
+                    <input
+                      type="text"
+                      name="endereco"
+                      value={dadosCompletosClinica.endereco}
+                      onChange={handleInputChangeCadastroCompleto}
+                      placeholder="Digite o nome da rua"
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                        Bairro
+                      </label>
+                      <input
+                        type="text"
+                        name="bairro"
+                        value={dadosCompletosClinica.bairro}
+                        onChange={handleInputChangeCadastroCompleto}
+                        placeholder="Digite o bairro"
+                        style={{
+                          width: '100%',
+                          padding: '0.875rem',
+                          border: '2px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '1rem',
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                        Número
+                      </label>
+                      <input
+                        type="text"
+                        name="numero"
+                        value={dadosCompletosClinica.numero}
+                        onChange={handleInputChangeCadastroCompleto}
+                        placeholder="Número"
+                        style={{
+                          width: '100%',
+                          padding: '0.875rem',
+                          border: '2px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '1rem',
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                      CEP
+                    </label>
+                    <input
+                      type="text"
+                      name="cep"
+                      value={dadosCompletosClinica.cep}
+                      onChange={handleInputChangeCadastroCompleto}
+                      placeholder="00000-000"
+                      maxLength="9"
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none'
+                      }}
+                    />
                   </div>
 
                   <div>
@@ -8877,16 +9585,14 @@ const Pacientes = () => {
 
                   <div>
                     <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
-                      Dia do Vencimento *
+                      Data de Vencimento *
+                      {empresaId === 3 && <span style={{ color: '#dc2626', marginLeft: '0.25rem' }}>(Obrigatório para boletos)</span>}
                     </label>
                     <input
-                      type="number"
+                      type="date"
                       name="vencimento"
                       value={dadosCompletosClinica.vencimento}
                       onChange={handleInputChangeCadastroCompleto}
-                      placeholder="Ex: 15"
-                      min="1"
-                      max="31"
                       required
                       style={{
                         width: '100%',
@@ -8897,9 +9603,16 @@ const Pacientes = () => {
                         outline: 'none'
                       }}
                     />
-                    <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem', marginBottom: 0 }}>
-                      Digite o dia do mês (1 a 31)
-                    </p>
+                    {empresaId === 3 && (
+                      <p style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '0.25rem', marginBottom: 0 }}>
+                        * Obrigatório para gerar boletos na Caixa
+                      </p>
+                    )}
+                    {empresaId !== 3 && (
+                      <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem', marginBottom: 0 }}>
+                        Data de vencimento da primeira parcela
+                      </p>
+                    )}
                   </div>
 
                   <div>

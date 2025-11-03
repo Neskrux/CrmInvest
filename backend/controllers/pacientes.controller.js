@@ -1,6 +1,51 @@
 const { supabase, supabaseAdmin } = require('../config/database');
 const { normalizarEmail } = require('../utils/helpers');
 const { criarMovimentacaoLeadAtribuido } = require('./movimentacoes.controller');
+const bcrypt = require('bcrypt');
+
+// Função auxiliar para normalizar o nome para o email
+// Formato: primeiroNome.segundoNome@grupoim.com.br
+const normalizarNomeParaEmail = (nomeCompleto) => {
+  if (!nomeCompleto) return '';
+  
+  // Dividir o nome em partes e remover espaços extras
+  const partes = nomeCompleto.trim().toLowerCase().split(/\s+/).filter(p => p.length > 0);
+  
+  if (partes.length === 0) return '';
+  
+  const primeiroNome = partes[0];
+  
+  // Se tiver pelo menos 2 partes, usar primeiro e segundo nome
+  if (partes.length >= 2) {
+    const segundoNome = partes[1];
+    // Remover acentos e caracteres especiais para melhor compatibilidade
+    const primeiroNormalizado = primeiroNome
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/[^a-z0-9]/g, ''); // Remove caracteres especiais
+    
+    const segundoNormalizado = segundoNome
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/[^a-z0-9]/g, ''); // Remove caracteres especiais
+    
+    if (primeiroNormalizado && segundoNormalizado) {
+      return `${primeiroNormalizado}.${segundoNormalizado}`;
+    }
+  }
+  
+  // Se tiver apenas um nome, usar apenas ele
+  if (primeiroNome) {
+    const primeiroNormalizado = primeiroNome
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/[^a-z0-9]/g, ''); // Remove caracteres especiais
+    
+    return primeiroNormalizado;
+  }
+  
+  return '';
+};
 
 // Constantes
 const STATUS_COM_EVIDENCIA = {
@@ -302,7 +347,7 @@ const getDashboardPacientes = async (req, res) => {
 // POST /api/pacientes - Criar paciente
 const createPaciente = async (req, res) => {
   try {
-    const { nome, telefone, email, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado, cadastrado_por_clinica, clinica_id, grau_parentesco, tratamento_especifico } = req.body;
+    const { nome, telefone, email, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado, cadastrado_por_clinica, clinica_id, grau_parentesco, tratamento_especifico, endereco, bairro, numero, cep } = req.body;
     
     // Normalizar telefone e CPF (remover formatação)
     const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
@@ -390,6 +435,10 @@ const createPaciente = async (req, res) => {
         cadastrado_por_clinica: finalCadastradoPorClinica,
         grau_parentesco,
         tratamento_especifico,
+        endereco,
+        bairro,
+        numero,
+        cep: cep ? cep.replace(/\D/g, '') : null, // Normalizar CEP (apenas números)
         empresa_id: req.user.empresa_id // Adicionar empresa_id do usuário que está criando
       }])
       .select();
@@ -408,7 +457,7 @@ const createPaciente = async (req, res) => {
 const updatePaciente = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, telefone, email, cpf, tipo_tratamento, status, observacoes, consultor_id, sdr_id, cidade, estado, cadastrado_por_clinica, clinica_id, grau_parentesco, tratamento_especifico } = req.body;
+    const { nome, telefone, email, cpf, tipo_tratamento, status, observacoes, consultor_id, sdr_id, cidade, estado, cadastrado_por_clinica, clinica_id, grau_parentesco, tratamento_especifico, endereco, bairro, numero, cep } = req.body;
     
     // Verificar se é consultor freelancer - freelancers não podem editar pacientes completamente
     if (req.user.tipo === 'consultor' && req.user.podealterarstatus !== true) {
@@ -545,6 +594,10 @@ const updatePaciente = async (req, res) => {
       estado,
       grau_parentesco,
       tratamento_especifico,
+      endereco,
+      bairro,
+      numero,
+      cep: cep ? cep.replace(/\D/g, '') : null, // Normalizar CEP (apenas números)
       empresa_id: req.user.empresa_id // Atualizar empresa_id do usuário que está editando
     };
     
@@ -1561,6 +1614,349 @@ const cadastroPublicoLead = async (req, res) => {
   }
 };
 
+// POST /api/pacientes/:id/criar-login - Criar login para paciente (apenas clínica)
+const criarLoginPaciente = async (req, res) => {
+  try {
+    const { id } = req.params;
+    let { email, senha } = req.body;
+
+    console.log(`🔐 [CRIAR LOGIN] Requisição recebida - Paciente ID: ${id}, Usuário: ${req.user.tipo} (ID: ${req.user.id})`);
+
+    // Verificar se usuário é clínica
+    if (req.user.tipo !== 'clinica') {
+      return res.status(403).json({ error: 'Apenas clínicas podem criar login para pacientes' });
+    }
+
+    // Buscar paciente completo (incluindo CPF)
+    const { data: paciente, error: pacienteError } = await supabaseAdmin
+      .from('pacientes')
+      .select('id, nome, cpf, clinica_id, tem_login, login_ativo, empresa_id')
+      .eq('id', id)
+      .single();
+
+    if (pacienteError) {
+      console.error('❌ Erro ao buscar paciente:', pacienteError);
+      // Se for erro de "não encontrado", retornar 404
+      if (pacienteError.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Paciente não encontrado' });
+      }
+      // Outros erros
+      throw pacienteError;
+    }
+
+    if (!paciente) {
+      console.error(`❌ Paciente com ID ${id} não encontrado`);
+      return res.status(404).json({ error: 'Paciente não encontrado' });
+    }
+
+    console.log(`🔍 Paciente encontrado: ${paciente.nome} (ID: ${id}), Clinica ID: ${paciente.clinica_id}`);
+
+    // Verificar se paciente pertence à clínica
+    const clinicaId = req.user.clinica_id || req.user.id;
+    console.log(`🔍 Clínica do usuário logado: ${clinicaId}, Tipo: ${req.user.tipo}`);
+    
+    if (paciente.clinica_id !== clinicaId) {
+      console.error(`❌ Acesso negado: Paciente pertence à clínica ${paciente.clinica_id}, mas usuário é da clínica ${clinicaId}`);
+      return res.status(403).json({ error: 'Você só pode criar login para pacientes da sua clínica' });
+    }
+
+    // Permitir recriar login mesmo se já existir um (será substituído)
+    const recriandoLogin = paciente.tem_login && paciente.login_ativo;
+    if (recriandoLogin) {
+      console.log(`🔄 Recriando login para paciente ${paciente.nome} (ID: ${id}) - Login anterior será substituído`);
+    }
+
+    // Gerar email e senha automaticamente se não fornecidos
+    if (!email || !senha) {
+      // Verificar se paciente tem CPF
+      if (!paciente.cpf || paciente.cpf.trim() === '') {
+        return res.status(400).json({ error: 'Paciente não possui CPF cadastrado. É necessário cadastrar o CPF antes de gerar o login.' });
+      }
+
+      // Verificar se paciente tem nome
+      if (!paciente.nome || paciente.nome.trim() === '') {
+        return res.status(400).json({ error: 'Paciente não possui nome cadastrado. É necessário cadastrar o nome antes de gerar o login.' });
+      }
+
+      // Normalizar CPF (apenas números)
+      const cpfNormalizado = paciente.cpf.replace(/\D/g, '');
+      
+      if (cpfNormalizado.length < 11) {
+        return res.status(400).json({ error: 'CPF inválido. O CPF deve ter 11 dígitos.' });
+      }
+
+      // Gerar email a partir do nome
+      const nomeNormalizado = normalizarNomeParaEmail(paciente.nome);
+      if (!nomeNormalizado) {
+        return res.status(400).json({ error: 'Não foi possível gerar o email a partir do nome do paciente. Verifique se o nome está completo.' });
+      }
+
+      // Email/login será primeiroNome.segundoNome@grupoim.com.br
+      email = `${nomeNormalizado}@grupoim.com.br`;
+      
+      // Senha será o CPF completo
+      senha = cpfNormalizado;
+      
+      console.log(`🔐 [AUTO] Gerando login automático para paciente ${paciente.nome} (ID: ${id})`);
+      console.log(`   Email: ${email}, Senha: ${senha}`);
+    }
+
+    // Validar senha
+    // Se foi gerado automaticamente, a senha será o CPF completo (11 dígitos)
+    // Se foi fornecido manualmente, precisa ter pelo menos 6 caracteres
+    const foiGeradoAutomaticamente = !req.body.email || !req.body.senha;
+    if (foiGeradoAutomaticamente && senha.length !== 11) {
+      return res.status(400).json({ error: 'Erro ao gerar senha automaticamente. CPF deve ter 11 dígitos.' });
+    } else if (!foiGeradoAutomaticamente && senha.length < 6) {
+      return res.status(400).json({ error: 'A senha deve ter pelo menos 6 caracteres' });
+    }
+
+    // Validar formato de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Email inválido' });
+    }
+
+    const emailNormalizado = normalizarEmail(email);
+
+    // Verificar se email já existe (exceto se for o próprio paciente)
+    const { data: emailExistente, error: emailError } = await supabaseAdmin
+      .from('pacientes')
+      .select('id, nome')
+      .eq('email_login', emailNormalizado)
+      .neq('id', id)
+      .single();
+
+    if (emailError && emailError.code !== 'PGRST116') { // PGRST116 = nenhum resultado encontrado
+      throw emailError;
+    }
+
+    if (emailExistente) {
+      return res.status(400).json({ 
+        error: 'Email já cadastrado', 
+        message: `Este email já está cadastrado para outro paciente (${emailExistente.nome})` 
+      });
+    }
+
+    // Hash da senha
+    const senhaHash = await bcrypt.hash(senha, 10);
+
+    // Atualizar paciente com login
+    const { data: pacienteAtualizado, error: updateError } = await supabaseAdmin
+      .from('pacientes')
+      .update({
+        email_login: emailNormalizado,
+        senha_hash: senhaHash,
+        tem_login: true,
+        login_ativo: true
+      })
+      .eq('id', id)
+      .select('id, nome, email_login, tem_login, login_ativo')
+      .single();
+
+    if (updateError) throw updateError;
+
+    console.log(`✅ Login ${recriandoLogin ? 'recriado' : 'criado'} para paciente ${pacienteAtualizado.nome} (ID: ${id}) pela clínica ${req.user.nome}`);
+    console.log(`   Email: ${emailNormalizado}, Senha gerada automaticamente`);
+
+    res.json({
+      success: true,
+      message: recriandoLogin ? 'Login recriado com sucesso' : 'Login criado com sucesso',
+      recriado: recriandoLogin, // Indica se foi recriado
+      autoGerado: !req.body.email || !req.body.senha, // Indica se foi gerado automaticamente
+      credenciais: {
+        email: emailNormalizado,
+        senha: senha // Retornar senha apenas na criação (não salvar em nenhum lugar)
+      },
+      paciente: {
+        id: pacienteAtualizado.id,
+        nome: pacienteAtualizado.nome,
+        email: pacienteAtualizado.email_login,
+        tem_login: pacienteAtualizado.tem_login,
+        login_ativo: pacienteAtualizado.login_ativo
+      }
+    });
+
+  } catch (error) {
+    console.error('Erro ao criar login para paciente:', error);
+    res.status(500).json({ error: error.message || 'Erro interno do servidor' });
+  }
+};
+
+// PUT /api/pacientes/:id/atualizar-login - Atualizar login do paciente
+const atualizarLoginPaciente = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { email, senha, senha_atual } = req.body;
+
+    // Verificar se usuário é clínica
+    if (req.user.tipo !== 'clinica') {
+      return res.status(403).json({ error: 'Apenas clínicas podem atualizar login de pacientes' });
+    }
+
+    // Buscar paciente
+    const { data: paciente, error: pacienteError } = await supabaseAdmin
+      .from('pacientes')
+      .select('id, nome, clinica_id, email_login, senha_hash, tem_login, login_ativo')
+      .eq('id', id)
+      .single();
+
+    if (pacienteError || !paciente) {
+      return res.status(404).json({ error: 'Paciente não encontrado' });
+    }
+
+    // Verificar se paciente pertence à clínica
+    const clinicaId = req.user.clinica_id || req.user.id;
+    if (paciente.clinica_id !== clinicaId) {
+      return res.status(403).json({ error: 'Você só pode atualizar login de pacientes da sua clínica' });
+    }
+
+    // Verificar se paciente tem login
+    if (!paciente.tem_login) {
+      return res.status(400).json({ error: 'Este paciente não possui login. Use a opção de criar login.' });
+    }
+
+    const updateData = {};
+
+    // Atualizar email se fornecido
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: 'Email inválido' });
+      }
+
+      const emailNormalizado = normalizarEmail(email);
+
+      // Verificar se email já existe em outro paciente
+      const { data: emailExistente, error: emailError } = await supabaseAdmin
+        .from('pacientes')
+        .select('id, nome')
+        .eq('email_login', emailNormalizado)
+        .neq('id', id)
+        .single();
+
+      if (emailError && emailError.code !== 'PGRST116') {
+        throw emailError;
+      }
+
+      if (emailExistente) {
+        return res.status(400).json({ 
+          error: 'Email já cadastrado', 
+          message: `Este email já está cadastrado para outro paciente (${emailExistente.nome})` 
+        });
+      }
+
+      updateData.email_login = emailNormalizado;
+    }
+
+    // Atualizar senha se fornecido
+    if (senha) {
+      if (senha.length < 6) {
+        return res.status(400).json({ error: 'A senha deve ter pelo menos 6 caracteres' });
+      }
+
+      // Se forneceu senha atual, verificar antes de atualizar
+      if (senha_atual) {
+        const senhaValida = await bcrypt.compare(senha_atual, paciente.senha_hash);
+        if (!senhaValida) {
+          return res.status(401).json({ error: 'Senha atual incorreta' });
+        }
+      }
+
+      updateData.senha_hash = await bcrypt.hash(senha, 10);
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: 'Nenhum campo para atualizar' });
+    }
+
+    // Atualizar paciente
+    const { data: pacienteAtualizado, error: updateError } = await supabaseAdmin
+      .from('pacientes')
+      .update(updateData)
+      .eq('id', id)
+      .select('id, nome, email_login, tem_login, login_ativo')
+      .single();
+
+    if (updateError) throw updateError;
+
+    console.log(`✅ Login atualizado para paciente ${pacienteAtualizado.nome} (ID: ${id}) pela clínica ${req.user.nome}`);
+
+    res.json({
+      success: true,
+      message: 'Login atualizado com sucesso',
+      paciente: {
+        id: pacienteAtualizado.id,
+        nome: pacienteAtualizado.nome,
+        email: pacienteAtualizado.email_login,
+        tem_login: pacienteAtualizado.tem_login,
+        login_ativo: pacienteAtualizado.login_ativo
+      }
+    });
+
+  } catch (error) {
+    console.error('Erro ao atualizar login do paciente:', error);
+    res.status(500).json({ error: error.message || 'Erro interno do servidor' });
+  }
+};
+
+// PUT /api/pacientes/:id/desativar-login - Desativar login do paciente
+const desativarLoginPaciente = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar se usuário é clínica
+    if (req.user.tipo !== 'clinica') {
+      return res.status(403).json({ error: 'Apenas clínicas podem desativar login de pacientes' });
+    }
+
+    // Buscar paciente
+    const { data: paciente, error: pacienteError } = await supabaseAdmin
+      .from('pacientes')
+      .select('id, nome, clinica_id, login_ativo')
+      .eq('id', id)
+      .single();
+
+    if (pacienteError || !paciente) {
+      return res.status(404).json({ error: 'Paciente não encontrado' });
+    }
+
+    // Verificar se paciente pertence à clínica
+    const clinicaId = req.user.clinica_id || req.user.id;
+    if (paciente.clinica_id !== clinicaId) {
+      return res.status(403).json({ error: 'Você só pode desativar login de pacientes da sua clínica' });
+    }
+
+    // Desativar login
+    const { data: pacienteAtualizado, error: updateError } = await supabaseAdmin
+      .from('pacientes')
+      .update({
+        login_ativo: false
+      })
+      .eq('id', id)
+      .select('id, nome, login_ativo')
+      .single();
+
+    if (updateError) throw updateError;
+
+    console.log(`✅ Login desativado para paciente ${pacienteAtualizado.nome} (ID: ${id}) pela clínica ${req.user.nome}`);
+
+    res.json({
+      success: true,
+      message: 'Login desativado com sucesso',
+      paciente: {
+        id: pacienteAtualizado.id,
+        nome: pacienteAtualizado.nome,
+        login_ativo: pacienteAtualizado.login_ativo
+      }
+    });
+
+  } catch (error) {
+    console.error('Erro ao desativar login do paciente:', error);
+    res.status(500).json({ error: error.message || 'Erro interno do servidor' });
+  }
+};
+
 module.exports = {
   getAllPacientes,
   getDashboardPacientes,
@@ -1574,6 +1970,9 @@ module.exports = {
   pegarLead,
   deleteLead,
   updateStatusLead,
-  cadastroPublicoLead
+  cadastroPublicoLead,
+  criarLoginPaciente,
+  atualizarLoginPaciente,
+  desativarLoginPaciente
 };
 

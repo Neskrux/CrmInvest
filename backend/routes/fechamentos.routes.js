@@ -36,6 +36,15 @@ router.get('/fechamentos/:id/contrato', authenticateToken, fechamentosController
 // GET /api/fechamentos/:id/print-confirmacao-url - Gerar URL assinada do print de confirmação
 router.get('/fechamentos/:id/print-confirmacao-url', authenticateToken, fechamentosController.getPrintConfirmacaoUrl);
 
+// GET /api/fechamentos/:id/boletos - Buscar boletos de um fechamento
+router.get('/fechamentos/:id/boletos', authenticateToken, fechamentosController.getBoletosFechamento);
+
+// GET /api/fechamentos/:id/boletos/:boletoId/visualizar - Visualizar boleto como HTML
+router.get('/fechamentos/:id/boletos/:boletoId/visualizar', authenticateToken, fechamentosController.visualizarBoleto);
+
+// POST /api/fechamentos/:id/gerar-boletos - Gerar boletos manualmente para um fechamento
+router.post('/fechamentos/:id/gerar-boletos', authenticateToken, fechamentosController.gerarBoletosFechamento);
+
 // PUT /api/fechamentos/:id/aprovar - Aprovar fechamento (apenas admin)
 router.put('/fechamentos/:id/aprovar', authenticateToken, requireAdmin, fechamentosController.aprovarFechamento);
 
