@@ -36,6 +36,20 @@ const solicitacoesCarteiraRoutes = require('./solicitacoes-carteira.routes');
 
 // Agrupar rotas
 // Nota: Mantendo os caminhos originais para compatibilidade com o frontend
+
+// Middleware de log para debug (antes de authRoutes)
+router.use((req, res, next) => {
+  if (req.path.includes('validar-biometria')) {
+    console.log('🔍 [ROUTES-INDEX] Antes de authRoutes - Path:', req.path);
+    console.log('🔍 [ROUTES-INDEX] URL:', req.url);
+    console.log('🔍 [ROUTES-INDEX] Method:', req.method);
+  }
+  next();
+});
+
+// IMPORTANTE: authRoutes deve ser a PRIMEIRA rota registrada para evitar conflitos
+router.use('/auth', authRoutes); // /api/auth/login, /api/auth/logout, etc.
+// Também registrar na raiz para compatibilidade
 router.use('/', authRoutes); // /api/login, /api/logout, etc.
 router.use('/', usuariosRoutes); // /api/usuarios/perfil
 router.use('/', empresasRoutes); // /api/empresas/perfil

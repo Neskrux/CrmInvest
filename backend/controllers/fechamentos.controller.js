@@ -1458,6 +1458,9 @@ const gerarBoletosFechamento = async (req, res) => {
     
     // Aceitar numero_parcelas opcional no body
     const numeroParcelasBody = req.body.numero_parcelas ? parseInt(req.body.numero_parcelas) : null;
+    
+    // Aceitar limpar_existentes opcional no body (se true, deleta boletos existentes antes de criar)
+    const limparExistentes = req.body.limpar_existentes === true;
 
     // Verificar se o fechamento existe e se o usuário tem permissão
     const { data: fechamento, error: fechamentoError } = await supabaseAdmin
@@ -1507,11 +1510,56 @@ const gerarBoletosFechamento = async (req, res) => {
     };
 
     // Verificar se já existem boletos para este fechamento
-    const { data: boletosExistentes } = await supabaseAdmin
+    const { data: boletosExistentes, error: boletosExistentesError } = await supabaseAdmin
       .from('boletos_caixa')
-      .select('id')
-      .eq('fechamento_id', fechamentoId)
-      .not('erro_criacao', 'is', null); // Ignorar boletos com erro
+      .select('id, numero_documento, nosso_numero, parcela_numero, status, erro_criacao')
+      .eq('fechamento_id', fechamentoId);
+    
+    if (boletosExistentes && boletosExistentes.length > 0) {
+      const boletosSemErro = boletosExistentes.filter(b => !b.erro_criacao);
+      const boletosComErro = boletosExistentes.filter(b => b.erro_criacao);
+      
+      console.log(`📋 [FECHAMENTO ${fechamentoId}] Boletos existentes no banco:`);
+      console.log(`   - Total: ${boletosExistentes.length}`);
+      console.log(`   - Sem erro: ${boletosSemErro.length}`);
+      console.log(`   - Com erro: ${boletosComErro.length}`);
+      
+      if (boletosSemErro.length > 0) {
+        console.log(`   - Boletos válidos encontrados:`);
+        boletosSemErro.forEach(b => {
+          console.log(`     * ${b.numero_documento} (nosso_numero: ${b.nosso_numero}, parcela: ${b.parcela_numero || 'N/A'})`);
+        });
+      }
+      
+      if (boletosComErro.length > 0) {
+        console.log(`   - Boletos com erro encontrados:`);
+        boletosComErro.forEach(b => {
+          console.log(`     * ${b.numero_documento} (erro: ${b.erro_criacao?.substring(0, 50)}...)`);
+        });
+      }
+      
+      // Se solicitado, limpar boletos existentes antes de criar novos
+      if (limparExistentes) {
+        console.log(`🗑️ [FECHAMENTO ${fechamentoId}] Limpando ${boletosExistentes.length} boleto(s) existente(s)...`);
+        
+        const { error: deleteError } = await supabaseAdmin
+          .from('boletos_caixa')
+          .delete()
+          .eq('fechamento_id', fechamentoId);
+        
+        if (deleteError) {
+          console.error(`❌ Erro ao limpar boletos existentes:`, deleteError);
+          return res.status(500).json({ 
+            error: 'Erro ao limpar boletos existentes',
+            details: deleteError.message 
+          });
+        }
+        
+        console.log(`✅ [FECHAMENTO ${fechamentoId}] ${boletosExistentes.length} boleto(s) removido(s) com sucesso`);
+      } else {
+        console.log(`ℹ️ [FECHAMENTO ${fechamentoId}] Boletos existentes serão mantidos. Use 'limpar_existentes: true' no body para limpar antes de criar novos.`);
+      }
+    }
 
     // Buscar dados completos do paciente
     const { data: pacienteCompleto, error: pacienteError } = await supabaseAdmin

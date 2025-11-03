@@ -106,30 +106,27 @@ async function criarBoletosCaixa(fechamento, paciente, idBeneficiario, cnpjBenef
             console.log(`🔄 URL normalizada: ${resultadoBoleto.url} -> ${urlBoletoPublica}`);
           }
 
-          // Verificar se o boleto já existe (por nosso_numero ou numero_documento)
-          const { data: boletoExistente, error: boletoExistenteError } = await supabaseAdmin
+          // IMPORTANTE: Verificar APENAS por numero_documento (único por parcela)
+          // Não verificar por nosso_numero porque a API da Caixa pode retornar o mesmo
+          // nosso_numero para boletos diferentes (problema conhecido da API Sandbox)
+          const { data: boletoExistente, error: erroPorDoc } = await supabaseAdmin
             .from('boletos_caixa')
-            .select('id, nosso_numero, numero_documento')
-            .or(`nosso_numero.eq.${resultadoBoleto.nosso_numero},numero_documento.eq.${numeroDocumento}`)
-            .limit(1)
-            .maybeSingle(); // maybeSingle() retorna null se não encontrar, ao invés de lançar erro
+            .select('*')
+            .eq('numero_documento', numeroDocumento)
+            .eq('fechamento_id', fechamento.id) // Garantir que é do mesmo fechamento
+            .maybeSingle();
 
-          if (boletoExistente && !boletoExistenteError) {
-            console.log(`⚠️ Boleto ${i + 1} já existe no banco (nosso_numero: ${resultadoBoleto.nosso_numero}, numero_documento: ${numeroDocumento}). Pulando inserção.`);
-            
-            // Buscar boleto completo para retornar
-            const { data: boletoCompleto } = await supabaseAdmin
-              .from('boletos_caixa')
-              .select('*')
-              .eq('id', boletoExistente.id)
-              .single();
-            
-            if (boletoCompleto) {
-              boletosCriados.push(boletoCompleto);
-            }
+          if (boletoExistente && !erroPorDoc) {
+            console.log(`⚠️ [${i + 1}/${fechamento.numero_parcelas}] Boleto já existe no banco por numero_documento: ${numeroDocumento} (id: ${boletoExistente.id}, nosso_numero: ${boletoExistente.nosso_numero})`);
+            // Adicionar ao array de retorno mesmo que já exista
+            boletosCriados.push(boletoExistente);
             sucessos++;
+            console.log(`✅ [${i + 1}/${fechamento.numero_parcelas}] Boleto existente adicionado ao retorno (id: ${boletoExistente.id})`);
             continue;
           }
+          
+          // Se não existe por numero_documento, tentar salvar mesmo que o nosso_numero possa ser duplicado
+          // (a API da Caixa Sandbox às vezes retorna nosso_numero duplicados)
 
           // Salvar boleto no banco
           const { data: boletoSalvo, error: boletoError } = await supabaseAdmin
@@ -162,38 +159,67 @@ async function criarBoletosCaixa(fechamento, paciente, idBeneficiario, cnpjBenef
             if (boletoError.code === '23505' || boletoError.message?.includes('duplicate key')) {
               console.warn(`⚠️ [${i + 1}/${fechamento.numero_parcelas}] Boleto duplicado detectado (duplicate key). Buscando boleto existente...`);
               
-              // Tentar buscar por nosso_numero primeiro
-              let boletoDuplicado = null;
-              const { data: boletoPorNossoNumero } = await supabaseAdmin
+              // IMPORTANTE: Verificar APENAS por numero_documento (único por parcela)
+              // NÃO buscar por nosso_numero porque a API pode retornar duplicados
+              const { data: boletoPorDoc } = await supabaseAdmin
                 .from('boletos_caixa')
                 .select('*')
-                .eq('nosso_numero', resultadoBoleto.nosso_numero)
+                .eq('numero_documento', numeroDocumento)
+                .eq('fechamento_id', fechamento.id)
                 .maybeSingle();
               
-              if (boletoPorNossoNumero) {
-                boletoDuplicado = boletoPorNossoNumero;
-              } else {
-                // Tentar buscar por numero_documento como fallback
-                const { data: boletoPorDoc } = await supabaseAdmin
-                  .from('boletos_caixa')
-                  .select('*')
-                  .eq('numero_documento', numeroDocumento)
-                  .maybeSingle();
-                
-                if (boletoPorDoc) {
-                  boletoDuplicado = boletoPorDoc;
-                }
-              }
-              
-              if (boletoDuplicado) {
-                console.log(`✅ [${i + 1}/${fechamento.numero_parcelas}] Usando boleto existente (nosso_numero: ${boletoDuplicado.nosso_numero}, numero_documento: ${boletoDuplicado.numero_documento})`);
-                boletosCriados.push(boletoDuplicado);
+              if (boletoPorDoc) {
+                // Boleto existe pelo numero_documento correto - usar ele
+                console.log(`✅ [${i + 1}/${fechamento.numero_parcelas}] Boleto encontrado por numero_documento: ${numeroDocumento} (id: ${boletoPorDoc.id})`);
+                boletosCriados.push(boletoPorDoc);
                 sucessos++;
                 continue;
               } else {
-                console.error(`❌ [${i + 1}/${fechamento.numero_parcelas}] Erro de duplicata mas boleto não encontrado no banco. Erro:`, boletoError);
-                // Continuar mesmo assim, não lançar erro para não parar o processo
-                continue;
+                // Boleto NÃO existe pelo numero_documento, mas nosso_numero está duplicado
+                // Isso é um problema da API da Caixa Sandbox retornando nosso_numero duplicados
+                // Solução: Criar o boleto SEM nosso_numero ou com um valor alternativo
+                console.error(`🔴 [${i + 1}/${fechamento.numero_parcelas}] PROBLEMA DA API CAIXA: nosso_numero ${resultadoBoleto.nosso_numero} duplicado!`);
+                console.error(`   Tentando salvar boleto com numero_documento: ${numeroDocumento}`);
+                console.error(`   Criando boleto SEM nosso_numero para evitar constraint...`);
+                
+                // Tentar criar o boleto sem o nosso_numero (ou com NULL)
+                // Usar erro_criacao para armazenar informação sobre nosso_numero duplicado
+                const { data: boletoSemNossoNumero, error: erroSemNossoNumero } = await supabaseAdmin
+                  .from('boletos_caixa')
+                  .insert([{
+                    paciente_id: paciente.id,
+                    fechamento_id: fechamento.id,
+                    id_beneficiario: idBeneficiarioNormalizado,
+                    nosso_numero: null, // NULL para evitar constraint
+                    numero_documento: numeroDocumento,
+                    codigo_barras: resultadoBoleto.codigo_barras,
+                    linha_digitavel: resultadoBoleto.linha_digitavel,
+                    url: urlBoletoPublica,
+                    qrcode: resultadoBoleto.qrcode,
+                    url_qrcode: resultadoBoleto.url_qrcode,
+                    valor: parseFloat(fechamento.valor_parcela),
+                    data_vencimento: dataVencimento.toISOString().split('T')[0],
+                    data_emissao: new Date().toISOString().split('T')[0],
+                    situacao: 'EM ABERTO',
+                    status: 'pendente',
+                    empresa_id: fechamento.empresa_id,
+                    parcela_numero: i + 1,
+                    sincronizado_em: new Date().toISOString(),
+                    erro_criacao: `NOSSO_NUMERO_DUPLICADO_DA_API: ${resultadoBoleto.nosso_numero} (boleto válido criado na API)`
+                  }])
+                  .select()
+                  .single();
+                
+                if (boletoSemNossoNumero && !erroSemNossoNumero) {
+                  console.log(`✅ [${i + 1}/${fechamento.numero_parcelas}] Boleto criado SEM nosso_numero (id: ${boletoSemNossoNumero.id}, numero_documento: ${numeroDocumento})`);
+                  boletosCriados.push(boletoSemNossoNumero);
+                  sucessos++;
+                  continue;
+                } else {
+                  console.error(`❌ [${i + 1}/${fechamento.numero_parcelas}] Erro ao criar boleto sem nosso_numero:`, erroSemNossoNumero);
+                  erros++;
+                  continue;
+                }
               }
             }
             
@@ -208,8 +234,24 @@ async function criarBoletosCaixa(fechamento, paciente, idBeneficiario, cnpjBenef
             sucessos++;
             console.log(`✅ [${i + 1}/${fechamento.numero_parcelas}] Boleto salvo no banco (nosso_numero: ${resultadoBoleto.nosso_numero}, id: ${boletoSalvo.id})`);
           } else {
-            console.warn(`⚠️ [${i + 1}/${fechamento.numero_parcelas}] Boleto criado na API mas não foi retornado pelo insert. Verificando...`);
-            erros++;
+            console.warn(`⚠️ [${i + 1}/${fechamento.numero_parcelas}] Boleto criado na API mas não foi retornado pelo insert. Tentando buscar...`);
+            
+            // Tentar buscar o boleto que acabou de ser criado
+            const { data: boletoBuscado } = await supabaseAdmin
+              .from('boletos_caixa')
+              .select('*')
+              .eq('numero_documento', numeroDocumento)
+              .eq('fechamento_id', fechamento.id)
+              .maybeSingle();
+            
+            if (boletoBuscado) {
+              console.log(`✅ [${i + 1}/${fechamento.numero_parcelas}] Boleto encontrado após insert (id: ${boletoBuscado.id})`);
+              boletosCriados.push(boletoBuscado);
+              sucessos++;
+            } else {
+              console.error(`❌ [${i + 1}/${fechamento.numero_parcelas}] Boleto não encontrado após insert. Possível problema na inserção.`);
+              erros++;
+            }
           }
           
           // Delay entre criações para respeitar rate limit da API (5 req/segundo)

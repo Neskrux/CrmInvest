@@ -49,6 +49,22 @@ app.use((req, res, next) => {
   bodyParser.urlencoded({ extended: true, limit: '250mb' })(req, res, next);
 });
 
+// Middleware de log global para capturar TODAS as requisições à API (para debug)
+app.use('/api', (req, res, next) => {
+  if (req.path.includes('validar-biometria')) {
+    console.log('🚨 [SERVER-GLOBAL] Requisição para /api/auth/validar-biometria');
+    console.log('🚨 [SERVER-GLOBAL] Method:', req.method);
+    console.log('🚨 [SERVER-GLOBAL] Path:', req.path);
+    console.log('🚨 [SERVER-GLOBAL] URL:', req.url);
+    console.log('🚨 [SERVER-GLOBAL] Headers:', {
+      'content-type': req.headers['content-type'],
+      'authorization': req.headers['authorization'] ? 'PRESENTE' : 'AUSENTE',
+      'origin': req.headers['origin']
+    });
+  }
+  next();
+});
+
 // Rate limiting global (aplicado a todas as rotas)
 app.use('/api', generalLimiter);
 
