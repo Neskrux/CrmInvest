@@ -521,6 +521,34 @@ const createFechamento = async (req, res) => {
         if (pacienteError || !pacienteCompleto) {
           console.error('❌ [CAIXA] Erro ao buscar paciente:', pacienteError);
         } else {
+          // Buscar CNPJ da empresa beneficiária (necessário para o payload conforme manual)
+          const { data: empresaData, error: empresaError } = await supabaseAdmin
+            .from('empresas')
+            .select('cnpj')
+            .eq('id', data[0].empresa_id)
+            .single();
+
+          // CNPJ correto da INVESTMONEY SECURITIZADORA DE CREDITOS S/A
+          const CNPJ_CORRETO = '41267440000197';
+          let cnpjParaUsar = null;
+
+          if (empresaError || !empresaData || !empresaData.cnpj) {
+            console.warn('⚠️ [CAIXA] Não foi possível buscar CNPJ da empresa. Usando CNPJ padrão da INVESTMONEY.');
+            cnpjParaUsar = CNPJ_CORRETO;
+          } else {
+            // Normalizar CNPJ (remover formatação)
+            const cnpjNormalizado = empresaData.cnpj.replace(/\D/g, '');
+            
+            // Validar se o CNPJ está correto (14 dígitos e corresponde ao da INVESTMONEY)
+            if (cnpjNormalizado.length === 14 && cnpjNormalizado === CNPJ_CORRETO) {
+              cnpjParaUsar = cnpjNormalizado;
+              console.log(`✅ [CAIXA] CNPJ validado e correto: ${cnpjParaUsar}`);
+            } else {
+              console.warn(`⚠️ [CAIXA] CNPJ do banco (${cnpjNormalizado}) não corresponde ao CNPJ cadastrado na Caixa (${CNPJ_CORRETO}). Usando CNPJ correto.`);
+              cnpjParaUsar = CNPJ_CORRETO;
+            }
+          }
+
           // Obter ID do beneficiário (configurável por empresa)
           const idBeneficiarioRaw = process.env.CAIXA_ID_BENEFICIARIO;
           
@@ -528,15 +556,25 @@ const createFechamento = async (req, res) => {
             console.warn('⚠️ [CAIXA] CAIXA_ID_BENEFICIARIO não configurado. Configure no .env');
           } else {
             // Normalizar ID do beneficiário (pode vir como "0374/1242669" ou apenas "1242669")
-            const idBeneficiario = idBeneficiarioRaw.includes('/') 
-              ? idBeneficiarioRaw.split('/')[1].trim() 
-              : idBeneficiarioRaw.trim();
+            // IMPORTANTE: Conforme Swagger, o parâmetro na URL deve ser "integer", não string com barra
+            // Portanto, sempre extrair apenas o código numérico para usar na URL
+            let idBeneficiario;
+            
+            if (idBeneficiarioRaw.includes('/')) {
+              // Extrair apenas o código numérico após a barra
+              idBeneficiario = idBeneficiarioRaw.split('/')[1].trim();
+              console.log(`📋 [CAIXA] Extraindo código do beneficiário: ${idBeneficiarioRaw} -> ${idBeneficiario}`);
+            } else {
+              // Já está no formato numérico
+              idBeneficiario = idBeneficiarioRaw.trim();
+            }
             
             // Criar boletos na Caixa
             const boletosCriados = await criarBoletosCaixa(
               data[0],
               pacienteCompleto,
-              idBeneficiario
+              idBeneficiario,
+              cnpjParaUsar // Passar CNPJ validado/correto da empresa beneficiária
             );
             
             if (boletosCriados.length > 0) {
@@ -985,6 +1023,34 @@ const aprovarFechamento = async (req, res) => {
         if (pacienteError || !pacienteCompleto) {
           console.error('❌ [CAIXA] Erro ao buscar paciente:', pacienteError);
         } else {
+          // Buscar CNPJ da empresa beneficiária (necessário para o payload conforme manual)
+          const { data: empresaData, error: empresaError } = await supabaseAdmin
+            .from('empresas')
+            .select('cnpj')
+            .eq('id', data[0].empresa_id)
+            .single();
+
+          // CNPJ correto da INVESTMONEY SECURITIZADORA DE CREDITOS S/A
+          const CNPJ_CORRETO = '41267440000197';
+          let cnpjParaUsar = null;
+
+          if (empresaError || !empresaData || !empresaData.cnpj) {
+            console.warn('⚠️ [CAIXA] Não foi possível buscar CNPJ da empresa. Usando CNPJ padrão da INVESTMONEY.');
+            cnpjParaUsar = CNPJ_CORRETO;
+          } else {
+            // Normalizar CNPJ (remover formatação)
+            const cnpjNormalizado = empresaData.cnpj.replace(/\D/g, '');
+            
+            // Validar se o CNPJ está correto (14 dígitos e corresponde ao da INVESTMONEY)
+            if (cnpjNormalizado.length === 14 && cnpjNormalizado === CNPJ_CORRETO) {
+              cnpjParaUsar = cnpjNormalizado;
+              console.log(`✅ [CAIXA] CNPJ validado e correto: ${cnpjParaUsar}`);
+            } else {
+              console.warn(`⚠️ [CAIXA] CNPJ do banco (${cnpjNormalizado}) não corresponde ao CNPJ cadastrado na Caixa (${CNPJ_CORRETO}). Usando CNPJ correto.`);
+              cnpjParaUsar = CNPJ_CORRETO;
+            }
+          }
+
           // Obter ID do beneficiário (configurável por empresa)
           const idBeneficiarioRaw = process.env.CAIXA_ID_BENEFICIARIO;
           
@@ -1010,7 +1076,8 @@ const aprovarFechamento = async (req, res) => {
               const boletosCriados = await criarBoletosCaixa(
                 data[0],
                 pacienteCompleto,
-                idBeneficiario
+                idBeneficiario,
+                cnpjParaUsar // Passar CNPJ validado/correto da empresa beneficiária
               );
               
               if (boletosCriados.length > 0) {
@@ -1388,6 +1455,9 @@ const gerarBoletosFechamento = async (req, res) => {
   try {
     const { id } = req.params;
     const fechamentoId = parseInt(id);
+    
+    // Aceitar numero_parcelas opcional no body
+    const numeroParcelasBody = req.body.numero_parcelas ? parseInt(req.body.numero_parcelas) : null;
 
     // Verificar se o fechamento existe e se o usuário tem permissão
     const { data: fechamento, error: fechamentoError } = await supabaseAdmin
@@ -1415,6 +1485,27 @@ const gerarBoletosFechamento = async (req, res) => {
       return res.status(400).json({ error: 'Este endpoint é apenas para empresa_id 3 (Caixa)' });
     }
 
+    // Validar número de parcelas fornecido no body
+    if (numeroParcelasBody !== null) {
+      if (isNaN(numeroParcelasBody) || numeroParcelasBody < 1 || numeroParcelasBody > 100) {
+        return res.status(400).json({ error: 'Número de parcelas deve ser entre 1 e 100' });
+      }
+    }
+
+    // Usar numero_parcelas do body se fornecido, senão usar do fechamento
+    const numeroParcelasParaUsar = numeroParcelasBody !== null ? numeroParcelasBody : (fechamento.numero_parcelas || 1);
+    
+    // Calcular valor da parcela baseado no número selecionado
+    const valorTotal = parseFloat(fechamento.valor_fechado) || 0;
+    const valorParcela = valorTotal / numeroParcelasParaUsar;
+    
+    // Criar objeto fechamento temporário com os valores ajustados
+    const fechamentoAjustado = {
+      ...fechamento,
+      numero_parcelas: numeroParcelasParaUsar,
+      valor_parcela: valorParcela
+    };
+
     // Verificar se já existem boletos para este fechamento
     const { data: boletosExistentes } = await supabaseAdmin
       .from('boletos_caixa')
@@ -1433,6 +1524,34 @@ const gerarBoletosFechamento = async (req, res) => {
       return res.status(404).json({ error: 'Paciente não encontrado' });
     }
 
+    // Buscar CNPJ da empresa beneficiária (necessário para o payload conforme manual)
+    const { data: empresaData, error: empresaError } = await supabaseAdmin
+      .from('empresas')
+      .select('cnpj')
+      .eq('id', fechamento.empresa_id)
+      .single();
+
+    // CNPJ correto da INVESTMONEY SECURITIZADORA DE CREDITOS S/A
+    const CNPJ_CORRETO = '41267440000197';
+    let cnpjParaUsar = null;
+
+    if (empresaError || !empresaData || !empresaData.cnpj) {
+      console.warn('⚠️ [CAIXA] Não foi possível buscar CNPJ da empresa. Usando CNPJ padrão da INVESTMONEY.');
+      cnpjParaUsar = CNPJ_CORRETO;
+    } else {
+      // Normalizar CNPJ (remover formatação)
+      const cnpjNormalizado = empresaData.cnpj.replace(/\D/g, '');
+      
+      // Validar se o CNPJ está correto (14 dígitos e corresponde ao da INVESTMONEY)
+      if (cnpjNormalizado.length === 14 && cnpjNormalizado === CNPJ_CORRETO) {
+        cnpjParaUsar = cnpjNormalizado;
+        console.log(`✅ [CAIXA] CNPJ validado e correto: ${cnpjParaUsar}`);
+      } else {
+        console.warn(`⚠️ [CAIXA] CNPJ do banco (${cnpjNormalizado}) não corresponde ao CNPJ cadastrado na Caixa (${CNPJ_CORRETO}). Usando CNPJ correto.`);
+        cnpjParaUsar = CNPJ_CORRETO;
+      }
+    }
+
     // Obter ID do beneficiário
     const idBeneficiarioRaw = process.env.CAIXA_ID_BENEFICIARIO;
     
@@ -1440,22 +1559,36 @@ const gerarBoletosFechamento = async (req, res) => {
       return res.status(500).json({ error: 'CAIXA_ID_BENEFICIARIO não configurado no servidor' });
     }
 
-    // Normalizar ID do beneficiário
-    const idBeneficiario = idBeneficiarioRaw.includes('/') 
-      ? idBeneficiarioRaw.split('/')[1].trim() 
-      : idBeneficiarioRaw.trim();
+    // Normalizar ID do beneficiário (pode vir como "0374/1242669" ou apenas "1242669")
+    // IMPORTANTE: Conforme Swagger, o parâmetro na URL deve ser "integer", não string com barra
+    // Portanto, sempre extrair apenas o código numérico para usar na URL
+    let idBeneficiario;
+    
+    if (idBeneficiarioRaw.includes('/')) {
+      // Extrair apenas o código numérico após a barra
+      idBeneficiario = idBeneficiarioRaw.split('/')[1].trim();
+      console.log(`📋 [CAIXA] Extraindo código do beneficiário: ${idBeneficiarioRaw} -> ${idBeneficiario}`);
+    } else {
+      // Já está no formato numérico
+      idBeneficiario = idBeneficiarioRaw.trim();
+    }
 
-    // Criar boletos na Caixa
+    // Criar boletos na Caixa usando o fechamento ajustado
+    console.log(`🚀 [BOLETO] Iniciando criação de ${numeroParcelasParaUsar} boletos para fechamento ${fechamentoId}`);
+    
     const boletosCriados = await criarBoletosCaixa(
-      fechamento,
+      fechamentoAjustado,
       pacienteCompleto,
-      idBeneficiario
+      idBeneficiario,
+      cnpjParaUsar // Passar CNPJ validado/correto da empresa beneficiária
     );
+
+    console.log(`✅ [BOLETO] Processo concluído. ${boletosCriados.length} boleto(s) criado(s) de ${numeroParcelasParaUsar} solicitado(s)`);
 
     if (boletosCriados.length > 0) {
       return res.json({
         success: true,
-        message: `${boletosCriados.length} boleto(s) criado(s) com sucesso`,
+        message: `${boletosCriados.length} boleto(s) criado(s) com sucesso${boletosCriados.length < numeroParcelasParaUsar ? ` (de ${numeroParcelasParaUsar} solicitado(s))` : ''}`,
         boletos: boletosCriados.map(b => ({
           id: b.id,
           nosso_numero: b.nosso_numero,
@@ -1464,18 +1597,943 @@ const gerarBoletosFechamento = async (req, res) => {
           data_vencimento: b.data_vencimento,
           url: b.url,
           linha_digitavel: b.linha_digitavel
-        }))
+        })),
+        total_solicitado: numeroParcelasParaUsar,
+        total_criado: boletosCriados.length
       });
     } else {
       return res.status(400).json({
         error: 'Nenhum boleto foi criado',
-        message: 'Verifique os logs do servidor para mais detalhes. Possíveis causas: paciente sem CPF, erro na API Caixa, ou dados inválidos.'
+        message: `Nenhum dos ${numeroParcelasParaUsar} boleto(s) solicitado(s) foi criado com sucesso. Verifique os logs do servidor para mais detalhes. Possíveis causas: paciente sem CPF, erro na API Caixa, ou dados inválidos.`
       });
     }
 
   } catch (error) {
     console.error('Erro ao gerar boletos do fechamento:', error);
     res.status(500).json({ error: error.message || 'Erro interno do servidor' });
+  }
+};
+
+/**
+ * Visualizar boleto como HTML formatado
+ * GET /api/fechamentos/:id/boletos/:boletoId/visualizar
+ */
+const visualizarBoleto = async (req, res) => {
+  try {
+    const { id, boletoId } = req.params;
+    const fechamentoId = parseInt(id);
+    const boletoIdInt = parseInt(boletoId);
+
+    // Buscar boleto
+    const { data: boleto, error: boletoError } = await supabaseAdmin
+      .from('boletos_caixa')
+      .select('*')
+      .eq('id', boletoIdInt)
+      .eq('fechamento_id', fechamentoId)
+      .single();
+
+    if (boletoError || !boleto) {
+      return res.status(404).send(`
+        <html>
+          <body style="font-family: Arial; text-align: center; padding: 50px;">
+            <h1>Boleto não encontrado</h1>
+            <p>O boleto solicitado não foi encontrado no sistema.</p>
+          </body>
+        </html>
+      `);
+    }
+
+    // Verificar permissão: admin pode ver todos, clínica só os seus, paciente só os seus
+    if (req.user.tipo === 'clinica') {
+      const clinicaId = req.user.clinica_id || req.user.id;
+      const { data: fechamentoCheck } = await supabaseAdmin
+        .from('fechamentos')
+        .select('clinica_id')
+        .eq('id', fechamentoId)
+        .single();
+      if (fechamentoCheck && fechamentoCheck.clinica_id !== clinicaId) {
+        return res.status(403).send(`
+          <html>
+            <body style="font-family: Arial; text-align: center; padding: 50px;">
+              <h1>Acesso negado</h1>
+              <p>Você só pode visualizar boletos dos seus próprios fechamentos.</p>
+            </body>
+          </html>
+        `);
+      }
+    } else if (req.user.tipo === 'paciente') {
+      const pacienteId = req.user.paciente_id || req.user.id;
+      const { data: fechamentoCheck } = await supabaseAdmin
+        .from('fechamentos')
+        .select('paciente_id')
+        .eq('id', fechamentoId)
+        .single();
+      if (fechamentoCheck && fechamentoCheck.paciente_id !== pacienteId) {
+        return res.status(403).send(`
+          <html>
+            <body style="font-family: Arial; text-align: center; padding: 50px;">
+              <h1>Acesso negado</h1>
+              <p>Você só pode visualizar seus próprios boletos.</p>
+            </body>
+          </html>
+        `);
+      }
+    }
+
+    // Buscar dados do fechamento
+    const { data: fechamento, error: fechamentoError } = await supabaseAdmin
+      .from('fechamentos')
+      .select('id, paciente_id, valor_fechado, numero_parcelas, clinica_id, empresa_id')
+      .eq('id', fechamentoId)
+      .single();
+
+    // Buscar dados do paciente
+    const { data: paciente, error: pacienteError } = await supabaseAdmin
+      .from('pacientes')
+      .select('nome, cpf, email, telefone, endereco, bairro, numero, cidade, estado, cep')
+      .eq('id', boleto.paciente_id)
+      .single();
+
+    // Buscar dados da empresa beneficiária
+    const { data: empresa, error: empresaError } = await supabaseAdmin
+      .from('empresas')
+      .select('nome, cnpj')
+      .eq('id', fechamento?.empresa_id || 3)
+      .single();
+
+    // Formatar data de vencimento
+    const dataVencimento = new Date(boleto.data_vencimento + 'T00:00:00');
+    const dataVencimentoFormatada = dataVencimento.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+
+    // Formatar valor
+    const valorFormatado = new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(boleto.valor);
+
+    // Formatar linha digitável com espaçamento (padrão FEBRABAN: 10491.24264 69000.100045 00008.930646 4 12710000049500)
+    const linhaDigitavel = (boleto.linha_digitavel || '').replace(/\D/g, ''); // Remover caracteres não numéricos
+    let linhaFormatada = linhaDigitavel;
+    
+    console.log('📊 [BOLETO] Linha digitável original:', boleto.linha_digitavel);
+    console.log('📊 [BOLETO] Linha digitável limpa:', linhaDigitavel, 'Tamanho:', linhaDigitavel.length);
+    console.log('📊 [BOLETO] Código de barras:', boleto.codigo_barras, 'Tamanho:', boleto.codigo_barras?.length);
+    
+    if (linhaDigitavel.length === 47) {
+      // Formato FEBRABAN padrão: 10491.24264 69000.100045 00008.930646 4 12710000049500
+      // Posições: 5 + ponto + 5 + espaço + 5 + ponto + 6 + espaço + 5 + ponto + 6 + espaço + 1 + espaço + 14
+      linhaFormatada = linhaDigitavel.substring(0, 5) + '.' +
+                       linhaDigitavel.substring(5, 10) + ' ' +
+                       linhaDigitavel.substring(10, 15) + '.' +
+                       linhaDigitavel.substring(15, 21) + ' ' +
+                       linhaDigitavel.substring(21, 26) + '.' +
+                       linhaDigitavel.substring(26, 32) + ' ' +
+                       linhaDigitavel.substring(32, 33) + ' ' +
+                       linhaDigitavel.substring(33, 47);
+      console.log('✅ [BOLETO] Linha digitável formatada corretamente');
+    } else if (linhaDigitavel.length > 0) {
+      // Se não tiver 47 caracteres, tentar formatar do melhor jeito possível
+      console.warn('⚠️ [BOLETO] Linha digitável com tamanho inválido:', linhaDigitavel.length, 'esperado: 47');
+      linhaFormatada = linhaDigitavel.substring(0, 5) + '.' +
+                       linhaDigitavel.substring(5, 10) + ' ' +
+                       linhaDigitavel.substring(10, 15) + '.' +
+                       linhaDigitavel.substring(15, 21) + ' ' +
+                       linhaDigitavel.substring(21, 26) + '.' +
+                       linhaDigitavel.substring(26, 32) + ' ' +
+                       linhaDigitavel.substring(32, 33) + ' ' +
+                       linhaDigitavel.substring(33);
+    } else {
+      console.warn('⚠️ [BOLETO] Linha digitável vazia ou inválida');
+      linhaFormatada = '00000.00000 00000.000000 00000.000000 0 00000000000000';
+    }
+
+    // Função para gerar código de barras ITF (Interleaved 2 of 5) usando CSS - MELHORADA
+    const gerarCodigoBarrasCSS = (codigo) => {
+      if (!codigo || codigo.length !== 44) {
+        console.warn('⚠️ [BOLETO] Código de barras inválido:', codigo, 'Tamanho:', codigo?.length);
+        return '<div style="color: red; padding: 10px; font-size: 10px;">⚠️ Código de barras inválido (esperado: 44 dígitos, recebido: ' + (codigo?.length || 0) + ')</div>';
+      }
+      
+      console.log('✅ [BOLETO] Gerando código de barras para:', codigo.substring(0, 10) + '...');
+      
+      // Padrões Interleaved 2 of 5 (ITF) para cada dígito
+      // N = Narrow (barra fina), W = Wide (barra grossa)
+      const patterns = {
+        '0': 'NNWWN', // 0-0-1-1-0
+        '1': 'WNNNW', // 1-0-0-0-1
+        '2': 'NWNNW', // 0-1-0-0-1
+        '3': 'WWNNN', // 1-1-0-0-0
+        '4': 'NNWNW', // 0-0-1-0-1
+        '5': 'WNWNN', // 1-0-1-0-0
+        '6': 'NWWNN', // 0-1-1-0-0
+        '7': 'NNNWW', // 0-0-0-1-1
+        '8': 'WNNWN', // 1-0-0-1-0
+        '9': 'NWNWN'  // 0-1-0-1-0
+      };
+      
+      let barrasHTML = '<div style="display: inline-block; height: 60px; background: white; padding: 5px 10px; white-space: nowrap; overflow-x: auto;">';
+      
+      // Start pattern (4 elementos: barra preta fina, espaço branco fino, barra preta fina, espaço branco fino)
+      barrasHTML += '<span style="display: inline-block; width: 2px; height: 100%; background: black; margin-right: 0;"></span>';
+      barrasHTML += '<span style="display: inline-block; width: 2px; height: 100%; background: white; margin-right: 0;"></span>';
+      barrasHTML += '<span style="display: inline-block; width: 2px; height: 100%; background: black; margin-right: 0;"></span>';
+      barrasHTML += '<span style="display: inline-block; width: 2px; height: 100%; background: white; margin-right: 0;"></span>';
+      
+      // Processar pares de dígitos (Interleaved 2 of 5 sempre trabalha com pares)
+      // Como temos 44 dígitos, são 22 pares
+      for (let i = 0; i < codigo.length; i += 2) {
+        const digit1 = codigo[i];
+        const digit2 = codigo[i + 1];
+        
+        if (!digit1 || !digit2) break; // Parar se não houver mais pares
+        
+        const pattern1 = patterns[digit1] || 'NNNNN';
+        const pattern2 = patterns[digit2] || 'NNNNN';
+        
+        // Intercalar os padrões: barras pretas (digit1) e espaços brancos (digit2)
+        for (let j = 0; j < 5; j++) {
+          const isWide1 = pattern1[j] === 'W';
+          const isWide2 = pattern2[j] === 'W';
+          
+          // Barra preta (do digit1)
+          const widthBarra = isWide1 ? 4 : 2;
+          barrasHTML += `<span style="display: inline-block; width: ${widthBarra}px; height: 100%; background: black; margin-right: 0;"></span>`;
+          
+          // Espaço branco (do digit2)
+          const widthEspaco = isWide2 ? 4 : 2;
+          barrasHTML += `<span style="display: inline-block; width: ${widthEspaco}px; height: 100%; background: white; margin-right: 0;"></span>`;
+        }
+      }
+      
+      // Não deve haver dígito ímpar com 44 dígitos, mas removendo essa parte por segurança
+      
+      // Stop pattern (3 elementos: barra preta grossa, espaço branco fino, barra preta fina)
+      barrasHTML += '<span style="display: inline-block; width: 4px; height: 100%; background: black; margin-right: 0;"></span>';
+      barrasHTML += '<span style="display: inline-block; width: 2px; height: 100%; background: white; margin-right: 0;"></span>';
+      barrasHTML += '<span style="display: inline-block; width: 2px; height: 100%; background: black; margin-right: 0;"></span>';
+      
+      barrasHTML += '</div>';
+      
+      console.log('✅ [BOLETO] Código de barras gerado com sucesso');
+      return barrasHTML;
+    };
+
+    // Buscar dados da clínica (beneficiário final)
+    const { data: clinica } = await supabaseAdmin
+      .from('clinicas')
+      .select('nome, cidade, uf')
+      .eq('id', fechamento?.clinica_id)
+      .single();
+
+    // Formatar data de emissão
+    const dataEmissao = new Date(boleto.data_emissao + 'T00:00:00');
+    const dataEmissaoFormatada = dataEmissao.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+
+    // Formatação do endereço do pagador (se disponível)
+    let enderecoPagador = '';
+    if (paciente) {
+      const partesEndereco = [];
+      if (paciente.endereco) partesEndereco.push(paciente.endereco);
+      if (paciente.numero) partesEndereco.push(paciente.numero);
+      if (paciente.bairro) partesEndereco.push(paciente.bairro);
+      if (paciente.cidade && paciente.estado) {
+        partesEndereco.push(`${paciente.cidade}/${paciente.estado}`);
+      }
+      if (paciente.cep) {
+        const cepFormatado = paciente.cep.replace(/(\d{5})(\d{3})/, '$1-$2');
+        partesEndereco.push(`CEP: ${cepFormatado}`);
+      }
+      enderecoPagador = partesEndereco.join(' - ');
+    }
+
+    // Calcular multa (10% do valor)
+    const valorMulta = (boleto.valor * 0.10).toFixed(2);
+    const valorMultaFormatado = new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(valorMulta);
+
+    // Data de início de juros (um dia após vencimento)
+    const dataJuros = new Date(boleto.data_vencimento + 'T00:00:00');
+    dataJuros.setDate(dataJuros.getDate() + 1);
+    const dataJurosFormatada = dataJuros.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+
+    // CNPJ fixo da empresa beneficiária
+    const CNPJ_EMPRESA_FIXO = '41267440000197';
+    const CNPJ_EMPRESA_FORMATADO = '41.267.440/0001-97';
+
+    // Formatar endereço do beneficiário
+    const enderecoBeneficiario = 'FRANCISCO ROCHA, 198,-BATEL/CURITIBA';
+    const cepBeneficiario = '80420-130';
+    const ufBeneficiario = 'PR';
+
+    // Formatar endereço do pagador
+    let enderecoPagadorFormatado = '';
+    if (paciente) {
+      const partes = [];
+      if (paciente.endereco) partes.push(paciente.endereco.toUpperCase());
+      if (paciente.numero) partes.push(paciente.numero);
+      if (paciente.bairro) partes.push(paciente.bairro.toUpperCase());
+      if (paciente.cidade) partes.push(paciente.cidade.toUpperCase());
+      enderecoPagadorFormatado = partes.join(',');
+    }
+
+    // HTML do boleto no padrão FEBRABAN/Caixa - IDÊNTICO AO ORIGINAL
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Boleto - ${boleto.numero_documento || 'Boleto'}</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 7px;
+      background: #fff;
+      padding: 0;
+      color: #000;
+      line-height: 1.1;
+    }
+    .actions-bar {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 10px;
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      margin-bottom: 10px;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+    .actions-bar button {
+      padding: 8px 16px;
+      border: 1px solid #0066cc;
+      background: #0066cc;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .actions-bar button:hover {
+      background: #0052a3;
+      border-color: #0052a3;
+    }
+    .actions-bar button:active {
+      transform: translateY(1px);
+    }
+    .boleto-wrapper {
+      padding: 10px;
+    }
+    .boleto-container {
+      width: 100%;
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      border: 1px solid #ccc;
+    }
+    
+    /* Header com gradiente Caixa - IDÊNTICO */
+    .header-banco {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 3px 6px;
+      border: 2px solid #000;
+      border-bottom: none;
+      background: linear-gradient(90deg, #00b5a6 0%, #0066cc 100%);
+      color: white;
+      height: 32px;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      flex: 1;
+    }
+    .logo-banco {
+      font-size: 13px;
+      font-weight: 600;
+      color: #b3e5d1;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .logo-banco .caixa {
+      color: white;
+      font-weight: 900;
+      font-size: 15px;
+    }
+    .logo-banco .caixa .x {
+      display: inline-block;
+      background: linear-gradient(180deg, #ffd700 0%, #ff8c00 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-weight: 900;
+    }
+    .codigo-banco {
+      font-size: 18px;
+      font-weight: 900;
+      border-left: 2px solid white;
+      border-right: 2px solid white;
+      padding: 0 8px;
+      margin: 0 6px;
+      height: 26px;
+      display: flex;
+      align-items: center;
+      color: white;
+    }
+    .linha-digitavel-header {
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      letter-spacing: 1.2px;
+      color: white;
+      flex: 1;
+      text-align: right;
+    }
+    
+    /* Tabela principal - IDÊNTICA À CAIXA */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 2px solid #000;
+      font-size: 7px;
+    }
+    td {
+      border: 1px solid #000;
+      padding: 1px 3px;
+      vertical-align: top;
+      font-size: 7px;
+      line-height: 1.1;
+      height: auto;
+    }
+    .campo-label {
+      font-size: 5.5px;
+      font-weight: normal;
+      display: block;
+      margin-bottom: 0;
+      color: #000;
+      line-height: 1;
+    }
+    .campo-valor {
+      font-weight: bold;
+      font-size: 8px;
+      text-transform: uppercase;
+      display: block;
+      line-height: 1.1;
+      margin-top: 1px;
+    }
+    .campo-valor-numero {
+      font-weight: bold;
+      font-size: 8px;
+      display: block;
+      line-height: 1.1;
+      margin-top: 1px;
+    }
+    
+    /* Valores destacados */
+    .valor-documento {
+      background: #e8e8e8;
+      font-weight: bold;
+      font-size: 10px;
+      text-align: right;
+      padding-right: 3px;
+    }
+    .valor-documento .campo-valor-numero {
+      font-size: 11px;
+    }
+    .vencimento {
+      background: #e8e8e8;
+      font-weight: bold;
+      font-size: 10px;
+      text-align: right;
+      padding-right: 3px;
+    }
+    .vencimento .campo-valor-numero {
+      font-size: 11px;
+    }
+    
+    /* Instruções */
+    .instrucoes {
+      font-size: 6.5px;
+      line-height: 1.3;
+      padding-top: 1px;
+    }
+    
+    /* Linha pontilhada de corte */
+    .linha-corte {
+      border-bottom: 1px dashed #999;
+      margin: 12px 0;
+      padding-bottom: 6px;
+      text-align: right;
+      font-size: 6px;
+      color: #666;
+    }
+    .linha-corte::after {
+      content: "✂ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -";
+    }
+    
+    /* Código de barras */
+    .codigo-barras {
+      text-align: center;
+      margin: 0;
+      padding: 6px;
+      border: 2px solid #000;
+      border-top: none;
+      background: white;
+    }
+    .codigo-barras-visual {
+      display: inline-block;
+      height: 50px;
+      background: white;
+      padding: 5px 10px;
+      white-space: nowrap;
+    }
+    .codigo-barras-numero {
+      margin-top: 2px;
+      font-size: 8px;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 0.5px;
+    }
+    
+    /* Autenticação mecânica */
+    .autenticacao-mecanica {
+      text-align: center;
+      font-size: 5.5px;
+      color: #666;
+      padding: 4px;
+      margin-top: 6px;
+    }
+    
+    /* Footer com contatos */
+    .footer-contatos {
+      margin-top: 10px;
+      padding-top: 6px;
+      border-top: 1px dashed #999;
+      font-size: 5.5px;
+      text-align: center;
+      color: #666;
+      line-height: 1.4;
+    }
+    
+    /* Ajustes específicos para campos */
+    .td-right {
+      text-align: right;
+    }
+    .td-center {
+      text-align: center;
+    }
+    
+    /* Ajustes de altura para células específicas */
+    .altura-instrucoes {
+      height: 60px;
+    }
+    
+    @media print {
+      body {
+        padding: 0;
+        background: white;
+      }
+      .actions-bar {
+        display: none;
+      }
+      .boleto-wrapper {
+        padding: 0;
+      }
+      .boleto-container {
+        border: none;
+      }
+      .linha-corte {
+        page-break-after: always;
+      }
+    }
+  </style>
+  <script>
+    function imprimirBoleto() {
+      window.print();
+    }
+    
+    function baixarBoleto() {
+      const elemento = document.querySelector('.boleto-wrapper');
+      const opt = {
+        margin: 0,
+        filename: 'boleto_${boleto.nosso_numero || boleto.numero_documento || 'download'}.pdf',
+        image: { type: 'jpeg', quality: 1 },
+        html2canvas: { scale: 4, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      
+      // Criar script para html2pdf se não existir
+      if (!window.html2pdf) {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+        script.onload = () => {
+          window.html2pdf().set(opt).from(elemento).save();
+        };
+        document.head.appendChild(script);
+      } else {
+        window.html2pdf().set(opt).from(elemento).save();
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="actions-bar">
+    <button onclick="imprimirBoleto()">🖨️ Imprimir</button>
+    <button onclick="baixarBoleto()">📥 Baixar PDF</button>
+  </div>
+  
+  <div class="boleto-wrapper">
+    <div class="boleto-container">
+      <!-- RECIBO DO PAGADOR -->
+      <div class="recibo-pagador">
+      <div class="header-banco">
+        <div class="header-left">
+          <span class="logo-banco">cobrança <span class="caixa">CAI<span class="x">X</span>A</span></span>
+        </div>
+        <div class="codigo-banco">104-0</div>
+        <div class="linha-digitavel-header">${linhaFormatada}</div>
+      </div>
+      
+      <table>
+        <tr>
+          <td style="width: 55%;">
+            <span class="campo-label">Beneficiário</span>
+            <span class="campo-valor">INVESTMONEY SECURITIZADORA DE CREDITOS S</span>
+          </td>
+          <td class="td-right" style="width: 45%;">
+            <span class="campo-label">CPF/CNPJ</span>
+            <span class="campo-valor-numero">${CNPJ_EMPRESA_FORMATADO}</span>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="2">
+            <span class="campo-label">Endereço do Beneficiário</span>
+            <span class="campo-valor" style="font-size: 8px;">${enderecoBeneficiario}</span>
+          </td>
+          <td class="td-right" style="width: 8%;">
+            <span class="campo-label">UF</span>
+            <span class="campo-valor-numero">${ufBeneficiario}</span>
+          </td>
+          <td class="td-right" style="width: 12%;">
+            <span class="campo-label">CEP</span>
+            <span class="campo-valor-numero">${cepBeneficiario}</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="width: 14%;">
+            <span class="campo-label">Data Documento</span>
+            <span class="campo-valor-numero">${dataEmissaoFormatada}</span>
+          </td>
+          <td style="width: 18%;">
+            <span class="campo-label">Dt. de Processamento</span>
+            <span class="campo-valor-numero">${dataEmissaoFormatada}</span>
+          </td>
+          <td style="width: 22%;">
+            <span class="campo-label">Num. Documento</span>
+            <span class="campo-valor-numero">${boleto.numero_documento || 'N/A'}</span>
+          </td>
+          <td style="width: 18%;">
+            <span class="campo-label">Ag./Cod. Beneficiário</span>
+            <span class="campo-valor-numero">0374/1242669</span>
+          </td>
+          <td style="width: 18%;">
+            <span class="campo-label">Nosso Número</span>
+            <span class="campo-valor-numero">${boleto.nosso_numero || 'N/A'}</span>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="4" style="width: 72%;">
+            <span class="campo-label">Pagador</span>
+            <span class="campo-valor">${(paciente?.nome || 'N/A').toUpperCase()}</span>
+          </td>
+          <td class="td-right" style="width: 28%;">
+            <span class="campo-label">CPF/CNPJ</span>
+            <span class="campo-valor-numero">${paciente?.cpf ? paciente.cpf.replace(/\D/g, '').replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : 'N/A'}</span>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="4">
+            <span class="campo-label">Endereço do Pagador</span>
+            <span class="campo-valor" style="font-size: 8px;">${enderecoPagadorFormatado || 'RUA LEANDRO BARRETO,,-JARDIM SAO PAUL/RECIFE'}</span>
+          </td>
+          <td class="td-right">
+            <span class="campo-label">UF</span>
+            <span class="campo-valor-numero">${paciente?.estado || 'PE'}</span>
+          </td>
+          <td class="td-right">
+            <span class="campo-label">CEP</span>
+            <span class="campo-valor-numero">${paciente?.cep ? paciente.cep.replace(/(\d{5})(\d{3})/, '$1-$2') : '50790-000'}</span>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="4">
+            <span class="campo-label">Sacador/Beneficiário Final</span>
+            <span class="campo-valor">${(clinica?.nome || 'CLINICA CIRURGICA ODONTOLOGICA RECIFE LT').toUpperCase()}</span>
+          </td>
+          <td colspan="2" class="td-right">
+            <span class="campo-label">CPF/CNPJ</span>
+            <span class="campo-valor-numero">33.910.210/0001-76</span>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="3" class="altura-instrucoes" style="vertical-align: top;">
+            <span class="campo-label">Instruções (Texto de Responsabilidade do Beneficiário)</span>
+            <div class="instrucoes">
+              NAO RECEBER APOS 30 DIAS DE ATRASO<br>
+              <strong>JUROS :</strong> 8,00% AO MES (DIAS CORRIDOS) A PARTIR DE: ${dataJurosFormatada}<br>
+              <strong>MULTA :</strong> ${valorMultaFormatado.replace('R$', '').trim()} REAIS A PARTIR DE ${dataJurosFormatada}
+            </div>
+          </td>
+          <td class="td-center" style="vertical-align: top;">
+            <span class="campo-label">Aceite</span>
+            <span class="campo-valor-numero">NAO</span>
+          </td>
+          <td class="td-center" style="vertical-align: top;">
+            <span class="campo-label">Carteira</span>
+            <span class="campo-valor-numero">RG</span>
+          </td>
+          <td class="td-center" style="vertical-align: top;">
+            <span class="campo-label">Espécie</span>
+            <span class="campo-valor-numero">DS</span>
+          </td>
+        </tr>
+      </table>
+      
+      <div class="autenticacao-mecanica">
+        Autenticação Mecânica - Recibo do Pagador
+      </div>
+    </div>
+    
+    <div class="linha-corte"></div>
+    
+    <!-- FICHA DE COMPENSAÇÃO -->
+    <div class="ficha-compensacao">
+      <div class="header-banco">
+        <div class="header-left">
+          <span class="logo-banco">cobrança <span class="caixa">CAI<span class="x">X</span>A</span></span>
+        </div>
+        <div class="codigo-banco">104-0</div>
+        <div class="linha-digitavel-header">${linhaFormatada}</div>
+      </div>
+      
+      <table>
+        <tr>
+          <td colspan="6" style="width: 73%;">
+            <span class="campo-label">Local de Pagamento</span>
+            <span class="campo-valor" style="font-size: 9px;">PREFERENCIALMENTE NAS CASAS LOTÉRICAS ATÉ O VALOR LIMITE</span>
+          </td>
+          <td class="vencimento" style="width: 27%;">
+            <span class="campo-label">Vencimento</span>
+            <span class="campo-valor-numero" style="font-size: 12px;">${dataVencimentoFormatada}</span>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="6">
+            <span class="campo-label">Beneficiário</span>
+            <span class="campo-valor">INVESTMONEY SECURITIZADORA DE CREDITOS S</span>
+          </td>
+          <td class="td-right">
+            <span class="campo-label">Ag./Cod. Beneficiário</span>
+            <span class="campo-valor-numero">0374/1242669</span>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="6">
+            <span class="campo-label">Endereço do Beneficiário</span>
+            <span class="campo-valor" style="font-size: 8px;">${enderecoBeneficiario}</span>
+          </td>
+          <td class="td-right">
+            <span class="campo-label">UF</span>
+            <span class="campo-valor-numero">${ufBeneficiario}</span>
+          </td>
+          <td class="td-right">
+            <span class="campo-label">CEP</span>
+            <span class="campo-valor-numero">${cepBeneficiario}</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="width: 11%;">
+            <span class="campo-label">Data do Documento</span>
+            <span class="campo-valor-numero">${dataEmissaoFormatada}</span>
+          </td>
+          <td style="width: 14%;">
+            <span class="campo-label">Num. Documento</span>
+            <span class="campo-valor-numero">${boleto.numero_documento || 'N/A'}</span>
+          </td>
+          <td style="width: 7%;">
+            <span class="campo-label">Espécie Doc.</span>
+            <span class="campo-valor-numero">DS</span>
+          </td>
+          <td style="width: 7%;">
+            <span class="campo-label">Aceite</span>
+            <span class="campo-valor-numero">NAO</span>
+          </td>
+          <td style="width: 14%;">
+            <span class="campo-label">Data do Processamento</span>
+            <span class="campo-valor-numero">${dataEmissaoFormatada}</span>
+          </td>
+          <td colspan="2" class="td-right">
+            <span class="campo-label">Nosso Número</span>
+            <span class="campo-valor-numero">${boleto.nosso_numero || 'N/A'}</span>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <span class="campo-label">Uso do Banco</span>
+            <span class="campo-valor-numero">&nbsp;</span>
+          </td>
+          <td>
+            <span class="campo-label">Carteira</span>
+            <span class="campo-valor-numero">RG</span>
+          </td>
+          <td>
+            <span class="campo-label">Espécie Moeda</span>
+            <span class="campo-valor-numero">R$</span>
+          </td>
+          <td colspan="2">
+            <span class="campo-label">Qtde. Moeda</span>
+            <span class="campo-valor-numero">&nbsp;</span>
+          </td>
+          <td>
+            <span class="campo-label">Valor</span>
+            <span class="campo-valor-numero">&nbsp;</span>
+          </td>
+          <td class="vencimento td-right">
+            <span class="campo-label">Vencimento</span>
+            <span class="campo-valor-numero" style="font-size: 12px;">${dataVencimentoFormatada}</span>
+          </td>
+          <td class="td-right">
+            <span class="campo-label">Ag./Cod. Beneficiário</span>
+            <span class="campo-valor-numero">0374/1242669</span>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="6" rowspan="5" style="vertical-align: top;">
+            <span class="campo-label">Instruções (Texto de responsabilidade do Beneficiário)</span>
+            <div class="instrucoes">
+              NAO RECEBER APOS 30 DIAS DE ATRASO<br>
+              <strong>JUROS :</strong> 8,00% AO MES (DIAS CORRIDOS) A PARTIR DE: ${dataJurosFormatada}<br>
+              <strong>MULTA :</strong> ${valorMultaFormatado.replace('R$', '').trim()} REAIS A PARTIR DE ${dataJurosFormatada}
+            </div>
+          </td>
+          <td class="valor-documento td-right">
+            <span class="campo-label">(=) Valor do Documento</span>
+            <span class="campo-valor-numero" style="font-size: 12px;">${valorFormatado}</span>
+          </td>
+        </tr>
+        <tr>
+          <td class="td-right">
+            <span class="campo-label">(-) Desconto</span>
+            <span class="campo-valor-numero">&nbsp;</span>
+          </td>
+        </tr>
+        <tr>
+          <td class="td-right">
+            <span class="campo-label">(-) Outras Deduções/Abatimento</span>
+            <span class="campo-valor-numero">&nbsp;</span>
+          </td>
+        </tr>
+        <tr>
+          <td class="td-right">
+            <span class="campo-label">(+) Mora/Multa/Juros</span>
+            <span class="campo-valor-numero">&nbsp;</span>
+          </td>
+        </tr>
+        <tr>
+          <td class="td-right">
+            <span class="campo-label">(+) Outros Acréscimos</span>
+            <span class="campo-valor-numero">&nbsp;</span>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="6">
+            <span class="campo-label">Pagador</span>
+            <span class="campo-valor">${(paciente?.nome || 'N/A').toUpperCase()}</span>
+          </td>
+          <td colspan="2" class="td-right">
+            <span class="campo-label">CPF/CNPJ</span>
+            <span class="campo-valor-numero">${paciente?.cpf ? paciente.cpf.replace(/\D/g, '').replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : 'N/A'}</span>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="6">
+            <span class="campo-label">Endereço</span>
+            <span class="campo-valor" style="font-size: 8px;">${enderecoPagadorFormatado || 'RUA LEANDRO BARRETO,,-JARDIM SAO PAUL/RECIFE'}</span>
+          </td>
+          <td class="td-right">
+            <span class="campo-label">UF:${paciente?.estado || 'PE'}</span>
+          </td>
+          <td class="td-right">
+            <span class="campo-label">CEP: ${paciente?.cep ? paciente.cep.replace(/(\d{5})(\d{3})/, '$1-$2') : '50790-000'}</span>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="5">
+            <span class="campo-label">Beneficiário Final</span>
+            <span class="campo-valor">${(clinica?.nome || 'CLINICA CIRURGICA ODONTOLOGICA RECIFE LT').toUpperCase()}</span>
+          </td>
+          <td colspan="3" class="td-right">
+            <span class="campo-label">CPF/CNPJ</span>
+            <span class="campo-valor-numero">33.910.210/0001-76</span>
+          </td>
+        </tr>
+      </table>
+      
+      <!-- Código de Barras -->
+      <div class="codigo-barras">
+        ${boleto.codigo_barras ? gerarCodigoBarrasCSS(boleto.codigo_barras) : '<div style="color: red; padding: 10px;">Código de barras não disponível</div>'}
+        <div class="codigo-barras-numero">${boleto.codigo_barras || 'N/A'}</div>
+      </div>
+      
+      <div class="autenticacao-mecanica">
+        Autenticação Mecânica - FICHA DE COMPENSAÇÃO
+      </div>
+    </div>
+    
+    <div class="footer-contatos">
+      SAC CAIXA: 0800 726 0101 (informações, reclamações, sugestões e elogios)<br>
+      Para pessoas com deficiência auditiva ou de fala: 0800 726 2492<br>
+      Ouvidoria: 0800 725 7474<br>
+      www.caixa.gov.br
+    </div>
+  </div>
+  </div> <!-- Fechando boleto-wrapper -->
+</body>
+</html>
+    `;
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  } catch (error) {
+    console.error('Erro ao visualizar boleto:', error);
+    res.status(500).send(`
+      <html>
+        <body style="font-family: Arial; text-align: center; padding: 50px;">
+          <h1>Erro ao carregar boleto</h1>
+          <p>Ocorreu um erro ao carregar o boleto. Por favor, tente novamente mais tarde.</p>
+        </body>
+      </html>
+    `);
   }
 };
 
@@ -1492,5 +2550,6 @@ module.exports = {
   aprovarFechamento,
   reprovarFechamento,
   criarAcessoFreelancer,
-  gerarBoletosFechamento
+  gerarBoletosFechamento,
+  visualizarBoleto
 };

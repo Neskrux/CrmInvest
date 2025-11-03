@@ -63,6 +63,10 @@ router.use('/idsf', idsfRoutes);
 const contratosCarteiraRoutes = require('./contratos-carteira.routes');
 router.use('/', contratosCarteiraRoutes); // /api/contratos-carteira/*
 
+// Rotas estáticas (imagens, etc)
+const staticRoutes = require('./static.routes');
+router.use('/', staticRoutes);
+
 // ✅ TODAS AS ROTAS FORAM REFATORADAS COM SUCESSO!
 // O backend agora está completamente modularizado e organizado.
 

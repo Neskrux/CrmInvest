@@ -311,9 +311,33 @@ const MeusBoletosPaciente = () => {
                     gap: '0.5rem',
                     flexWrap: 'wrap'
                   }}>
-                    {boleto.url && (
+                    {boleto.fechamento_id && boleto.id && (
                       <button
-                        onClick={() => window.open(boleto.url, '_blank')}
+                        onClick={async () => {
+                          try {
+                            // Fazer requisição autenticada para obter o HTML do boleto
+                            const response = await makeRequest(`/fechamentos/${boleto.fechamento_id}/boletos/${boleto.id}/visualizar`, {
+                              method: 'GET'
+                            });
+                            
+                            if (!response.ok) {
+                              throw new Error('Erro ao carregar boleto');
+                            }
+                            
+                            // Obter o HTML da resposta
+                            const html = await response.text();
+                            
+                            // Criar uma nova janela e escrever o HTML nela
+                            const newWindow = window.open('', '_blank');
+                            if (newWindow) {
+                              newWindow.document.write(html);
+                              newWindow.document.close();
+                            }
+                          } catch (error) {
+                            console.error('Erro ao abrir boleto:', error);
+                            showErrorToast('Erro ao abrir boleto. Verifique se você tem permissão.');
+                          }
+                        }}
                         style={{
                           padding: '0.5rem 1rem',
                           backgroundColor: '#1a1d23',

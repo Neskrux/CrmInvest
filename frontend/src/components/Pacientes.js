@@ -73,7 +73,11 @@ const Pacientes = () => {
     empreendimento_externo: '',
     status: 'lead',
     observacoes: '',
-    consultor_id: ''
+    consultor_id: '',
+    endereco: '',
+    bairro: '',
+    numero: '',
+    cep: ''
   });
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewPaciente, setViewPaciente] = useState(null);
@@ -322,6 +326,10 @@ const Pacientes = () => {
     estado: '',
     tipo_tratamento: '',
     observacoes: '',
+    endereco: '',
+    bairro: '',
+    numero: '',
+    cep: '',
     // Dados do fechamento
     valor_fechado: '',
     valor_fechado_formatado: '',
@@ -1074,7 +1082,11 @@ const Pacientes = () => {
       empreendimento_id: paciente.empreendimento_id || '',
       status: paciente.status || 'lead',
       observacoes: paciente.observacoes || '',
-      consultor_id: paciente.consultor_id || ''
+      consultor_id: paciente.consultor_id || '',
+      endereco: paciente.endereco || '',
+      bairro: paciente.bairro || '',
+      numero: paciente.numero || '',
+      cep: paciente.cep || ''
     });
     
     // Verificar se a cidade é customizada (não está na lista de cidades do estado)
@@ -2764,6 +2776,10 @@ const Pacientes = () => {
       estado: '',
       tipo_tratamento: '',
       observacoes: '',
+      endereco: '',
+      bairro: '',
+      numero: '',
+      cep: '',
       // Dados do fechamento
       valor_fechado: '',
       valor_fechado_formatado: '',
@@ -2801,6 +2817,12 @@ const Pacientes = () => {
         value = value;
       } else if (name === 'cidade') {
         value = formatarCidade(value);
+      } else if (name === 'cep') {
+        // Formatar CEP: 00000-000
+        value = value.replace(/\D/g, '');
+        if (value.length > 5) {
+          value = value.substring(0, 5) + '-' + value.substring(5, 8);
+        }
       }
     }
     
@@ -2934,7 +2956,11 @@ const Pacientes = () => {
         estado: dados.estado,
         tipo_tratamento: dados.tipo_tratamento,
         status: 'fechado', // Já criamos como fechado
-        observacoes: dados.observacoes
+        observacoes: dados.observacoes,
+        endereco: dados.endereco,
+        bairro: dados.bairro,
+        numero: dados.numero,
+        cep: dados.cep
       };
       
       const pacienteResponse = await makeRequest('/pacientes', {
@@ -3027,7 +3053,11 @@ const Pacientes = () => {
       status: 'sem_primeiro_contato',
       observacoes: '',
       // Se for consultor, pré-preenche com o próprio ID
-      consultor_id: isConsultor ? String(user?.consultor_id || user?.id) : ''
+      consultor_id: isConsultor ? String(user?.consultor_id || user?.id) : '',
+      endereco: '',
+      bairro: '',
+      numero: '',
+      cep: ''
     });
     setEditingPaciente(null);
     setShowModal(false);
@@ -5840,6 +5870,58 @@ const Pacientes = () => {
                 </div>
               </div>
 
+              {/* Campos de Endereço */}
+              <div className="form-group">
+                <label className="form-label">Rua</label>
+                <input
+                  type="text"
+                  name="endereco"
+                  className="form-input"
+                  value={formData.endereco}
+                  onChange={handleInputChange}
+                  placeholder="Digite o nome da rua"
+                />
+              </div>
+
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">Bairro</label>
+                  <input
+                    type="text"
+                    name="bairro"
+                    className="form-input"
+                    value={formData.bairro}
+                    onChange={handleInputChange}
+                    placeholder="Digite o bairro"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Número</label>
+                  <input
+                    type="text"
+                    name="numero"
+                    className="form-input"
+                    value={formData.numero}
+                    onChange={handleInputChange}
+                    placeholder="Número"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">CEP</label>
+                <input
+                  type="text"
+                  name="cep"
+                  className="form-input"
+                  value={formData.cep}
+                  onChange={handleInputChange}
+                  placeholder="00000-000"
+                  maxLength="9"
+                />
+              </div>
+
               <div className="grid grid-2">
                 <div className="form-group">
                   <label className="form-label">{empresaId === 5 ? 'Empreendimento *' : 'Tipo de Tratamento *'}</label>
@@ -6022,6 +6104,58 @@ const Pacientes = () => {
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Campos de Endereço */}
+              <div className="form-group">
+                <label className="form-label">Rua</label>
+                <input
+                  type="text"
+                  name="endereco"
+                  className="form-input"
+                  value={formData.endereco}
+                  onChange={handleInputChange}
+                  placeholder="Digite o nome da rua"
+                />
+              </div>
+
+              <div className="grid grid-2">
+                <div className="form-group">
+                  <label className="form-label">Bairro</label>
+                  <input
+                    type="text"
+                    name="bairro"
+                    className="form-input"
+                    value={formData.bairro}
+                    onChange={handleInputChange}
+                    placeholder="Digite o bairro"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Número</label>
+                  <input
+                    type="text"
+                    name="numero"
+                    className="form-input"
+                    value={formData.numero}
+                    onChange={handleInputChange}
+                    placeholder="Número"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">CEP</label>
+                <input
+                  type="text"
+                  name="cep"
+                  className="form-input"
+                  value={formData.cep}
+                  onChange={handleInputChange}
+                  placeholder="00000-000"
+                  maxLength="9"
+                />
               </div>
 
               <div className="grid grid-2">
@@ -8623,6 +8757,94 @@ const Pacientes = () => {
                         )}
                       </div>
                     )}
+                  </div>
+
+                  {/* Campos de Endereço */}
+                  <div>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                      Rua
+                    </label>
+                    <input
+                      type="text"
+                      name="endereco"
+                      value={dadosCompletosClinica.endereco}
+                      onChange={handleInputChangeCadastroCompleto}
+                      placeholder="Digite o nome da rua"
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                        Bairro
+                      </label>
+                      <input
+                        type="text"
+                        name="bairro"
+                        value={dadosCompletosClinica.bairro}
+                        onChange={handleInputChangeCadastroCompleto}
+                        placeholder="Digite o bairro"
+                        style={{
+                          width: '100%',
+                          padding: '0.875rem',
+                          border: '2px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '1rem',
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                        Número
+                      </label>
+                      <input
+                        type="text"
+                        name="numero"
+                        value={dadosCompletosClinica.numero}
+                        onChange={handleInputChangeCadastroCompleto}
+                        placeholder="Número"
+                        style={{
+                          width: '100%',
+                          padding: '0.875rem',
+                          border: '2px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '1rem',
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                      CEP
+                    </label>
+                    <input
+                      type="text"
+                      name="cep"
+                      value={dadosCompletosClinica.cep}
+                      onChange={handleInputChangeCadastroCompleto}
+                      placeholder="00000-000"
+                      maxLength="9"
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none'
+                      }}
+                    />
                   </div>
 
                   <div>

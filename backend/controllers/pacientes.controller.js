@@ -347,7 +347,7 @@ const getDashboardPacientes = async (req, res) => {
 // POST /api/pacientes - Criar paciente
 const createPaciente = async (req, res) => {
   try {
-    const { nome, telefone, email, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado, cadastrado_por_clinica, clinica_id, grau_parentesco, tratamento_especifico } = req.body;
+    const { nome, telefone, email, cpf, tipo_tratamento, status, observacoes, consultor_id, cidade, estado, cadastrado_por_clinica, clinica_id, grau_parentesco, tratamento_especifico, endereco, bairro, numero, cep } = req.body;
     
     // Normalizar telefone e CPF (remover formatação)
     const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
@@ -435,6 +435,10 @@ const createPaciente = async (req, res) => {
         cadastrado_por_clinica: finalCadastradoPorClinica,
         grau_parentesco,
         tratamento_especifico,
+        endereco,
+        bairro,
+        numero,
+        cep: cep ? cep.replace(/\D/g, '') : null, // Normalizar CEP (apenas números)
         empresa_id: req.user.empresa_id // Adicionar empresa_id do usuário que está criando
       }])
       .select();
@@ -453,7 +457,7 @@ const createPaciente = async (req, res) => {
 const updatePaciente = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, telefone, email, cpf, tipo_tratamento, status, observacoes, consultor_id, sdr_id, cidade, estado, cadastrado_por_clinica, clinica_id, grau_parentesco, tratamento_especifico } = req.body;
+    const { nome, telefone, email, cpf, tipo_tratamento, status, observacoes, consultor_id, sdr_id, cidade, estado, cadastrado_por_clinica, clinica_id, grau_parentesco, tratamento_especifico, endereco, bairro, numero, cep } = req.body;
     
     // Verificar se é consultor freelancer - freelancers não podem editar pacientes completamente
     if (req.user.tipo === 'consultor' && req.user.podealterarstatus !== true) {
@@ -590,6 +594,10 @@ const updatePaciente = async (req, res) => {
       estado,
       grau_parentesco,
       tratamento_especifico,
+      endereco,
+      bairro,
+      numero,
+      cep: cep ? cep.replace(/\D/g, '') : null, // Normalizar CEP (apenas números)
       empresa_id: req.user.empresa_id // Atualizar empresa_id do usuário que está editando
     };
     

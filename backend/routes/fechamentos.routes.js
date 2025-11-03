@@ -39,6 +39,9 @@ router.get('/fechamentos/:id/print-confirmacao-url', authenticateToken, fechamen
 // GET /api/fechamentos/:id/boletos - Buscar boletos de um fechamento
 router.get('/fechamentos/:id/boletos', authenticateToken, fechamentosController.getBoletosFechamento);
 
+// GET /api/fechamentos/:id/boletos/:boletoId/visualizar - Visualizar boleto como HTML
+router.get('/fechamentos/:id/boletos/:boletoId/visualizar', authenticateToken, fechamentosController.visualizarBoleto);
+
 // POST /api/fechamentos/:id/gerar-boletos - Gerar boletos manualmente para um fechamento
 router.post('/fechamentos/:id/gerar-boletos', authenticateToken, fechamentosController.gerarBoletosFechamento);
 

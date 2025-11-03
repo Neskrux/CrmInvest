@@ -65,6 +65,12 @@ const Fechamentos = () => {
   const [boletosFechamento, setBoletosFechamento] = useState([]);
   const [carregandoBoletos, setCarregandoBoletos] = useState(false);
   const [gerandoBoletos, setGerandoBoletos] = useState(false);
+  
+  // Estados para modal de seleção de parcelas
+  const [showParcelasModal, setShowParcelasModal] = useState(false);
+  const [fechamentoParaGerar, setFechamentoParaGerar] = useState(null);
+  const [numeroParcelasSelecionado, setNumeroParcelasSelecionado] = useState(1);
+  const [numeroParcelasInput, setNumeroParcelasInput] = useState('1');
 
 
   // Estado para modal de explicação de permissões
@@ -494,13 +500,19 @@ const Fechamentos = () => {
     }
   };
 
-  const gerarBoletosFechamento = async (fechamentoId) => {
+  const gerarBoletosFechamento = async (fechamentoId, numeroParcelas = null) => {
     if (!fechamentoId) return;
     
     setGerandoBoletos(true);
     try {
+      const body = numeroParcelas ? { numero_parcelas: numeroParcelas } : {};
+      
       const response = await makeRequest(`/fechamentos/${fechamentoId}/gerar-boletos`, {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
       });
 
       const data = await response.json();
@@ -511,6 +523,10 @@ const Fechamentos = () => {
 
       showSuccessToast(data.message || `${data.boletos?.length || 0} boleto(s) criado(s) com sucesso!`);
       
+      // Fechar modal se estiver aberto
+      setShowParcelasModal(false);
+      setFechamentoParaGerar(null);
+      
       // Recarregar lista de boletos
       await buscarBoletosFechamento(fechamentoId);
     } catch (error) {
@@ -518,6 +534,25 @@ const Fechamentos = () => {
       showErrorToast(error.message || 'Erro ao gerar boletos');
     } finally {
       setGerandoBoletos(false);
+    }
+  };
+
+  const abrirModalParcelas = (fechamento) => {
+    setFechamentoParaGerar(fechamento);
+    const parcelasPadrao = fechamento.numero_parcelas || 1;
+    setNumeroParcelasSelecionado(parcelasPadrao);
+    setNumeroParcelasInput(String(parcelasPadrao));
+    setShowParcelasModal(true);
+  };
+
+  const confirmarGeracaoParcelas = () => {
+    if (fechamentoParaGerar) {
+      const valorValidado = parseInt(numeroParcelasInput) || fechamentoParaGerar.numero_parcelas || 1;
+      if (valorValidado >= 1 && valorValidado <= 100) {
+        gerarBoletosFechamento(fechamentoParaGerar.id, valorValidado);
+      } else {
+        showErrorToast('Número de parcelas deve ser entre 1 e 100');
+      }
     }
   };
 
@@ -3276,7 +3311,7 @@ const Fechamentos = () => {
                       </div>
                       {viewingFechamento?.aprovado === 'aprovado' && (isAdmin || isConsultorInterno || isClinica) && (
                         <button
-                          onClick={() => gerarBoletosFechamento(viewingFechamento.id)}
+                          onClick={() => abrirModalParcelas(viewingFechamento)}
                           disabled={gerandoBoletos}
                           style={{
                             padding: '0.75rem 1.5rem',
@@ -3424,9 +3459,33 @@ const Fechamentos = () => {
                               </div>
                               
                               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                {boleto.url && (
+                                {boleto.fechamento_id && boleto.id && (
                                   <button
-                                    onClick={() => window.open(boleto.url, '_blank')}
+                                    onClick={async () => {
+                                      try {
+                                        // Fazer requisição autenticada para obter o HTML do boleto
+                                        const response = await makeRequest(`/fechamentos/${boleto.fechamento_id}/boletos/${boleto.id}/visualizar`, {
+                                          method: 'GET'
+                                        });
+                                        
+                                        if (!response.ok) {
+                                          throw new Error('Erro ao carregar boleto');
+                                        }
+                                        
+                                        // Obter o HTML da resposta
+                                        const html = await response.text();
+                                        
+                                        // Criar uma nova janela e escrever o HTML nela
+                                        const newWindow = window.open('', '_blank');
+                                        if (newWindow) {
+                                          newWindow.document.write(html);
+                                          newWindow.document.close();
+                                        }
+                                      } catch (error) {
+                                        console.error('Erro ao abrir boleto:', error);
+                                        showErrorToast('Erro ao abrir boleto. Verifique se você tem permissão.');
+                                      }
+                                    }}
                                     style={{
                                       padding: '0.5rem 1rem',
                                       backgroundColor: '#3b82f6',
@@ -3944,6 +4003,226 @@ const Fechamentos = () => {
                   onClick={() => setShowPermissaoModal(false)}
                 >
                   Entendi
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Seleção de Parcelas */}
+      {showParcelasModal && fechamentoParaGerar && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Selecionar Número de Parcelas</h2>
+              <button 
+                className="close-btn" 
+                onClick={() => {
+                  setShowParcelasModal(false);
+                  setFechamentoParaGerar(null);
+                }}
+                disabled={gerandoBoletos}
+              >
+                ×
+              </button>
+            </div>
+            <div style={{ padding: '1.5rem' }}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '0.5rem', 
+                  fontWeight: '600',
+                  color: '#374151'
+                }}>
+                  Número de Parcelas:
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={numeroParcelasInput}
+                  onChange={(e) => {
+                    // Permitir digitar livremente, incluindo valores vazios
+                    const valor = e.target.value;
+                    // Permitir apenas números ou string vazia
+                    if (valor === '' || (!isNaN(Number(valor)) && Number(valor) >= 0)) {
+                      setNumeroParcelasInput(valor);
+                      // Atualizar valor validado se for um número válido
+                      const numValor = parseInt(valor);
+                      if (!isNaN(numValor) && numValor >= 1 && numValor <= 100) {
+                        setNumeroParcelasSelecionado(numValor);
+                      }
+                    }
+                  }}
+                  onBlur={(e) => {
+                    // Restaurar cor da borda
+                    e.target.style.borderColor = '#d1d5db';
+                    
+                    // Quando sair do campo, validar e corrigir se necessário
+                    const valor = e.target.value.trim();
+                    if (valor === '' || isNaN(Number(valor)) || Number(valor) < 1) {
+                      const valorPadrao = fechamentoParaGerar.numero_parcelas || 1;
+                      setNumeroParcelasInput(String(valorPadrao));
+                      setNumeroParcelasSelecionado(valorPadrao);
+                    } else {
+                      const numValor = parseInt(valor);
+                      if (numValor > 100) {
+                        setNumeroParcelasInput('100');
+                        setNumeroParcelasSelecionado(100);
+                      } else if (numValor < 1) {
+                        const valorPadrao = fechamentoParaGerar.numero_parcelas || 1;
+                        setNumeroParcelasInput(String(valorPadrao));
+                        setNumeroParcelasSelecionado(valorPadrao);
+                      } else {
+                        setNumeroParcelasInput(String(numValor));
+                        setNumeroParcelasSelecionado(numValor);
+                      }
+                    }
+                  }}
+                  disabled={gerandoBoletos}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '1rem',
+                    outline: 'none',
+                    transition: 'border-color 0.2s'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                />
+                <p style={{ 
+                  fontSize: '0.875rem', 
+                  color: '#6b7280', 
+                  marginTop: '0.5rem',
+                  margin: 0
+                }}>
+                  Valor padrão do fechamento: {fechamentoParaGerar.numero_parcelas || 1} parcela(s)
+                </p>
+              </div>
+
+              {/* Resumo */}
+              <div style={{
+                backgroundColor: '#f0f9ff',
+                border: '1px solid #bae6fd',
+                borderRadius: '8px',
+                padding: '1rem',
+                marginBottom: '1.5rem'
+              }}>
+                <div style={{ fontSize: '0.875rem', color: '#0369a1', marginBottom: '0.5rem' }}>
+                  Resumo:
+                </div>
+                <div style={{ display: 'grid', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#0c4a6e' }}>Valor Total:</span>
+                    <strong style={{ color: '#0c4a6e' }}>
+                      {new Intl.NumberFormat('pt-BR', { 
+                        style: 'currency', 
+                        currency: 'BRL' 
+                      }).format(fechamentoParaGerar.valor_fechado || 0)}
+                    </strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#0c4a6e' }}>Número de Parcelas:</span>
+                    <strong style={{ color: '#0c4a6e' }}>
+                      {numeroParcelasInput || numeroParcelasSelecionado}
+                    </strong>
+                  </div>
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between',
+                    paddingTop: '0.5rem',
+                    borderTop: '1px solid #bae6fd',
+                    marginTop: '0.5rem'
+                  }}>
+                    <span style={{ color: '#0c4a6e', fontWeight: '600' }}>Valor por Parcela:</span>
+                    <strong style={{ color: '#0c4a6e', fontSize: '1.125rem' }}>
+                      {new Intl.NumberFormat('pt-BR', { 
+                        style: 'currency', 
+                        currency: 'BRL' 
+                      }).format((fechamentoParaGerar.valor_fechado || 0) / (parseInt(numeroParcelasInput) || numeroParcelasSelecionado || 1))}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ 
+                display: 'flex', 
+                gap: '0.75rem', 
+                justifyContent: 'flex-end',
+                marginTop: '1.5rem'
+              }}>
+                <button
+                  onClick={() => {
+                    setShowParcelasModal(false);
+                    setFechamentoParaGerar(null);
+                  }}
+                  disabled={gerandoBoletos}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: gerandoBoletos ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!gerandoBoletos) e.target.style.backgroundColor = '#e5e7eb';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!gerandoBoletos) e.target.style.backgroundColor = '#f3f4f6';
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarGeracaoParcelas}
+                  disabled={gerandoBoletos || !numeroParcelasInput || parseInt(numeroParcelasInput) < 1}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: gerandoBoletos || !numeroParcelasInput || parseInt(numeroParcelasInput) < 1 ? '#9ca3af' : '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: gerandoBoletos || !numeroParcelasInput || parseInt(numeroParcelasInput) < 1 ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    const valor = parseInt(numeroParcelasInput);
+                    if (!gerandoBoletos && numeroParcelasInput && valor >= 1) {
+                      e.target.style.backgroundColor = '#2563eb';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    const valor = parseInt(numeroParcelasInput);
+                    if (!gerandoBoletos && numeroParcelasInput && valor >= 1) {
+                      e.target.style.backgroundColor = '#3b82f6';
+                    }
+                  }}
+                >
+                  {gerandoBoletos ? (
+                    <>
+                      <div className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }}></div>
+                      Gerando...
+                    </>
+                  ) : (
+                    <>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                      </svg>
+                      Gerar Boletos
+                    </>
+                  )}
                 </button>
               </div>
             </div>
