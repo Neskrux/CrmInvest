@@ -137,7 +137,7 @@ app.get('/api/empreendimentos-public', async (req, res) => {
     
         const { data, error } = await supabaseAdmin
           .from('empreendimentos')
-          .select('id, nome, endereco, bairro, cidade, estado, status, created_at, unidades, tipo')
+          .select('id, nome, endereco, bairro, cidade, estado, status, created_at, unidades, tipo, observacoes, planta_url, planta_humanizada_url, condicoes_pagamento')
           .eq('status', 'ativo'); // Apenas empreendimentos ativos
 
     if (error) {
