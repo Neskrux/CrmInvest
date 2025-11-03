@@ -5,6 +5,7 @@ const { JWT_SECRET } = require('../config/constants');
 const { normalizarEmail } = require('../utils/helpers');
 const transporter = require('../config/email');
 const { logLoginAttempt, logError, isDevelopment } = require('../utils/logger');
+const bigDataCorpFacematchService = require('../services/bigdatacorp-facematch.service');
 
 // Login
 const login = async (req, res) => {
@@ -289,6 +290,23 @@ const login = async (req, res) => {
         console.log('❌ Senha inválida para', tipoLogin);
       }
       return res.status(401).json({ error: 'Credenciais inválidas' });
+    }
+
+    // Verificar se é paciente e se precisa validar biométrica (primeiro login)
+    if (tipoLogin === 'paciente') {
+      const precisaValidarBiometria = !usuario.biometria_aprovada || usuario.biometria_aprovada === false;
+      
+      if (precisaValidarBiometria) {
+        console.log('🔐 [PRIMEIRO LOGIN] Paciente requer validação biométrica:', usuario.nome);
+        // Retornar resposta especial indicando que precisa validar biométrica
+        return res.json({
+          primeiroLogin: true,
+          requerBiometria: true,
+          paciente_id: usuario.id,
+          paciente_nome: usuario.nome,
+          message: 'É necessário validar sua identidade antes de acessar o sistema'
+        });
+      }
     }
 
     // Atualizar último login (diferente para pacientes)
@@ -751,12 +769,186 @@ const resetPassword = async (req, res) => {
   }
 };
 
+// POST /api/auth/validar-biometria - Validar biométrica do paciente no primeiro login
+const validarBiometria = async (req, res) => {
+  try {
+    console.log('🔐 [VALIDAÇÃO BIOMÉTRICA] ==========================================');
+    console.log('🔐 [VALIDAÇÃO BIOMÉTRICA] Requisição recebida');
+    console.log('🔐 [VALIDAÇÃO BIOMÉTRICA] Method:', req.method);
+    console.log('🔐 [VALIDAÇÃO BIOMÉTRICA] Path:', req.path);
+    console.log('🔐 [VALIDAÇÃO BIOMÉTRICA] URL:', req.url);
+    console.log('🔐 [VALIDAÇÃO BIOMÉTRICA] Headers:', {
+      'content-type': req.headers['content-type'],
+      'authorization': req.headers['authorization'] ? 'PRESENTE' : 'AUSENTE',
+      'user-agent': req.headers['user-agent']
+    });
+    console.log('🔐 [VALIDAÇÃO BIOMÉTRICA] Body keys:', Object.keys(req.body || {}));
+    
+    const { paciente_id, selfie_base64, documento_base64 } = req.body;
+
+    console.log('🔐 [VALIDAÇÃO BIOMÉTRICA] Requisição recebida para paciente ID:', paciente_id);
+
+    // Validar campos obrigatórios
+    if (!paciente_id || !selfie_base64 || !documento_base64) {
+      return res.status(400).json({ 
+        error: 'Campos obrigatórios: paciente_id, selfie_base64, documento_base64' 
+      });
+    }
+
+    // Validar se o serviço BigDataCorp está configurado
+    if (!bigDataCorpFacematchService.isConfigured()) {
+      console.error('❌ [VALIDAÇÃO BIOMÉTRICA] BigDataCorp não está configurado');
+      return res.status(503).json({ 
+        error: 'Serviço de validação biométrica não está configurado. Entre em contato com o suporte.' 
+      });
+    }
+
+    // Validar formato das imagens
+    if (!bigDataCorpFacematchService.isValidBase64Image(selfie_base64)) {
+      return res.status(400).json({ error: 'Selfie inválida. Por favor, tire uma nova foto.' });
+    }
+
+    if (!bigDataCorpFacematchService.isValidBase64Image(documento_base64)) {
+      return res.status(400).json({ error: 'Foto do documento inválida. Por favor, tire uma nova foto.' });
+    }
+
+    // Buscar paciente
+    const { data: paciente, error: pacienteError } = await supabaseAdmin
+      .from('pacientes')
+      .select('id, nome, cpf, tem_login, login_ativo, biometria_aprovada, empresa_id')
+      .eq('id', paciente_id)
+      .single();
+
+    if (pacienteError || !paciente) {
+      console.error('❌ [VALIDAÇÃO BIOMÉTRICA] Paciente não encontrado:', pacienteError);
+      return res.status(404).json({ error: 'Paciente não encontrado' });
+    }
+
+    // Verificar se paciente tem login ativo
+    if (!paciente.tem_login || !paciente.login_ativo) {
+      return res.status(400).json({ error: 'Paciente não possui login ativo' });
+    }
+
+    // Verificar se já foi aprovado (não deve acontecer, mas por segurança)
+    if (paciente.biometria_aprovada) {
+      console.log('⚠️ [VALIDAÇÃO BIOMÉTRICA] Paciente já tem biométrica aprovada');
+      // Gerar token normalmente já que já foi validado
+      const payload = {
+        id: paciente.id,
+        nome: paciente.nome,
+        email: paciente.email_login,
+        tipo: 'paciente',
+        paciente_id: paciente.id,
+        empresa_id: paciente.empresa_id,
+        podealterarstatus: false,
+        pode_ver_todas_novas_clinicas: false,
+        is_freelancer: false
+      };
+
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
+
+      return res.json({
+        success: true,
+        aprovado: true,
+        message: 'Biometria já validada anteriormente',
+        token: token,
+        usuario: {
+          ...paciente,
+          tipo: 'paciente',
+          biometria_aprovada: true
+        }
+      });
+    }
+
+    console.log('🔐 [VALIDAÇÃO BIOMÉTRICA] Chamando BigDataCorp para comparar faces...');
+
+    // Chamar serviço BigDataCorp
+    const resultadoValidacao = await bigDataCorpFacematchService.compararFaces(
+      documento_base64,
+      selfie_base64
+    );
+
+    console.log('📊 [VALIDAÇÃO BIOMÉTRICA] Resultado:', resultadoValidacao);
+
+    // Atualizar paciente com resultado
+    if (resultadoValidacao.success && resultadoValidacao.match) {
+      // APROVADO
+      console.log('✅ [VALIDAÇÃO BIOMÉTRICA] Match confirmado - Identidade validada');
+      
+      await supabaseAdmin
+        .from('pacientes')
+        .update({
+          biometria_aprovada: true,
+          biometria_aprovada_em: new Date().toISOString(),
+          biometria_erro: null
+        })
+        .eq('id', paciente_id);
+
+      // Gerar token JWT para o paciente
+      const payload = {
+        id: paciente.id,
+        nome: paciente.nome,
+        email: paciente.email_login,
+        tipo: 'paciente',
+        paciente_id: paciente.id,
+        empresa_id: paciente.empresa_id,
+        podealterarstatus: false,
+        pode_ver_todas_novas_clinicas: false,
+        is_freelancer: false
+      };
+
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
+
+      // Atualizar último login
+      await supabaseAdmin
+        .from('pacientes')
+        .update({ ultimo_login: new Date().toISOString() })
+        .eq('id', paciente_id);
+
+      res.json({
+        success: true,
+        aprovado: true,
+        message: 'Identidade validada com sucesso!',
+        token: token,
+        usuario: {
+          ...paciente,
+          tipo: 'paciente',
+          biometria_aprovada: true
+        }
+      });
+    } else {
+      // NÃO APROVADO
+      console.log('❌ [VALIDAÇÃO BIOMÉTRICA] No Match - Faces não correspondem');
+      
+      await supabaseAdmin
+        .from('pacientes')
+        .update({
+          biometria_aprovada: false,
+          biometria_erro: resultadoValidacao.message || 'Validação biométrica falhou'
+        })
+        .eq('id', paciente_id);
+
+      res.status(400).json({
+        success: false,
+        aprovado: false,
+        error: resultadoValidacao.message || 'As faces não correspondem. Por favor, tente novamente.',
+        code: resultadoValidacao.code,
+        podeTentarNovamente: true
+      });
+    }
+  } catch (error) {
+    console.error('❌ [VALIDAÇÃO BIOMÉTRICA] Erro ao validar biométrica:', error);
+    res.status(500).json({ error: 'Erro interno do servidor ao validar biométrica' });
+  }
+};
+
 module.exports = {
   login,
   logout,
   verifyToken,
   forgotPassword,
   validateResetToken,
-  resetPassword
+  resetPassword,
+  validarBiometria
 };
 
