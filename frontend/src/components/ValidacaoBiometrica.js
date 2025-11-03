@@ -262,9 +262,6 @@ const ValidacaoBiometrica = () => {
     }
   };
 
-  // Detectar se é mobile
-  const isMobile = window.innerWidth < 768;
-
   return (
     <div style={{
       minHeight: '100vh',
