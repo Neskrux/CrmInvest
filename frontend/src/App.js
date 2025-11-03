@@ -38,6 +38,7 @@ import DashboardPaciente from './components/DashboardPaciente';
 import AgendamentosPaciente from './components/AgendamentosPaciente';
 import MeusDocumentosPaciente from './components/MeusDocumentosPaciente';
 import MeusBoletosPaciente from './components/MeusBoletosPaciente';
+import ValidacaoBiometrica from './components/ValidacaoBiometrica';
 import logoBrasao from './images/logobrasao.png';
 import logoHorizontal from './images/logohorizontal.png';
 import logoHorizontalPreto from './images/logohorizontalpreto.png';
@@ -177,6 +178,7 @@ const AppContent = () => {
         <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/validacao-biometrica" element={<ValidacaoBiometrica />} />
         <Route path="/" element={<Login />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
