@@ -88,9 +88,57 @@ const getEmpreendimentoById = async (req, res) => {
   }
 };
 
+// GET /api/empreendimentos/:id/unidades - Buscar unidades de um empreendimento
+const getUnidadesByEmpreendimento = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tipo, torre, status } = req.query;
+    
+    let query = supabaseAdmin
+      .from('unidades')
+      .select('*')
+      .eq('empreendimento_id', id);
+
+    // Aplicar filtros se fornecidos
+    if (tipo) query = query.eq('tipo_unidade', tipo);
+    if (torre) query = query.eq('torre', torre);
+    if (status) query = query.eq('status', status);
+
+    const { data, error } = await query.order('numero', { ascending: true });
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// GET /api/empreendimentos/:id/unidades/:unidadeId - Buscar unidade específica
+const getUnidadeById = async (req, res) => {
+  try {
+    const { id, unidadeId } = req.params;
+    
+    const { data, error } = await supabaseAdmin
+      .from('unidades')
+      .select('*')
+      .eq('id', unidadeId)
+      .eq('empreendimento_id', id)
+      .single();
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   testEmpreendimentos,
   getAllEmpreendimentos,
-  getEmpreendimentoById
+  getEmpreendimentoById,
+  getUnidadesByEmpreendimento,
+  getUnidadeById
 };
 
