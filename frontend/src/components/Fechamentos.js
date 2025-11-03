@@ -3470,11 +3470,20 @@ const Fechamentos = () => {
                                 <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                                   Vencimento: {boleto.data_vencimento ? new Date(boleto.data_vencimento).toLocaleDateString('pt-BR') : 'Não informado'}
                                 </div>
-                                {boleto.nosso_numero && (
-                                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
-                                    Nosso Número: {boleto.nosso_numero}
-                                  </div>
-                                )}
+                                {(() => {
+                                  // Extrair nosso_numero: primeiro do campo nosso_numero, depois do erro_criacao se necessário
+                                  let nossoNumero = boleto.nosso_numero;
+                                  if (!nossoNumero && boleto.erro_criacao && boleto.erro_criacao.includes('NOSSO_NUMERO_DUPLICADO_DA_API')) {
+                                    const match = boleto.erro_criacao.match(/NOSSO_NUMERO_DUPLICADO_DA_API: (\d+)/);
+                                    if (match) nossoNumero = match[1];
+                                  }
+                                  
+                                  return nossoNumero ? (
+                                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+                                      Nosso Número: {nossoNumero}
+                                    </div>
+                                  ) : null;
+                                })()}
                               </div>
                               
                               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -3564,13 +3573,30 @@ const Fechamentos = () => {
                               <div style={{
                                 marginTop: '0.75rem',
                                 padding: '0.75rem',
-                                backgroundColor: '#fee2e2',
-                                border: '1px solid #fecaca',
+                                backgroundColor: boleto.erro_criacao.includes('NOSSO_NUMERO_DUPLICADO_DA_API') 
+                                  ? '#fef3c7'  // Amarelo claro para aviso
+                                  : '#fee2e2', // Vermelho claro para erro real
+                                border: `1px solid ${boleto.erro_criacao.includes('NOSSO_NUMERO_DUPLICADO_DA_API') 
+                                  ? '#fde68a' 
+                                  : '#fecaca'}`,
                                 borderRadius: '6px',
                                 fontSize: '0.875rem',
-                                color: '#991b1b'
+                                color: boleto.erro_criacao.includes('NOSSO_NUMERO_DUPLICADO_DA_API') 
+                                  ? '#92400e'  // Marrom escuro para aviso
+                                  : '#991b1b'  // Vermelho escuro para erro
                               }}>
-                                <strong>Erro ao criar boleto:</strong> {boleto.erro_criacao}
+                                {boleto.erro_criacao.includes('NOSSO_NUMERO_DUPLICADO_DA_API') ? (
+                                  <>
+                                    <strong>⚠️ Aviso:</strong> {boleto.erro_criacao.replace('NOSSO_NUMERO_DUPLICADO_DA_API: ', '').replace(' (boleto válido criado na API)', '')}
+                                    <div style={{ marginTop: '0.25rem', fontSize: '0.8125rem', fontStyle: 'italic' }}>
+                                      Este boleto foi criado com sucesso na API da Caixa e está válido para pagamento.
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <strong>Erro ao criar boleto:</strong> {boleto.erro_criacao}
+                                  </>
+                                )}
                               </div>
                             )}
                             

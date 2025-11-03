@@ -19,12 +19,43 @@ const Login = () => {
     setError('');
     setLoading(true);
 
-    const result = await login(formData.email, formData.senha);
-    
-    if (!result.success) {
-      setError(result.error || 'Credenciais inválidas. Verifique email e senha.');
+    try {
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+      const response = await fetch(`${API_BASE_URL}/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email: formData.email, senha: formData.senha })
+      });
+
+      const data = await response.json();
+
+      // Verificar se é primeiro login e requer biométrica
+      if (response.ok && data.primeiroLogin && data.requerBiometria) {
+        // Redirecionar para tela de validação biométrica
+        navigate('/validacao-biometrica', {
+          state: {
+            paciente_id: data.paciente_id,
+            paciente_nome: data.paciente_nome,
+            email: formData.email,
+            senha: formData.senha
+          }
+        });
+        return;
+      }
+
+      // Login normal - usar função login do contexto
+      const result = await login(formData.email, formData.senha);
+      
+      if (!result.success) {
+        setError(result.error || 'Credenciais inválidas. Verifique email e senha.');
+      }
+    } catch (error) {
+      setError(error.message || 'Erro ao fazer login. Tente novamente.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleDemoLogin = () => {
