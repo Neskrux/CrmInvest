@@ -266,36 +266,54 @@ const ValidacaoBiometrica = () => {
     <div style={{
       minHeight: '100vh',
       display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
+      flexDirection: 'column',
       background: 'linear-gradient(135deg, #1a1d23 0%, #2d3748 100%)',
-      padding: isMobile ? '0.5rem' : '1rem'
+      padding: 0,
+      position: 'relative'
     }}>
       <div style={{
         background: 'white',
         borderRadius: isMobile ? '0' : '12px',
-        padding: isMobile ? '1.25rem' : '2rem',
-        maxWidth: '600px',
+        padding: isMobile ? '1rem' : '2rem',
+        paddingTop: isMobile ? '1rem' : '2rem',
+        paddingBottom: isMobile ? '1rem' : '2rem',
+        maxWidth: isMobile ? '100%' : '600px',
         width: '100%',
+        margin: isMobile ? 0 : 'auto',
         boxShadow: isMobile ? 'none' : '0 20px 40px rgba(0, 0, 0, 0.1)',
-        maxHeight: isMobile ? '100vh' : 'auto',
-        overflowY: isMobile ? 'auto' : 'visible'
+        height: isMobile ? '100vh' : 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
       }}>
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+        <div style={{ 
+          textAlign: 'center', 
+          marginBottom: isMobile ? '1rem' : '2rem',
+          flexShrink: 0
+        }}>
           <img 
             src={logoBrasaoPreto} 
             alt="Logo" 
             style={{ 
-              height: isMobile ? '50px' : '60px', 
-              marginBottom: isMobile ? '0.75rem' : '1rem',
+              height: isMobile ? '40px' : '60px', 
+              marginBottom: isMobile ? '0.5rem' : '1rem',
               objectFit: 'contain'
             }} 
           />
-          <h2 style={{ margin: 0, fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: '700', color: '#1a1d23' }}>
+          <h2 style={{ 
+            margin: 0, 
+            fontSize: isMobile ? '1.125rem' : '1.5rem', 
+            fontWeight: '700', 
+            color: '#1a1d23' 
+          }}>
             Validação de Identidade
           </h2>
-          <p style={{ margin: '0.5rem 0 0 0', color: '#6b7280', fontSize: isMobile ? '0.8125rem' : '0.875rem' }}>
+          <p style={{ 
+            margin: '0.25rem 0 0 0', 
+            color: '#6b7280', 
+            fontSize: isMobile ? '0.75rem' : '0.875rem' 
+          }}>
             Olá, {paciente_nome || 'Paciente'}
           </p>
         </div>
@@ -303,28 +321,45 @@ const ValidacaoBiometrica = () => {
         {/* Mensagem de erro */}
         {error && (
           <div style={{
-            padding: '1rem',
+            padding: isMobile ? '0.75rem' : '1rem',
             backgroundColor: '#fee2e2',
             border: '1px solid #fecaca',
             borderRadius: '8px',
-            marginBottom: '1.5rem',
-            color: '#991b1b'
+            marginBottom: isMobile ? '0.75rem' : '1.5rem',
+            color: '#991b1b',
+            fontSize: isMobile ? '0.75rem' : '0.875rem'
           }}>
             {error}
           </div>
         )}
 
-        {/* Passo 1: Selfie */}
-        {passoAtual === 1 && (
-          <div>
-            <div style={{ marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: isMobile ? '1rem' : '1.125rem', fontWeight: '600', marginBottom: '0.5rem', color: '#1a1d23' }}>
-                Passo 1: Foto do Rosto
-              </h3>
-              <p style={{ color: '#6b7280', fontSize: isMobile ? '0.8125rem' : '0.875rem', marginBottom: '1rem' }}>
-                Posicione seu rosto na câmera e tire uma selfie clara.
-              </p>
-            </div>
+        {/* Container scrollável para o conteúdo */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          WebkitOverflowScrolling: 'touch'
+        }}>
+          {/* Passo 1: Selfie */}
+          {passoAtual === 1 && (
+            <div>
+              <div style={{ marginBottom: isMobile ? '0.75rem' : '1.5rem' }}>
+                <h3 style={{ 
+                  fontSize: isMobile ? '0.9rem' : '1.125rem', 
+                  fontWeight: '600', 
+                  marginBottom: '0.25rem', 
+                  color: '#1a1d23' 
+                }}>
+                  Passo 1: Foto do Rosto
+                </h3>
+                <p style={{ 
+                  color: '#6b7280', 
+                  fontSize: isMobile ? '0.75rem' : '0.875rem', 
+                  marginBottom: isMobile ? '0.5rem' : '1rem' 
+                }}>
+                  Posicione seu rosto na câmera e tire uma selfie clara.
+                </p>
+              </div>
 
             {!selfieBase64 ? (
               <div>
@@ -380,8 +415,9 @@ const ValidacaoBiometrica = () => {
                       backgroundColor: '#000',
                       borderRadius: '8px',
                       marginBottom: '1rem',
-                      minHeight: isMobile ? '300px' : '400px',
-                      maxHeight: isMobile ? '70vh' : '500px',
+                      minHeight: isMobile ? '200px' : '400px',
+                      height: isMobile ? '35vh' : 'auto',
+                      maxHeight: isMobile ? '35vh' : '500px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -468,7 +504,7 @@ const ValidacaoBiometrica = () => {
                     width: '100%',
                     borderRadius: '8px',
                     marginBottom: '1rem',
-                    maxHeight: '400px',
+                    maxHeight: isMobile ? '250px' : '400px',
                     objectFit: 'cover'
                   }}
                 />
@@ -527,11 +563,20 @@ const ValidacaoBiometrica = () => {
         {/* Passo 2: Documento */}
         {passoAtual === 2 && (
           <div>
-            <div style={{ marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: isMobile ? '1rem' : '1.125rem', fontWeight: '600', marginBottom: '0.5rem', color: '#1a1d23' }}>
+            <div style={{ marginBottom: isMobile ? '0.75rem' : '1.5rem' }}>
+              <h3 style={{ 
+                fontSize: isMobile ? '0.9rem' : '1.125rem', 
+                fontWeight: '600', 
+                marginBottom: '0.25rem', 
+                color: '#1a1d23' 
+              }}>
                 Passo 2: Foto do Documento
               </h3>
-              <p style={{ color: '#6b7280', fontSize: isMobile ? '0.8125rem' : '0.875rem', marginBottom: '1rem' }}>
+              <p style={{ 
+                color: '#6b7280', 
+                fontSize: isMobile ? '0.75rem' : '0.875rem', 
+                marginBottom: isMobile ? '0.5rem' : '1rem' 
+              }}>
                 Tire uma foto do seu RG ou CNH. A foto deve estar clara e legível.
               </p>
             </div>
@@ -598,8 +643,9 @@ const ValidacaoBiometrica = () => {
                       backgroundColor: '#000',
                       borderRadius: '8px',
                       marginBottom: '1rem',
-                      minHeight: isMobile ? '300px' : '400px',
-                      maxHeight: isMobile ? '70vh' : '500px',
+                      minHeight: isMobile ? '200px' : '400px',
+                      height: isMobile ? '35vh' : 'auto',
+                      maxHeight: isMobile ? '35vh' : '500px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -676,7 +722,7 @@ const ValidacaoBiometrica = () => {
                     width: '100%',
                     borderRadius: '8px',
                     marginBottom: '1rem',
-                    maxHeight: '400px',
+                    maxHeight: isMobile ? '250px' : '400px',
                     objectFit: 'contain',
                     backgroundColor: '#f9fafb'
                   }}
@@ -767,16 +813,24 @@ const ValidacaoBiometrica = () => {
             </p>
           </div>
         )}
+        </div>
 
-        {/* Botão voltar para login */}
-        <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+        {/* Botão voltar para login - Fixo no rodapé */}
+        <div style={{ 
+          marginTop: 'auto',
+          padding: isMobile ? '1rem' : '2rem',
+          textAlign: 'center',
+          borderTop: isMobile ? '1px solid #e5e7eb' : 'none',
+          backgroundColor: 'white',
+          flexShrink: 0
+        }}>
           <button
             onClick={voltarParaLogin}
             style={{
               background: 'none',
               border: 'none',
               color: '#6b7280',
-              fontSize: '0.875rem',
+              fontSize: isMobile ? '0.8125rem' : '0.875rem',
               cursor: 'pointer',
               textDecoration: 'underline'
             }}
