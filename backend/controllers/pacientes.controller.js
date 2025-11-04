@@ -1229,7 +1229,7 @@ const updateStatusLead = async (req, res) => {
 const cadastroPublicoLead = async (req, res) => {
   try {
     console.log('📝 Cadastro de lead recebido:', req.body);
-    let { nome, telefone, email, cpf, tipo_tratamento, empreendimento_id, observacoes, cidade, estado, grau_parentesco, ref_consultor, sdr_id } = req.body;
+    let { nome, telefone, email, cpf, tipo_tratamento, empreendimento_id, observacoes, cidade, estado, grau_parentesco, ref_consultor, sdr_id, consultor_interno_id } = req.body;
     console.log('👥 Grau de parentesco:', grau_parentesco);
     
     // Validar campos obrigatórios
@@ -1380,6 +1380,7 @@ const cadastroPublicoLead = async (req, res) => {
           grau_parentesco: grau_parentesco || null, // Grau de parentesco do indicador
           consultor_id: consultorId, // Atribuir ao consultor se encontrado pelo código de referência
           sdr_id: sdr_id || null, // Atribuir ao SDR se selecionado
+          consultor_interno_id: consultor_interno_id || null, // Atribuir ao consultor interno (corretor) se fornecido
           empresa_id: 5 // Incorporadora - todos os leads do formulário CapturaClientes vêm para empresa_id=5
         }])
         .select();

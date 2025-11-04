@@ -523,12 +523,80 @@ const Pacientes = () => {
     if (!validarNovoCliente()) return;
     setNovoClienteLoading(true);
     try {
+      // Buscar o consultor do usuário logado para verificar tipo_consultor
+      // Tentar usar consultor_id primeiro, depois user.id
+      const consultorId = user?.consultor_id || user?.id;
+      const userId = user?.id;
+      let consultorUsuario = null;
+      let consultorIdParaAtribuir = null;
+      
+      // Primeiro, tentar encontrar na lista de consultores já carregada
+      // Buscar por consultor_id ou por user_id
+      if (consultores.length > 0) {
+        if (user?.consultor_id) {
+          consultorUsuario = consultores.find(c => String(c.id) === String(user.consultor_id));
+          consultorIdParaAtribuir = user.consultor_id;
+        }
+        
+        // Se não encontrou por consultor_id, tentar por user_id
+        if (!consultorUsuario && userId) {
+          consultorUsuario = consultores.find(c => String(c.user_id) === String(userId) || String(c.id) === String(userId));
+          if (consultorUsuario) {
+            consultorIdParaAtribuir = consultorUsuario.id;
+          }
+        }
+      }
+      
+      // Se não encontrou na lista, buscar na API
+      if (!consultorUsuario && consultorId) {
+        try {
+          const consultorResponse = await makeRequest(`/consultores/${consultorId}`);
+          if (consultorResponse.ok) {
+            consultorUsuario = await consultorResponse.json();
+            consultorIdParaAtribuir = consultorUsuario.id;
+          }
+        } catch (err) {
+          console.warn('Erro ao buscar consultor:', err);
+        }
+      }
+      
+      // Se ainda não encontrou e tem userId, tentar buscar por user_id
+      if (!consultorUsuario && userId) {
+        try {
+          const consultorResponse = await makeRequest(`/consultores?user_id=${userId}`);
+          if (consultorResponse.ok) {
+            const consultoresData = await consultorResponse.json();
+            if (Array.isArray(consultoresData) && consultoresData.length > 0) {
+              consultorUsuario = consultoresData[0];
+              consultorIdParaAtribuir = consultorUsuario.id;
+            }
+          }
+        } catch (err) {
+          console.warn('Erro ao buscar consultor por user_id:', err);
+        }
+      }
+      
+      // Preparar o payload do novo cliente
+      const payload = {
+        ...novoClienteForm,
+        origem_formulario: 'captura-clientes'
+      };
+      
+      // Se encontrou o consultor e ele tem tipo_consultor definido
+      if (consultorUsuario && consultorUsuario.tipo_consultor && consultorIdParaAtribuir) {
+        const tipoConsultor = consultorUsuario.tipo_consultor.toLowerCase().trim();
+        if (tipoConsultor === 'sdr') {
+          // Se for SDR, atribuir ao sdr_id (mesmo que já tenha um valor selecionado)
+          payload.sdr_id = String(consultorIdParaAtribuir);
+        } else if (tipoConsultor === 'corretor') {
+          // Se for corretor, atribuir ao consultor_interno_id
+          payload.consultor_interno_id = String(consultorIdParaAtribuir);
+        }
+      }
+      
       const response = await makeRequest('/leads/cadastro', {
         method: 'POST',
-        body: JSON.stringify({
-          ...novoClienteForm,
-          origem_formulario: 'captura-clientes'
-        })
+        body: JSON.stringify(payload)
       });
       const data = await response.json().catch(() => ({}));
       if (response.ok) {
