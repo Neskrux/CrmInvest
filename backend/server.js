@@ -154,7 +154,7 @@ app.get('/api/empreendimentos-public', async (req, res) => {
     
         const { data, error } = await supabaseAdmin
           .from('empreendimentos')
-          .select('id, nome, endereco, bairro, cidade, estado, status, created_at, unidades, tipo, observacoes, planta_url, planta_humanizada_url, condicoes_pagamento')
+          .select('id, nome, endereco, bairro, cidade, estado, status, created_at, unidades, tipo, observacoes, planta_url, planta_humanizada_url, condicoes_pagamento, galeria_imagens, diferenciais_gerais, progresso_obra, data_inicio_obra, data_entrega, valor_condominio, valor_iptu, data_ultima_atualizacao, telefone, email, site_incorporadora, pdf_url, catalogo_url, tour_virtual_url, simulador_caixa_url')
           .eq('status', 'ativo'); // Apenas empreendimentos ativos
 
     if (error) {
@@ -167,6 +167,46 @@ app.get('/api/empreendimentos-public', async (req, res) => {
 
     console.log('✅ [Backend] Empreendimentos carregados:', data.length);
     res.json(data);
+  } catch (error) {
+    console.error('❌ [Backend] Erro completo:', error);
+    res.status(500).json({ 
+      error: error.message,
+      details: 'Erro interno do servidor'
+    });
+  }
+});
+
+// Endpoint público para buscar unidades de um empreendimento
+app.get('/api/empreendimentos-public/:id/unidades', async (req, res) => {
+  try {
+    const { supabaseAdmin } = require('./config/database');
+    const { id } = req.params;
+    const { tipo, torre, status } = req.query;
+    
+    console.log(`🔍 [Backend] Buscando unidades do empreendimento ${id} (endpoint público)...`);
+    
+    let query = supabaseAdmin
+      .from('unidades')
+      .select('*')
+      .eq('empreendimento_id', id);
+
+    // Aplicar filtros se fornecidos
+    if (tipo) query = query.eq('tipo_unidade', tipo);
+    if (torre) query = query.eq('torre', torre);
+    if (status) query = query.eq('status', status);
+
+    const { data, error } = await query.order('numero', { ascending: true });
+
+    if (error) {
+      console.error('❌ [Backend] Erro na query:', error);
+      return res.status(500).json({ 
+        error: 'Erro ao buscar unidades',
+        details: error.message
+      });
+    }
+
+    console.log(`✅ [Backend] Unidades carregadas: ${data.length}`);
+    res.json(data || []);
   } catch (error) {
     console.error('❌ [Backend] Erro completo:', error);
     res.status(500).json({ 
