@@ -10,18 +10,10 @@ const Empreendimentos = () => {
   const [error, setError] = useState(null);
   const [selectedEmpreendimento, setSelectedEmpreendimento] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [activeTab, setActiveTab] = useState('galeria');
+  const [activeTab, setActiveTab] = useState('unidades');
   const [showImageLightbox, setShowImageLightbox] = useState(false);
   const [lightboxImageIndex, setLightboxImageIndex] = useState(0);
-  const [unidades, setUnidades] = useState([]);
-  const [loadingUnidades, setLoadingUnidades] = useState(false);
-  const [filtrosUnidades, setFiltrosUnidades] = useState({
-    tipo: '',
-    torre: '',
-    status: ''
-  });
-  const [selectedUnidade, setSelectedUnidade] = useState(null);
-  const [showUnidadeModal, setShowUnidadeModal] = useState(false);
+  const [filtroGaleria, setFiltroGaleria] = useState('Fotos');
 
   // Função para buscar empreendimentos do banco
   const fetchEmpreendimentos = async () => {
@@ -71,7 +63,7 @@ const Empreendimentos = () => {
            endereco: emp.endereco || '',
            bairro: emp.bairro || '',
            tipo: emp.tipo || 'Residencial',
-           unidades: emp.unidades || 0,
+           unidades: emp.unidades != null ? parseInt(emp.unidades, 10) || 0 : 0,
            status: emp.status === 'ativo' ? 'Em construção' : 'Lançamento',
            imagem: imagemPath,
            plantaUrl: emp.planta_url || '',
@@ -163,90 +155,13 @@ const Empreendimentos = () => {
   const handleCardClick = async (empreendimento) => {
     setSelectedEmpreendimento(empreendimento);
     setShowModal(true);
-    setActiveTab('galeria'); // Aba padrão agora é galeria
-    
-    // Buscar unidades do empreendimento
-    await fetchUnidades(empreendimento.id);
-  };
-
-  // Função para buscar unidades
-  const fetchUnidades = async (empreendimentoId) => {
-    try {
-      setLoadingUnidades(true);
-      const config = await import('../config');
-      const response = await fetch(
-        `${config.default.API_BASE_URL}/empreendimentos/${empreendimentoId}/unidades`,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        }
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        setUnidades(data || []);
-      } else {
-        console.warn('Erro ao buscar unidades');
-        setUnidades([]);
-      }
-    } catch (err) {
-      console.error('Erro ao buscar unidades:', err);
-      setUnidades([]);
-    } finally {
-      setLoadingUnidades(false);
-    }
-  };
-
-  // Função para aplicar filtros nas unidades
-  const aplicarFiltrosUnidades = async () => {
-    if (!selectedEmpreendimento) return;
-    
-    try {
-      setLoadingUnidades(true);
-      const config = await import('../config');
-      const params = new URLSearchParams();
-      if (filtrosUnidades.tipo) params.append('tipo', filtrosUnidades.tipo);
-      if (filtrosUnidades.torre) params.append('torre', filtrosUnidades.torre);
-      if (filtrosUnidades.status) params.append('status', filtrosUnidades.status);
-      
-      const response = await fetch(
-        `${config.default.API_BASE_URL}/empreendimentos/${selectedEmpreendimento.id}/unidades?${params.toString()}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        }
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        setUnidades(data || []);
-      }
-    } catch (err) {
-      console.error('Erro ao filtrar unidades:', err);
-    } finally {
-      setLoadingUnidades(false);
-    }
-  };
-
-  // Função para abrir modal de unidade
-  const handleUnidadeClick = (unidade) => {
-    setSelectedUnidade(unidade);
-    setShowUnidadeModal(true);
+    setActiveTab('unidades'); // Aba padrão agora é unidades
   };
 
   const closeModal = () => {
     setShowModal(false);
     setSelectedEmpreendimento(null);
-    setActiveTab('galeria'); // Resetar aba ao fechar
-    setUnidades([]);
-    setFiltrosUnidades({ tipo: '', torre: '', status: '' });
-  };
-
-  const closeUnidadeModal = () => {
-    setShowUnidadeModal(false);
-    setSelectedUnidade(null);
+    setActiveTab('unidades'); // Resetar aba ao fechar
   };
 
    // Função formatPrice removida (não mais necessária)
@@ -541,7 +456,7 @@ const Empreendimentos = () => {
                 }}>
                   <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
                     {empreendimento.tipo || 'Tipo não informado'}
-                    {empreendimento.unidades > 0 && ` • ${empreendimento.unidades} unidades`}
+                    {(empreendimento.unidades && empreendimento.unidades > 0) && ` • ${empreendimento.unidades} unidades`}
                   </div>
                   <div style={{
                     display: 'flex',
@@ -579,7 +494,7 @@ const Empreendimentos = () => {
           padding: '1rem'
         }}>
           <div style={{
-            backgroundColor: 'white',
+            backgroundColor: '#1f2937',
             borderRadius: '12px',
             maxWidth: '1400px',
             width: '100%',
@@ -591,12 +506,12 @@ const Empreendimentos = () => {
           }}>
             {/* Header do Modal */}
             <div style={{
-              padding: '1.5rem',
-              borderBottom: '1px solid #e5e7eb',
+              padding: '1rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              backgroundColor: 'white'
+              backgroundColor: '#1f2937'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <button
@@ -606,7 +521,7 @@ const Empreendimentos = () => {
                     border: 'none',
                     fontSize: '1.5rem',
                     cursor: 'pointer',
-                    color: '#6b7280',
+                    color: '#9ca3af',
                     padding: '0.5rem',
                     borderRadius: '6px',
                     display: 'flex',
@@ -616,59 +531,53 @@ const Empreendimentos = () => {
                 >
                   ←
                 </button>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <div style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '50%',
-                    backgroundColor: '#3b82f6',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'white',
-                    fontWeight: '700',
-                    fontSize: '1rem'
-                  }}>
-                    IM
-                  </div>
-                  <span style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: '500' }}>
-                    IM INCORPORADORA E CONSTRUTORA
-                  </span>
-                </div>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 {selectedEmpreendimento.telefone && (
                   <button
                     onClick={() => window.open(`tel:${selectedEmpreendimento.telefone}`)}
                     style={{
-                      width: '40px',
-                      height: '40px',
-                      borderRadius: '50%',
-                      border: '1px solid #e5e7eb',
-                      backgroundColor: 'white',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    📞
-                  </button>
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#9ca3af'
+                  }}
+                >
+                  📞
+                </button>
                 )}
                 <button
+                  onClick={() => {
+                    // Função para copiar link ou compartilhar
+                    const url = window.location.href;
+                    navigator.clipboard.writeText(url).then(() => {
+                      alert('Link copiado para a área de transferência!');
+                    }).catch(() => {
+                      alert('Erro ao copiar link');
+                    });
+                  }}
                   style={{
                     width: '40px',
                     height: '40px',
                     borderRadius: '50%',
-                    border: '1px solid #e5e7eb',
-                    backgroundColor: 'white',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    justifyContent: 'center',
+                    fontSize: '1.25rem',
+                    color: '#9ca3af'
                   }}
+                  title="Copiar link"
                 >
-                  📋
+                  🔗
                 </button>
                 <button
                   onClick={closeModal}
@@ -676,13 +585,14 @@ const Empreendimentos = () => {
                     width: '40px',
                     height: '40px',
                     borderRadius: '50%',
-                    border: '1px solid #e5e7eb',
-                    backgroundColor: 'white',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '1.25rem'
+                    fontSize: '1.25rem',
+                    color: '#9ca3af'
                   }}
                 >
                   ×
@@ -703,34 +613,37 @@ const Empreendimentos = () => {
                 color: 'white',
                 display: 'flex',
                 flexDirection: 'column',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                borderRight: '1px solid rgba(255, 255, 255, 0.1)'
               }}>
-                {/* Abas de Navegação */}
+                {/* Abas de Navegação - Navbar no topo */}
                 <div style={{
                   display: 'flex',
-                  flexDirection: 'column',
-                  padding: '1rem',
-                  gap: '0.5rem'
+                  padding: '0.5rem 1rem',
+                  gap: '0.25rem',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                  backgroundColor: 'rgba(0, 0, 0, 0.2)'
                 }}>
-                  {['galeria', 'hotsite', 'catalogo', 'unidades'].map((tab) => (
+                  {['unidades', 'galeria', 'hotsite', 'catalogo'].map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
                       style={{
-                        padding: '0.75rem 1rem',
+                        padding: '0.5rem 0.75rem',
                         border: 'none',
-                        borderRadius: '8px',
-                        backgroundColor: activeTab === tab ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                        borderRadius: '4px',
+                        backgroundColor: activeTab === tab ? 'rgba(59, 130, 246, 0.3)' : 'transparent',
                         color: activeTab === tab ? '#60a5fa' : '#9ca3af',
                         cursor: 'pointer',
-                        fontSize: '0.875rem',
-                        fontWeight: activeTab === tab ? '600' : '500',
-                        textAlign: 'left',
-                        transition: 'all 0.2s ease'
+                        fontSize: '0.75rem',
+                        fontWeight: activeTab === tab ? '600' : '400',
+                        textAlign: 'center',
+                        transition: 'all 0.2s ease',
+                        whiteSpace: 'nowrap'
                       }}
                       onMouseEnter={(e) => {
                         if (activeTab !== tab) {
-                          e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                          e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
                         }
                       }}
                       onMouseLeave={(e) => {
@@ -924,7 +837,7 @@ const Empreendimentos = () => {
               {/* Painel Direito - Conteúdo das Abas */}
               <div style={{
                 flex: 1,
-                backgroundColor: 'white',
+                backgroundColor: '#1f2937',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden'
@@ -932,7 +845,8 @@ const Empreendimentos = () => {
                 <div style={{
                   padding: '1.5rem',
                   flex: 1,
-                  overflowY: 'auto'
+                  overflowY: 'auto',
+                  color: 'white'
                 }}>
               {/* Aba: Informações */}
               {activeTab === 'informacoes' && (
@@ -1151,25 +1065,26 @@ const Empreendimentos = () => {
                         {['Fotos', 'Plantas', 'Videos', 'Tour virtual'].map((filtro) => (
                           <button
                             key={filtro}
+                            onClick={() => setFiltroGaleria(filtro)}
                             style={{
                               padding: '0.5rem 1rem',
-                              border: '1px solid #e5e7eb',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
                               borderRadius: '6px',
-                              backgroundColor: filtro === 'Fotos' ? '#3b82f6' : 'white',
-                              color: filtro === 'Fotos' ? 'white' : '#374151',
+                              backgroundColor: filtroGaleria === filtro ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                              color: filtroGaleria === filtro ? '#60a5fa' : '#9ca3af',
                               cursor: 'pointer',
                               fontSize: '0.875rem',
                               fontWeight: '500',
                               transition: 'all 0.2s ease'
                             }}
                             onMouseEnter={(e) => {
-                              if (filtro !== 'Fotos') {
-                                e.target.style.backgroundColor = '#f9fafb';
+                              if (filtroGaleria !== filtro) {
+                                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
                               }
                             }}
                             onMouseLeave={(e) => {
-                              if (filtro !== 'Fotos') {
-                                e.target.style.backgroundColor = 'white';
+                              if (filtroGaleria !== filtro) {
+                                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                               }
                             }}
                           >
@@ -1178,8 +1093,8 @@ const Empreendimentos = () => {
                         ))}
                       </div>
 
-                      {/* Grid de Imagens */}
-                      {selectedEmpreendimento.galeriaImagens && selectedEmpreendimento.galeriaImagens.length > 0 ? (
+                      {/* Conteúdo baseado no filtro selecionado */}
+                      {filtroGaleria === 'Fotos' && selectedEmpreendimento.galeriaImagens && selectedEmpreendimento.galeriaImagens.length > 0 && (
                         <div style={{
                           display: 'grid',
                           gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
@@ -1225,13 +1140,105 @@ const Empreendimentos = () => {
                             </div>
                           ))}
                         </div>
-                      ) : (
+                      )}
+
+                      {filtroGaleria === 'Plantas' && (
+                        <div>
+                          {selectedEmpreendimento.plantaUrl ? (
+                            <div style={{
+                              width: '100%',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              backgroundColor: '#f9fafb',
+                              borderRadius: '8px',
+                              padding: '1rem',
+                              minHeight: '400px'
+                            }}>
+                              <img
+                                src={selectedEmpreendimento.plantaUrl}
+                                alt={`Planta de ${selectedEmpreendimento.nome}`}
+                                style={{
+                                  maxWidth: '100%',
+                                  height: 'auto',
+                                  borderRadius: '8px',
+                                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                                }}
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <div style={{
+                              textAlign: 'center',
+                              padding: '3rem 1rem',
+                              color: '#9ca3af'
+                            }}>
+                              <p style={{ fontSize: '1rem', margin: 0, color: '#9ca3af' }}>
+                                Planta não disponível para este empreendimento
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {filtroGaleria === 'Videos' && (
                         <div style={{
                           textAlign: 'center',
                           padding: '3rem 1rem',
                           color: '#9ca3af'
                         }}>
-                          <p style={{ fontSize: '1rem', margin: 0 }}>
+                          <p style={{ fontSize: '1rem', margin: 0, color: '#9ca3af' }}>
+                            Vídeos não disponíveis para este empreendimento
+                          </p>
+                        </div>
+                      )}
+
+                      {filtroGaleria === 'Tour virtual' && (
+                        <div>
+                          {selectedEmpreendimento.tourVirtualUrl ? (
+                            <div style={{
+                              width: '100%',
+                              height: '600px',
+                              borderRadius: '8px',
+                              overflow: 'hidden',
+                              backgroundColor: '#f9fafb'
+                            }}>
+                              <iframe
+                                src={selectedEmpreendimento.tourVirtualUrl}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  border: 'none'
+                                }}
+                                title="Tour Virtual"
+                                allowFullScreen
+                              />
+                            </div>
+                          ) : (
+                            <div style={{
+                              textAlign: 'center',
+                              padding: '3rem 1rem',
+                              color: '#9ca3af'
+                            }}>
+                              <p style={{ fontSize: '1rem', margin: 0, color: '#9ca3af' }}>
+                                Tour virtual não disponível para este empreendimento
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Mensagem quando não há conteúdo de Fotos */}
+                      {filtroGaleria === 'Fotos' && (!selectedEmpreendimento.galeriaImagens || selectedEmpreendimento.galeriaImagens.length === 0) && (
+                        <div style={{
+                          textAlign: 'center',
+                          padding: '3rem 1rem',
+                          color: '#9ca3af'
+                        }}>
+                          <p style={{ fontSize: '1rem', margin: 0, color: '#9ca3af' }}>
                             Galeria de imagens não disponível para este empreendimento
                           </p>
                         </div>
@@ -1245,212 +1252,191 @@ const Empreendimentos = () => {
                       {/* Resumo de Disponibilidade */}
                       <div style={{
                         marginBottom: '2rem',
-                        padding: '1rem',
-                        backgroundColor: '#f0fdf4',
+                        padding: '1.5rem',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
                         borderRadius: '8px',
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: '1rem'
+                        flexDirection: 'column',
+                        gap: '1rem',
+                        border: '1px solid rgba(16, 185, 129, 0.2)'
                       }}>
                         <div style={{
-                          width: '12px',
-                          height: '12px',
-                          borderRadius: '50%',
-                          backgroundColor: '#10b981'
-                        }} />
-                        <span style={{ fontSize: '0.875rem', color: '#065f46', fontWeight: '600' }}>
-                          {unidades.filter(u => u.status === 'disponivel').length} UNIDADES DISPONÍVEIS
-                        </span>
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '1rem'
+                        }}>
+                          <div style={{
+                            width: '12px',
+                            height: '12px',
+                            borderRadius: '50%',
+                            backgroundColor: '#10b981'
+                          }} />
+                          <span style={{ fontSize: '1rem', color: '#10b981', fontWeight: '700' }}>
+                            {selectedEmpreendimento.unidades || 0} UNIDADES DISPONÍVEIS
+                          </span>
+                        </div>
+                        
                         {selectedEmpreendimento.dataUltimaAtualizacao && (
-                          <>
-                            <span style={{ color: '#9ca3af', margin: '0 0.5rem' }}>•</span>
-                            <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                              Última atualização - {new Date(selectedEmpreendimento.dataUltimaAtualizacao).toLocaleDateString('pt-BR')}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            fontSize: '0.875rem',
+                            color: '#9ca3af'
+                          }}>
+                            <span>
+                              Última atualização: {new Date(selectedEmpreendimento.dataUltimaAtualizacao).toLocaleDateString('pt-BR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric'
+                              })}
                             </span>
-                          </>
+                          </div>
                         )}
+
+                        {/* Informações adicionais do empreendimento */}
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                          gap: '1rem',
+                          marginTop: '1rem',
+                          paddingTop: '1rem',
+                          borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+                        }}>
+                          {selectedEmpreendimento.valorCondominio && (
+                            <div>
+                              <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>
+                                Condomínio
+                              </div>
+                              <div style={{ fontSize: '1rem', color: 'white', fontWeight: '600' }}>
+                                R$ {parseFloat(selectedEmpreendimento.valorCondominio).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </div>
+                            </div>
+                          )}
+                          {selectedEmpreendimento.valorIptu && (
+                            <div>
+                              <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>
+                                IPTU
+                              </div>
+                              <div style={{ fontSize: '1rem', color: 'white', fontWeight: '600' }}>
+                                R$ {parseFloat(selectedEmpreendimento.valorIptu).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </div>
+                            </div>
+                          )}
+                          {selectedEmpreendimento.dataEntrega && (
+                            <div>
+                              <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.25rem' }}>
+                                Previsão de Entrega
+                              </div>
+                              <div style={{ fontSize: '1rem', color: 'white', fontWeight: '600' }}>
+                                {new Date(selectedEmpreendimento.dataEntrega).toLocaleDateString('pt-BR', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric'
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
-                      {/* Tabelas organizadas por Tipo */}
-                      {loadingUnidades ? (
-                        <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
-                          Carregando unidades...
-                        </div>
-                      ) : unidades.length > 0 ? (() => {
-                        // Agrupar unidades por tipo
-                        const unidadesPorTipo = {};
-                        unidades.forEach(u => {
-                          const chave = `${u.tipo_unidade || 'Sem tipo'}${u.torre ? ` - Torre ${u.torre}` : ''}`;
-                          if (!unidadesPorTipo[chave]) {
-                            unidadesPorTipo[chave] = [];
-                          }
-                          unidadesPorTipo[chave].push(u);
-                        });
-
-                        return Object.entries(unidadesPorTipo).map(([tipoGrupo, unidadesGrupo]) => (
-                          <div key={tipoGrupo} style={{ marginBottom: '2rem' }}>
-                            <h3 style={{
-                              fontSize: '1rem',
-                              fontWeight: '600',
-                              color: '#1f2937',
-                              marginBottom: '1rem',
-                              textTransform: 'uppercase'
-                            }}>
-                              {selectedEmpreendimento.nome} - {tipoGrupo}
-                            </h3>
-                            <div style={{
-                              border: '1px solid #e5e7eb',
-                              borderRadius: '8px',
-                              overflow: 'hidden'
-                            }}>
-                              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <thead>
-                                  <tr style={{ backgroundColor: '#f9fafb' }}>
-                                    <th style={{
-                                      padding: '0.75rem 1rem',
-                                      textAlign: 'left',
-                                      fontSize: '0.875rem',
-                                      fontWeight: '600',
-                                      color: '#374151',
-                                      borderBottom: '1px solid #e5e7eb'
-                                    }}>
-                                      Unidade
-                                    </th>
-                                    <th style={{
-                                      padding: '0.75rem 1rem',
-                                      textAlign: 'left',
-                                      fontSize: '0.875rem',
-                                      fontWeight: '600',
-                                      color: '#374151',
-                                      borderBottom: '1px solid #e5e7eb'
-                                    }}>
-                                      Metragem (Privativo)
-                                    </th>
-                                    <th style={{
-                                      padding: '0.75rem 1rem',
-                                      textAlign: 'left',
-                                      fontSize: '0.875rem',
-                                      fontWeight: '600',
-                                      color: '#374151',
-                                      borderBottom: '1px solid #e5e7eb'
-                                    }}>
-                                      Valor
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {unidadesGrupo.map((unidade) => (
-                                    <tr
-                                      key={unidade.id}
-                                      onClick={() => handleUnidadeClick(unidade)}
-                                      style={{
-                                        cursor: 'pointer',
-                                        transition: 'background-color 0.2s ease'
-                                      }}
-                                      onMouseEnter={(e) => {
-                                        e.currentTarget.style.backgroundColor = '#f9fafb';
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        e.currentTarget.style.backgroundColor = 'white';
-                                      }}
-                                    >
-                                      <td style={{
-                                        padding: '0.75rem 1rem',
-                                        fontSize: '0.875rem',
-                                        color: '#1f2937',
-                                        borderBottom: '1px solid #f3f4f6'
-                                      }}>
-                                        {unidade.numero}
-                                        {unidade.tipo_unidade && (
-                                          <span style={{
-                                            marginLeft: '0.5rem',
-                                            padding: '0.125rem 0.5rem',
-                                            backgroundColor: '#d1fae5',
-                                            color: '#065f46',
-                                            borderRadius: '4px',
-                                            fontSize: '0.75rem',
-                                            fontWeight: '600'
-                                          }}>
-                                            {unidade.tipo_unidade}
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td style={{
-                                        padding: '0.75rem 1rem',
-                                        fontSize: '0.875rem',
-                                        color: '#6b7280',
-                                        borderBottom: '1px solid #f3f4f6'
-                                      }}>
-                                        {unidade.metragem ? `${unidade.metragem} m²` : '-'}
-                                      </td>
-                                      <td style={{
-                                        padding: '0.75rem 1rem',
-                                        fontSize: '0.875rem',
-                                        borderBottom: '1px solid #f3f4f6'
-                                      }}>
-                                        {unidade.status === 'vendido' ? (
-                                          <span style={{
-                                            padding: '0.5rem 1rem',
-                                            backgroundColor: '#f3f4f6',
-                                            color: '#6b7280',
-                                            borderRadius: '6px',
-                                            fontSize: '0.875rem',
-                                            fontWeight: '500'
-                                          }}>
-                                            Vendido
-                                          </span>
-                                        ) : unidade.status === 'reservado' ? (
-                                          <span style={{
-                                            padding: '0.5rem 1rem',
-                                            backgroundColor: '#fef3c7',
-                                            color: '#92400e',
-                                            borderRadius: '6px',
-                                            fontSize: '0.875rem',
-                                            fontWeight: '500'
-                                          }}>
-                                            Reservado
-                                          </span>
-                                        ) : unidade.valor ? (
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleUnidadeClick(unidade);
-                                            }}
-                                            style={{
-                                              padding: '0.5rem 1rem',
-                                              backgroundColor: '#3b82f6',
-                                              color: 'white',
-                                              border: 'none',
-                                              borderRadius: '6px',
-                                              fontSize: '0.875rem',
-                                              fontWeight: '600',
-                                              cursor: 'pointer'
-                                            }}
-                                          >
-                                            R$ {parseFloat(unidade.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                          </button>
-                                        ) : (
-                                          <span style={{ color: '#9ca3af' }}>-</span>
-                                        )}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        ));
-                      })() : (
-                        <div style={{
-                          textAlign: 'center',
-                          padding: '3rem 1rem',
-                          color: '#9ca3af'
+                      {/* Informações sobre o empreendimento */}
+                      <div style={{
+                        padding: '1.5rem',
+                        backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                      }}>
+                        <h3 style={{
+                          fontSize: '1.125rem',
+                          fontWeight: '600',
+                          color: 'white',
+                          marginBottom: '1rem'
                         }}>
-                          <p style={{ fontSize: '1rem', margin: 0 }}>
-                            Nenhuma unidade encontrada
-                          </p>
+                          Informações do Empreendimento
+                        </h3>
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.75rem'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            paddingBottom: '0.75rem',
+                            borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                          }}>
+                            <span style={{ fontSize: '0.875rem', color: '#9ca3af' }}>Tipo</span>
+                            <span style={{ fontSize: '0.875rem', color: 'white', fontWeight: '500' }}>
+                              {selectedEmpreendimento.tipo || 'Não informado'}
+                            </span>
+                          </div>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            paddingBottom: '0.75rem',
+                            borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                          }}>
+                            <span style={{ fontSize: '0.875rem', color: '#9ca3af' }}>Total de Unidades</span>
+                            <span style={{ fontSize: '0.875rem', color: 'white', fontWeight: '500' }}>
+                              {selectedEmpreendimento.unidades || 0}
+                            </span>
+                          </div>
+                          {selectedEmpreendimento.dataInicioObra && (
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              paddingBottom: '0.75rem',
+                              borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                            }}>
+                              <span style={{ fontSize: '0.875rem', color: '#9ca3af' }}>Início da Obra</span>
+                              <span style={{ fontSize: '0.875rem', color: 'white', fontWeight: '500' }}>
+                                {new Date(selectedEmpreendimento.dataInicioObra).toLocaleDateString('pt-BR', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric'
+                                })}
+                              </span>
+                            </div>
+                          )}
+                          {selectedEmpreendimento.progressoObra !== undefined && (
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.5rem',
+                              paddingTop: '0.75rem'
+                            }}>
+                              <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                              }}>
+                                <span style={{ fontSize: '0.875rem', color: '#9ca3af' }}>Progresso da Obra</span>
+                                <span style={{ fontSize: '0.875rem', color: 'white', fontWeight: '500' }}>
+                                  {selectedEmpreendimento.progressoObra || 0}%
+                                </span>
+                              </div>
+                              <div style={{
+                                width: '100%',
+                                height: '8px',
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                borderRadius: '4px',
+                                overflow: 'hidden'
+                              }}>
+                                <div style={{
+                                  width: `${selectedEmpreendimento.progressoObra || 0}%`,
+                                  height: '100%',
+                                  backgroundColor: '#10b981',
+                                  transition: 'width 0.3s ease'
+                                }} />
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
                   )}
 
@@ -1461,7 +1447,7 @@ const Empreendimentos = () => {
                       padding: '3rem 1rem',
                       color: '#9ca3af'
                     }}>
-                      <p style={{ fontSize: '1rem', margin: 0 }}>
+                      <p style={{ fontSize: '1rem', margin: 0, color: '#9ca3af' }}>
                         Hotsite será implementado em breve
                       </p>
                       {selectedEmpreendimento.tourVirtualUrl && (
@@ -1500,12 +1486,13 @@ const Empreendimentos = () => {
                             width: '100%',
                             height: '600px',
                             border: 'none',
-                            borderRadius: '8px'
+                            borderRadius: '8px',
+                            backgroundColor: 'rgba(0, 0, 0, 0.2)'
                           }}
                           title="Catálogo do Empreendimento"
                         />
                       ) : (
-                        <p style={{ fontSize: '1rem', margin: 0 }}>
+                        <p style={{ fontSize: '1rem', margin: 0, color: '#9ca3af' }}>
                           Catálogo não disponível para este empreendimento
                         </p>
                       )}
@@ -1932,155 +1919,6 @@ const Empreendimentos = () => {
                 </div>
               </div>
             </div>
-
-            {/* Footer do Modal com Botões de Ação */}
-            <div style={{
-              padding: '1rem 1.5rem',
-              borderTop: '1px solid #e5e7eb',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '0.5rem'
-            }}>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                {selectedEmpreendimento.pdfUrl && (
-                  <a
-                    href={selectedEmpreendimento.pdfUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      padding: '0.5rem 1rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      backgroundColor: 'white',
-                      color: '#374151',
-                      textDecoration: 'none',
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Ver PDF
-                  </a>
-                )}
-                {selectedEmpreendimento.catalogoUrl && (
-                  <a
-                    href={selectedEmpreendimento.catalogoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      padding: '0.5rem 1rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      backgroundColor: 'white',
-                      color: '#374151',
-                      textDecoration: 'none',
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Catálogo
-                  </a>
-                )}
-                {selectedEmpreendimento.simuladorCaixaUrl && (
-                  <a
-                    href={selectedEmpreendimento.simuladorCaixaUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      padding: '0.5rem 1rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      backgroundColor: 'white',
-                      color: '#374151',
-                      textDecoration: 'none',
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Simulador Caixa
-                  </a>
-                )}
-                {(selectedEmpreendimento.telefone || selectedEmpreendimento.email || selectedEmpreendimento.siteIncorporadora) && (
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    {selectedEmpreendimento.telefone && (
-                      <a
-                        href={`tel:${selectedEmpreendimento.telefone}`}
-                        style={{
-                          padding: '0.5rem 1rem',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          backgroundColor: 'white',
-                          color: '#374151',
-                          textDecoration: 'none',
-                          fontSize: '0.875rem',
-                          fontWeight: '500',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        📞 {selectedEmpreendimento.telefone}
-                      </a>
-                    )}
-                    {selectedEmpreendimento.email && (
-                      <a
-                        href={`mailto:${selectedEmpreendimento.email}`}
-                        style={{
-                          padding: '0.5rem 1rem',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          backgroundColor: 'white',
-                          color: '#374151',
-                          textDecoration: 'none',
-                          fontSize: '0.875rem',
-                          fontWeight: '500',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        ✉️ Email
-                      </a>
-                    )}
-                    {selectedEmpreendimento.siteIncorporadora && (
-                      <a
-                        href={selectedEmpreendimento.siteIncorporadora}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          padding: '0.5rem 1rem',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          backgroundColor: 'white',
-                          color: '#374151',
-                          textDecoration: 'none',
-                          fontSize: '0.875rem',
-                          fontWeight: '500',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        🌐 Site
-                      </a>
-                    )}
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={closeModal}
-                style={{
-                  padding: '0.5rem 1rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  backgroundColor: 'white',
-                  color: '#374151',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '500'
-                }}
-              >
-                Fechar
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -2257,168 +2095,6 @@ const Empreendimentos = () => {
         </div>
         );
       })()}
-
-      {/* Modal de Detalhes da Unidade */}
-      {showUnidadeModal && selectedUnidade && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1500,
-          padding: '1rem'
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            maxWidth: '500px',
-            width: '100%',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            boxShadow: '0 20px 25px rgba(0, 0, 0, 0.1)'
-          }}>
-            <div style={{
-              padding: '1.5rem',
-              borderBottom: '1px solid #e5e7eb',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '600' }}>
-                Unidade {selectedUnidade.numero}
-                {selectedUnidade.torre && ` - Torre ${selectedUnidade.torre}`}
-              </h2>
-              <button
-                onClick={closeUnidadeModal}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                  color: '#6b7280'
-                }}
-              >
-                ×
-              </button>
-            </div>
-            <div style={{ padding: '1.5rem' }}>
-              <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
-                <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Status</div>
-                <span style={{
-                  padding: '0.25rem 0.75rem',
-                  borderRadius: '12px',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  backgroundColor: selectedUnidade.status === 'disponivel' ? '#d1fae5' : 
-                                  selectedUnidade.status === 'reservado' ? '#fef3c7' : '#fee2e2',
-                  color: selectedUnidade.status === 'disponivel' ? '#065f46' : 
-                         selectedUnidade.status === 'reservado' ? '#92400e' : '#991b1b'
-                }}>
-                  {selectedUnidade.status === 'disponivel' ? 'Disponível' : 
-                   selectedUnidade.status === 'reservado' ? 'Reservado' : 'Vendido'}
-                </span>
-              </div>
-              
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                gap: '1rem',
-                marginBottom: '1rem'
-              }}>
-                {selectedUnidade.tipo_unidade && (
-                  <div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Tipo</div>
-                    <div style={{ fontWeight: '600' }}>{selectedUnidade.tipo_unidade}</div>
-                  </div>
-                )}
-                {selectedUnidade.metragem && (
-                  <div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Área</div>
-                    <div style={{ fontWeight: '600' }}>{selectedUnidade.metragem} m²</div>
-                  </div>
-                )}
-                {selectedUnidade.dormitorios !== null && (
-                  <div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Dormitórios</div>
-                    <div style={{ fontWeight: '600' }}>{selectedUnidade.dormitorios}</div>
-                  </div>
-                )}
-                {selectedUnidade.suites !== null && (
-                  <div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Suítes</div>
-                    <div style={{ fontWeight: '600' }}>{selectedUnidade.suites}</div>
-                  </div>
-                )}
-                {selectedUnidade.vagas !== null && (
-                  <div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Vagas</div>
-                    <div style={{ fontWeight: '600' }}>{selectedUnidade.vagas}</div>
-                  </div>
-                )}
-              </div>
-
-              {selectedUnidade.valor && (
-                <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#eff6ff', borderRadius: '8px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Valor</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#3b82f6' }}>
-                    R$ {parseFloat(selectedUnidade.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </div>
-                </div>
-              )}
-
-              {selectedUnidade.diferenciais && (
-                <div>
-                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>Diferenciais</h3>
-                  <div style={{
-                    padding: '1rem',
-                    backgroundColor: '#f9fafb',
-                    borderRadius: '8px',
-                    whiteSpace: 'pre-line',
-                    lineHeight: '1.6'
-                  }}>
-                    {selectedUnidade.diferenciais}
-                  </div>
-                </div>
-              )}
-
-              <div style={{
-                marginTop: '1.5rem',
-                padding: '1rem',
-                backgroundColor: '#fef3c7',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                color: '#92400e'
-              }}>
-                ⚠️ Aviso: Ao compartilhar esta unidade, certifique-se de possuir a documentação necessária (IR).
-              </div>
-            </div>
-            <div style={{
-              padding: '1rem 1.5rem',
-              borderTop: '1px solid #e5e7eb',
-              display: 'flex',
-              justifyContent: 'flex-end'
-            }}>
-              <button
-                onClick={closeUnidadeModal}
-                style={{
-                  padding: '0.5rem 1rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  backgroundColor: 'white',
-                  cursor: 'pointer'
-                }}
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
