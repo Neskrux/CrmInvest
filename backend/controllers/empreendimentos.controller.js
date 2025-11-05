@@ -81,11 +81,23 @@ const getEmpreendimentoById = async (req, res) => {
       .eq('id', id)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // Se não encontrou o registro, retornar 404
+      if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
+        return res.status(404).json({ error: 'Empreendimento não encontrado' });
+      }
+      throw error;
+    }
 
+    if (!data) {
+      return res.status(404).json({ error: 'Empreendimento não encontrado' });
+    }
+
+    // Retornar no formato esperado pelo frontend
     res.json(data);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('❌ Erro ao buscar empreendimento:', error);
+    res.status(500).json({ error: error.message || 'Erro ao buscar empreendimento' });
   }
 };
 
@@ -168,16 +180,18 @@ const uploadGaleria = async (req, res) => {
     // Fazer upload com geração automática de thumbnail
     const result = await uploadGaleriaImagem(req.file, id, categoria);
 
+    const tipoArquivo = categoria === 'videos' ? 'Vídeo' : 'Imagem';
+    
     res.json({
       success: true,
-      message: 'Imagem uploadada com sucesso',
+      message: `${tipoArquivo} uploadado(a) com sucesso`,
       data: result
     });
 
   } catch (error) {
     console.error('❌ Erro no upload de galeria:', error);
     res.status(500).json({ 
-      error: error.message || 'Erro ao fazer upload da imagem'
+      error: error.message || 'Erro ao fazer upload do arquivo'
     });
   }
 };
@@ -228,9 +242,11 @@ const uploadGaleriaMultiple = async (req, res) => {
       }
     }
 
+    const tipoArquivo = categoria === 'videos' ? 'vídeo(s)' : 'imagem(ns)';
+    
     res.json({
       success: true,
-      message: `${results.length} imagem(ns) uploadada(s) com sucesso`,
+      message: `${results.length} ${tipoArquivo} uploadado(s) com sucesso`,
       uploaded: results.length,
       failed: errors.length,
       data: results,
@@ -240,7 +256,7 @@ const uploadGaleriaMultiple = async (req, res) => {
   } catch (error) {
     console.error('❌ Erro no upload múltiplo de galeria:', error);
     res.status(500).json({ 
-      error: error.message || 'Erro ao fazer upload das imagens'
+      error: error.message || 'Erro ao fazer upload dos arquivos'
     });
   }
 };
@@ -274,6 +290,237 @@ const removeGaleria = async (req, res) => {
   }
 };
 
+// PUT /api/empreendimentos/:id - Atualizar empreendimento
+const updateEmpreendimento = async (req, res) => {
+  try {
+    // Verificar se é admin
+    if (req.user.tipo !== 'admin') {
+      return res.status(403).json({ error: 'Apenas administradores podem editar empreendimentos' });
+    }
+
+    const { id } = req.params;
+    const updateData = req.body;
+
+    // Remover campos que não devem ser atualizados
+    delete updateData.id;
+    delete updateData.created_at;
+    delete updateData.empresa_id;
+
+    // Limpar apenas strings vazias (null deve ser mantido para atualizar campos no banco)
+    Object.keys(updateData).forEach(key => {
+      const value = updateData[key];
+      // Remover apenas strings vazias e undefined (null é válido para limpar campos)
+      if (value === '' || (typeof value === 'string' && value.trim() === '')) {
+        updateData[key] = null; // Converter string vazia para null
+        return;
+      }
+      // Remover undefined apenas
+      if (value === undefined) {
+        delete updateData[key];
+        return;
+      }
+      // Para campos de data, validar formato e converter string vazia para null
+      if (key.includes('data') || key.includes('_date')) {
+        if (typeof value === 'string' && value.trim() === '') {
+          updateData[key] = null;
+          return;
+        }
+      }
+      // null é válido, não remover
+    });
+
+    // Atualizar data_ultima_atualizacao
+    updateData.data_ultima_atualizacao = new Date().toISOString();
+
+    // Fazer update
+    const { data, error } = await supabaseAdmin
+      .from('empreendimentos')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Erro ao atualizar empreendimento:', error);
+      return res.status(500).json({ 
+        error: 'Erro ao atualizar empreendimento',
+        details: error.message
+      });
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: 'Empreendimento não encontrado' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Empreendimento atualizado com sucesso',
+      data
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao atualizar empreendimento:', error);
+    res.status(500).json({ 
+      error: error.message || 'Erro ao atualizar empreendimento'
+    });
+  }
+};
+
+// PUT /api/empreendimentos/:id/unidades/:unidadeId - Atualizar unidade
+const updateUnidade = async (req, res) => {
+  try {
+    // Verificar se é admin
+    if (req.user.tipo !== 'admin') {
+      return res.status(403).json({ error: 'Apenas administradores podem editar unidades' });
+    }
+
+    const { id, unidadeId } = req.params;
+    const updateData = req.body;
+
+    // Remover campos que não devem ser atualizados
+    delete updateData.id;
+    delete updateData.empreendimento_id;
+    delete updateData.created_at;
+
+    // Atualizar updated_at
+    updateData.updated_at = new Date().toISOString();
+
+    // Verificar se a unidade pertence ao empreendimento
+    const { data: unidade, error: checkError } = await supabaseAdmin
+      .from('unidades')
+      .select('id, empreendimento_id')
+      .eq('id', unidadeId)
+      .eq('empreendimento_id', id)
+      .single();
+
+    if (checkError || !unidade) {
+      return res.status(404).json({ error: 'Unidade não encontrada ou não pertence a este empreendimento' });
+    }
+
+    // Fazer update
+    const { data, error } = await supabaseAdmin
+      .from('unidades')
+      .update(updateData)
+      .eq('id', unidadeId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Erro ao atualizar unidade:', error);
+      return res.status(500).json({ 
+        error: 'Erro ao atualizar unidade',
+        details: error.message
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Unidade atualizada com sucesso',
+      data
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao atualizar unidade:', error);
+    res.status(500).json({ 
+      error: error.message || 'Erro ao atualizar unidade'
+    });
+  }
+};
+
+// POST /api/empreendimentos/:id/unidades - Criar nova unidade
+const createUnidade = async (req, res) => {
+  try {
+    // Verificar se é admin
+    if (req.user.tipo !== 'admin') {
+      return res.status(403).json({ error: 'Apenas administradores podem criar unidades' });
+    }
+
+    const { id } = req.params;
+    const newUnidade = req.body;
+
+    // Adicionar empreendimento_id
+    newUnidade.empreendimento_id = parseInt(id);
+    newUnidade.created_at = new Date().toISOString();
+    newUnidade.updated_at = new Date().toISOString();
+
+    // Fazer insert
+    const { data, error } = await supabaseAdmin
+      .from('unidades')
+      .insert(newUnidade)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Erro ao criar unidade:', error);
+      return res.status(500).json({ 
+        error: 'Erro ao criar unidade',
+        details: error.message
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Unidade criada com sucesso',
+      data
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao criar unidade:', error);
+    res.status(500).json({ 
+      error: error.message || 'Erro ao criar unidade'
+    });
+  }
+};
+
+// DELETE /api/empreendimentos/:id/unidades/:unidadeId - Deletar unidade
+const deleteUnidade = async (req, res) => {
+  try {
+    // Verificar se é admin
+    if (req.user.tipo !== 'admin') {
+      return res.status(403).json({ error: 'Apenas administradores podem deletar unidades' });
+    }
+
+    const { id, unidadeId } = req.params;
+
+    // Verificar se a unidade pertence ao empreendimento
+    const { data: unidade, error: checkError } = await supabaseAdmin
+      .from('unidades')
+      .select('id, empreendimento_id')
+      .eq('id', unidadeId)
+      .eq('empreendimento_id', id)
+      .single();
+
+    if (checkError || !unidade) {
+      return res.status(404).json({ error: 'Unidade não encontrada ou não pertence a este empreendimento' });
+    }
+
+    // Fazer delete
+    const { error } = await supabaseAdmin
+      .from('unidades')
+      .delete()
+      .eq('id', unidadeId);
+
+    if (error) {
+      console.error('❌ Erro ao deletar unidade:', error);
+      return res.status(500).json({ 
+        error: 'Erro ao deletar unidade',
+        details: error.message
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Unidade deletada com sucesso'
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao deletar unidade:', error);
+    res.status(500).json({ 
+      error: error.message || 'Erro ao deletar unidade'
+    });
+  }
+};
+
 module.exports = {
   testEmpreendimentos,
   getAllEmpreendimentos,
@@ -282,6 +529,10 @@ module.exports = {
   getUnidadeById,
   uploadGaleria,
   uploadGaleriaMultiple,
-  removeGaleria
+  removeGaleria,
+  updateEmpreendimento,
+  updateUnidade,
+  createUnidade,
+  deleteUnidade
 };
 

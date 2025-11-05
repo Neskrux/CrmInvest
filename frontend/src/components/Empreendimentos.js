@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import useBranding from '../hooks/useBranding';
 import { useAuth } from '../contexts/AuthContext';
 import { getSupabaseClient } from '../lib/supabaseClient';
-import { Phone, Mail, Share2, X, Calculator, ArrowLeft, Home, Images, Globe, BookOpen, ChevronLeft, ChevronRight, Maximize2, Bed, BedDouble, Car, Clock, Bath, Droplets, Ruler, Edit, Copy, Upload } from 'lucide-react';
+import { Phone, Mail, Share2, X, Calculator, ArrowLeft, Home, Images, Globe, BookOpen, ChevronLeft, ChevronRight, Maximize2, Minimize2, Bed, BedDouble, Car, Clock, Bath, Droplets, Ruler, Edit, Copy, Upload } from 'lucide-react';
 
 // ==== Helpers de imagem/URLs ====
 const BUCKET = 'galeria-empreendimentos';
@@ -28,7 +28,7 @@ const buildUrlsForFile = (supabase, filePath, sizeBytes) => {
 
 const Empreendimentos = () => {
   const { t } = useBranding();
-  const { user, makeRequest } = useAuth();
+  const { user, makeRequest, isAdmin } = useAuth();
   const [empreendimentos, setEmpreendimentos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -57,6 +57,15 @@ const Empreendimentos = () => {
   });
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ uploaded: 0, total: 0 });
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editFormData, setEditFormData] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [editingUnidade, setEditingUnidade] = useState(null);
+  const [showUnidadeEditModal, setShowUnidadeEditModal] = useState(false);
+  const [unidadeFormData, setUnidadeFormData] = useState(null);
+  const [savingUnidade, setSavingUnidade] = useState(false);
+  const [playingVideoIndex, setPlayingVideoIndex] = useState(null);
+  const [tourVirtualFullscreen, setTourVirtualFullscreen] = useState(false);
 
   // Função para buscar empreendimentos do banco
   const fetchEmpreendimentos = async () => {
@@ -89,7 +98,9 @@ const Empreendimentos = () => {
            bairro: emp.bairro || '',
            tipo: emp.tipo || 'Residencial',
            unidades: emp.unidades != null ? parseInt(emp.unidades, 10) || 0 : 0,
-           status: emp.status === 'ativo' ? 'Em construção' : 'Lançamento',
+           status: emp.status || 'em_construcao',
+           cidade: emp.cidade || '',
+           estado: emp.estado || '',
            imagem: imagemPath,
           condicoesPagamento: (() => {
             try {
@@ -129,6 +140,9 @@ const Empreendimentos = () => {
           dataEntrega: emp.data_entrega || null,
           valorCondominio: emp.valor_condominio || null,
           valorIptu: emp.valor_iptu || null,
+          dormitorios: emp.dormitorios || null,
+          suites: emp.suites || null,
+          vagas: emp.vagas || null,
           dataUltimaAtualizacao: emp.data_ultima_atualizacao || null,
           telefone: emp.telefone || '',
           email: emp.email || '',
@@ -167,6 +181,34 @@ const Empreendimentos = () => {
     }
   }, [showModal]);
 
+  // Resetar tela cheia do tour virtual ao fechar modal ou mudar empreendimento
+  useEffect(() => {
+    if (!showModal) {
+      setTourVirtualFullscreen(false);
+    }
+  }, [showModal, selectedEmpreendimento?.id]);
+
+  // Desabilitar scroll do body quando tour virtual estiver em tela cheia
+  useEffect(() => {
+    if (tourVirtualFullscreen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      
+      // Handler para ESC para sair da tela cheia
+      const handleEsc = (e) => {
+        if (e.key === 'Escape') {
+          setTourVirtualFullscreen(false);
+        }
+      };
+      window.addEventListener('keydown', handleEsc);
+      
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        window.removeEventListener('keydown', handleEsc);
+      };
+    }
+  }, [tourVirtualFullscreen]);
+
   // Gerenciar carregamento e limpeza da galeria baseado na aba ativa
   useEffect(() => {
     if (!selectedEmpreendimento) return;
@@ -195,6 +237,8 @@ const Empreendimentos = () => {
           }
           return novo;
         });
+        // Resetar vídeo em reprodução ao mudar de filtro
+        setPlayingVideoIndex(null);
         fetchGaleriaImagens(empreendimentoId, categoriaSupabase);
       }
     } else {
@@ -205,6 +249,8 @@ const Empreendimentos = () => {
         return novo;
       });
       setLoadingGaleria(false);
+      // Resetar vídeo em reprodução ao sair da aba
+      setPlayingVideoIndex(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, filtroGaleria, selectedEmpreendimento?.id]);
@@ -281,18 +327,27 @@ const Empreendimentos = () => {
             const filePath = `${empreendimentoId}/${categoria}/${file.name}`;
             // Verificar se é imagem (para aplicar transform) ou vídeo
             const isImage = /\.(jpg|jpeg|png|gif|webp|avif)$/i.test(file.name);
+            let urlObj;
             if (isImage) {
               const size = file?.metadata?.size ?? 0;
-              return buildUrlsForFile(supabase, filePath, size);
+              urlObj = buildUrlsForFile(supabase, filePath, size);
             } else {
               // Para vídeos ou outros arquivos, usar apenas URL original
               const fullUrl = getPublic(supabase, filePath);
-              return { thumbUrl: fullUrl, transformUrl: null, fullUrl };
+              urlObj = { thumbUrl: fullUrl, transformUrl: null, fullUrl };
             }
+            // Adicionar nome do arquivo para facilitar remoção de duplicatas
+            urlObj.fileName = file.name;
+            return urlObj;
           })
           .filter(item => item && item.fullUrl);
 
-        return { categoria, urls };
+        // Remover duplicatas baseado no nome do arquivo (mais confiável)
+        const urlsUnicas = urls.filter((item, index, self) => {
+          return index === self.findIndex(i => i.fileName === item.fileName);
+        });
+
+        return { categoria, urls: urlsUnicas };
       });
 
       // Aguardar todas as requisições em paralelo
@@ -363,7 +418,8 @@ const Empreendimentos = () => {
         // Recarregar galeria após upload usando a categoria que foi enviada
         await fetchGaleriaImagens(selectedEmpreendimento.id, categoria);
         
-        alert(`${result.uploaded} imagem(ns) uploadada(s) com sucesso!`);
+        const tipoArquivo = categoria === 'videos' ? 'vídeo(s)' : 'imagem(ns)';
+        alert(`${result.uploaded} ${tipoArquivo} uploadado(s) com sucesso!`);
       } else {
         // Upload único
         formData.append('imagem', files[0]);
@@ -393,7 +449,8 @@ const Empreendimentos = () => {
         // Recarregar galeria após upload usando a categoria que foi enviada
         await fetchGaleriaImagens(selectedEmpreendimento.id, categoria);
         
-        alert('Imagem uploadada com sucesso!');
+        const tipoArquivo = categoria === 'videos' ? 'Vídeo' : 'Imagem';
+        alert(`${tipoArquivo} uploadado(a) com sucesso!`);
       }
     } catch (error) {
       console.error('Erro no upload:', error);
@@ -401,6 +458,201 @@ const Empreendimentos = () => {
     } finally {
       setUploading(false);
       setUploadProgress({ uploaded: 0, total: 0 });
+    }
+  };
+
+  // Função para salvar/criar unidade
+  const handleSaveUnidade = async () => {
+    if (!unidadeFormData || !selectedEmpreendimento) return;
+
+    try {
+      setSavingUnidade(true);
+
+      // Preparar dados para envio
+      const updateData = { ...unidadeFormData };
+      
+      // Converter valores numéricos
+      if (updateData.metragem_privativa) {
+        updateData.metragem_privativa = parseFloat(updateData.metragem_privativa) || null;
+      }
+      if (updateData.area_total) {
+        updateData.area_total = parseFloat(updateData.area_total) || null;
+      }
+      if (updateData.valor) {
+        updateData.valor = parseFloat(updateData.valor) || null;
+      }
+      if (updateData.dormitorios) {
+        updateData.dormitorios = parseInt(updateData.dormitorios) || null;
+      }
+      if (updateData.suites) {
+        updateData.suites = parseInt(updateData.suites) || null;
+      }
+      if (updateData.vagas) {
+        updateData.vagas = parseInt(updateData.vagas) || null;
+      }
+      if (updateData.banheiros) {
+        updateData.banheiros = parseInt(updateData.banheiros) || null;
+      }
+      if (updateData.andar) {
+        updateData.andar = parseInt(updateData.andar) || null;
+      }
+
+      // Limpar campos vazios
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === '' || updateData[key] === null) {
+          updateData[key] = null;
+        }
+      });
+
+      let response;
+      if (editingUnidade) {
+        // Atualizar unidade existente
+        response = await makeRequest(`/empreendimentos/${selectedEmpreendimento.id}/unidades/${editingUnidade.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(updateData)
+        });
+      } else {
+        // Criar nova unidade
+        response = await makeRequest(`/empreendimentos/${selectedEmpreendimento.id}/unidades`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(updateData)
+        });
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao salvar unidade');
+      }
+
+      // Recarregar unidades
+      await fetchUnidades(selectedEmpreendimento.id);
+
+      // Fechar modal
+      setShowUnidadeEditModal(false);
+      setEditingUnidade(null);
+      alert(editingUnidade ? 'Unidade atualizada com sucesso!' : 'Unidade criada com sucesso!');
+
+    } catch (error) {
+      console.error('Erro ao salvar unidade:', error);
+      alert(`Erro ao salvar: ${error.message}`);
+    } finally {
+      setSavingUnidade(false);
+    }
+  };
+
+  // Função para salvar alterações do empreendimento
+  const handleSaveEmpreendimento = async () => {
+    if (!editFormData || !selectedEmpreendimento) return;
+
+    try {
+      setSaving(true);
+
+      // Preparar dados para envio
+      const updateData = { ...editFormData };
+      
+      // Filtrar e converter condicoes_pagamento para string se for array
+      if (Array.isArray(updateData.condicoes_pagamento)) {
+        // Filtrar condições válidas (com valor, título e descrição preenchidos)
+        const condicoesValidas = updateData.condicoes_pagamento.filter(
+          cond => cond && cond.valor && cond.titulo && cond.descricao
+        );
+        // Se não houver condições válidas, definir como null explicitamente
+        if (condicoesValidas.length === 0) {
+          updateData.condicoes_pagamento = null;
+        } else {
+          // Converter para JSON string apenas se houver condições válidas
+          updateData.condicoes_pagamento = JSON.stringify(condicoesValidas);
+        }
+      } else if (!updateData.condicoes_pagamento) {
+        // Se não for array e estiver vazio/null, definir como null
+        updateData.condicoes_pagamento = null;
+      }
+
+      // Remover campos que não devem ser enviados
+      delete updateData.idx;
+      delete updateData.id;
+      delete updateData.created_at;
+      delete updateData.empresa_id;
+      delete updateData.descricao; // Não salvar descricao, usar apenas observacoes
+
+      // Converter campos vazios para null (em vez de remover)
+      Object.keys(updateData).forEach(key => {
+        const value = updateData[key];
+        
+        // Converter strings vazias para null
+        if (value === '' || (typeof value === 'string' && value.trim() === '')) {
+          updateData[key] = null;
+          return;
+        }
+        
+        // Para campos de data, validar se está vazio
+        if (key.includes('data') || key.includes('_date')) {
+          if (!value || (typeof value === 'string' && value.trim() === '')) {
+            updateData[key] = null;
+            return;
+          }
+        }
+        
+        // Para números, converter string vazia para null (mas manter 0 como valor válido)
+        const numericFields = ['dormitorios', 'suites', 'vagas', 'unidades', 'progresso_obra', 'valor_condominio', 'valor_iptu'];
+        if (numericFields.includes(key)) {
+          if (value === '' || value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) {
+            updateData[key] = null;
+            return;
+          }
+        }
+        
+        // Para números NaN, converter para null
+        if (typeof value === 'number' && isNaN(value)) {
+          updateData[key] = null;
+          return;
+        }
+        
+        // Manter undefined como null também
+        if (value === undefined) {
+          updateData[key] = null;
+          return;
+        }
+      });
+
+      const response = await makeRequest(`/empreendimentos/${selectedEmpreendimento.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao salvar alterações');
+      }
+
+      const result = await response.json();
+      
+      // Atualizar o empreendimento na lista
+      setEmpreendimentos(prev => prev.map(emp => 
+        emp.id === selectedEmpreendimento.id ? { ...emp, ...result.data } : emp
+      ));
+
+      // Atualizar o empreendimento selecionado
+      setSelectedEmpreendimento({ ...selectedEmpreendimento, ...result.data });
+
+      // Fechar modal
+      setShowEditModal(false);
+      alert('Empreendimento atualizado com sucesso!');
+
+    } catch (error) {
+      console.error('Erro ao salvar empreendimento:', error);
+      alert(`Erro ao salvar: ${error.message}`);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -644,17 +896,52 @@ const Empreendimentos = () => {
   // Função para obter cor do status
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
-      case 'pronto para morar':
-      case 'pronto':
-        return '#10b981';
+      case 'entregue':
+        return '#10b981'; // Verde
+      case 'em_construcao':
       case 'em construção':
       case 'construção':
-        return '#f59e0b';
-      case 'lançamento':
-        return '#3b82f6';
+        return '#f59e0b'; // Amarelo
+      case 'inativo':
+        return '#ef4444'; // Vermelho
       default:
-        return '#6b7280';
+        return '#6b7280'; // Cinza
     }
+  };
+
+  // Função para obter label do status
+  const getStatusLabel = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'entregue':
+        return 'Entregue';
+      case 'em_construcao':
+      case 'em construção':
+      case 'construção':
+        return 'Em construção';
+      case 'inativo':
+        return 'Inativo';
+      default:
+        return status || 'Não informado';
+    }
+  };
+
+  // Função para formatar data para input type="date"
+  const formatDateForInput = (dateString) => {
+    if (!dateString) return '';
+    // Se já está no formato YYYY-MM-DD, retornar direto
+    if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateString)) {
+      return dateString.split('T')[0].split(' ')[0]; // Remove time if present
+    }
+    // Tentar parsear outras formatos
+    try {
+      const date = new Date(dateString);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString().split('T')[0];
+      }
+    } catch (e) {
+      // Ignorar erro
+    }
+    return '';
   };
 
   // Estilos customizados para as scrollbars dos painéis
@@ -937,7 +1224,7 @@ const Empreendimentos = () => {
                   fontWeight: '600',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
                 }}>
-                  {empreendimento.status || 'Status não informado'}
+                  {getStatusLabel(empreendimento.status)}
                 </div>
               </div>
 
@@ -1124,6 +1411,89 @@ const Empreendimentos = () => {
                     }}
                   >
                     <Mail size={18} />
+                  </button>
+                )}
+                {isAdmin && (
+                  <button
+                    onClick={async () => {
+                      // Buscar dados completos do backend para garantir que temos todos os campos
+                      try {
+                        const config = await import('../config');
+                        const API_BASE_URL = config.default.API_BASE_URL || 'http://localhost:5000/api';
+                        const response = await fetch(`${API_BASE_URL}/empreendimentos-public/${selectedEmpreendimento.id}`);
+                        if (response.ok) {
+                          const empreendimento = await response.json();
+                          
+                          // Preparar dados do formulário com mapeamento correto
+                          const formData = {
+                            nome: empreendimento.nome ?? '',
+                            tipo: empreendimento.tipo ?? '',
+                            status: empreendimento.status ?? 'em_construcao',
+                            unidades: empreendimento.unidades ?? 0,
+                            endereco: empreendimento.endereco ?? '',
+                            bairro: empreendimento.bairro ?? '',
+                            cidade: empreendimento.cidade ?? '',
+                            estado: empreendimento.estado ?? '',
+                            telefone: empreendimento.telefone ?? '',
+                            email: empreendimento.email ?? '',
+                            imagem: empreendimento.imagem ?? '',
+                            progresso_obra: empreendimento.progresso_obra != null ? empreendimento.progresso_obra : 0,
+                            data_inicio_obra: empreendimento.data_inicio_obra ? formatDateForInput(empreendimento.data_inicio_obra) : '',
+                            data_entrega: empreendimento.data_entrega ? formatDateForInput(empreendimento.data_entrega) : '',
+                            valor_condominio: empreendimento.valor_condominio ?? '',
+                            valor_iptu: empreendimento.valor_iptu ?? '',
+                            dormitorios: empreendimento.dormitorios ?? null,
+                            suites: empreendimento.suites ?? null,
+                            vagas: empreendimento.vagas ?? null,
+                            observacoes: empreendimento.observacoes ?? '',
+                            catalogo_url: empreendimento.catalogo_url ?? '',
+                            tour_virtual_url: empreendimento.tour_virtual_url ?? '',
+                            diferenciais_gerais: empreendimento.diferenciais_gerais ?? '',
+                            diferenciais_unidade: empreendimento.diferenciais_unidade ?? '',
+                            // Parse condicoes_pagamento se for string
+                            condicoes_pagamento: typeof empreendimento.condicoes_pagamento === 'string' 
+                              ? (empreendimento.condicoes_pagamento ? JSON.parse(empreendimento.condicoes_pagamento) : [])
+                              : (empreendimento.condicoes_pagamento || [])
+                          };
+                          setEditFormData(formData);
+                          setShowEditModal(true);
+                          
+                          // Carregar unidades do empreendimento
+                          await fetchUnidades(selectedEmpreendimento.id);
+                        } else {
+                          alert('Erro ao carregar dados do empreendimento');
+                        }
+                      } catch (error) {
+                        console.error('Erro ao carregar dados:', error);
+                        alert('Erro ao carregar dados do empreendimento');
+                      }
+                    }}
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#9ca3af',
+                      transition: 'all 0.2s ease'
+                    }}
+                    title="Editar empreendimento"
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = 'rgba(16, 185, 129, 0.2)';
+                      e.target.style.color = '#10b981';
+                      e.target.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                      e.target.style.color = '#9ca3af';
+                      e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                    }}
+                  >
+                    <Edit size={18} />
                   </button>
                 )}
                 <button
@@ -1453,25 +1823,33 @@ const Empreendimentos = () => {
                   )}
 
                   {/* Características */}
-                  <div style={{
-                    display: 'flex',
-                    gap: '1rem',
-                    marginBottom: '1.5rem',
-                    flexWrap: 'wrap'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#9ca3af', fontSize: '0.875rem' }}>
-                      <Bed size={20} />
-                      <span>3 Dorm.</span>
+                  {(selectedEmpreendimento.dormitorios || selectedEmpreendimento.suites || selectedEmpreendimento.vagas) && (
+                    <div style={{
+                      display: 'flex',
+                      gap: '1rem',
+                      marginBottom: '1.5rem',
+                      flexWrap: 'wrap'
+                    }}>
+                      {selectedEmpreendimento.dormitorios && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#9ca3af', fontSize: '0.875rem' }}>
+                          <Bed size={20} />
+                          <span>{selectedEmpreendimento.dormitorios} Dorm.</span>
+                        </div>
+                      )}
+                      {selectedEmpreendimento.suites && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#9ca3af', fontSize: '0.875rem' }}>
+                          <BedDouble size={20} />
+                          <span>{selectedEmpreendimento.suites} Suites</span>
+                        </div>
+                      )}
+                      {selectedEmpreendimento.vagas && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#9ca3af', fontSize: '0.875rem' }}>
+                          <Car size={20} />
+                          <span>{selectedEmpreendimento.vagas} Vagas</span>
+                        </div>
+                      )}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#9ca3af', fontSize: '0.875rem' }}>
-                      <BedDouble size={20} />
-                      <span>1 Suites</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#9ca3af', fontSize: '0.875rem' }}>
-                      <Car size={20} />
-                      <span>2 Vagas</span>
-                    </div>
-                  </div>
+                  )}
 
                   {/* Valor Condomínio */}
                   {selectedEmpreendimento.valorCondominio && (
@@ -1765,7 +2143,7 @@ const Empreendimentos = () => {
                           backgroundColor: `${getStatusColor(selectedEmpreendimento.status)}20`,
                           fontSize: '0.875rem'
                         }}>
-                          {selectedEmpreendimento.status || 'Não informado'}
+                          {getStatusLabel(selectedEmpreendimento.status)}
                         </div>
                       </div>
                     </div>
@@ -1893,7 +2271,9 @@ const Empreendimentos = () => {
                             type="file"
                             id={`upload-galeria-${selectedEmpreendimento?.id || 'default'}-${filtroGaleria}`}
                             multiple
-                            accept="image/*"
+                            accept={filtroGaleria === 'Videos' 
+                              ? "video/*" 
+                              : "image/*"}
                             style={{ display: 'none' }}
                             onChange={(e) => {
                               const files = e.target.files;
@@ -1965,13 +2345,15 @@ const Empreendimentos = () => {
 
                       {/* Conteúdo baseado no filtro selecionado */}
                       {!loadingGaleria && (() => {
-                        // Mapear filtros para categorias do Supabase
+                        // Pular lógica genérica para abas que têm renderização específica
+                        if (filtroGaleria === 'Videos' || filtroGaleria === 'Tour virtual') {
+                          return null; // Essas abas têm renderização específica abaixo
+                        }
+                        
                         const categoriaMap = {
-                          'Plantas': 'plantas-humanizadas',
-                          'Videos': 'videos',
-                          'Tour virtual': 'tour-virtual',
                           'Áreas de Lazer': 'areas-de-lazer',
-                          'Apartamento': 'apartamento'
+                          'Apartamento': 'apartamento',
+                          'Plantas': 'plantas-humanizadas'
                         };
                         
                         const categoria = categoriaMap[filtroGaleria];
@@ -1983,16 +2365,36 @@ const Empreendimentos = () => {
                         const imagensNormalizadas = imagens.map(img => 
                           typeof img === 'string' ? { thumbUrl: img, transformUrl: null, fullUrl: img } : img
                         );
-                        if (imagensNormalizadas.length > 0) {
+                        
+                        // Remover duplicatas baseado no fileName (se disponível) ou URL normalizada
+                        const getUniqueKey = (img) => {
+                          // Priorizar fileName se disponível (mais confiável)
+                          if (img.fileName) return img.fileName;
+                          // Fallback: normalizar URL
+                          if (!img.fullUrl) return '';
+                          try {
+                            const urlObj = new URL(img.fullUrl);
+                            return urlObj.pathname;
+                          } catch {
+                            return img.fullUrl.split('?')[0];
+                          }
+                        };
+                        
+                        const imagensUnicas = imagensNormalizadas.filter((img, index, self) => {
+                          const key = getUniqueKey(img);
+                          return index === self.findIndex(i => getUniqueKey(i) === key);
+                        });
+                        
+                        if (imagensUnicas.length > 0) {
                           return (
                             <div style={{
                               display: 'grid',
                               gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
                               gap: '0.75rem'
                             }}>
-                              {imagensNormalizadas.map((img, index) => (
+                              {imagensUnicas.map((img, index) => (
                                 <div
-                                  key={index}
+                                  key={`${img.fullUrl}-${index}`}
                                   onClick={() => {
                                     setLightboxImageIndex(index);
                                     setShowImageLightbox(true);
@@ -2079,115 +2481,19 @@ const Empreendimentos = () => {
                               typeof img === 'string' ? { thumbUrl: img, transformUrl: null, fullUrl: img } : img
                             );
                             
-                            if (plantasNormalizadas.length > 0) {
-                              return (
-                                <div style={{
-                                  display: 'grid',
-                                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                                  gap: '0.75rem'
-                                }}>
-                                  {plantasNormalizadas.map((img, index) => (
-                                    <div
-                                      key={index}
-                                      onClick={() => {
-                                        // Calcular índice considerando todas as imagens
-                                        const todasImagens = plantasNormalizadas.map(p => p.fullUrl);
-                                        const indexGlobal = todasImagens.indexOf(img.fullUrl);
-                                        setLightboxImageIndex(indexGlobal);
-                                        setShowImageLightbox(true);
-                                      }}
-                                      style={{
-                                        borderRadius: '8px',
-                                        overflow: 'hidden',
-                                        cursor: 'pointer',
-                                        backgroundColor: '#f3f4f6',
-                                        transition: 'transform 0.2s ease'
-                                      }}
-                                      onMouseEnter={(e) => {
-                                        e.currentTarget.style.transform = 'scale(1.02)';
-                                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        e.currentTarget.style.transform = 'scale(1)';
-                                        e.currentTarget.style.boxShadow = 'none';
-                                      }}
-                                    >
-                                      <img
-                                        src={img.thumbUrl}
-                                        alt={`Planta ${index + 1} de ${selectedEmpreendimento.nome}`}
-                                        loading="lazy"
-                                        decoding="async"
-                                        fetchPriority="low"
-                                        data-transform={img.transformUrl || ''}
-                                        data-full={img.fullUrl}
-                                        style={{
-                                          width: '100%',
-                                          height: 'auto',
-                                          display: 'block'
-                                        }}
-                                        onError={(e) => {
-                                          const el = e.currentTarget;
-                                          // 1) se falhou a thumb, tenta transform
-                                          if (el.src === img.thumbUrl && img.transformUrl) {
-                                            el.src = img.transformUrl;
-                                            return;
-                                          }
-                                          // 2) se falhou a transform (ou não tem), cai para full
-                                          if (el.src !== img.fullUrl) {
-                                            el.src = img.fullUrl;
-                                            return;
-                                          }
-                                          // 3) última tentativa falhou: esconde
-                                          el.style.display = 'none';
-                                        }}
-                                      />
-                                    </div>
-                                  ))}
-                                </div>
-                              );
-                            } else if (selectedEmpreendimento.plantaUrl) {
-                              return (
-                                <div style={{
-                                  width: '100%',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  justifyContent: 'center',
-                                  alignItems: 'center',
-                                  backgroundColor: '#f9fafb',
-                                  borderRadius: '8px',
-                                  padding: '1rem',
-                                  minHeight: '400px'
-                                }}>
-                                  <img
-                                    src={selectedEmpreendimento.plantaUrl}
-                                    alt={`Planta de ${selectedEmpreendimento.nome}`}
-                                    loading="lazy"
-                                    decoding="async"
-                                    fetchPriority="low"
-                                    style={{
-                                      maxWidth: '100%',
-                                      height: 'auto',
-                                      borderRadius: '8px',
-                                      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-                                    }}
-                                    onError={(e) => {
-                                      e.target.style.display = 'none';
-                                    }}
-                                  />
-                                </div>
-                              );
-                            }
-                            return (
-                              <div style={{
-                                textAlign: 'center',
-                                padding: '3rem 1rem',
-                                color: '#9ca3af'
-                              }}>
-                                <p style={{ fontSize: '1rem', margin: 0, color: '#9ca3af' }}>
-                                  Planta não disponível para este empreendimento
-                                </p>
-                              </div>
-                            );
+                            // Remover duplicatas baseado no fileName (se disponível) ou URL normalizada
+                            const getUniqueKey = (img) => {
+                              // Priorizar fileName se disponível (mais confiável)
+                              if (img.fileName) return img.fileName;
+                              // Fallback: normalizar URL
+                              if (!img.fullUrl) return '';
+                              try {
+                                const urlObj = new URL(img.fullUrl);
+                                return urlObj.pathname;
+                              } catch {
+                                return img.fullUrl.split('?')[0];
+                              }
+                            };
                           })()}
                         </div>
                       )}
@@ -2196,35 +2502,117 @@ const Empreendimentos = () => {
                         <div>
                           {(() => {
                             const galeriaEmpreendimento = galeriaImagensSupabase[selectedEmpreendimento.id] || {};
-                            const videos = galeriaEmpreendimento['videos'] || [];
+                            const videosRaw = galeriaEmpreendimento['videos'] || [];
                             
-                            if (videos.length > 0) {
+                            // Normalizar vídeos: extrair fullUrl de objetos ou usar string direto
+                            const videos = videosRaw.map(video => {
+                              if (typeof video === 'string') {
+                                return { fullUrl: video };
+                              }
+                              return { fullUrl: video.fullUrl || video.thumbUrl || video };
+                            }).filter(v => v.fullUrl);
+                            
+                            // Remover duplicatas baseado no fullUrl
+                            const videosUnicos = videos.filter((video, index, self) => {
+                              const normalizeUrl = (url) => {
+                                if (!url) return '';
+                                try {
+                                  const urlObj = new URL(url);
+                                  return urlObj.pathname;
+                                } catch {
+                                  return url.split('?')[0];
+                                }
+                              };
+                              const key = normalizeUrl(video.fullUrl);
+                              return index === self.findIndex(v => normalizeUrl(v.fullUrl) === key);
+                            });
+                            
+                            if (videosUnicos.length > 0) {
                               return (
                                 <div style={{
                                   display: 'grid',
                                   gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
                                   gap: '1rem'
                                 }}>
-                                  {videos.map((videoUrl, index) => (
-                                    <div
-                                      key={index}
-                                      style={{
-                                        borderRadius: '8px',
-                                        overflow: 'hidden',
-                                        backgroundColor: '#1f2937'
-                                      }}
-                                    >
-                                      <video
-                                        src={videoUrl}
-                                        controls
+                                  {videosUnicos.map((video, index) => (
+                                      <div
+                                        key={`video-${index}-${video.fullUrl}`}
                                         style={{
-                                          width: '100%',
-                                          height: 'auto',
-                                          display: 'block'
+                                          borderRadius: '8px',
+                                          overflow: 'hidden',
+                                          backgroundColor: '#000000',
+                                          aspectRatio: '16/9',
+                                          position: 'relative',
+                                          cursor: 'pointer'
                                         }}
-                                      />
-                                    </div>
-                                  ))}
+                                        onClick={() => {
+                                          setPlayingVideoIndex(playingVideoIndex === index ? null : index);
+                                        }}
+                                      >
+                                        {playingVideoIndex === index ? (
+                                          <video
+                                            src={video.fullUrl}
+                                            controls
+                                            autoPlay
+                                            style={{
+                                              width: '100%',
+                                              height: '100%',
+                                              objectFit: 'contain',
+                                              backgroundColor: '#000'
+                                            }}
+                                            onEnded={() => setPlayingVideoIndex(null)}
+                                          />
+                                        ) : (
+                                          <div
+                                            style={{
+                                              width: '100%',
+                                              height: '100%',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              backgroundColor: '#000000',
+                                              position: 'relative'
+                                            }}
+                                          >
+                                            {/* Ícone de Play */}
+                                            <div
+                                              style={{
+                                                width: '80px',
+                                                height: '80px',
+                                                borderRadius: '50%',
+                                                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s ease'
+                                              }}
+                                              onMouseEnter={(e) => {
+                                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)';
+                                                e.currentTarget.style.transform = 'scale(1.1)';
+                                              }}
+                                              onMouseLeave={(e) => {
+                                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                                                e.currentTarget.style.transform = 'scale(1)';
+                                              }}
+                                            >
+                                              <svg
+                                                width="40"
+                                                height="40"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                style={{ marginLeft: '4px' }}
+                                              >
+                                                <path
+                                                  d="M8 5v14l11-7z"
+                                                  fill="#000000"
+                                                />
+                                              </svg>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
                                 </div>
                               );
                             }
@@ -2328,7 +2716,8 @@ const Empreendimentos = () => {
                                   height: '600px',
                                   borderRadius: '8px',
                                   overflow: 'hidden',
-                                  backgroundColor: '#1f2937'
+                                  backgroundColor: '#1f2937',
+                                  position: 'relative'
                                 }}>
                                   <iframe
                                     src={selectedEmpreendimento.tourVirtualUrl}
@@ -2340,6 +2729,35 @@ const Empreendimentos = () => {
                                     title="Tour Virtual"
                                     allowFullScreen
                                   />
+                                  {/* Botão de Tela Cheia */}
+                                  <button
+                                    onClick={() => setTourVirtualFullscreen(true)}
+                                    style={{
+                                      position: 'absolute',
+                                      top: '1rem',
+                                      right: '1rem',
+                                      padding: '0.75rem',
+                                      borderRadius: '8px',
+                                      border: 'none',
+                                      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                                      color: 'white',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      zIndex: 10,
+                                      transition: 'background-color 0.2s ease'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+                                    }}
+                                    title="Tela Cheia"
+                                  >
+                                    <Maximize2 size={20} />
+                                  </button>
                                 </div>
                               );
                             }
@@ -2756,23 +3174,32 @@ const Empreendimentos = () => {
                         Hotsite será implementado em breve
                       </p>
                       {selectedEmpreendimento.tourVirtualUrl && (
-                        <a
-                          href={selectedEmpreendimento.tourVirtualUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          onClick={() => {
+                            setActiveTab('galeria');
+                            setFiltroGaleria('Tour virtual');
+                          }}
                           style={{
                             display: 'inline-block',
                             marginTop: '1rem',
                             padding: '0.75rem 1.5rem',
                             backgroundColor: '#3b82f6',
                             color: 'white',
-                            textDecoration: 'none',
+                            border: 'none',
                             borderRadius: '6px',
-                            fontWeight: '500'
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#2563eb';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#3b82f6';
                           }}
                         >
                           Ver Tour Virtual
-                        </a>
+                        </button>
                       )}
                     </div>
                   )}
@@ -4082,6 +4509,1436 @@ const Empreendimentos = () => {
                 <span>Copiar texto</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Edição de Empreendimento */}
+      {showEditModal && editFormData && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '2rem'
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowEditModal(false);
+          }
+        }}
+        >
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            width: '100%',
+            maxWidth: '900px',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header do Modal */}
+            <div style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <h2 style={{
+                margin: 0,
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                color: '#1f2937'
+              }}>
+                Editar Empreendimento
+              </h2>
+              <button
+                onClick={() => setShowEditModal(false)}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  border: 'none',
+                  backgroundColor: '#f3f4f6',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#6b7280',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#e5e7eb';
+                  e.target.style.color = '#374151';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.color = '#6b7280';
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Conteúdo do Modal - Scrollable */}
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '1.5rem'
+            }}>
+              {/* Formulário de Edição */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {/* Informações Básicas */}
+                <div>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#1f2937' }}>
+                    Informações Básicas
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Nome *
+                      </label>
+                      <input
+                        type="text"
+                        value={editFormData.nome || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, nome: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Tipo
+                      </label>
+                      <input
+                        type="text"
+                        value={editFormData.tipo || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, tipo: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Status
+                      </label>
+                      <select
+                        value={editFormData.status || 'em_construcao'}
+                        onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      >
+                        <option value="em_construcao">Em construção</option>
+                        <option value="entregue">Entregue</option>
+                        <option value="inativo">Inativo</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Unidades
+                      </label>
+                      <input
+                        type="number"
+                        value={editFormData.unidades || 0}
+                        onChange={(e) => setEditFormData({ ...editFormData, unidades: parseInt(e.target.value) || 0 })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Localização */}
+                <div>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#1f2937' }}>
+                    Localização
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Endereço
+                      </label>
+                      <input
+                        type="text"
+                        value={editFormData.endereco || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, endereco: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Bairro
+                      </label>
+                      <input
+                        type="text"
+                        value={editFormData.bairro || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, bairro: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Cidade
+                      </label>
+                      <input
+                        type="text"
+                        value={editFormData.cidade || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, cidade: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Estado
+                      </label>
+                      <input
+                        type="text"
+                        value={editFormData.estado || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, estado: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contato */}
+                <div>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#1f2937' }}>
+                    Contato
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Telefone
+                      </label>
+                      <input
+                        type="text"
+                        value={editFormData.telefone || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, telefone: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        value={editFormData.email || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Campos adicionais importantes */}
+                <div>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#1f2937' }}>
+                    Informações Adicionais
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Imagem (URL)
+                      </label>
+                      <input
+                        type="text"
+                        value={editFormData.imagem || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, imagem: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Progresso da Obra (%)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={editFormData.progresso_obra ?? 0}
+                        onChange={(e) => setEditFormData({ ...editFormData, progresso_obra: parseInt(e.target.value) || 0 })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Data Início Obra
+                      </label>
+                      <input
+                        type="date"
+                        value={formatDateForInput(editFormData.data_inicio_obra)}
+                        onChange={(e) => setEditFormData({ ...editFormData, data_inicio_obra: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Data Entrega
+                      </label>
+                      <input
+                        type="date"
+                        value={formatDateForInput(editFormData.data_entrega)}
+                        onChange={(e) => setEditFormData({ ...editFormData, data_entrega: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Valor Condomínio
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={editFormData.valor_condominio ?? ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, valor_condominio: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Valor IPTU
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={editFormData.valor_iptu ?? ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, valor_iptu: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Dormitórios
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={editFormData.dormitorios ?? ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, dormitorios: e.target.value ? parseInt(e.target.value) : null })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Suítes
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={editFormData.suites ?? ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, suites: e.target.value ? parseInt(e.target.value) : null })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Vagas
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={editFormData.vagas ?? ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, vagas: e.target.value ? parseInt(e.target.value) : null })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Observações
+                      </label>
+                      <textarea
+                        value={editFormData.observacoes || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, observacoes: e.target.value })}
+                        rows={6}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem',
+                          fontFamily: 'inherit',
+                          resize: 'vertical'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* URLs */}
+                <div>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#1f2937' }}>
+                    URLs
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Catálogo URL
+                      </label>
+                      <input
+                        type="url"
+                        value={editFormData.catalogo_url || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, catalogo_url: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Tour Virtual URL
+                      </label>
+                      <input
+                        type="url"
+                        value={editFormData.tour_virtual_url || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, tour_virtual_url: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Diferenciais */}
+                <div>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#1f2937' }}>
+                    Diferenciais
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Diferenciais Gerais
+                      </label>
+                      <textarea
+                        value={editFormData.diferenciais_gerais || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, diferenciais_gerais: e.target.value })}
+                        rows={6}
+                        placeholder="Um por linha (ex: • Academia)"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem',
+                          fontFamily: 'inherit',
+                          resize: 'vertical'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Diferenciais da Unidade
+                      </label>
+                      <textarea
+                        value={editFormData.diferenciais_unidade || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, diferenciais_unidade: e.target.value })}
+                        rows={6}
+                        placeholder="Um por linha (ex: • Porcelanato)"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem',
+                          fontFamily: 'inherit',
+                          resize: 'vertical'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Condições de Pagamento */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <h3 style={{ fontSize: '1.125rem', fontWeight: '600', margin: 0, color: '#1f2937' }}>
+                      Condições de Pagamento
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const novasCondicoes = [...(editFormData.condicoes_pagamento || [])];
+                        novasCondicoes.push({
+                          valor: '',
+                          titulo: '',
+                          descricao: '',
+                          detalhes: []
+                        });
+                        setEditFormData({ ...editFormData, condicoes_pagamento: novasCondicoes });
+                      }}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: '#10b981',
+                        color: 'white',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <span>+</span>
+                      <span>Adicionar Condição</span>
+                    </button>
+                  </div>
+
+                  {(editFormData.condicoes_pagamento || []).length === 0 ? (
+                    <p style={{ color: '#6b7280', fontSize: '0.875rem', textAlign: 'center', padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                      Nenhuma condição de pagamento cadastrada. Clique em "Adicionar Condição" para começar.
+                    </p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      {(editFormData.condicoes_pagamento || []).map((condicao, index) => (
+                        <div
+                          key={index}
+                          style={{
+                            padding: '1.5rem',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '8px',
+                            backgroundColor: '#f9fafb'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                            <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: '600', color: '#1f2937' }}>
+                              Condição {index + 1}
+                            </h4>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const novasCondicoes = [...(editFormData.condicoes_pagamento || [])];
+                                novasCondicoes.splice(index, 1);
+                                setEditFormData({ ...editFormData, condicoes_pagamento: novasCondicoes });
+                              }}
+                              style={{
+                                padding: '0.5rem',
+                                borderRadius: '6px',
+                                border: 'none',
+                                backgroundColor: '#ef4444',
+                                color: 'white',
+                                fontSize: '0.875rem',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Remover
+                            </button>
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                                  Valor *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={condicao.valor || ''}
+                                  onChange={(e) => {
+                                    const novasCondicoes = [...(editFormData.condicoes_pagamento || [])];
+                                    novasCondicoes[index].valor = e.target.value;
+                                    setEditFormData({ ...editFormData, condicoes_pagamento: novasCondicoes });
+                                  }}
+                                  placeholder="Ex: 30%, R$ 50.000, etc."
+                                  style={{
+                                    width: '100%',
+                                    padding: '0.75rem',
+                                    border: '1px solid #d1d5db',
+                                    borderRadius: '8px',
+                                    fontSize: '0.875rem'
+                                  }}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                                  Título *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={condicao.titulo || ''}
+                                  onChange={(e) => {
+                                    const novasCondicoes = [...(editFormData.condicoes_pagamento || [])];
+                                    novasCondicoes[index].titulo = e.target.value;
+                                    setEditFormData({ ...editFormData, condicoes_pagamento: novasCondicoes });
+                                  }}
+                                  placeholder="Ex: Entrada, Financiamento, etc."
+                                  style={{
+                                    width: '100%',
+                                    padding: '0.75rem',
+                                    border: '1px solid #d1d5db',
+                                    borderRadius: '8px',
+                                    fontSize: '0.875rem'
+                                  }}
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                                Descrição *
+                              </label>
+                              <textarea
+                                value={condicao.descricao || ''}
+                                onChange={(e) => {
+                                  const novasCondicoes = [...(editFormData.condicoes_pagamento || [])];
+                                  novasCondicoes[index].descricao = e.target.value;
+                                  setEditFormData({ ...editFormData, condicoes_pagamento: novasCondicoes });
+                                }}
+                                rows={3}
+                                placeholder="Descreva a condição de pagamento..."
+                                style={{
+                                  width: '100%',
+                                  padding: '0.75rem',
+                                  border: '1px solid #d1d5db',
+                                  borderRadius: '8px',
+                                  fontSize: '0.875rem',
+                                  fontFamily: 'inherit',
+                                  resize: 'vertical'
+                                }}
+                              />
+                            </div>
+
+                            {/* Detalhes (opcional) */}
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                                Detalhes (opcional - um por linha)
+                              </label>
+                              <textarea
+                                value={(condicao.detalhes || []).join('\n')}
+                                onChange={(e) => {
+                                  const novasCondicoes = [...(editFormData.condicoes_pagamento || [])];
+                                  novasCondicoes[index].detalhes = e.target.value
+                                    .split('\n')
+                                    .map(line => line.trim())
+                                    .filter(line => line.length > 0);
+                                  setEditFormData({ ...editFormData, condicoes_pagamento: novasCondicoes });
+                                }}
+                                rows={3}
+                                placeholder="Cada linha será um detalhe separado..."
+                                style={{
+                                  width: '100%',
+                                  padding: '0.75rem',
+                                  border: '1px solid #d1d5db',
+                                  borderRadius: '8px',
+                                  fontSize: '0.875rem',
+                                  fontFamily: 'inherit',
+                                  resize: 'vertical'
+                                }}
+                              />
+                              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
+                                Cada linha será salva como um detalhe separado. Deixe em branco se não houver detalhes.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Gerenciamento de Unidades */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <h3 style={{ fontSize: '1.125rem', fontWeight: '600', margin: 0, color: '#1f2937' }}>
+                      Unidades
+                    </h3>
+                    <button
+                      onClick={async () => {
+                        // Buscar unidades do empreendimento
+                        try {
+                          const config = await import('../config');
+                          const API_BASE_URL = config.default.API_BASE_URL || 'http://localhost:5000/api';
+                          const response = await fetch(`${API_BASE_URL}/empreendimentos-public/${selectedEmpreendimento.id}/unidades`);
+                          if (response.ok) {
+                            const unidades = await response.json();
+                            setListaUnidades(unidades);
+                            // Criar nova unidade vazia
+                            setUnidadeFormData({
+                              numero: '',
+                              tipo_unidade: '',
+                              torre: null,
+                              metragem_privativa: '',
+                              valor: null,
+                              status: 'disponivel',
+                              dormitorios: null,
+                              suites: null,
+                              vagas: null,
+                              banheiros: null,
+                              andar: null,
+                              observacoes: null,
+                              area_total: ''
+                            });
+                            setEditingUnidade(null);
+                            setShowUnidadeEditModal(true);
+                          }
+                        } catch (error) {
+                          console.error('Erro ao buscar unidades:', error);
+                          alert('Erro ao carregar unidades');
+                        }
+                      }}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: '#10b981',
+                        color: 'white',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <span>+</span>
+                      <span>Nova Unidade</span>
+                    </button>
+                  </div>
+                  
+                  {/* Lista de Unidades */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '300px', overflowY: 'auto' }}>
+                    {listaUnidades.length === 0 ? (
+                      <p style={{ color: '#6b7280', fontSize: '0.875rem', textAlign: 'center', padding: '1rem' }}>
+                        Nenhuma unidade cadastrada
+                      </p>
+                    ) : (
+                      listaUnidades.map((unidade) => (
+                        <div
+                          key={unidade.id}
+                          style={{
+                            padding: '1rem',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '8px',
+                            backgroundColor: '#f9fafb',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: '600', color: '#1f2937', marginBottom: '0.25rem' }}>
+                              {unidade.numero || unidade.numero_unidade || 'N/A'}
+                            </div>
+                            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                              {unidade.tipo_unidade || ''} 
+                              {unidade.metragem_privativa && ` • ${unidade.metragem_privativa} m²`}
+                              {unidade.valor && ` • R$ ${parseFloat(unidade.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const config = await import('../config');
+                                  const API_BASE_URL = config.default.API_BASE_URL || 'http://localhost:5000/api';
+                                  const response = await fetch(`${API_BASE_URL}/empreendimentos-public/${selectedEmpreendimento.id}/unidades`);
+                                  if (response.ok) {
+                                    const unidades = await response.json();
+                                    const unidadeCompleta = unidades.find(u => u.id === unidade.id);
+                                    if (unidadeCompleta) {
+                                      setUnidadeFormData({
+                                        numero: unidadeCompleta.numero || '',
+                                        tipo_unidade: unidadeCompleta.tipo_unidade || '',
+                                        torre: unidadeCompleta.torre || null,
+                                        metragem_privativa: unidadeCompleta.metragem_privativa || '',
+                                        valor: unidadeCompleta.valor || null,
+                                        status: unidadeCompleta.status || 'disponivel',
+                                        dormitorios: unidadeCompleta.dormitorios || null,
+                                        suites: unidadeCompleta.suites || null,
+                                        vagas: unidadeCompleta.vagas || null,
+                                        banheiros: unidadeCompleta.banheiros || null,
+                                        andar: unidadeCompleta.andar || null,
+                                        observacoes: unidadeCompleta.observacoes || null,
+                                        area_total: unidadeCompleta.area_total || ''
+                                      });
+                                      setEditingUnidade(unidadeCompleta);
+                                      setShowUnidadeEditModal(true);
+                                    }
+                                  }
+                                } catch (error) {
+                                  console.error('Erro ao carregar unidade:', error);
+                                }
+                              }}
+                              style={{
+                                padding: '0.5rem 0.75rem',
+                                borderRadius: '6px',
+                                border: '1px solid #d1d5db',
+                                backgroundColor: 'white',
+                                color: '#374151',
+                                fontSize: '0.875rem',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (!window.confirm(`Tem certeza que deseja deletar a unidade ${unidade.numero || unidade.numero_unidade}?`)) {
+                                  return;
+                                }
+                                try {
+                                  const response = await makeRequest(`/empreendimentos/${selectedEmpreendimento.id}/unidades/${unidade.id}`, {
+                                    method: 'DELETE'
+                                  });
+                                  if (response.ok) {
+                                    // Recarregar unidades
+                                    await fetchUnidades(selectedEmpreendimento.id);
+                                    alert('Unidade deletada com sucesso!');
+                                  } else {
+                                    const errorData = await response.json();
+                                    throw new Error(errorData.error || 'Erro ao deletar unidade');
+                                  }
+                                } catch (error) {
+                                  console.error('Erro ao deletar unidade:', error);
+                                  alert(`Erro ao deletar: ${error.message}`);
+                                }
+                              }}
+                              style={{
+                                padding: '0.5rem 0.75rem',
+                                borderRadius: '6px',
+                                border: 'none',
+                                backgroundColor: '#ef4444',
+                                color: 'white',
+                                fontSize: '0.875rem',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Deletar
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer com Botões */}
+            <div style={{
+              padding: '1.5rem',
+              borderTop: '1px solid #e5e7eb',
+              display: 'flex',
+              gap: '0.75rem',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => setShowEditModal(false)}
+                disabled={saving}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb',
+                  backgroundColor: 'white',
+                  color: '#374151',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  opacity: saving ? 0.5 : 1
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveEmpreendimento}
+                disabled={saving}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: saving ? '#9ca3af' : '#10b981',
+                  color: 'white',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: saving ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {saving ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Edição de Unidade */}
+      {showUnidadeEditModal && unidadeFormData && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            width: '100%',
+            maxWidth: '600px',
+            maxHeight: '90vh',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600', color: '#1f2937' }}>
+                {editingUnidade ? 'Editar Unidade' : 'Nova Unidade'}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowUnidadeEditModal(false);
+                  setEditingUnidade(null);
+                  setUnidadeFormData(null);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#9ca3af',
+                  padding: '0.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{
+              padding: '1.5rem',
+              overflowY: 'auto',
+              flex: 1
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {/* Informações Básicas */}
+                <div>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem', color: '#1f2937' }}>
+                    Informações Básicas
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Número *
+                      </label>
+                      <input
+                        type="text"
+                        value={unidadeFormData.numero || ''}
+                        onChange={(e) => setUnidadeFormData({ ...unidadeFormData, numero: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Tipo de Unidade
+                      </label>
+                      <input
+                        type="text"
+                        value={unidadeFormData.tipo_unidade || ''}
+                        onChange={(e) => setUnidadeFormData({ ...unidadeFormData, tipo_unidade: e.target.value })}
+                        placeholder="Ex: Garden, Standard, etc."
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Torre
+                      </label>
+                      <input
+                        type="text"
+                        value={unidadeFormData.torre || ''}
+                        onChange={(e) => setUnidadeFormData({ ...unidadeFormData, torre: e.target.value || null })}
+                        placeholder="Opcional"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Status
+                      </label>
+                      <select
+                        value={unidadeFormData.status || 'disponivel'}
+                        onChange={(e) => setUnidadeFormData({ ...unidadeFormData, status: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      >
+                        <option value="disponivel">Disponível</option>
+                        <option value="vendido">Vendido</option>
+                        <option value="reservado">Reservado</option>
+                        <option value="indisponivel">Indisponível</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dimensões e Valores */}
+                <div>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem', color: '#1f2937' }}>
+                    Dimensões e Valores
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Metragem Privativa (m²)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={unidadeFormData.metragem_privativa || ''}
+                        onChange={(e) => setUnidadeFormData({ ...unidadeFormData, metragem_privativa: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Área Total (m²)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={unidadeFormData.area_total || ''}
+                        onChange={(e) => setUnidadeFormData({ ...unidadeFormData, area_total: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Valor (R$)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={unidadeFormData.valor || ''}
+                        onChange={(e) => setUnidadeFormData({ ...unidadeFormData, valor: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Andar
+                      </label>
+                      <input
+                        type="number"
+                        value={unidadeFormData.andar || ''}
+                        onChange={(e) => setUnidadeFormData({ ...unidadeFormData, andar: e.target.value || null })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Características */}
+                <div>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem', color: '#1f2937' }}>
+                    Características
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Dormitórios
+                      </label>
+                      <input
+                        type="number"
+                        value={unidadeFormData.dormitorios || ''}
+                        onChange={(e) => setUnidadeFormData({ ...unidadeFormData, dormitorios: e.target.value || null })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Suítes
+                      </label>
+                      <input
+                        type="number"
+                        value={unidadeFormData.suites || ''}
+                        onChange={(e) => setUnidadeFormData({ ...unidadeFormData, suites: e.target.value || null })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Banheiros
+                      </label>
+                      <input
+                        type="number"
+                        value={unidadeFormData.banheiros || ''}
+                        onChange={(e) => setUnidadeFormData({ ...unidadeFormData, banheiros: e.target.value || null })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Vagas
+                      </label>
+                      <input
+                        type="number"
+                        value={unidadeFormData.vagas || ''}
+                        onChange={(e) => setUnidadeFormData({ ...unidadeFormData, vagas: e.target.value || null })}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Observações */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                    Observações
+                  </label>
+                  <textarea
+                    value={unidadeFormData.observacoes || ''}
+                    onChange={(e) => setUnidadeFormData({ ...unidadeFormData, observacoes: e.target.value || null })}
+                    rows={3}
+                    placeholder="Observações adicionais sobre a unidade"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '0.875rem',
+                      fontFamily: 'inherit',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              padding: '1.5rem',
+              borderTop: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '0.75rem'
+            }}>
+              <button
+                onClick={() => {
+                  setShowUnidadeEditModal(false);
+                  setEditingUnidade(null);
+                  setUnidadeFormData(null);
+                }}
+                disabled={savingUnidade}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb',
+                  backgroundColor: 'white',
+                  color: '#374151',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: savingUnidade ? 'not-allowed' : 'pointer',
+                  opacity: savingUnidade ? 0.5 : 1
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveUnidade}
+                disabled={savingUnidade || !unidadeFormData.numero}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: savingUnidade || !unidadeFormData.numero ? '#9ca3af' : '#10b981',
+                  color: 'white',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: savingUnidade || !unidadeFormData.numero ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {savingUnidade ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Tela Cheia para Tour Virtual */}
+      {tourVirtualFullscreen && selectedEmpreendimento?.tourVirtualUrl && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: '#000000',
+          zIndex: 10001,
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          {/* Header com botão de fechar */}
+          <div style={{
+            padding: '1rem',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            zIndex: 10002
+          }}>
+            <button
+              onClick={() => setTourVirtualFullscreen(false)}
+              style={{
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                color: 'white',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                transition: 'background-color 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+              }}
+              title="Sair da Tela Cheia"
+            >
+              <Minimize2 size={20} />
+              <span style={{ fontSize: '0.875rem' }}>Sair da Tela Cheia</span>
+            </button>
+          </div>
+
+          {/* Iframe em tela cheia */}
+          <div style={{
+            flex: 1,
+            width: '100%',
+            height: '100%',
+            overflow: 'hidden'
+          }}>
+            <iframe
+              src={selectedEmpreendimento.tourVirtualUrl}
+              style={{
+                width: '100%',
+                height: '100%',
+                border: 'none'
+              }}
+              title="Tour Virtual - Tela Cheia"
+              allowFullScreen
+            />
           </div>
         </div>
       )}
