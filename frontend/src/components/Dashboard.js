@@ -161,6 +161,9 @@ const Dashboard = () => {
   // Iniciar com outubro/2024 (mês atual - semana 40 do ano)
   const [mesSelecionadoMetas, setMesSelecionadoMetas] = useState(new Date(2024, 9, 1)); // Outubro 2024
   
+  // Estado para limite da clínica
+  const [clinicaLimite, setClinicaLimite] = useState(null);
+  
   // Buscar metas (apenas admin)
   const fetchMetas = async (mes = null, ano = null) => {
     if (!isAdmin) return;
@@ -635,8 +638,18 @@ const Dashboard = () => {
         let fechamentos = await fechamentosRes.json();
         const clinicasFiltradas = await clinicasRes.json();
         
-        // Se for clínica, filtrar apenas dados relacionados a ela
+        // Se for clínica, buscar dados da clínica para mostrar limite
         if (isClinica && user?.clinica_id) {
+          try {
+            const clinicaRes = await makeRequest(`/clinicas/${user.clinica_id}`);
+            if (clinicaRes.ok) {
+              const clinicaData = await clinicaRes.json();
+              setClinicaLimite(clinicaData.limite_credito);
+            }
+          } catch (error) {
+            console.error('Erro ao buscar dados da clínica:', error);
+          }
+          
           const clinicaId = user.clinica_id;
           
           // Filtrar agendamentos desta clínica
@@ -2323,6 +2336,28 @@ const Dashboard = () => {
                 No período selecionado
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Card Meu Limite - NO TOPO (apenas para clínicas) */}
+      {isClinica && (
+        <div className="card" style={{ marginTop: '2rem', marginBottom: '2rem' }}>
+          <div className="card-header" style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' }}>
+            <h2 className="card-title" style={{ color: '#92400e', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              💳 Meu Limite
+            </h2>
+          </div>
+          <div className="card-body" style={{ padding: '1.5rem' }}>
+            {clinicaLimite !== undefined && clinicaLimite !== null ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ fontSize: '2rem', fontWeight: '700', color: '#1a1d23' }}>
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(clinicaLimite)}
+                </div>
+              </div>
+            ) : (
+              <div style={{ color: '#6b7280' }}>Limite não definido</div>
+            )}
           </div>
         </div>
       )}
@@ -4183,6 +4218,7 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+
     </div>
     
     {/* Modais de Notificações - os componentes já verificam internamente se devem ser exibidos */}

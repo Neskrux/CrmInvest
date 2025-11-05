@@ -39,6 +39,8 @@ import AgendamentosPaciente from './components/AgendamentosPaciente';
 import MeusDocumentosPaciente from './components/MeusDocumentosPaciente';
 import MeusBoletosPaciente from './components/MeusBoletosPaciente';
 import ValidacaoBiometrica from './components/ValidacaoBiometrica';
+import AssinaturaDigital from './components/AssinaturaDigital';
+import ValidarDocumentoAssinado from './components/ValidarDocumentoAssinado';
 import logoBrasao from './images/logobrasao.png';
 import logoHorizontal from './images/logohorizontal.png';
 import logoHorizontalPreto from './images/logohorizontalpreto.png';
@@ -115,6 +117,7 @@ const AppContent = () => {
     if (path.includes('/meus-documentos')) return 'meus-documentos';
     if (path.includes('/materiais')) return 'materiais';
     if (path.includes('/perfil')) return 'perfil';
+    if (path.includes('/assinatura-digital')) return 'assinatura-digital';
     return 'dashboard';
   };
   
@@ -179,6 +182,7 @@ const AppContent = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/validacao-biometrica" element={<ValidacaoBiometrica />} />
+        <Route path="/validar-documento-assinado" element={<ValidarDocumentoAssinado />} />
         <Route path="/" element={<Login />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -297,6 +301,7 @@ const AppContent = () => {
         <Route path="/como-fazer" element={<ComoFazer />} />
         <Route path="/idsf" element={<IDSFIntegration />} />
         <Route path="/evidencias" element={<Evidencias />} />
+        <Route path="/assinatura-digital" element={<AssinaturaDigital />} />
         <Route path="/perfil" element={<Perfil />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -869,6 +874,24 @@ const AppContent = () => {
                   <polyline points="21 15 16 10 5 21"/>
                 </svg>
                 Evidências
+              </Link>
+            </div>
+          )}
+
+          {/* Assinatura Digital - Apenas Admin */}
+          {isAdmin && (
+            <div className="nav-item">
+              <Link
+                to="/assinatura-digital"
+                className={`nav-link ${activeTab === 'assinatura-digital' ? 'active' : ''}`}
+                onClick={handleMobileNavigation}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  <path d="M13 8H7"/>
+                  <path d="M17 12H7"/>
+                </svg>
+                Assinatura Digital
               </Link>
             </div>
           )}
