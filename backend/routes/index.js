@@ -1,6 +1,20 @@
 const express = require('express');
 const router = express.Router();
 
+// Middleware de debug temporário para rastrear todas as requisições
+router.use((req, res, next) => {
+  if (req.path.includes('whatsapp')) {
+    console.log('🔍 [DEBUG INDEX] Requisição WhatsApp detectada:', {
+      method: req.method,
+      path: req.path,
+      url: req.url,
+      originalUrl: req.originalUrl,
+      baseUrl: req.baseUrl
+    });
+  }
+  next();
+});
+
 // Middleware para passar io para os controllers
 router.use((req, res, next) => {
   // Passar io do app.locals para req para uso nos controllers
@@ -25,6 +39,7 @@ const pacientesFinanceiroRoutes = require('./pacientes-financeiro.routes');
 const metaAdsRoutes = require('./meta-ads.routes');
 const empreendimentosRoutes = require('./empreendimentos.routes');
 const movimentacoesRoutes = require('./movimentacoes.routes');
+const whatsappRoutes = require('./whatsapp.routes');
 
 // Importar rotas de APIs externas
 const documentsRoutes = require('./documents.routes');
@@ -34,6 +49,10 @@ const idsfRoutes = require('./idsf.routes');
 const solicitacoesCarteiraRoutes = require('./solicitacoes-carteira.routes');
 
 // Agrupar rotas
+// IMPORTANTE: Rotas de WhatsApp PRIMEIRO para evitar conflitos com outras rotas
+// Rotas de WhatsApp (antes de TODAS as outras para garantir que não sejam interceptadas)
+router.use('/whatsapp', whatsappRoutes); // /api/whatsapp/*
+
 // Nota: Mantendo os caminhos originais para compatibilidade com o frontend
 router.use('/', authRoutes); // /api/login, /api/logout, etc.
 router.use('/', usuariosRoutes); // /api/usuarios/perfil

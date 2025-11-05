@@ -62,11 +62,52 @@ const verifyTokenLimiter = rateLimit({
   skip: (req) => isDevelopment
 });
 
+// Rate limiter específico para webhooks (100 requests/minuto)
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: isDevelopment ? 9999 : 100, // 100 requests por minuto em produção, ilimitado em dev
+  message: {
+    error: 'Muitas requisições de webhook. Tente novamente em 1 minuto.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => isDevelopment
+});
+
+// Rate limiter específico para WhatsApp Sandbox (1 mensagem a cada 3 segundos)
+// Limitação específica do Sandbox do Twilio
+const whatsappSandboxLimiter = rateLimit({
+  windowMs: 3000, // 3 segundos
+  max: 1, // 1 mensagem a cada 3 segundos (limitação do Sandbox)
+  message: {
+    error: 'Limite do Sandbox: apenas 1 mensagem a cada 3 segundos. Aguarde alguns segundos antes de tentar novamente.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => isDevelopment // Não aplicar em desenvolvimento para facilitar testes
+});
+
+// Rate limiter para WhatsApp Produção (mais permissivo)
+// Em produção não há limite de 3 segundos, apenas rate limiting padrão
+const whatsappProductionLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: isDevelopment ? 9999 : 1000, // 1000 mensagens por minuto em produção
+  message: {
+    error: 'Limite de mensagens excedido. Aguarde alguns segundos antes de tentar novamente.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => isDevelopment
+});
+
 module.exports = {
   loginLimiter,
   generalLimiter,
   uploadLimiter,
   apiLimiter,
-  verifyTokenLimiter
+  verifyTokenLimiter,
+  webhookLimiter,
+  whatsappSandboxLimiter,
+  whatsappProductionLimiter
 };
 
