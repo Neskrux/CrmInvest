@@ -37,11 +37,12 @@ async function generateThumbnail(imageBuffer) {
  */
 async function uploadGaleriaImagem(file, empreendimentoId, categoria) {
   try {
-    // Validar se é imagem
+    // Verificar se é imagem ou vídeo
     const isImage = /\.(png|jpg|jpeg|webp|avif|gif)$/i.test(file.originalname || '');
+    const isVideo = /\.(mp4|mov|avi|mkv|wmv|flv|webm)$/i.test(file.originalname || '');
     
-    if (!isImage) {
-      throw new Error('Apenas imagens são suportadas para galeria');
+    if (!isImage && !isVideo) {
+      throw new Error('Apenas imagens e vídeos são suportados para galeria');
     }
 
     // Gerar nome único para o arquivo
@@ -50,7 +51,7 @@ async function uploadGaleriaImagem(file, empreendimentoId, categoria) {
     const originalExt = file.originalname.split('.').pop().toLowerCase();
     const fileName = `${timestamp}-${randomId}.${originalExt}`;
     
-    // Path da imagem original: {empreendimentoId}/{categoria}/{fileName}
+    // Path do arquivo original: {empreendimentoId}/{categoria}/{fileName}
     const originalPath = `${empreendimentoId}/${categoria}/${fileName}`;
     
     console.log('📤 Upload de galeria iniciado:', {
@@ -58,10 +59,11 @@ async function uploadGaleriaImagem(file, empreendimentoId, categoria) {
       categoria,
       fileName,
       originalPath,
-      size: file.size
+      size: file.size,
+      type: isImage ? 'imagem' : 'video'
     });
 
-    // 1. Upload da imagem original
+    // 1. Upload do arquivo original
     const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
       .from(BUCKET)
       .upload(originalPath, file.buffer, {
@@ -71,37 +73,39 @@ async function uploadGaleriaImagem(file, empreendimentoId, categoria) {
       });
 
     if (uploadError) {
-      throw new Error(`Erro ao fazer upload da imagem: ${uploadError.message}`);
+      throw new Error(`Erro ao fazer upload do arquivo: ${uploadError.message}`);
     }
 
-    console.log('✅ Imagem original uploadada:', originalPath);
+    console.log(`✅ ${isImage ? 'Imagem' : 'Vídeo'} original uploadado:`, originalPath);
 
     // 2. Gerar e fazer upload da thumbnail (apenas para imagens)
     let thumbnailPath = null;
-    try {
-      const thumbnailBuffer = await generateThumbnail(file.buffer);
-      
-      // Path da thumbnail: .thumbs/960w/{empreendimentoId}/{categoria}/{fileName sem ext}.webp
-      const fileNameWithoutExt = fileName.replace(/\.[^.]+$/, '');
-      thumbnailPath = `.thumbs/960w/${empreendimentoId}/${categoria}/${fileNameWithoutExt}.webp`;
-      
-      const { data: thumbData, error: thumbError } = await supabaseAdmin.storage
-        .from(BUCKET)
-        .upload(thumbnailPath, thumbnailBuffer, {
-          contentType: 'image/webp',
-          cacheControl: '31536000, immutable', // Cache de 1 ano
-          upsert: true // Permite sobrescrever se já existir
-        });
+    if (isImage) {
+      try {
+        const thumbnailBuffer = await generateThumbnail(file.buffer);
+        
+        // Path da thumbnail: .thumbs/960w/{empreendimentoId}/{categoria}/{fileName sem ext}.webp
+        const fileNameWithoutExt = fileName.replace(/\.[^.]+$/, '');
+        thumbnailPath = `.thumbs/960w/${empreendimentoId}/${categoria}/${fileNameWithoutExt}.webp`;
+        
+        const { data: thumbData, error: thumbError } = await supabaseAdmin.storage
+          .from(BUCKET)
+          .upload(thumbnailPath, thumbnailBuffer, {
+            contentType: 'image/webp',
+            cacheControl: '31536000, immutable', // Cache de 1 ano
+            upsert: true // Permite sobrescrever se já existir
+          });
 
-      if (thumbError) {
-        console.warn('⚠️ Erro ao fazer upload da thumbnail (continuando):', thumbError.message);
+        if (thumbError) {
+          console.warn('⚠️ Erro ao fazer upload da thumbnail (continuando):', thumbError.message);
+          // Não falha o upload se a thumbnail der erro
+        } else {
+          console.log('✅ Thumbnail gerada e uploadada:', thumbnailPath);
+        }
+      } catch (thumbErr) {
+        console.warn('⚠️ Erro ao gerar thumbnail (continuando):', thumbErr.message);
         // Não falha o upload se a thumbnail der erro
-      } else {
-        console.log('✅ Thumbnail gerada e uploadada:', thumbnailPath);
       }
-    } catch (thumbErr) {
-      console.warn('⚠️ Erro ao gerar thumbnail (continuando):', thumbErr.message);
-      // Não falha o upload se a thumbnail der erro
     }
 
     // 3. Gerar URLs públicas
@@ -119,7 +123,8 @@ async function uploadGaleriaImagem(file, empreendimentoId, categoria) {
         path: originalPath,
         url: originalUrl,
         fileName: fileName,
-        size: file.size
+        size: file.size,
+        type: isImage ? 'image' : 'video'
       },
       thumbnail: thumbnailPath ? {
         path: thumbnailPath,

@@ -15,10 +15,18 @@ const { supabase, supabaseAdmin } = require('./config/database');
 // Importar rotas refatoradas
 const routes = require('./routes');
 
-// Importar middlewares e controllers para rotas de upload de galeria
-const { authenticateUpload } = require('./middleware/auth');
+// Importar middlewares e controllers para rotas de upload de galeria e unidades
+const { authenticateUpload, authenticateToken } = require('./middleware/auth');
 const { uploadGaleria: multerGaleria } = require('./config/multer');
-const { uploadGaleria, uploadGaleriaMultiple, removeGaleria } = require('./controllers/empreendimentos.controller');
+const { 
+  uploadGaleria, 
+  uploadGaleriaMultiple, 
+  removeGaleria,
+  createUnidade,
+  updateUnidade,
+  deleteUnidade,
+  updateEmpreendimento
+} = require('./controllers/empreendimentos.controller');
 
 // Importar MetaAdsAPI (service)
 const MetaAdsAPI = require('./services/meta-ads.service');
@@ -159,8 +167,7 @@ app.get('/api/empreendimentos-public', async (req, res) => {
     
         const { data, error } = await supabaseAdmin
           .from('empreendimentos')
-          .select('id, nome, endereco, bairro, cidade, estado, status, created_at, unidades, tipo, observacoes, imagem, condicoes_pagamento, diferenciais_gerais, diferenciais_unidade, progresso_obra, data_inicio_obra, data_entrega, valor_condominio, valor_iptu, data_ultima_atualizacao, telefone, email, catalogo_url, tour_virtual_url, simulador_caixa_url')
-          .eq('status', 'ativo'); // Apenas empreendimentos ativos
+          .select('id, nome, endereco, bairro, cidade, estado, status, created_at, unidades, tipo, observacoes, imagem, condicoes_pagamento, diferenciais_gerais, diferenciais_unidade, progresso_obra, data_inicio_obra, data_entrega, valor_condominio, valor_iptu, data_ultima_atualizacao, telefone, email, catalogo_url, tour_virtual_url, simulador_caixa_url, dormitorios, suites, vagas');
 
     if (error) {
       console.error('❌ [Backend] Erro na query:', error);
@@ -171,6 +178,47 @@ app.get('/api/empreendimentos-public', async (req, res) => {
     }
 
     console.log('✅ [Backend] Empreendimentos carregados:', data.length);
+    res.json(data);
+  } catch (error) {
+    console.error('❌ [Backend] Erro completo:', error);
+    res.status(500).json({ 
+      error: error.message,
+      details: 'Erro interno do servidor'
+    });
+  }
+});
+
+// Endpoint público para buscar um empreendimento específico por ID
+app.get('/api/empreendimentos-public/:id', async (req, res) => {
+  try {
+    const { supabaseAdmin } = require('./config/database');
+    const { id } = req.params;
+    
+    console.log(`🔍 [Backend] Buscando empreendimento ${id} (endpoint público)...`);
+    
+    const { data, error } = await supabaseAdmin
+      .from('empreendimentos')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      // Se não encontrou o registro, retornar 404
+      if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
+        return res.status(404).json({ error: 'Empreendimento não encontrado' });
+      }
+      console.error('❌ [Backend] Erro na query:', error);
+      return res.status(500).json({ 
+        error: 'Erro ao buscar empreendimento',
+        details: error.message
+      });
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: 'Empreendimento não encontrado' });
+    }
+
+    console.log(`✅ [Backend] Empreendimento ${id} carregado`);
     res.json(data);
   } catch (error) {
     console.error('❌ [Backend] Erro completo:', error);
@@ -249,6 +297,23 @@ app.post('/api/empreendimentos/:id/galeria/upload-multiple', authenticateUpload,
 
 // DELETE /api/empreendimentos/:id/galeria/* - Remover imagem
 app.delete('/api/empreendimentos/:id/galeria/*', authenticateUpload, removeGaleria);
+
+// ============================================
+// Rotas de unidades de empreendimentos
+// Definidas diretamente no server.js para evitar problemas com Express Router
+// ============================================
+
+// POST /api/empreendimentos/:id/unidades - Criar nova unidade (apenas admin)
+app.post('/api/empreendimentos/:id/unidades', authenticateToken, createUnidade);
+
+// PUT /api/empreendimentos/:id/unidades/:unidadeId - Atualizar unidade (apenas admin)
+app.put('/api/empreendimentos/:id/unidades/:unidadeId', authenticateToken, updateUnidade);
+
+// DELETE /api/empreendimentos/:id/unidades/:unidadeId - Deletar unidade (apenas admin)
+app.delete('/api/empreendimentos/:id/unidades/:unidadeId', authenticateToken, deleteUnidade);
+
+// PUT /api/empreendimentos/:id - Atualizar empreendimento (apenas admin)
+app.put('/api/empreendimentos/:id', authenticateToken, updateEmpreendimento);
 
 // Usar rotas refatoradas
 app.use('/api', routes);

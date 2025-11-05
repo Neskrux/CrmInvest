@@ -8,7 +8,11 @@ const {
   getUnidadeById,
   uploadGaleria,
   uploadGaleriaMultiple,
-  removeGaleria
+  removeGaleria,
+  updateEmpreendimento,
+  updateUnidade,
+  createUnidade,
+  deleteUnidade
 } = require('../controllers/empreendimentos.controller');
 const { authenticateToken, authenticateUpload } = require('../middleware/auth');
 const { uploadGaleria: multerGaleria } = require('../config/multer');
@@ -39,11 +43,27 @@ router.use(authenticateToken);
 // GET /api/empreendimentos - Listar empreendimentos
 router.get('/', getAllEmpreendimentos);
 
+// ============================================
+// Rotas de Unidades (devem vir ANTES da rota genérica /:id)
+// ============================================
+
 // GET /api/empreendimentos/:id/unidades/:unidadeId - Buscar unidade específica
 router.get('/:id/unidades/:unidadeId', getUnidadeById);
 
 // GET /api/empreendimentos/:id/unidades - Buscar unidades de um empreendimento (com filtros opcionais: ?tipo=X&torre=Y&status=Z)
 router.get('/:id/unidades', getUnidadesByEmpreendimento);
+
+// POST /api/empreendimentos/:id/unidades - Criar nova unidade (apenas admin)
+router.post('/:id/unidades', createUnidade);
+
+// PUT /api/empreendimentos/:id/unidades/:unidadeId - Atualizar unidade (apenas admin)
+router.put('/:id/unidades/:unidadeId', updateUnidade);
+
+// DELETE /api/empreendimentos/:id/unidades/:unidadeId - Deletar unidade (apenas admin)
+router.delete('/:id/unidades/:unidadeId', deleteUnidade);
+
+// PUT /api/empreendimentos/:id - Atualizar empreendimento (apenas admin)
+router.put('/:id', updateEmpreendimento);
 
 // GET /api/empreendimentos/:id - Buscar empreendimento por ID (rota genérica por último)
 router.get('/:id', getEmpreendimentoById);

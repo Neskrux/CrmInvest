@@ -87,22 +87,34 @@ const uploadMateriais = multer({
   }
 });
 
-// Middleware para upload de galeria de empreendimentos (imagens maiores)
+// Middleware para upload de galeria de empreendimentos (imagens e vídeos)
 const galeriaFilter = (req, file, cb) => {
-  // Permitir imagens: JPG, PNG, WEBP, AVIF, GIF
+  // Permitir tanto imagens quanto vídeos
+  // A validação da categoria será feita no controller
   const allowedTypes = [
+    // Imagens
     'image/jpeg',
     'image/jpg',
     'image/png',
     'image/webp',
     'image/avif',
-    'image/gif'
+    'image/gif',
+    // Vídeos
+    'video/mp4',
+    'video/quicktime',
+    'video/x-msvideo',
+    'video/x-matroska',
+    'video/x-ms-wmv',
+    'video/x-flv',
+    'video/webm',
+    'video/avi',
+    'video/mov'
   ];
   
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Apenas imagens (JPG, PNG, WEBP, AVIF, GIF) são permitidas!'), false);
+    cb(new Error('Apenas imagens (JPG, PNG, WEBP, AVIF, GIF) e vídeos (MP4, MOV, AVI, MKV, WMV, FLV, WEBM) são permitidos!'), false);
   }
 };
 
@@ -110,7 +122,7 @@ const uploadGaleria = multer({
   storage: storage,
   fileFilter: galeriaFilter,
   limits: {
-    fileSize: 100 * 1024 * 1024 // Limite de 100MB para imagens grandes
+    fileSize: 500 * 1024 * 1024 // Limite de 500MB (para suportar vídeos também)
   }
 });
 
