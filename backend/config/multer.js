@@ -87,9 +87,37 @@ const uploadMateriais = multer({
   }
 });
 
+// Middleware para upload de galeria de empreendimentos (imagens maiores)
+const galeriaFilter = (req, file, cb) => {
+  // Permitir imagens: JPG, PNG, WEBP, AVIF, GIF
+  const allowedTypes = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'image/avif',
+    'image/gif'
+  ];
+  
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Apenas imagens (JPG, PNG, WEBP, AVIF, GIF) são permitidas!'), false);
+  }
+};
+
+const uploadGaleria = multer({
+  storage: storage,
+  fileFilter: galeriaFilter,
+  limits: {
+    fileSize: 100 * 1024 * 1024 // Limite de 100MB para imagens grandes
+  }
+});
+
 module.exports = {
   upload,
   uploadEvidencia,
-  uploadMateriais
+  uploadMateriais,
+  uploadGaleria
 };
 

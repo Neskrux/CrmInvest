@@ -2,7 +2,29 @@ import React, { useState, useEffect } from 'react';
 import useBranding from '../hooks/useBranding';
 import { useAuth } from '../contexts/AuthContext';
 import { getSupabaseClient } from '../lib/supabaseClient';
-import { Phone, Mail, Share2, X, Calculator, ArrowLeft, Home, Images, Globe, BookOpen, ChevronLeft, ChevronRight, Maximize2, Bed, BedDouble, Car, Clock, Bath, Droplets, Ruler, Edit, Copy } from 'lucide-react';
+import { Phone, Mail, Share2, X, Calculator, ArrowLeft, Home, Images, Globe, BookOpen, ChevronLeft, ChevronRight, Maximize2, Bed, BedDouble, Car, Clock, Bath, Droplets, Ruler, Edit, Copy, Upload } from 'lucide-react';
+
+// ==== Helpers de imagem/URLs ====
+const BUCKET = 'galeria-empreendimentos';
+const MAX_TRANSFORM_BYTES = 25 * 1024 * 1024;
+
+const encodePath = (p) => p.split('/').map(encodeURIComponent).join('/');
+
+const getPublic = (supabase, path, transform) =>
+  supabase.storage.from(BUCKET).getPublicUrl(encodePath(path), transform ? { transform } : undefined).data.publicUrl;
+
+const toThumbPath = (filePath) =>
+  `.thumbs/960w/${filePath.replace(/\.[^.]+$/, '')}.webp`;
+
+// Constrói as 3 variantes (thumb -> transform -> object)
+const buildUrlsForFile = (supabase, filePath, sizeBytes) => {
+  const fullObject = getPublic(supabase, filePath); // /object/public/ (via getPublicUrl)
+  const thumb = getPublic(supabase, toThumbPath(filePath)); // pode 404, a <img> faz fallback
+  const maybeTransform = sizeBytes <= MAX_TRANSFORM_BYTES
+    ? getPublic(supabase, filePath, { width: 480, quality: 80, resize: 'cover' })
+    : null;
+  return { thumbUrl: thumb, transformUrl: maybeTransform, fullUrl: fullObject };
+};
 
 const Empreendimentos = () => {
   const { t } = useBranding();
@@ -33,6 +55,8 @@ const Empreendimentos = () => {
     descricaoImovel: true,
     receberPropostas: true
   });
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ uploaded: 0, total: 0 });
 
   // Função para buscar empreendimentos do banco
   const fetchEmpreendimentos = async () => {
@@ -189,16 +213,16 @@ const Empreendimentos = () => {
   useEffect(() => {
     const handleKeyboard = (e) => {
       if (showImageLightbox && selectedEmpreendimento) {
-        // Mesma lógica do lightbox: combinar todas as imagens
+        // Mesma lógica do lightbox: combinar todas as imagens (usar fullUrl)
         const galeriaEmpreendimento = galeriaImagensSupabase[selectedEmpreendimento.id] || {};
-        const todasImagensSupabase = Object.values(galeriaEmpreendimento).flat();
+        const supabaseFull = Object.values(galeriaEmpreendimento).flat().map(it => it.fullUrl ?? it); // suporta legado
         const imagensJSON = selectedEmpreendimento.galeriaImagens || [];
-        const todasImagens = [...todasImagensSupabase, ...imagensJSON];
+        const allImages = [...supabaseFull, ...imagensJSON];
         
         const imagemPrincipal = selectedEmpreendimento.imagem;
         const images = imagemPrincipal 
-          ? [imagemPrincipal, ...todasImagens.filter(img => img !== imagemPrincipal)]
-          : (todasImagens.length > 0 ? todasImagens : []);
+          ? [imagemPrincipal, ...allImages.filter(u => u !== imagemPrincipal)]
+          : (allImages.length > 0 ? allImages : []);
         
         if (e.key === 'Escape') {
           setShowImageLightbox(false);
@@ -250,17 +274,23 @@ const Empreendimentos = () => {
           return { categoria, urls: [] };
         }
 
-        // Gerar URLs públicas para cada arquivo
+        // Gerar URLs para cada arquivo (thumb -> transform -> full)
         const urls = data
           .filter(file => file.name && !file.name.startsWith('.'))
           .map((file) => {
             const filePath = `${empreendimentoId}/${categoria}/${file.name}`;
-            const { data: urlData } = supabase.storage
-              .from('galeria-empreendimentos')
-              .getPublicUrl(filePath);
-            return urlData?.publicUrl || null;
+            // Verificar se é imagem (para aplicar transform) ou vídeo
+            const isImage = /\.(jpg|jpeg|png|gif|webp|avif)$/i.test(file.name);
+            if (isImage) {
+              const size = file?.metadata?.size ?? 0;
+              return buildUrlsForFile(supabase, filePath, size);
+            } else {
+              // Para vídeos ou outros arquivos, usar apenas URL original
+              const fullUrl = getPublic(supabase, filePath);
+              return { thumbUrl: fullUrl, transformUrl: null, fullUrl };
+            }
           })
-          .filter(url => url);
+          .filter(item => item && item.fullUrl);
 
         return { categoria, urls };
       });
@@ -272,7 +302,7 @@ const Empreendimentos = () => {
       setGaleriaImagensSupabase(prev => {
         const imagensPorCategoria = { ...(prev[empreendimentoId] || {}) };
         results.forEach(({ categoria, urls }) => {
-          imagensPorCategoria[categoria] = urls;
+          imagensPorCategoria[categoria] = urls; // array de objetos {thumbUrl, transformUrl, fullUrl}
         });
         return {
           ...prev,
@@ -284,6 +314,93 @@ const Empreendimentos = () => {
     } catch (err) {
       console.error('Erro ao buscar galeria do Supabase:', err);
       setLoadingGaleria(false);
+    }
+  };
+
+  // Função para fazer upload de imagens para a galeria
+  const handleUploadGaleria = async (files, categoria) => {
+    if (!selectedEmpreendimento || !files || files.length === 0) return;
+
+    try {
+      setUploading(true);
+      setUploadProgress({ uploaded: 0, total: files.length });
+
+      const formData = new FormData();
+      
+      // Configurar URL base da API
+      const config = await import('../config');
+      const API_BASE_URL = config.default.API_BASE_URL || 'http://localhost:5000/api';
+      const token = localStorage.getItem('token');
+
+      // Se for múltiplos arquivos, usar endpoint de múltiplo upload
+      if (files.length > 1) {
+        Array.from(files).forEach(file => {
+          formData.append('imagens', file);
+        });
+        formData.append('categoria', categoria);
+
+        const response = await fetch(`${API_BASE_URL}/empreendimentos/${selectedEmpreendimento.id}/galeria/upload-multiple`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+            // Não definir Content-Type, deixar o browser definir com boundary
+          },
+          body: formData
+        });
+
+        if (response.status === 401) {
+          throw new Error('Sessão expirada. Por favor, faça login novamente.');
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Erro ao fazer upload' }));
+          throw new Error(errorData.error || 'Erro ao fazer upload');
+        }
+
+        const result = await response.json();
+        setUploadProgress({ uploaded: files.length, total: files.length });
+        
+        // Recarregar galeria após upload usando a categoria que foi enviada
+        await fetchGaleriaImagens(selectedEmpreendimento.id, categoria);
+        
+        alert(`${result.uploaded} imagem(ns) uploadada(s) com sucesso!`);
+      } else {
+        // Upload único
+        formData.append('imagem', files[0]);
+        formData.append('categoria', categoria);
+
+        const response = await fetch(`${API_BASE_URL}/empreendimentos/${selectedEmpreendimento.id}/galeria/upload`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+            // Não definir Content-Type, deixar o browser definir com boundary
+          },
+          body: formData
+        });
+
+        if (response.status === 401) {
+          throw new Error('Sessão expirada. Por favor, faça login novamente.');
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Erro ao fazer upload' }));
+          throw new Error(errorData.error || 'Erro ao fazer upload');
+        }
+
+        const result = await response.json();
+        setUploadProgress({ uploaded: 1, total: 1 });
+        
+        // Recarregar galeria após upload usando a categoria que foi enviada
+        await fetchGaleriaImagens(selectedEmpreendimento.id, categoria);
+        
+        alert('Imagem uploadada com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro no upload:', error);
+      alert(`Erro ao fazer upload: ${error.message}`);
+    } finally {
+      setUploading(false);
+      setUploadProgress({ uploaded: 0, total: 0 });
     }
   };
 
@@ -737,15 +854,27 @@ const Empreendimentos = () => {
               {/* Imagem do Empreendimento */}
               <div style={{
                 height: '240px',
-                backgroundImage: empreendimento.imagem ? `url(${empreendimento.imagem})` : 'none',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
                 position: 'relative',
                 backgroundColor: '#1f2937',
                 borderTopLeftRadius: '12px',
-                borderTopRightRadius: '12px'
+                borderTopRightRadius: '12px',
+                overflow: 'hidden'
               }}>
+                {empreendimento.imagem && (
+                  <img
+                    src={empreendimento.imagem}
+                    alt={empreendimento.nome || 'Empreendimento'}
+                    loading="lazy"
+                    decoding="async"
+                    fetchPriority="low"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      display: 'block'
+                    }}
+                  />
+                )}
                 {/* Overlay escuro gradiente na parte inferior */}
                 <div style={{
                   position: 'absolute',
@@ -1191,6 +1320,8 @@ const Empreendimentos = () => {
                       <img
                         src={selectedEmpreendimento.imagem}
                         alt={selectedEmpreendimento.nome}
+                        loading="lazy"
+                        decoding="async"
                         style={{
                           width: '100%',
                           height: '100%',
@@ -1722,7 +1853,8 @@ const Empreendimentos = () => {
                           display: 'flex',
                           gap: '0.5rem',
                           marginBottom: '1.5rem',
-                          flexWrap: 'wrap'
+                          flexWrap: 'wrap',
+                          alignItems: 'center'
                         }}>
                         {['Apartamento', 'Áreas de Lazer', 'Plantas', 'Videos', 'Tour virtual'].map((filtro) => (
                           <button
@@ -1753,6 +1885,81 @@ const Empreendimentos = () => {
                             {filtro}
                           </button>
                         ))}
+                        
+                        {/* Botão de Upload - Não mostrar para Tour virtual */}
+                        {filtroGaleria !== 'Tour virtual' && (
+                        <div style={{ marginLeft: 'auto', position: 'relative' }}>
+                          <input
+                            type="file"
+                            id={`upload-galeria-${selectedEmpreendimento?.id || 'default'}-${filtroGaleria}`}
+                            multiple
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={(e) => {
+                              const files = e.target.files;
+                              if (files && files.length > 0) {
+                                const categoriaMap = {
+                                  'Apartamento': 'apartamento',
+                                  'Áreas de Lazer': 'areas-de-lazer',
+                                  'Plantas': 'plantas-humanizadas',
+                                  'Tour virtual': 'tour-virtual',
+                                  'Videos': 'videos'
+                                };
+                                const categoria = categoriaMap[filtroGaleria] || 'apartamento';
+                                
+                                // Criar uma cópia do FileList como Array para garantir que seja preservado
+                                const filesArray = Array.from(files);
+                                handleUploadGaleria(filesArray, categoria);
+                              }
+                              // Reset input para permitir selecionar o mesmo arquivo novamente
+                              e.target.value = '';
+                            }}
+                            disabled={uploading}
+                          />
+                          <button
+                            onClick={() => {
+                              const inputId = `upload-galeria-${selectedEmpreendimento?.id || 'default'}-${filtroGaleria}`;
+                              document.getElementById(inputId)?.click();
+                            }}
+                            disabled={uploading}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              border: '1px solid rgba(16, 185, 129, 0.3)',
+                              borderRadius: '6px',
+                              backgroundColor: uploading ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.15)',
+                              color: uploading ? '#9ca3af' : '#10b981',
+                              cursor: uploading ? 'not-allowed' : 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: '500',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              transition: 'all 0.2s ease',
+                              opacity: uploading ? 0.6 : 1
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!uploading) {
+                                e.target.style.backgroundColor = 'rgba(16, 185, 129, 0.25)';
+                                e.target.style.borderColor = 'rgba(16, 185, 129, 0.5)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!uploading) {
+                                e.target.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+                                e.target.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                              }
+                            }}
+                          >
+                            <Upload size={16} />
+                            <span>
+                              {uploading 
+                                ? `Enviando... (${uploadProgress.uploaded}/${uploadProgress.total})`
+                                : 'Adicionar'
+                              }
+                            </span>
+                          </button>
+                        </div>
+                        )}
                       </div>
                       )}
 
@@ -1772,14 +1979,18 @@ const Empreendimentos = () => {
                         const imagens = categoria ? (galeriaEmpreendimento[categoria] || []) : [];
                         
                         // Se houver imagens, renderizar grid
-                        if (imagens.length > 0) {
+                        // Normalizar imagens: pode ser objeto {thumbUrl, transformUrl, fullUrl} ou string (legado)
+                        const imagensNormalizadas = imagens.map(img => 
+                          typeof img === 'string' ? { thumbUrl: img, transformUrl: null, fullUrl: img } : img
+                        );
+                        if (imagensNormalizadas.length > 0) {
                           return (
                             <div style={{
                               display: 'grid',
                               gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
                               gap: '0.75rem'
                             }}>
-                              {imagens.map((imgUrl, index) => (
+                              {imagensNormalizadas.map((img, index) => (
                                 <div
                                   key={index}
                                   onClick={() => {
@@ -1805,17 +2016,33 @@ const Empreendimentos = () => {
                                   }}
                                 >
                                   <img
-                                    src={imgUrl}
-                                    alt={`Imagem ${index + 1} de ${selectedEmpreendimento.nome}`}
+                                    src={img.thumbUrl}
                                     loading="lazy"
+                                    decoding="async"
+                                    fetchPriority="low"
+                                    data-transform={img.transformUrl || ''}
+                                    data-full={img.fullUrl}
                                     style={{
                                       width: '100%',
                                       height: '100%',
                                       objectFit: 'cover'
                                     }}
                                     onError={(e) => {
-                                      e.target.style.display = 'none';
+                                      const el = e.currentTarget;
+                                      // 1) se falhou a thumb, tenta transform
+                                      if (el.src === img.thumbUrl && img.transformUrl) {
+                                        el.src = img.transformUrl;
+                                        return;
+                                      }
+                                      // 2) se falhou a transform (ou não tem), cai para full
+                                      if (el.src !== img.fullUrl) {
+                                        el.src = img.fullUrl;
+                                        return;
+                                      }
+                                      // 3) última tentativa falhou: esconde
+                                      el.style.display = 'none';
                                     }}
+                                    alt={`Imagem ${index + 1} de ${selectedEmpreendimento.nome}`}
                                   />
                                 </div>
                               ))}
@@ -1847,21 +2074,25 @@ const Empreendimentos = () => {
                             // Primeiro tentar imagens do Supabase, depois URL do banco
                             const galeriaEmpreendimento = galeriaImagensSupabase[selectedEmpreendimento.id] || {};
                             const plantasSupabase = galeriaEmpreendimento['plantas-humanizadas'] || [];
+                            // Normalizar imagens: pode ser objeto {thumbUrl, transformUrl, fullUrl} ou string (legado)
+                            const plantasNormalizadas = plantasSupabase.map(img => 
+                              typeof img === 'string' ? { thumbUrl: img, transformUrl: null, fullUrl: img } : img
+                            );
                             
-                            if (plantasSupabase.length > 0) {
+                            if (plantasNormalizadas.length > 0) {
                               return (
                                 <div style={{
                                   display: 'grid',
                                   gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
                                   gap: '0.75rem'
                                 }}>
-                                  {plantasSupabase.map((imgUrl, index) => (
+                                  {plantasNormalizadas.map((img, index) => (
                                     <div
                                       key={index}
                                       onClick={() => {
                                         // Calcular índice considerando todas as imagens
-                                        const todasImagens = [...plantasSupabase];
-                                        const indexGlobal = todasImagens.indexOf(imgUrl);
+                                        const todasImagens = plantasNormalizadas.map(p => p.fullUrl);
+                                        const indexGlobal = todasImagens.indexOf(img.fullUrl);
                                         setLightboxImageIndex(indexGlobal);
                                         setShowImageLightbox(true);
                                       }}
@@ -1882,16 +2113,32 @@ const Empreendimentos = () => {
                                       }}
                                     >
                                       <img
-                                        src={imgUrl}
+                                        src={img.thumbUrl}
                                         alt={`Planta ${index + 1} de ${selectedEmpreendimento.nome}`}
                                         loading="lazy"
+                                        decoding="async"
+                                        fetchPriority="low"
+                                        data-transform={img.transformUrl || ''}
+                                        data-full={img.fullUrl}
                                         style={{
                                           width: '100%',
                                           height: 'auto',
                                           display: 'block'
                                         }}
                                         onError={(e) => {
-                                          e.target.style.display = 'none';
+                                          const el = e.currentTarget;
+                                          // 1) se falhou a thumb, tenta transform
+                                          if (el.src === img.thumbUrl && img.transformUrl) {
+                                            el.src = img.transformUrl;
+                                            return;
+                                          }
+                                          // 2) se falhou a transform (ou não tem), cai para full
+                                          if (el.src !== img.fullUrl) {
+                                            el.src = img.fullUrl;
+                                            return;
+                                          }
+                                          // 3) última tentativa falhou: esconde
+                                          el.style.display = 'none';
                                         }}
                                       />
                                     </div>
@@ -1915,6 +2162,8 @@ const Empreendimentos = () => {
                                     src={selectedEmpreendimento.plantaUrl}
                                     alt={`Planta de ${selectedEmpreendimento.nome}`}
                                     loading="lazy"
+                                    decoding="async"
+                                    fetchPriority="low"
                                     style={{
                                       maxWidth: '100%',
                                       height: 'auto',
@@ -2000,8 +2249,12 @@ const Empreendimentos = () => {
                             // Primeiro tentar imagens do Supabase, depois URL do banco
                             const galeriaEmpreendimento = galeriaImagensSupabase[selectedEmpreendimento.id] || {};
                             const tourSupabase = galeriaEmpreendimento['tour-virtual'] || [];
+                            // Normalizar imagens: pode ser objeto {thumbUrl, transformUrl, fullUrl} ou string (legado)
+                            const tourNormalizadas = tourSupabase.map(img => 
+                              typeof img === 'string' ? { thumbUrl: img, transformUrl: null, fullUrl: img } : img
+                            );
                             
-                            if (tourSupabase.length > 0) {
+                            if (tourNormalizadas.length > 0) {
                               // Mostrar como imagens clicáveis
                               return (
                                 <div style={{
@@ -2009,12 +2262,12 @@ const Empreendimentos = () => {
                                   gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
                                   gap: '0.75rem'
                                 }}>
-                                  {tourSupabase.map((imgUrl, index) => (
+                                  {tourNormalizadas.map((img, index) => (
                                     <div
                                       key={index}
                                       onClick={() => {
-                                        const todasImagens = [...tourSupabase];
-                                        const indexGlobal = todasImagens.indexOf(imgUrl);
+                                        const todasImagens = tourNormalizadas.map(t => t.fullUrl);
+                                        const indexGlobal = todasImagens.indexOf(img.fullUrl);
                                         setLightboxImageIndex(indexGlobal);
                                         setShowImageLightbox(true);
                                       }}
@@ -2035,16 +2288,32 @@ const Empreendimentos = () => {
                                       }}
                                     >
                                       <img
-                                        src={imgUrl}
+                                        src={img.thumbUrl}
                                         alt={`Tour Virtual ${index + 1} de ${selectedEmpreendimento.nome}`}
                                         loading="lazy"
+                                        decoding="async"
+                                        fetchPriority="low"
+                                        data-transform={img.transformUrl || ''}
+                                        data-full={img.fullUrl}
                                         style={{
                                           width: '100%',
                                           height: 'auto',
                                           display: 'block'
                                         }}
                                         onError={(e) => {
-                                          e.target.style.display = 'none';
+                                          const el = e.currentTarget;
+                                          // 1) se falhou a thumb, tenta transform
+                                          if (el.src === img.thumbUrl && img.transformUrl) {
+                                            el.src = img.transformUrl;
+                                            return;
+                                          }
+                                          // 2) se falhou a transform (ou não tem), cai para full
+                                          if (el.src !== img.fullUrl) {
+                                            el.src = img.fullUrl;
+                                            return;
+                                          }
+                                          // 3) última tentativa falhou: esconde
+                                          el.style.display = 'none';
                                         }}
                                       />
                                     </div>
@@ -3020,17 +3289,17 @@ const Empreendimentos = () => {
 
       {/* Lightbox para foto completa - suporta galeria */}
       {showImageLightbox && selectedEmpreendimento && (() => {
-        // Combinar imagens do Supabase e JSON para o lightbox
+        // Combinar imagens do Supabase e JSON para o lightbox (usar fullUrl)
         const galeriaEmpreendimento = galeriaImagensSupabase[selectedEmpreendimento.id] || {};
-        const todasImagensSupabase = Object.values(galeriaEmpreendimento).flat();
+        const supabaseFull = Object.values(galeriaEmpreendimento).flat().map(it => it.fullUrl ?? it); // suporta legado
         const imagensJSON = selectedEmpreendimento.galeriaImagens || [];
-        const todasImagens = [...todasImagensSupabase, ...imagensJSON];
+        const allImages = [...supabaseFull, ...imagensJSON];
         
         // Se houver imagem principal, colocar ela no início (prioridade)
         const imagemPrincipal = selectedEmpreendimento.imagem;
         const images = imagemPrincipal 
-          ? [imagemPrincipal, ...todasImagens.filter(img => img !== imagemPrincipal)]
-          : (todasImagens.length > 0 ? todasImagens : []);
+          ? [imagemPrincipal, ...allImages.filter(u => u !== imagemPrincipal)]
+          : (allImages.length > 0 ? allImages : []);
         const currentIndex = lightboxImageIndex >= 0 && lightboxImageIndex < images.length ? lightboxImageIndex : 0;
         const currentImage = images[currentIndex];
         
