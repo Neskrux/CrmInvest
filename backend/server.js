@@ -15,6 +15,11 @@ const { supabase, supabaseAdmin } = require('./config/database');
 // Importar rotas refatoradas
 const routes = require('./routes');
 
+// Importar middlewares e controllers para rotas de upload de galeria
+const { authenticateUpload } = require('./middleware/auth');
+const { uploadGaleria: multerGaleria } = require('./config/multer');
+const { uploadGaleria, uploadGaleriaMultiple, removeGaleria } = require('./controllers/empreendimentos.controller');
+
 // Importar MetaAdsAPI (service)
 const MetaAdsAPI = require('./services/meta-ads.service');
 
@@ -34,16 +39,16 @@ app.use(cors(corsConfig));
 
 // Middleware JSON para outras rotas (exceto uploads)
 app.use((req, res, next) => {
-  // Pular body parser para rotas de upload
-  if (req.path.includes('/contratos-carteira/upload')) {
+  // Pular body parser para rotas de upload (FormData)
+  if (req.path.includes('/upload') || req.path.includes('/galeria/upload')) {
     return next();
   }
   bodyParser.json({ limit: '250mb' })(req, res, next);
 });
 
 app.use((req, res, next) => {
-  // Pular body parser para rotas de upload
-  if (req.path.includes('/contratos-carteira/upload')) {
+  // Pular body parser para rotas de upload (FormData)
+  if (req.path.includes('/upload') || req.path.includes('/galeria/upload')) {
     return next();
   }
   bodyParser.urlencoded({ extended: true, limit: '250mb' })(req, res, next);
@@ -231,26 +236,22 @@ app.get('/', (req, res) => {
   });
 });
 
+// ============================================
+// Rotas de upload de galeria de empreendimentos
+// Definidas diretamente no server.js para evitar problemas com Express Router
+// ============================================
+
+// POST /api/empreendimentos/:id/galeria/upload - Upload de imagem única
+app.post('/api/empreendimentos/:id/galeria/upload', authenticateUpload, multerGaleria.single('imagem'), uploadGaleria);
+
+// POST /api/empreendimentos/:id/galeria/upload-multiple - Upload múltiplo
+app.post('/api/empreendimentos/:id/galeria/upload-multiple', authenticateUpload, multerGaleria.array('imagens', 20), uploadGaleriaMultiple);
+
+// DELETE /api/empreendimentos/:id/galeria/* - Remover imagem
+app.delete('/api/empreendimentos/:id/galeria/*', authenticateUpload, removeGaleria);
+
 // Usar rotas refatoradas
 app.use('/api', routes);
-
-// ✅ TODAS AS ROTAS FORAM REFATORADAS COM SUCESSO!
-// O backend agora está completamente modularizado em:
-// - Auth (6 rotas)
-// - Usuários (2 rotas)
-// - Empresas (2 rotas)
-// - Clínicas (16 rotas)
-// - Consultores (12 rotas)
-// - Pacientes & Leads (13 rotas)
-// - Agendamentos & Evidências (10 rotas)
-// - Fechamentos (9 rotas)
-// - Dashboard (5 rotas)
-// - Materiais (4 rotas)
-// - Metas (3 rotas)
-// - Novas Clínicas (6 rotas)
-// - Pacientes Financeiro (5 rotas)
-// - Meta Ads (13 rotas)
-// Total: 106 rotas refatoradas + 3 rotas de APIs externas = 109 rotas
 
 // Configurar Socket.IO apenas se não estiver no Vercel
 let io = null;

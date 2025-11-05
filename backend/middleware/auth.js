@@ -25,12 +25,6 @@ const authenticateUpload = (req, res, next) => {
   const authHeader = req.headers.authorization || req.headers.Authorization;
   const token = authHeader && authHeader.split(' ')[1];
 
-  console.log('🔍 Debug authenticateUpload:', {
-    hasAuthHeader: !!authHeader,
-    hasToken: !!token,
-    headers: Object.keys(req.headers)
-  });
-
   if (!token) {
     return res.status(401).json({ error: 'Token de acesso requerido' });
   }

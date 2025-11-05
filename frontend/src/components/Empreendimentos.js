@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import useBranding from '../hooks/useBranding';
 import { useAuth } from '../contexts/AuthContext';
 import { getSupabaseClient } from '../lib/supabaseClient';
-import { Phone, Mail, Share2, X, Calculator, ArrowLeft, Home, Images, Globe, BookOpen, ChevronLeft, ChevronRight, Maximize2, Bed, BedDouble, Car, Clock, Bath, Droplets, Ruler, Edit, Copy } from 'lucide-react';
+import { Phone, Mail, Share2, X, Calculator, ArrowLeft, Home, Images, Globe, BookOpen, ChevronLeft, ChevronRight, Maximize2, Bed, BedDouble, Car, Clock, Bath, Droplets, Ruler, Edit, Copy, Upload } from 'lucide-react';
 
 // ==== Helpers de imagem/URLs ====
 const BUCKET = 'galeria-empreendimentos';
@@ -55,6 +55,8 @@ const Empreendimentos = () => {
     descricaoImovel: true,
     receberPropostas: true
   });
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ uploaded: 0, total: 0 });
 
   // Função para buscar empreendimentos do banco
   const fetchEmpreendimentos = async () => {
@@ -312,6 +314,93 @@ const Empreendimentos = () => {
     } catch (err) {
       console.error('Erro ao buscar galeria do Supabase:', err);
       setLoadingGaleria(false);
+    }
+  };
+
+  // Função para fazer upload de imagens para a galeria
+  const handleUploadGaleria = async (files, categoria) => {
+    if (!selectedEmpreendimento || !files || files.length === 0) return;
+
+    try {
+      setUploading(true);
+      setUploadProgress({ uploaded: 0, total: files.length });
+
+      const formData = new FormData();
+      
+      // Configurar URL base da API
+      const config = await import('../config');
+      const API_BASE_URL = config.default.API_BASE_URL || 'http://localhost:5000/api';
+      const token = localStorage.getItem('token');
+
+      // Se for múltiplos arquivos, usar endpoint de múltiplo upload
+      if (files.length > 1) {
+        Array.from(files).forEach(file => {
+          formData.append('imagens', file);
+        });
+        formData.append('categoria', categoria);
+
+        const response = await fetch(`${API_BASE_URL}/empreendimentos/${selectedEmpreendimento.id}/galeria/upload-multiple`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+            // Não definir Content-Type, deixar o browser definir com boundary
+          },
+          body: formData
+        });
+
+        if (response.status === 401) {
+          throw new Error('Sessão expirada. Por favor, faça login novamente.');
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Erro ao fazer upload' }));
+          throw new Error(errorData.error || 'Erro ao fazer upload');
+        }
+
+        const result = await response.json();
+        setUploadProgress({ uploaded: files.length, total: files.length });
+        
+        // Recarregar galeria após upload usando a categoria que foi enviada
+        await fetchGaleriaImagens(selectedEmpreendimento.id, categoria);
+        
+        alert(`${result.uploaded} imagem(ns) uploadada(s) com sucesso!`);
+      } else {
+        // Upload único
+        formData.append('imagem', files[0]);
+        formData.append('categoria', categoria);
+
+        const response = await fetch(`${API_BASE_URL}/empreendimentos/${selectedEmpreendimento.id}/galeria/upload`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+            // Não definir Content-Type, deixar o browser definir com boundary
+          },
+          body: formData
+        });
+
+        if (response.status === 401) {
+          throw new Error('Sessão expirada. Por favor, faça login novamente.');
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Erro ao fazer upload' }));
+          throw new Error(errorData.error || 'Erro ao fazer upload');
+        }
+
+        const result = await response.json();
+        setUploadProgress({ uploaded: 1, total: 1 });
+        
+        // Recarregar galeria após upload usando a categoria que foi enviada
+        await fetchGaleriaImagens(selectedEmpreendimento.id, categoria);
+        
+        alert('Imagem uploadada com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro no upload:', error);
+      alert(`Erro ao fazer upload: ${error.message}`);
+    } finally {
+      setUploading(false);
+      setUploadProgress({ uploaded: 0, total: 0 });
     }
   };
 
@@ -1764,7 +1853,8 @@ const Empreendimentos = () => {
                           display: 'flex',
                           gap: '0.5rem',
                           marginBottom: '1.5rem',
-                          flexWrap: 'wrap'
+                          flexWrap: 'wrap',
+                          alignItems: 'center'
                         }}>
                         {['Apartamento', 'Áreas de Lazer', 'Plantas', 'Videos', 'Tour virtual'].map((filtro) => (
                           <button
@@ -1795,6 +1885,81 @@ const Empreendimentos = () => {
                             {filtro}
                           </button>
                         ))}
+                        
+                        {/* Botão de Upload - Não mostrar para Tour virtual */}
+                        {filtroGaleria !== 'Tour virtual' && (
+                        <div style={{ marginLeft: 'auto', position: 'relative' }}>
+                          <input
+                            type="file"
+                            id={`upload-galeria-${selectedEmpreendimento?.id || 'default'}-${filtroGaleria}`}
+                            multiple
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={(e) => {
+                              const files = e.target.files;
+                              if (files && files.length > 0) {
+                                const categoriaMap = {
+                                  'Apartamento': 'apartamento',
+                                  'Áreas de Lazer': 'areas-de-lazer',
+                                  'Plantas': 'plantas-humanizadas',
+                                  'Tour virtual': 'tour-virtual',
+                                  'Videos': 'videos'
+                                };
+                                const categoria = categoriaMap[filtroGaleria] || 'apartamento';
+                                
+                                // Criar uma cópia do FileList como Array para garantir que seja preservado
+                                const filesArray = Array.from(files);
+                                handleUploadGaleria(filesArray, categoria);
+                              }
+                              // Reset input para permitir selecionar o mesmo arquivo novamente
+                              e.target.value = '';
+                            }}
+                            disabled={uploading}
+                          />
+                          <button
+                            onClick={() => {
+                              const inputId = `upload-galeria-${selectedEmpreendimento?.id || 'default'}-${filtroGaleria}`;
+                              document.getElementById(inputId)?.click();
+                            }}
+                            disabled={uploading}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              border: '1px solid rgba(16, 185, 129, 0.3)',
+                              borderRadius: '6px',
+                              backgroundColor: uploading ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.15)',
+                              color: uploading ? '#9ca3af' : '#10b981',
+                              cursor: uploading ? 'not-allowed' : 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: '500',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              transition: 'all 0.2s ease',
+                              opacity: uploading ? 0.6 : 1
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!uploading) {
+                                e.target.style.backgroundColor = 'rgba(16, 185, 129, 0.25)';
+                                e.target.style.borderColor = 'rgba(16, 185, 129, 0.5)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!uploading) {
+                                e.target.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+                                e.target.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                              }
+                            }}
+                          >
+                            <Upload size={16} />
+                            <span>
+                              {uploading 
+                                ? `Enviando... (${uploadProgress.uploaded}/${uploadProgress.total})`
+                                : 'Adicionar'
+                              }
+                            </span>
+                          </button>
+                        </div>
+                        )}
                       </div>
                       )}
 
