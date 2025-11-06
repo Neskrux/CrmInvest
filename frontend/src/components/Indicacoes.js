@@ -691,6 +691,7 @@ const Indicacoes = () => {
             O que vou indicar?
           </h2>
           
+          
           <div>
             {isIncorporadora ? (
               <>
@@ -702,7 +703,39 @@ const Indicacoes = () => {
                   maxWidth: '800px',
                   margin: '0 auto 1.5rem'
                 }}>
-                  <strong>Você indicará pessoas interessadas em comprar imóveis nos nossos empreendimentos.</strong><br /><br />
+                  <strong>Você indicará pessoas interessadas em comprar imóveis nos nossos empreendimentos.</strong><br />
+                  <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  marginTop: '1.5rem',
+                  marginBottom: '1.5rem'
+                }}>
+                  <button
+                    onClick={() => window.location.href = '/empreendimentos'}
+                    style={{
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '12px',
+                      fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.transform = 'translateY(-2px)';
+                      e.target.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.5)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.transform = 'translateY(0)';
+                      e.target.style.boxShadow = '0 4px 15px rgba(59, 130, 246, 0.4)';
+                    }}
+                  >
+                    Ver nossos empreendimentos
+                  </button>
+                </div>
                   <p>Preencha o formulário abaixo com as informações do cliente que você quer indicar.</p>
                 </p>
               </>
