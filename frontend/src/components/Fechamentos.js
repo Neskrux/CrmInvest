@@ -47,7 +47,12 @@ const Fechamentos = () => {
     data_operacao: '',
     valor_entregue: '',
     valor_entregue_formatado: '',
-    tipo_operacao: ''
+    tipo_operacao: '',
+    // Campos de entrada
+    entrada_total: '',
+    entrada_total_formatado: '',
+    entrada_paga: '',
+    entrada_paga_formatado: ''
   });
   const [contratoSelecionado, setContratoSelecionado] = useState(null);
   const [printConfirmacaoSelecionado, setPrintConfirmacaoSelecionado] = useState(null);
@@ -354,6 +359,44 @@ const Fechamentos = () => {
         }
       }
       
+      // Processar entrada_total
+      const entradaTotalOriginal = fechamento.entrada_total;
+      let entradaTotalNumerico = '';
+      let entradaTotalFormatado = '';
+      
+      if (entradaTotalOriginal !== null && entradaTotalOriginal !== undefined && entradaTotalOriginal !== '') {
+        const numeroLimpo = typeof entradaTotalOriginal === 'string' 
+          ? parseFloat(entradaTotalOriginal.replace(/[^\d.,-]/g, '').replace(',', '.'))
+          : parseFloat(entradaTotalOriginal);
+        
+        if (!isNaN(numeroLimpo)) {
+          entradaTotalNumerico = numeroLimpo.toString();
+          entradaTotalFormatado = numeroLimpo.toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          });
+        }
+      }
+      
+      // Processar entrada_paga
+      const entradaPagaOriginal = fechamento.entrada_paga;
+      let entradaPagaNumerico = '';
+      let entradaPagaFormatado = '';
+      
+      if (entradaPagaOriginal !== null && entradaPagaOriginal !== undefined && entradaPagaOriginal !== '') {
+        const numeroLimpo = typeof entradaPagaOriginal === 'string' 
+          ? parseFloat(entradaPagaOriginal.replace(/[^\d.,-]/g, '').replace(',', '.'))
+          : parseFloat(entradaPagaOriginal);
+        
+        if (!isNaN(numeroLimpo)) {
+          entradaPagaNumerico = numeroLimpo.toString();
+          entradaPagaFormatado = numeroLimpo.toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          });
+        }
+      }
+      
       // Processar valor_parcela
       const valorParcelaOriginal = fechamento.valor_parcela;
       let valorParcelaNumerico = '';
@@ -390,7 +433,12 @@ const Fechamentos = () => {
         data_operacao: fechamento.data_operacao || '',
         valor_entregue: valorEntregueNumerico,
         valor_entregue_formatado: valorEntregueFormatado,
-        tipo_operacao: fechamento.tipo_operacao || ''
+        tipo_operacao: fechamento.tipo_operacao || '',
+        // Campos de entrada
+        entrada_total: entradaTotalNumerico,
+        entrada_total_formatado: entradaTotalFormatado,
+        entrada_paga: entradaPagaNumerico,
+        entrada_paga_formatado: entradaPagaFormatado
       });
     } else {
       setFechamentoEditando(null);
@@ -413,7 +461,12 @@ const Fechamentos = () => {
         data_operacao: '',
         valor_entregue: '',
         valor_entregue_formatado: '',
-        tipo_operacao: ''
+        tipo_operacao: '',
+        // Campos de entrada
+        entrada_total: '',
+        entrada_total_formatado: '',
+        entrada_paga: '',
+        entrada_paga_formatado: ''
       });
     }
     setPrintConfirmacaoSelecionado(null);
@@ -444,7 +497,12 @@ const Fechamentos = () => {
       data_operacao: '',
       valor_entregue: '',
       valor_entregue_formatado: '',
-      tipo_operacao: ''
+      tipo_operacao: '',
+      // Campos de entrada
+      entrada_total: '',
+      entrada_total_formatado: '',
+      entrada_paga: '',
+      entrada_paga_formatado: ''
     });
   };
 
@@ -709,6 +767,13 @@ const Fechamentos = () => {
       if (novoFechamento.tipo_operacao) {
         formData.append('tipo_operacao', novoFechamento.tipo_operacao);
       }
+      // Campos de entrada
+      if (novoFechamento.entrada_total) {
+        formData.append('entrada_total', parseFloat(novoFechamento.entrada_total));
+      }
+      if (novoFechamento.entrada_paga) {
+        formData.append('entrada_paga', parseFloat(novoFechamento.entrada_paga));
+      }
       if (printConfirmacaoSelecionado) {
         formData.append('print_confirmacao', printConfirmacaoSelecionado);
       }
@@ -900,6 +965,30 @@ const Fechamentos = () => {
       ...novoFechamento, 
       valor_parcela: valorNumerico,
       valor_parcela_formatado: valorFormatado
+    });
+  };
+  
+  const handleEntradaTotalChange = (e) => {
+    const valorDigitado = e.target.value;
+    const valorFormatado = formatarValorInput(valorDigitado);
+    const valorNumerico = desformatarValor(valorFormatado);
+    
+    setNovoFechamento({
+      ...novoFechamento, 
+      entrada_total: valorNumerico,
+      entrada_total_formatado: valorFormatado
+    });
+  };
+  
+  const handleEntradaPagaChange = (e) => {
+    const valorDigitado = e.target.value;
+    const valorFormatado = formatarValorInput(valorDigitado);
+    const valorNumerico = desformatarValor(valorFormatado);
+    
+    setNovoFechamento({
+      ...novoFechamento, 
+      entrada_paga: valorNumerico,
+      entrada_paga_formatado: valorFormatado
     });
   };
 
@@ -2186,6 +2275,30 @@ const Fechamentos = () => {
                       onChange={handleValorEntregueChange}
                       placeholder="0,00"
                     />
+                  </div>
+
+                  <div className="grid grid-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
+                    <div className="form-group">
+                      <label className="form-label">Entrada Total (R$)</label>
+                      <input 
+                        type="text"
+                        className="form-input"
+                        value={novoFechamento.entrada_total_formatado || ''}
+                        onChange={handleEntradaTotalChange}
+                        placeholder="0,00"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Entrada Paga até o Momento (R$)</label>
+                      <input 
+                        type="text"
+                        className="form-input"
+                        value={novoFechamento.entrada_paga_formatado || ''}
+                        onChange={handleEntradaPagaChange}
+                        placeholder="0,00"
+                      />
+                    </div>
                   </div>
 
                   <div className="form-group">

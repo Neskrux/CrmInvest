@@ -171,7 +171,10 @@ const createFechamento = async (req, res) => {
       // Novos campos administrativos
       data_operacao,
       valor_entregue,
-      tipo_operacao
+      tipo_operacao,
+      // Campos de entrada
+      entrada_total,
+      entrada_paga
     } = req.body;
 
     // Verificar se é fechamento automático (baseado nas observações)
@@ -253,6 +256,9 @@ const createFechamento = async (req, res) => {
     const dataOperacao = data_operacao || null;
     const valorEntregueVal = valor_entregue ? parseFloat(valor_entregue) : null;
     const tipoOperacaoVal = tipo_operacao || null;
+    // Processar campos de entrada
+    const entradaTotalVal = entrada_total ? parseFloat(entrada_total) : null;
+    const entradaPagaVal = entrada_paga ? parseFloat(entrada_paga) : null;
 
     // Dados do contrato (se houver arquivo)
     let contratoArquivo = null;
@@ -333,6 +339,9 @@ const createFechamento = async (req, res) => {
         data_operacao: dataOperacao,
         valor_entregue: valorEntregueVal,
         tipo_operacao: tipoOperacaoVal,
+        // Campos de entrada
+        entrada_total: entradaTotalVal,
+        entrada_paga: entradaPagaVal,
         print_confirmacao_arquivo: printConfirmacaoArquivo,
         print_confirmacao_nome: printConfirmacaoNome,
         print_confirmacao_tamanho: printConfirmacaoTamanho,
@@ -647,7 +656,10 @@ const updateFechamento = async (req, res) => {
       // Campos administrativos
       data_operacao,
       valor_entregue,
-      tipo_operacao
+      tipo_operacao,
+      // Campos de entrada
+      entrada_total,
+      entrada_paga
     } = req.body;
 
     // Converter campos opcionais para null se não enviados ou vazios
@@ -724,6 +736,9 @@ const updateFechamento = async (req, res) => {
     const dataOperacao = data_operacao || null;
     const valorEntregueVal = valor_entregue ? parseFloat(valor_entregue) : null;
     const tipoOperacaoVal = tipo_operacao || null;
+    // Processar campos de entrada
+    const entradaTotalVal = entrada_total ? parseFloat(entrada_total) : null;
+    const entradaPagaVal = entrada_paga ? parseFloat(entrada_paga) : null;
     
     // Upload de print de confirmação se fornecido
     let printConfirmacaoArquivo = null;
@@ -759,7 +774,10 @@ const updateFechamento = async (req, res) => {
       // Campos administrativos
       data_operacao: dataOperacao,
       valor_entregue: valorEntregueVal,
-      tipo_operacao: tipoOperacaoVal
+      tipo_operacao: tipoOperacaoVal,
+      // Campos de entrada
+      entrada_total: entradaTotalVal,
+      entrada_paga: entradaPagaVal
     };
     
     // Adicionar campos do print apenas se houver novo upload
