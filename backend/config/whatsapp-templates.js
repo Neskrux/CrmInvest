@@ -7,8 +7,8 @@ const templates = {
 		name: 'boleto_vence_3_dias',
 		message: 'Seu boleto vence em 3 dias.', // Fallback para mensagem simples
 		body: 'Olá {{1}}, seu boleto vence em 3 dias. Caso já tenha efetuado o pagamento, desconsidere esta mensagem.', // Template aprovado Twilio
-		contentSid: null, // Será configurado quando o template for aprovado no Twilio
-		useSimpleText: true, // Mudar para false quando contentSid for configurado
+		contentSid: 'HXabbfe00bbeab1fc1dfefa85ba802fa95', // Será configurado quando o template for aprovado no Twilio
+		useSimpleText: false, // Mudar para false quando contentSid for configurado
 		variables: ['nome'] // Mapeamento: {{1}} = nome
 	},
 	
@@ -16,8 +16,8 @@ const templates = {
 		name: 'boleto_vence_1_dia',
 		message: 'Seu boleto vence em 1 dia.', // Fallback
 		body: 'Olá {{1}}, seu boleto vence em 1 dia. Caso já tenha efetuado o pagamento, desconsidere esta mensagem.', // Template aprovado
-		contentSid: null,
-		useSimpleText: true,
+		contentSid: 'HXa550eb015db27f6d81025d6d39cf7b08',
+		useSimpleText: false,
 		variables: ['nome'] // Mapeamento: {{1}} = nome
 	},
 	
@@ -25,8 +25,9 @@ const templates = {
 		name: 'boleto_vence_hoje',
 		message: 'Seu boleto vence hoje!', // Fallback
 		body: 'Olá {{1}}, seu boleto vence hoje. Caso já tenha efetuado o pagamento, desconsidere esta mensagem.', // Template aprovado
-		contentSid: null,
-		useSimpleText: true,
+		contentSid: 'HX6b4fddbc1ae679b22219b9dff4ad0b6d'
+		,
+		useSimpleText: false,
 		variables: ['nome'] // Mapeamento: {{1}} = nome
 	},
 	

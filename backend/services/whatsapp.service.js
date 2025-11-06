@@ -86,6 +86,14 @@ function getStatusCallbackUrl() {
 	return null;
 }
 
+/**
+ * Normaliza número de telefone para formato E.164 usado pelo Twilio WhatsApp
+ * Formato E.164: +[código do país][número] (ex: +5511999999999 para Brasil)
+ * Documentação Twilio: https://www.twilio.com/docs/glossary/what-e164
+ * 
+ * @param {string} to - Número de telefone (pode estar em vários formatos)
+ * @returns {string} Número formatado como whatsapp:+[E.164]
+ */
 function normalizeToWhatsApp(to) {
 	if (!to) {
 		throw new Error('Número de telefone não fornecido.');
@@ -95,32 +103,45 @@ function normalizeToWhatsApp(to) {
 	let cleaned = to.replace(/^whatsapp:/i, '');
 	
 	// Remover todos caracteres não numéricos exceto + no início
-	// Manter o + se estiver no início
 	const hasPlus = cleaned.startsWith('+');
-	const numbersOnly = cleaned.replace(/\D/g, '');
-	
+	let numbersOnly = cleaned.replace(/\D/g, '');
+
+	// Se já tem código de país (começa com +), usar como está
 	if (hasPlus) {
 		cleaned = '+' + numbersOnly;
 	} else {
-		cleaned = numbersOnly;
+		// Números brasileiros: DDD (2 dígitos) + número (8 ou 9 dígitos)
+		// Padrão: 11 dígitos (DDD + 9 dígitos) ou 10 dígitos (DDD + 8 dígitos)
+		// DDDs brasileiros: 11-99 (excluindo 90-99 que são outros serviços)
+		const isBrazilianNumber = /^[1-9][1-9]\d{8,9}$/.test(numbersOnly) && 
+		                          (numbersOnly.length === 10 || numbersOnly.length === 11);
+		
+		if (isBrazilianNumber && !numbersOnly.startsWith('55')) {
+			// Adicionar código do Brasil (55) conforme E.164
+			cleaned = '+55' + numbersOnly;
+		} else if (numbersOnly.length >= 10 && numbersOnly.length <= 15) {
+			// Número internacional sem código de país detectado
+			// Adicionar + assumindo que é um número válido
+			cleaned = '+' + numbersOnly;
+		} else {
+			cleaned = numbersOnly;
+		}
 	}
 
-	// Validar comprimento (10-15 dígitos, excluindo o +)
-	const numberLength = numbersOnly.length;
+	// Validar comprimento E.164 (mínimo 10 dígitos incluindo código do país)
+	const numberLength = cleaned.replace(/\D/g, '').length;
 	if (numberLength < 10 || numberLength > 15) {
-		throw new Error(`Número de telefone inválido: deve ter entre 10 e 15 dígitos (recebido: ${numberLength} dígitos).`);
+		throw new Error(`Número de telefone inválido: deve ter entre 10 e 15 dígitos no formato E.164 (recebido: ${numberLength} dígitos).`);
 	}
 
-	// Validar formato internacional (deve começar com código de país)
+	// Validar formato E.164: deve começar com + seguido de dígitos
 	if (!cleaned.startsWith('+')) {
-		// Se não começa com +, adicionar (assumindo código padrão)
-		// Nota: Em produção, você pode querer validar código de país específico
 		cleaned = '+' + cleaned;
 	}
 
-	// Validar que o número não contém caracteres inválidos após limpeza
-	if (!/^\+?\d{10,15}$/.test(cleaned)) {
-		throw new Error(`Número de telefone em formato inválido: ${to}`);
+	// Validar que o número está no formato E.164 correto
+	if (!/^\+\d{10,15}$/.test(cleaned)) {
+		throw new Error(`Número de telefone em formato inválido. Use formato E.164: +[código país][número] (ex: +5511999999999). Recebido: ${to}`);
 	}
 
 	return `whatsapp:${cleaned}`;

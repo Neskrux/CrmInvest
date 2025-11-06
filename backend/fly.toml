@@ -11,9 +11,9 @@ primary_region = "gru"  # Região do Brasil
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = true
+  auto_stop_machines = false  # Servidor sempre ativo para receber callbacks do Twilio
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1  # Garantir máquina sempre rodando
   processes = ["app"]
   
   # Timeout aumentado para uploads de vídeos grandes
@@ -36,4 +36,23 @@ primary_region = "gru"  # Região do Brasil
   cpu_kind = "shared"
   cpus = 1
 
+# Scheduled Jobs para notificações WhatsApp de boletos
+# Executam diariamente às 08:00 (America/Sao_Paulo)
+[[scheduled_jobs]]
+  name = "boleto-3-dias"
+  schedule = "0 8 * * *"  # 08:00 diariamente
+  command = ["node", "workers/cron-handler.js", "3"]
+  timezone = "America/Sao_Paulo"
+
+[[scheduled_jobs]]
+  name = "boleto-1-dia"
+  schedule = "0 8 * * *"  # 08:00 diariamente
+  command = ["node", "workers/cron-handler.js", "1"]
+  timezone = "America/Sao_Paulo"
+
+[[scheduled_jobs]]
+  name = "boleto-hoje"
+  schedule = "0 8 * * *"  # 08:00 diariamente
+  command = ["node", "workers/cron-handler.js", "0"]
+  timezone = "America/Sao_Paulo"
 
