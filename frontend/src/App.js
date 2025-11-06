@@ -212,6 +212,7 @@ const AppContent = () => {
           <Route path="/como-fazer" element={<ComoFazer />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/pacientes" element={<Pacientes />} />
+          {isIncorporadora && <Route path="/empreendimentos" element={<Empreendimentos />} />}
           {!isIncorporadora && <Route path="/materiais" element={<Materiais />} />}
           <Route path="/perfil" element={<Perfil />} />
           <Route path="/" element={<Navigate to="/indicacoes" replace />} />
@@ -382,6 +383,19 @@ const AppContent = () => {
                 </svg>
                 <span>{isIncorporadora ? 'Clientes' : 'Pacientes'}</span>
               </Link>
+
+              {isIncorporadora && (
+              <Link
+                to="/empreendimentos"
+                className={`freelancer-nav-item ${activeTab === 'empreendimentos' ? 'active' : ''}`}
+              >
+                <svg className="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>
+                <span>Empreendimentos</span>
+              </Link>
+              )}
 
               {!isIncorporadora && (
               <Link

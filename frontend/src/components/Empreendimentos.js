@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import useBranding from '../hooks/useBranding';
 import { useAuth } from '../contexts/AuthContext';
 import { getSupabaseClient } from '../lib/supabaseClient';
-import { Phone, Mail, Share2, X, Calculator, ArrowLeft, Home, Images, Globe, BookOpen, ChevronLeft, ChevronRight, Maximize2, Minimize2, Bed, BedDouble, Car, Clock, Bath, Droplets, Ruler, Edit, Copy, Upload } from 'lucide-react';
+import { Phone, Mail, Share2, X, Calculator, ArrowLeft, Home, Images, Globe, BookOpen, ChevronLeft, ChevronRight, Maximize2, Minimize2, Bed, BedDouble, Car, Clock, Bath, Droplets, Ruler, Edit, Copy, Upload, Info } from 'lucide-react';
 
 // ==== Helpers de imagem/URLs ====
 const BUCKET = 'galeria-empreendimentos';
@@ -28,13 +28,13 @@ const buildUrlsForFile = (supabase, filePath, sizeBytes) => {
 
 const Empreendimentos = () => {
   const { t } = useBranding();
-  const { user, makeRequest, isAdmin } = useAuth();
+  const { user, makeRequest, isAdmin, isFreelancer } = useAuth();
   const [empreendimentos, setEmpreendimentos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedEmpreendimento, setSelectedEmpreendimento] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [activeTab, setActiveTab] = useState('unidades');
+  const [activeTab, setActiveTab] = useState('unidades'); // Aba padrão
   const [showImageLightbox, setShowImageLightbox] = useState(false);
   const [lightboxImageIndex, setLightboxImageIndex] = useState(0);
   const [filtroGaleria, setFiltroGaleria] = useState('Apartamento');
@@ -66,6 +66,16 @@ const Empreendimentos = () => {
   const [savingUnidade, setSavingUnidade] = useState(false);
   const [playingVideoIndex, setPlayingVideoIndex] = useState(null);
   const [tourVirtualFullscreen, setTourVirtualFullscreen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  // Detectar mudanças de tamanho da tela
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Função para buscar empreendimentos do banco
   const fetchEmpreendimentos = async () => {
@@ -681,7 +691,9 @@ const Empreendimentos = () => {
   const handleCardClick = async (empreendimento) => {
     setSelectedEmpreendimento(empreendimento);
     setShowModal(true);
-    setActiveTab('unidades'); // Aba padrão agora é unidades
+    // No mobile, começar com aba 'inicio'; no desktop, começar com 'unidades'
+    const isMobileNow = window.innerWidth <= 768;
+    setActiveTab(isMobileNow ? 'inicio' : 'unidades');
     setTipoDiferencial('unidade'); // Resetar para unidade
     setFiltroGaleria('Apartamento'); // Resetar filtro da galeria para Apartamento
     // Carregar unidades ao abrir o modal
@@ -1308,17 +1320,18 @@ const Empreendimentos = () => {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
-          padding: '1rem'
+          padding: isMobile ? '0' : '1rem'
         }}>
           <div style={{
             backgroundColor: '#1f2937',
-            borderRadius: '12px',
+            borderRadius: isMobile ? '0' : '12px',
             maxWidth: '1400px',
             width: '100%',
-            maxHeight: '90vh',
+            maxHeight: isMobile ? '100vh' : '90vh',
+            height: isMobile ? '100vh' : 'auto',
             display: 'flex',
             flexDirection: 'column',
-            boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)',
+            boxShadow: isMobile ? 'none' : '0 25px 50px rgba(0, 0, 0, 0.25)',
             overflow: 'hidden'
           }}>
             {/* Header do Modal */}
@@ -1525,34 +1538,48 @@ const Empreendimentos = () => {
               </div>
             </div>
 
-            {/* Container Principal - Dois Painéis */}
-            <div style={{
-              display: 'flex',
-              flex: 1,
-              overflow: 'hidden'
-            }}>
-              {/* Painel Esquerdo - Informações Fixas */}
-              <div style={{
-                width: '400px',
-                backgroundColor: '#1f2937',
-                color: 'white',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-                borderRight: '1px solid rgba(255, 255, 255, 0.1)'
-              }}>
-                {/* Abas de Navegação - Navbar no topo */}
-                <div style={{
-                  display: 'flex',
-                  padding: '0.75rem',
-                  gap: '0.5rem',
-                  backdropFilter: 'blur(10px)'
-                }}>
-                  {[
+            {/* Navbar de Abas - Sempre visível no topo */}
+            {(() => {
+              // Definir abas: no mobile inclui "Início", no desktop não
+              const tabs = isMobile 
+                ? [
+                    { id: 'inicio', label: 'Início', icon: Info },
                     { id: 'unidades', label: 'Unidades', icon: Home },
                     { id: 'galeria', label: 'Galeria', icon: Images },
                     { id: 'hotsite', label: 'Hotsite', icon: Globe }
-                  ].map((tab) => {
+                  ]
+                : [
+                    { id: 'unidades', label: 'Unidades', icon: Home },
+                    { id: 'galeria', label: 'Galeria', icon: Images },
+                    { id: 'hotsite', label: 'Hotsite', icon: Globe }
+                  ];
+              
+              // Calcular quantidade total de itens na navbar (abas + catálogo se existir)
+              const totalItems = tabs.length + (selectedEmpreendimento?.catalogoUrl ? 1 : 0);
+              
+              // No mobile, calcular tamanho dinâmico dos botões
+              // Considerando padding do container (1rem = 0.5rem de cada lado) e gaps entre botões
+              const containerPadding = 1; // 0.5rem de cada lado
+              const gapBetweenButtons = (totalItems - 1) * 0.25; // 0.25rem entre cada botão
+              const availableWidth = `calc(100% - ${containerPadding}rem - ${gapBetweenButtons}rem)`;
+              const mobileButtonWidth = isMobile ? `calc(${availableWidth} / ${totalItems})` : 'auto';
+              
+              // Ajustar tamanho de fonte e ícone baseado na quantidade de itens
+              const mobileFontSize = isMobile && totalItems > 4 ? '0.55rem' : (isMobile ? '0.65rem' : '0.75rem');
+              const mobileIconSize = isMobile && totalItems > 4 ? 14 : (isMobile ? 16 : 18);
+              const mobileMinWidth = isMobile && totalItems > 4 ? '45px' : (isMobile ? '60px' : 'auto');
+              
+              return (
+                <div style={{
+                  display: 'flex',
+                  padding: isMobile ? '0.5rem' : '0.75rem',
+                  gap: isMobile ? '0.25rem' : '0.5rem',
+                  backdropFilter: 'blur(10px)',
+                  overflowX: isMobile ? 'auto' : 'visible',
+                  backgroundColor: '#1f2937',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                  {tabs.map((tab) => {
                     const IconComponent = tab.icon;
                     const isActive = activeTab === tab.id;
                     return (
@@ -1560,21 +1587,23 @@ const Empreendimentos = () => {
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
                         style={{
-                          flex: 1,
-                          padding: '0.625rem 0.75rem',
+                          flex: isMobile ? '0 0 auto' : 1,
+                          width: isMobile ? mobileButtonWidth : 'auto',
+                          padding: isMobile ? '0.5rem 0.25rem' : '0.625rem 0.75rem',
                           border: isActive ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
                           borderRadius: '8px',
                           backgroundColor: isActive ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
                           color: isActive ? '#60a5fa' : '#9ca3af',
                           cursor: 'pointer',
-                          fontSize: '0.75rem',
+                          fontSize: mobileFontSize,
                           fontWeight: isActive ? '600' : '500',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
                           gap: '0.25rem',
                           transition: 'all 0.2s ease',
-                          boxShadow: isActive ? '0 2px 8px rgba(59, 130, 246, 0.2)' : 'none'
+                          boxShadow: isActive ? '0 2px 8px rgba(59, 130, 246, 0.2)' : 'none',
+                          minWidth: mobileMinWidth
                         }}
                         onMouseEnter={(e) => {
                           if (!isActive) {
@@ -1591,7 +1620,7 @@ const Empreendimentos = () => {
                           }
                         }}
                       >
-                        <IconComponent size={18} strokeWidth={isActive ? 2.5 : 2} />
+                        <IconComponent size={mobileIconSize} strokeWidth={isActive ? 2.5 : 2} />
                         <span>{tab.label}</span>
                       </button>
                     );
@@ -1603,21 +1632,23 @@ const Empreendimentos = () => {
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{
-                        flex: 1,
-                        padding: '0.625rem 0.75rem',
+                        flex: isMobile ? '0 0 auto' : 1,
+                        width: isMobile ? mobileButtonWidth : 'auto',
+                        padding: isMobile ? '0.5rem 0.25rem' : '0.625rem 0.75rem',
                         border: '1px solid rgba(255, 255, 255, 0.1)',
                         borderRadius: '8px',
                         backgroundColor: 'rgba(255, 255, 255, 0.05)',
                         color: '#9ca3af',
                         cursor: 'pointer',
-                        fontSize: '0.75rem',
+                        fontSize: mobileFontSize,
                         fontWeight: '500',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         gap: '0.25rem',
                         transition: 'all 0.2s ease',
-                        textDecoration: 'none'
+                        textDecoration: 'none',
+                        minWidth: isMobile ? (totalItems > 4 ? '50px' : '60px') : 'auto'
                       }}
                       onMouseEnter={(e) => {
                         e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
@@ -1630,17 +1661,40 @@ const Empreendimentos = () => {
                         e.target.style.color = '#9ca3af';
                       }}
                     >
-                      <BookOpen size={18} strokeWidth={2} />
+                      <BookOpen size={mobileIconSize} strokeWidth={2} />
                       <span>Catálogo</span>
                     </a>
                   )}
                 </div>
+              );
+            })()}
+
+            {/* Container Principal - Dois Painéis */}
+            <div style={{
+              display: 'flex',
+              flex: 1,
+              overflow: 'hidden',
+              flexDirection: isMobile ? 'column' : 'row'
+            }}>
+              {/* Painel Esquerdo - Informações Fixas */}
+              {/* Desktop: sempre visível. Mobile: apenas quando aba 'inicio' está ativa */}
+              <div style={{
+                width: isMobile ? '100%' : '400px',
+                minHeight: isMobile ? 'auto' : '100%',
+                backgroundColor: '#1f2937',
+                color: 'white',
+                display: isMobile ? (activeTab === 'inicio' ? 'flex' : 'none') : 'flex',
+                flexDirection: 'column',
+                overflow: isMobile ? 'auto' : 'hidden',
+                borderRight: isMobile ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+                borderBottom: isMobile ? '1px solid rgba(255, 255, 255, 0.1)' : 'none'
+              }}>
 
                 {/* Informações do Empreendimento */}
                 <div 
                   className="empreendimento-left-panel-scroll"
                   style={{
-                    padding: '1.5rem',
+                    padding: isMobile ? '1rem' : '1.5rem',
                     flex: 1,
                     overflowY: 'auto'
                   }}>
@@ -1824,31 +1878,31 @@ const Empreendimentos = () => {
 
                   {/* Características */}
                   {(selectedEmpreendimento.dormitorios || selectedEmpreendimento.suites || selectedEmpreendimento.vagas) && (
-                    <div style={{
-                      display: 'flex',
-                      gap: '1rem',
-                      marginBottom: '1.5rem',
-                      flexWrap: 'wrap'
-                    }}>
+                  <div style={{
+                    display: 'flex',
+                    gap: '1rem',
+                    marginBottom: '1.5rem',
+                    flexWrap: 'wrap'
+                  }}>
                       {selectedEmpreendimento.dormitorios && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#9ca3af', fontSize: '0.875rem' }}>
-                          <Bed size={20} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#9ca3af', fontSize: '0.875rem' }}>
+                      <Bed size={20} />
                           <span>{selectedEmpreendimento.dormitorios} Dorm.</span>
-                        </div>
+                    </div>
                       )}
                       {selectedEmpreendimento.suites && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#9ca3af', fontSize: '0.875rem' }}>
-                          <BedDouble size={20} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#9ca3af', fontSize: '0.875rem' }}>
+                      <BedDouble size={20} />
                           <span>{selectedEmpreendimento.suites} Suites</span>
-                        </div>
+                    </div>
                       )}
                       {selectedEmpreendimento.vagas && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#9ca3af', fontSize: '0.875rem' }}>
-                          <Car size={20} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#9ca3af', fontSize: '0.875rem' }}>
+                      <Car size={20} />
                           <span>{selectedEmpreendimento.vagas} Vagas</span>
-                        </div>
-                      )}
                     </div>
+                      )}
+                  </div>
                   )}
 
                   {/* Valor Condomínio */}
@@ -1978,23 +2032,26 @@ const Empreendimentos = () => {
               </div>
 
               {/* Painel Direito - Conteúdo das Abas */}
+              {/* Desktop: sempre visível. Mobile: esconder quando estiver na aba 'inicio' */}
               <div style={{
                 flex: 1,
+                width: isMobile ? '100%' : 'auto',
                 backgroundColor: '#1f2937',
-                display: 'flex',
+                display: (isMobile && activeTab === 'inicio') ? 'none' : 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden'
               }}>
                 <div 
                   className="empreendimento-right-panel-scroll"
                   style={{
-                    padding: '1.5rem',
+                    padding: isMobile ? '1rem' : '1.5rem',
                     flex: 1,
                     overflowY: 'auto',
                     color: 'white'
                   }}>
+
               {/* Aba: Informações */}
-              {activeTab === 'informacoes' && (
+              {!isMobile && activeTab === 'informacoes' && (
                 <div>
                   {/* Imagem do Empreendimento */}
                   {selectedEmpreendimento.imagem && (
@@ -2264,8 +2321,8 @@ const Empreendimentos = () => {
                           </button>
                         ))}
                         
-                        {/* Botão de Upload - Não mostrar para Tour virtual */}
-                        {filtroGaleria !== 'Tour virtual' && (
+                        {/* Botão de Upload - Não mostrar para Tour virtual e freelancers */}
+                        {filtroGaleria !== 'Tour virtual' && !isFreelancer && (
                         <div style={{ marginLeft: 'auto', position: 'relative' }}>
                           <input
                             type="file"
@@ -2535,11 +2592,11 @@ const Empreendimentos = () => {
                                   gap: '1rem'
                                 }}>
                                   {videosUnicos.map((video, index) => (
-                                      <div
+                                    <div
                                         key={`video-${index}-${video.fullUrl}`}
-                                        style={{
-                                          borderRadius: '8px',
-                                          overflow: 'hidden',
+                                      style={{
+                                        borderRadius: '8px',
+                                        overflow: 'hidden',
                                           backgroundColor: '#000000',
                                           aspectRatio: '16/9',
                                           position: 'relative',
@@ -2550,12 +2607,12 @@ const Empreendimentos = () => {
                                         }}
                                       >
                                         {playingVideoIndex === index ? (
-                                          <video
+                                      <video
                                             src={video.fullUrl}
-                                            controls
+                                        controls
                                             autoPlay
-                                            style={{
-                                              width: '100%',
+                                        style={{
+                                          width: '100%',
                                               height: '100%',
                                               objectFit: 'contain',
                                               backgroundColor: '#000'
@@ -2611,8 +2668,8 @@ const Empreendimentos = () => {
                                             </div>
                                           </div>
                                         )}
-                                      </div>
-                                    ))}
+                                    </div>
+                                  ))}
                                 </div>
                               );
                             }
@@ -3205,8 +3262,8 @@ const Empreendimentos = () => {
                   )}
 
 
-                  {/* Aba: Simulador Caixa */}
-                  {activeTab === 'simulador' && (
+                  {/* Aba: Simulador Caixa - Não disponível para freelancers */}
+                  {activeTab === 'simulador' && !isFreelancer && (
                     <div style={{
                       width: '100%',
                       height: '100%',
@@ -3679,7 +3736,7 @@ const Empreendimentos = () => {
               gap: '0.5rem',
               backgroundColor: '#1f2937'
             }}>
-              {selectedEmpreendimento.simuladorCaixaUrl && (
+              {selectedEmpreendimento.simuladorCaixaUrl && !isFreelancer && (
                 <button
                   onClick={() => setActiveTab('simulador')}
                   style={{
