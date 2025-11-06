@@ -30,6 +30,7 @@ const movimentacoesRoutes = require('./movimentacoes.routes');
 // Importar rotas de APIs externas
 const documentsRoutes = require('./documents.routes');
 const idsfRoutes = require('./idsf.routes');
+const documentosAssinadosRoutes = require('./documentos-assinados.routes');
 
 // Importar rotas de solicitações de carteira ANTES das outras para evitar conflitos
 const solicitacoesCarteiraRoutes = require('./solicitacoes-carteira.routes');
@@ -72,6 +73,7 @@ router.use('/', movimentacoesRoutes); // /api/movimentacoes/*
 // Rotas de APIs externas
 router.use('/documents', documentsRoutes);
 router.use('/idsf', idsfRoutes);
+router.use('/documentos-assinados', documentosAssinadosRoutes); // /api/documentos-assinados/*
 
 // Importar rotas de contratos de carteira
 const contratosCarteiraRoutes = require('./contratos-carteira.routes');

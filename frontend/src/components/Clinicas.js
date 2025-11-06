@@ -5790,6 +5790,40 @@ const Clinicas = () => {
                    </div>
                  )}
                  
+                 {/* Limite de Crédito (apenas admin pode ver e editar) */}
+                 {isAdmin && (
+                   <div>
+                     <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Limite de Crédito</label>
+                     {activeViewTab === 'informacoes' && !editingClinica ? (
+                       <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937', fontSize: '1.125rem', fontWeight: '600' }}>
+                         {viewingClinica.limite_credito ? 
+                           new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(viewingClinica.limite_credito) : 
+                           'R$ 0,00'}
+                       </p>
+                     ) : editingClinica && editingClinica.id === viewingClinica.id ? (
+                       <input
+                         type="number"
+                         step="0.01"
+                         min="0"
+                         value={editingClinica.limite_credito || ''}
+                         onChange={(e) => setEditingClinica({
+                           ...editingClinica,
+                           limite_credito: parseFloat(e.target.value) || 0
+                         })}
+                         style={{
+                           width: '100%',
+                           padding: '0.5rem',
+                           marginTop: '0.25rem',
+                           border: '1px solid #d1d5db',
+                           borderRadius: '6px',
+                           fontSize: '0.875rem'
+                         }}
+                         placeholder="0.00"
+                       />
+                     ) : null}
+                   </div>
+                 )}
+                 
                  {/* Vídeo de Validação */}
                  {viewingClinica.video_validacao && (
                    <div>
