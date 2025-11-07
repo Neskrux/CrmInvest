@@ -3337,6 +3337,13 @@ const Pacientes = () => {
       setSalvandoCadastroCompleto(false);
     }
   };
+  // Debug: verificar quando modal de clínica deveria ser renderizado
+  useEffect(() => {
+    if (showModal && isClinica && !editingPaciente) {
+      console.log('🚀🚀🚀 [Pacientes] MODAL STEP-BY-STEP DEVE SER RENDERIZADO AGORA!');
+    }
+  }, [showModal, isClinica, editingPaciente]);
+  
   // Debug: verificar valores quando showModal muda
   useEffect(() => {
     if (showModal) {
@@ -3346,8 +3353,18 @@ const Pacientes = () => {
         isAdmin,
         isConsultor,
         isConsultorInterno,
-        userTipo: user?.tipo
+        userTipo: user?.tipo,
+        modalQueDeveAbrir: isClinica && !editingPaciente ? 'ModalCadastroPacienteClinica (step-by-step)' : 
+                          isClinica && editingPaciente ? 'Modal de edição para clínica' :
+                          isConsultor && !isAdmin && !isConsultorInterno ? 'Modal simples para freelancer' :
+                          (isAdmin || isConsultorInterno) ? 'Modal completo para admin/interno' : 
+                          'Nenhum modal correspondente'
       });
+      
+      // Log específico para clínica
+      if (isClinica && !editingPaciente) {
+        console.log('✅✅✅ [Pacientes] CONDIÇÕES ATENDIDAS PARA MODAL STEP-BY-STEP CLÍNICA');
+      }
     }
   }, [showModal, isClinica, editingPaciente, isAdmin, isConsultor, isConsultorInterno, user]);
   
@@ -4028,7 +4045,17 @@ const Pacientes = () => {
               ) : (
                 <button
                   className="btn btn-primary"
-                  onClick={() => setShowModal(true)}
+                  onClick={() => {
+                    console.log('🔍 [Pacientes] Botão Cadastrar Paciente clicado');
+                    console.log('🔍 [Pacientes] Valores atuais:', {
+                      isClinica,
+                      editingPaciente,
+                      userTipo: user?.tipo,
+                      userId: user?.id
+                    });
+                    setShowModal(true);
+                    console.log('🔍 [Pacientes] showModal foi definido como true');
+                  }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 6 }}>
                     <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -5148,7 +5175,17 @@ const Pacientes = () => {
               <div style={{ flexShrink: 0 }}>
                 <button 
                   className="btn btn-primary" 
-                  onClick={() => setShowCadastroCompletoModal(true)}
+                  onClick={() => {
+                    console.log('🔍 [Pacientes] Botão Cadastrar Paciente clicado (Meus Pacientes)');
+                    console.log('🔍 [Pacientes] Valores atuais:', {
+                      isClinica,
+                      editingPaciente,
+                      userTipo: user?.tipo,
+                      userId: user?.id
+                    });
+                    setShowModal(true);
+                    console.log('🔍 [Pacientes] showModal foi definido como true');
+                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -5676,23 +5713,44 @@ const Pacientes = () => {
         </>
       )}
       
-      {/* Modal de Cadastro Step-by-Step para Clínicas - DEVE VIR PRIMEIRO PARA TER PRIORIDADE */}
-      {showModal && isClinica && !editingPaciente && (
-        <ModalCadastroPacienteClinica
-          onClose={() => {
-            setShowModal(false);
-            resetForm();
-          }}
-          onComplete={() => {
-            setShowModal(false);
-            resetForm();
-            fetchPacientes();
-          }}
-        />
-      )}
+      {/* ========== MODAIS DE CADASTRO ========== */}
+      {/* PRIORIDADE 1: Modal Step-by-Step para Clínicas */}
+      {(() => {
+        console.log('🔍🔍🔍 [Pacientes] VERIFICANDO RENDERIZAÇÃO DO MODAL');
+        console.log('🔍🔍🔍 [Pacientes] showModal:', showModal);
+        console.log('🔍🔍🔍 [Pacientes] isClinica:', isClinica);
+        console.log('🔍🔍🔍 [Pacientes] editingPaciente:', editingPaciente);
+        console.log('🔍🔍🔍 [Pacientes] user?.tipo:', user?.tipo);
+        
+        const deveRenderizar = showModal && isClinica && !editingPaciente;
+        console.log('🔍🔍🔍 [Pacientes] deveRenderizar:', deveRenderizar);
+        
+        if (deveRenderizar) {
+          console.log('✅✅✅ [Pacientes] RENDERIZANDO MODAL STEP-BY-STEP PARA CLÍNICA');
+          console.log('✅✅✅ [Pacientes] Valores:', { showModal, isClinica, editingPaciente });
+        }
+        return deveRenderizar ? (
+          <ModalCadastroPacienteClinica
+            onClose={() => {
+              console.log('🔍 [Pacientes] Modal clínica fechando');
+              setShowModal(false);
+              resetForm();
+            }}
+            onComplete={() => {
+              console.log('✅ [Pacientes] Modal clínica completado');
+              setShowModal(false);
+              resetForm();
+              fetchPacientes();
+            }}
+          />
+        ) : null;
+      })()}
       
-      {/* Modal de Cadastro - Formulário Simples (para freelancers) */}
-      {showModal && !editingPaciente && isConsultor && !isAdmin && !isConsultorInterno && !isClinica && (
+      {/* PRIORIDADE 2: Outros modais (só renderizam se NÃO for clínica) */}
+      {showModal && !isClinica && !editingPaciente && (
+        <>
+          {/* Modal Simples para Freelancers */}
+          {isConsultor && !isAdmin && !isConsultorInterno && (
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: '700px' }}>
             <div className="modal-header">
@@ -5964,18 +6022,18 @@ const Pacientes = () => {
             </form>
           </div>
         </div>
-      )}
+          )}
+          
+          {/* Modal Completo para Admins e Internos */}
+          {(isAdmin || isConsultorInterno) && (
+            <div className="modal-overlay">
+              <div className="modal">
+                <div className="modal-header">
+                  <h2 className="modal-title">{empresaId === 5 ? 'Novo Cliente' : 'Novo Paciente'}</h2>
+                  <button className="close-btn" onClick={resetForm}>×</button>
+                </div>
 
-      {/* Modal de Cadastro - Formulário Completo (para admins e internos) */}
-      {showModal && !editingPaciente && (isAdmin || isConsultorInterno || !isConsultor) && !isClinica && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <div className="modal-header">
-              <h2 className="modal-title">{empresaId === 5 ? 'Novo Cliente' : 'Novo Paciente'}</h2>
-              <button className="close-btn" onClick={resetForm}>×</button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="modal-body">
+                <form onSubmit={handleSubmit} className="modal-body">
               <div className="form-group">
                 <label className="form-label">Nome Completo *</label>
                 <input
@@ -6177,245 +6235,13 @@ const Pacientes = () => {
             </form>
           </div>
         </div>
+          )}
+        </>
       )}
-      {/* Modal de Cadastro - Formulário Completo (para admins e internos) */}
-      {showModal && !editingPaciente && (isAdmin || isConsultorInterno || !isConsultor) && !isClinica && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <div className="modal-header">
-              <h2 className="modal-title">{empresaId === 5 ? 'Novo Cliente' : 'Novo Paciente'}</h2>
-              <button className="close-btn" onClick={resetForm}>×</button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="modal-body">
-              <div className="form-group">
-                <label className="form-label">Nome Completo *</label>
-                <input
-                  type="text"
-                  name="nome"
-                  className="form-input"
-                  value={formData.nome}
-                  onChange={handleInputChange}
-                  onBlur={handleNomeBlur}
-                  placeholder="Digite o nome do paciente"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-2">
-                <div className="form-group">
-                  <label className="form-label">Telefone *</label>
-                  <input
-                    type="tel"
-                    name="telefone"
-                    className="form-input"
-                    value={formData.telefone}
-                    onChange={handleInputChange}
-                    placeholder="(11) 99999-9999"
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">CPF *</label>
-                  <input
-                    type="text"
-                    name="cpf"
-                    className="form-input"
-                    value={formData.cpf}
-                    onChange={handleInputChange}
-                    placeholder="000.000.000-00"
-                    maxLength="14"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-2">
-                <div className="form-group">
-                  <label className="form-label">Estado *</label>
-                  <select
-                    name="estado"
-                    className="form-select"
-                    value={formData.estado}
-                    onChange={handleInputChange}
-                    required
-                  >
-                    <option value="">Selecione o estado</option>
-                    {estadosBrasileiros.map(estado => (
-                      <option key={estado.sigla} value={estado.sigla}>
-                        {estado.sigla} - {estado.nome}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Cidade *</label>
-                  {formData.estado && cidadesPorEstado[formData.estado] && !cidadeCustomizada ? (
-                    <select
-                      name="cidade"
-                      className="form-select"
-                      value={formData.cidade}
-                      onChange={(e) => {
-                        if (e.target.value === 'OUTRA') {
-                          setCidadeCustomizada(true);
-                          setFormData(prev => ({ ...prev, cidade: '' }));
-                        } else {
-                          handleInputChange(e);
-                        }
-                      }}
-                      required
-                    >
-                      <option value="">Selecione a cidade</option>
-                      {cidadesPorEstado[formData.estado].map(cidade => (
-                        <option key={cidade} value={cidade}>{cidade}</option>
-                      ))}
-                      <option value="OUTRA">Outra cidade</option>
-                    </select>
-                  ) : (
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      <input
-                        type="text"
-                        name="cidade"
-                        className="form-input"
-                        value={formData.cidade}
-                        onChange={handleInputChange}
-                        placeholder="Digite o nome da cidade"
-                        disabled={!formData.estado}
-                        required
-                      />
-                      {formData.estado && cidadesPorEstado[formData.estado] && cidadeCustomizada && (
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          style={{ whiteSpace: 'nowrap', fontSize: '0.875rem', padding: '0.5rem' }}
-                          onClick={() => {
-                            setCidadeCustomizada(false);
-                            setFormData(prev => ({ ...prev, cidade: '' }));
-                          }}
-                        >
-                          Voltar
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Campos de Endereço */}
-              <div className="form-group">
-                <label className="form-label">Rua</label>
-                <input
-                  type="text"
-                  name="endereco"
-                  className="form-input"
-                  value={formData.endereco}
-                  onChange={handleInputChange}
-                  placeholder="Digite o nome da rua"
-                />
-              </div>
-
-              <div className="grid grid-2">
-                <div className="form-group">
-                  <label className="form-label">Bairro</label>
-                  <input
-                    type="text"
-                    name="bairro"
-                    className="form-input"
-                    value={formData.bairro}
-                    onChange={handleInputChange}
-                    placeholder="Digite o bairro"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Número</label>
-                  <input
-                    type="text"
-                    name="numero"
-                    className="form-input"
-                    value={formData.numero}
-                    onChange={handleInputChange}
-                    placeholder="Número"
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">CEP</label>
-                <input
-                  type="text"
-                  name="cep"
-                  className="form-input"
-                  value={formData.cep}
-                  onChange={handleInputChange}
-                  placeholder="00000-000"
-                  maxLength="9"
-                />
-              </div>
-
-              <div className="grid grid-2">
-                <div className="form-group">
-                  <label className="form-label">{empresaId === 5 ? 'Empreendimento *' : 'Tipo de Tratamento *'}</label>
-                  <select
-                    name="tipo_tratamento"
-                    className="form-select"
-                    value={formData.tipo_tratamento}
-                    onChange={handleInputChange}
-                    required
-                  >
-                    <option value="">Selecione</option>
-                    <option value="Estético">Estético</option>
-                    <option value="Odontológico">Odontológico</option>
-                    <option value="Ambos">Ambos</option>
-                  </select>
-                </div>
-                </div>
-
-              <div className="form-group">
-                <label className="form-label">{empresaId === 5 ? 'Corretor Responsável' : 'Consultor Responsável'}</label>
-                <select
-                  name="consultor_id"
-                  className="form-select"
-                  value={formData.consultor_id}
-                  onChange={handleInputChange}
-                >
-                  <option value="">Selecione (opcional)</option>
-                  {consultores.filter(consultor => consultor.empresa_id === user?.empresa_id).map(consultor => (
-                    <option key={consultor.id} value={consultor.id}>
-                      {consultor.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Observações</label>
-                <textarea
-                  name="observacoes"
-                  className="form-textarea"
-                  value={formData.observacoes}
-                  onChange={handleInputChange}
-                  placeholder="Informações adicionais..."
-                  rows="3"
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={resetForm}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Cadastrar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {/* Modal de Edição - Formulário Completo (para todos que podem editar) */}
-      {showModal && editingPaciente && (
+      {showModal && editingPaciente && (() => {
+        console.log('❌ [Pacientes] RENDERIZANDO MODAL DE EDIÇÃO');
+        return true;
+      })() && (
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
@@ -8020,7 +7846,10 @@ const Pacientes = () => {
         </div>
       )}
       {/* Modal de Edição para Clínicas (mantém o antigo para edição) */}
-      {showModal && isClinica && editingPaciente && (
+      {showModal && isClinica && editingPaciente && (() => {
+        console.log('❌ [Pacientes] RENDERIZANDO MODAL DE EDIÇÃO PARA CLÍNICA');
+        return true;
+      })() && (
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: '900px', maxHeight: '90vh', overflow: 'auto' }}>
             <div className="modal-header">
@@ -8996,8 +8825,8 @@ const Pacientes = () => {
         />
       )}
       
-      {/* Modal de Cadastro Completo para Clínicas */}
-      {showCadastroCompletoModal && isClinica && (
+      {/* Modal de Cadastro Completo para Clínicas - REMOVIDO - Agora usa ModalCadastroPacienteClinica */}
+      {false && showCadastroCompletoModal && isClinica && (
         <div className="modal-overlay">
           <div className="modal" style={{ 
             maxWidth: window.innerWidth <= 768 ? '95vw' : '1000px', 
