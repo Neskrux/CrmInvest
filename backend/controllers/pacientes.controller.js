@@ -453,11 +453,70 @@ const createPaciente = async (req, res) => {
   }
 };
 
+// GET /api/pacientes/:id - Buscar paciente por ID
+const getPacienteById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Se for paciente, só pode buscar seus próprios dados
+    if (req.user.tipo === 'paciente') {
+      const pacienteId = req.user.paciente_id || req.user.id;
+      if (parseInt(id) !== parseInt(pacienteId)) {
+        return res.status(403).json({ error: 'Você só pode visualizar seus próprios dados.' });
+      }
+    }
+    
+    // Se for clínica, só pode buscar pacientes cadastrados por ela
+    if (req.user.tipo === 'clinica') {
+      const { data: paciente, error: fetchError } = await supabaseAdmin
+        .from('pacientes')
+        .select('cadastrado_por_clinica, clinica_id')
+        .eq('id', id)
+        .single();
+        
+      if (fetchError) {
+        return res.status(404).json({ error: 'Paciente não encontrado' });
+      }
+      
+      // Clínica só pode ver pacientes que ela mesma cadastrou
+      if (!paciente.cadastrado_por_clinica || paciente.clinica_id !== (req.user.clinica_id || req.user.id)) {
+        return res.status(403).json({ error: 'Você só pode visualizar pacientes cadastrados pela sua clínica.' });
+      }
+    }
+    
+    // Buscar paciente completo
+    const { data: pacienteData, error } = await supabaseAdmin
+      .from('pacientes')
+      .select(`
+        *,
+        empreendimentos(nome, cidade, estado)
+      `)
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Paciente não encontrado' });
+      }
+      throw error;
+    }
+    
+    if (!pacienteData) {
+      return res.status(404).json({ error: 'Paciente não encontrado' });
+    }
+    
+    res.json(pacienteData);
+  } catch (error) {
+    console.error('❌ Erro ao buscar paciente:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // PUT /api/pacientes/:id - Atualizar paciente
 const updatePaciente = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, telefone, email, cpf, tipo_tratamento, status, observacoes, consultor_id, sdr_id, cidade, estado, cadastrado_por_clinica, clinica_id, grau_parentesco, tratamento_especifico, endereco, bairro, numero, cep } = req.body;
+    const { nome, telefone, email, cpf, tipo_tratamento, status, observacoes, consultor_id, sdr_id, cidade, estado, cadastrado_por_clinica, clinica_id, grau_parentesco, tratamento_especifico, endereco, bairro, numero, cep, data_nascimento, contrato_servico_url } = req.body;
     
     // Verificar se é consultor freelancer - freelancers não podem editar pacientes completamente
     if (req.user.tipo === 'consultor' && req.user.podealterarstatus !== true) {
@@ -483,6 +542,17 @@ const updatePaciente = async (req, res) => {
     // Normalizar telefone e CPF (remover formatação)
     const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
     const cpfNumeros = cpf ? cpf.replace(/\D/g, '') : '';
+    
+    console.log('🔍 [UPDATE_PACIENTE] CPF recebido:', {
+      cpf_original: cpf,
+      cpf_tipo: typeof cpf,
+      cpf_é_undefined: cpf === undefined,
+      cpf_é_null: cpf === null,
+      cpf_é_vazio: cpf === '',
+      cpf_numeros: cpfNumeros,
+      cpf_numeros_length: cpfNumeros.length,
+      paciente_id: id
+    });
     
     // Verificar se telefone já existe em outro paciente da mesma empresa
     if (telefoneNumeros) {
@@ -580,26 +650,49 @@ const updatePaciente = async (req, res) => {
       statusFinal: statusFinal
     });
     
-    // Se é clínica editando, manter os campos específicos
+    // Criar updateData apenas com campos que foram explicitamente fornecidos
     const updateData = {
-      nome, 
-      telefone: telefoneNumeros, // Usar telefone normalizado
-      email,
-      cpf: cpfNumeros, // Usar CPF normalizado
-      tipo_tratamento, 
-      status: statusFinal, // Usar status diferenciado
-      observacoes,
-      sdr_id: sdr_id || null, // Adicionar suporte para sdr_id
-      cidade,
-      estado,
-      grau_parentesco,
-      tratamento_especifico,
-      endereco,
-      bairro,
-      numero,
-      cep: cep ? cep.replace(/\D/g, '') : null, // Normalizar CEP (apenas números)
-      empresa_id: req.user.empresa_id // Atualizar empresa_id do usuário que está editando
+      empresa_id: req.user.empresa_id // Sempre atualizar empresa_id do usuário que está editando
     };
+    
+    // Só incluir campos se foram explicitamente fornecidos
+    if (nome !== undefined) updateData.nome = nome;
+    if (telefone !== undefined) updateData.telefone = telefoneNumeros;
+    if (email !== undefined) updateData.email = email;
+    if (tipo_tratamento !== undefined) updateData.tipo_tratamento = tipo_tratamento;
+    if (status !== undefined || consultorId !== undefined) updateData.status = statusFinal;
+    if (observacoes !== undefined) updateData.observacoes = observacoes;
+    if (sdr_id !== undefined) updateData.sdr_id = sdr_id || null;
+    if (cidade !== undefined) updateData.cidade = cidade;
+    if (estado !== undefined) updateData.estado = estado;
+    if (grau_parentesco !== undefined) updateData.grau_parentesco = grau_parentesco;
+    if (tratamento_especifico !== undefined) updateData.tratamento_especifico = tratamento_especifico;
+    if (endereco !== undefined) updateData.endereco = endereco;
+    if (bairro !== undefined) updateData.bairro = bairro;
+    if (numero !== undefined) updateData.numero = numero;
+    if (cep !== undefined) updateData.cep = cep ? cep.replace(/\D/g, '') : null;
+    
+    // Só incluir CPF se foi explicitamente fornecido
+    if (cpf !== undefined && cpf !== null && cpfNumeros !== '') {
+      updateData.cpf = cpfNumeros;
+      console.log('✅ [UPDATE_PACIENTE] CPF incluído no updateData:', cpfNumeros);
+    } else {
+      console.log('⚠️ [UPDATE_PACIENTE] CPF NÃO incluído no updateData:', {
+        cpf_undefined: cpf === undefined,
+        cpf_null: cpf === null,
+        cpfNumeros_vazio: cpfNumeros === ''
+      });
+    }
+    
+    // Adicionar data_nascimento se fornecido
+    if (data_nascimento !== undefined && data_nascimento !== null && data_nascimento !== '') {
+      updateData.data_nascimento = data_nascimento;
+    }
+    
+    // Adicionar contrato_servico_url se fornecido
+    if (contrato_servico_url !== undefined && contrato_servico_url !== null && contrato_servico_url !== '') {
+      updateData.contrato_servico_url = contrato_servico_url;
+    }
     
     // Só incluir consultor_id se foi explicitamente fornecido
     if (consultor_id !== undefined) {
@@ -1959,6 +2052,7 @@ const desativarLoginPaciente = async (req, res) => {
 
 module.exports = {
   getAllPacientes,
+  getPacienteById,
   getDashboardPacientes,
   createPaciente,
   updatePaciente,

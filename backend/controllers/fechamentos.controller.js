@@ -826,6 +826,8 @@ const getContratoUrl = async (req, res) => {
   try {
     const { id } = req.params;
 
+    console.log('🔍 [GET_CONTRATO_URL] Iniciando busca de contrato para fechamento:', id);
+
     // Buscar dados do fechamento
     const { data: fechamento, error } = await supabaseAdmin
       .from('fechamentos')
@@ -833,14 +835,23 @@ const getContratoUrl = async (req, res) => {
       .eq('id', id)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ [GET_CONTRATO_URL] Erro ao buscar fechamento:', error);
+      return res.status(404).json({ error: 'Fechamento não encontrado', details: error.message });
+    }
+
+    if (!fechamento) {
+      console.warn('⚠️ [GET_CONTRATO_URL] Fechamento não encontrado:', id);
+      return res.status(404).json({ error: 'Fechamento não encontrado!' });
+    }
 
     if (!fechamento?.contrato_arquivo) {
-      return res.status(404).json({ error: 'Contrato não encontrado!' });
+      console.warn('⚠️ [GET_CONTRATO_URL] Fechamento não tem contrato_arquivo:', id);
+      return res.status(404).json({ error: 'Contrato não encontrado no fechamento!' });
     }
 
     // Log para debug
-    console.log('🔍 Buscando contrato:', {
+    console.log('🔍 [GET_CONTRATO_URL] Buscando contrato:', {
       fechamento_id: id,
       contrato_arquivo: fechamento.contrato_arquivo,
       bucket: STORAGE_BUCKET_CONTRATOS
@@ -854,7 +865,7 @@ const getContratoUrl = async (req, res) => {
       contratoPath = `fechamentos/${contratoPath}`;
     }
 
-    console.log('🔍 Caminho do contrato:', contratoPath);
+    console.log('🔍 [GET_CONTRATO_URL] Caminho do contrato:', contratoPath);
 
     // Gerar URL assinada com validade de 24 horas (86400 segundos)
     const { data: urlData, error: urlError } = await supabaseAdmin.storage
@@ -862,9 +873,24 @@ const getContratoUrl = async (req, res) => {
       .createSignedUrl(contratoPath, 86400);
 
     if (urlError) {
-      console.error('Erro ao gerar URL assinada:', urlError);
+      console.error('❌ [GET_CONTRATO_URL] Erro ao gerar URL assinada:', urlError);
+      console.error('❌ [GET_CONTRATO_URL] Detalhes do erro:', {
+        message: urlError.message,
+        statusCode: urlError.statusCode,
+        error: urlError.error
+      });
+      return res.status(500).json({ 
+        error: 'Erro ao gerar URL de download', 
+        details: urlError.message 
+      });
+    }
+
+    if (!urlData || !urlData.signedUrl) {
+      console.error('❌ [GET_CONTRATO_URL] URL assinada não foi gerada corretamente');
       return res.status(500).json({ error: 'Erro ao gerar URL de download' });
     }
+
+    console.log('✅ [GET_CONTRATO_URL] URL gerada com sucesso para fechamento:', id);
 
     // Retornar apenas a URL assinada
     res.json({ 
@@ -873,8 +899,12 @@ const getContratoUrl = async (req, res) => {
       expiraEm: '24 horas'
     });
   } catch (error) {
-    console.error('Erro ao gerar URL do contrato:', error);
-    res.status(500).json({ error: error.message });
+    console.error('❌ [GET_CONTRATO_URL] Erro ao gerar URL do contrato:', error);
+    console.error('❌ [GET_CONTRATO_URL] Stack trace:', error.stack);
+    res.status(500).json({ 
+      error: error.message || 'Erro ao gerar URL do contrato',
+      details: error.stack 
+    });
   }
 };
 

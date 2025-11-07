@@ -875,13 +875,98 @@ const validarBiometria = async (req, res) => {
       // APROVADO
       console.log('✅ [VALIDAÇÃO BIOMÉTRICA] Match confirmado - Identidade validada');
       
+      // Salvar fotos no Supabase Storage
+      let selfieUrl = null;
+      let documentoUrl = null;
+      
+      try {
+        const documentsService = require('../services/documents.service');
+        const { STORAGE_BUCKET_DOCUMENTOS } = require('../config/constants');
+        
+        // Converter base64 para Buffer
+        const base64ToBuffer = (base64String) => {
+          // Remove o prefixo data:image/...;base64, se existir
+          const base64Data = base64String.replace(/^data:image\/\w+;base64,/, '');
+          return Buffer.from(base64Data, 'base64');
+        };
+        
+        // Determinar tipo MIME a partir do base64
+        const getMimeType = (base64String) => {
+          if (base64String.startsWith('data:image/jpeg') || base64String.startsWith('data:image/jpg')) {
+            return 'image/jpeg';
+          } else if (base64String.startsWith('data:image/png')) {
+            return 'image/png';
+          }
+          return 'image/jpeg'; // Default
+        };
+        
+        // Upload da selfie
+        const selfieBuffer = base64ToBuffer(selfie_base64);
+        const selfieMimeType = getMimeType(selfie_base64);
+        const timestamp = Date.now();
+        const selfieFileName = `pacientes/${paciente_id}/selfie_biometrica_${timestamp}.jpg`;
+        
+        const { data: selfieUpload, error: selfieError } = await supabaseAdmin.storage
+          .from(STORAGE_BUCKET_DOCUMENTOS)
+          .upload(selfieFileName, selfieBuffer, {
+            contentType: selfieMimeType,
+            upsert: false
+          });
+        
+        if (!selfieError && selfieUpload) {
+          const { data: selfieUrlData } = supabaseAdmin.storage
+            .from(STORAGE_BUCKET_DOCUMENTOS)
+            .getPublicUrl(selfieFileName);
+          selfieUrl = selfieUrlData.publicUrl;
+          console.log('✅ [VALIDAÇÃO BIOMÉTRICA] Selfie salva:', selfieUrl);
+        } else {
+          console.error('❌ [VALIDAÇÃO BIOMÉTRICA] Erro ao salvar selfie:', selfieError);
+        }
+        
+        // Upload do documento (RG)
+        const documentoBuffer = base64ToBuffer(documento_base64);
+        const documentoMimeType = getMimeType(documento_base64);
+        const documentoFileName = `pacientes/${paciente_id}/documento_biometrica_${timestamp}.jpg`;
+        
+        const { data: documentoUpload, error: documentoError } = await supabaseAdmin.storage
+          .from(STORAGE_BUCKET_DOCUMENTOS)
+          .upload(documentoFileName, documentoBuffer, {
+            contentType: documentoMimeType,
+            upsert: false
+          });
+        
+        if (!documentoError && documentoUpload) {
+          const { data: documentoUrlData } = supabaseAdmin.storage
+            .from(STORAGE_BUCKET_DOCUMENTOS)
+            .getPublicUrl(documentoFileName);
+          documentoUrl = documentoUrlData.publicUrl;
+          console.log('✅ [VALIDAÇÃO BIOMÉTRICA] Documento salvo:', documentoUrl);
+        } else {
+          console.error('❌ [VALIDAÇÃO BIOMÉTRICA] Erro ao salvar documento:', documentoError);
+        }
+      } catch (uploadError) {
+        console.error('❌ [VALIDAÇÃO BIOMÉTRICA] Erro ao fazer upload das fotos:', uploadError);
+        // Continuar mesmo se o upload falhar (não bloquear a validação)
+      }
+      
+      // Atualizar paciente com resultado e URLs das fotos
+      const updateData = {
+        biometria_aprovada: true,
+        biometria_aprovada_em: new Date().toISOString(),
+        biometria_erro: null
+      };
+      
+      if (selfieUrl) {
+        updateData.selfie_biometrica_url = selfieUrl;
+      }
+      
+      if (documentoUrl) {
+        updateData.documento_biometrica_url = documentoUrl;
+      }
+      
       await supabaseAdmin
         .from('pacientes')
-        .update({
-          biometria_aprovada: true,
-          biometria_aprovada_em: new Date().toISOString(),
-          biometria_erro: null
-        })
+        .update(updateData)
         .eq('id', paciente_id);
 
       // Gerar token JWT para o paciente
@@ -913,6 +998,7 @@ const validarBiometria = async (req, res) => {
         usuario: {
           ...paciente,
           tipo: 'paciente',
+          paciente_id: paciente.id,
           biometria_aprovada: true
         }
       });

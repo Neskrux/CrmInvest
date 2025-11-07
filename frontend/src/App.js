@@ -41,6 +41,7 @@ import MeusBoletosPaciente from './components/MeusBoletosPaciente';
 import ValidacaoBiometrica from './components/ValidacaoBiometrica';
 import AssinaturaDigital from './components/AssinaturaDigital';
 import ValidarDocumentoAssinado from './components/ValidarDocumentoAssinado';
+// Removida importação de CadastroCompletoPaciente - agora usa ModalCadastroCompletoPaciente
 import logoBrasao from './images/logobrasao.png';
 import logoHorizontal from './images/logohorizontal.png';
 import logoHorizontalPreto from './images/logohorizontalpreto.png';

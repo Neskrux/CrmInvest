@@ -8,6 +8,9 @@ const { authenticateToken, requireAdmin } = require('../middleware/auth');
 // GET /api/pacientes - Listar pacientes
 router.get('/pacientes', authenticateToken, pacientesController.getAllPacientes);
 
+// GET /api/pacientes/:id - Buscar paciente por ID
+router.get('/pacientes/:id', authenticateToken, pacientesController.getPacienteById);
+
 // GET /api/dashboard/pacientes - Listar pacientes para dashboard
 router.get('/dashboard/pacientes', authenticateToken, pacientesController.getDashboardPacientes);
 
