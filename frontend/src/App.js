@@ -13,7 +13,6 @@ import CapturaClinica from './components/CapturaClinica';
 import CapturaClinicaSucesso from './components/CapturaClinicaSucesso';
 import CapturaClientes from './components/CapturaClientes';
 import CapturaSucessoClientes from './components/CapturaSucessoClientes';
-import CapturaIndicadorClientes from './components/CapturaIndicadorClientes';
 import Login from './components/Login';
 import ResetPassword from './components/ResetPassword';
 import Dashboard from './components/Dashboard';
@@ -25,7 +24,6 @@ import Agendamentos from './components/Agendamentos';
 import Fechamentos from './components/Fechamentos';
 import MetaAds from './components/MetaAds';
 import Movimentacoes from './components/Movimentacoes';
-// import WhatsApp from './components/WhatsApp'; // Temporariamente removido
 import Perfil from './components/Perfil';
 import Materiais from './components/Materiais';
 import IDSFIntegration from './components/IDSFIntegration';
@@ -1334,7 +1332,6 @@ function App() {
               {/* Rotas públicas - Captura de clientes */}
               <Route path="/captura-clientes" element={<CapturaClientes />} />
               <Route path="/captura-sucesso-clientes" element={<CapturaSucessoClientes />} />
-              <Route path="/captura-indicador-cliente" element={<CapturaIndicadorClientes />} />
 
               {/* Rotas da aplicação principal */}
               <Route path="/*" element={<AppContent />} />

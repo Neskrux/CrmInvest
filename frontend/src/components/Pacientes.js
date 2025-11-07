@@ -8,6 +8,7 @@ import ModalEvidencia from './ModalEvidencia';
 import ModalCriarLoginPaciente from './ModalCriarLoginPaciente';
 import * as XLSX from 'xlsx';
 import useSmartPolling from '../hooks/useSmartPolling';
+import './Pacientes.css';
 
 const Pacientes = () => {
   const { t, empresaId, shouldShow } = useBranding();
@@ -3689,21 +3690,21 @@ const Pacientes = () => {
       {activeTab === 'pacientes' && (
         <>
           {/* Resumo de Estatísticas */}
-          <div className="stats-grid" style={{ marginBottom: '2rem' }}>
+          <div className="pacientes-stats-grid">
             
-            <div className="stat-card">
-              <div className="stat-label">Agendamentos</div>
-              <div className="stat-value">{agendamentos.length}</div>
+            <div className="pacientes-stat-card">
+              <div className="pacientes-stat-label">Agendamentos</div>
+              <div className="pacientes-stat-value">{agendamentos.length}</div>
             </div>
             
-            <div className="stat-card">
-              <div className="stat-label">Fechados</div>
-              <div className="stat-value">{pacientes.filter(p => p.status === 'fechado').length}</div>
+            <div className="pacientes-stat-card">
+              <div className="pacientes-stat-label">Fechados</div>
+              <div className="pacientes-stat-value">{pacientes.filter(p => p.status === 'fechado').length}</div>
             </div>
             
-            <div className="stat-card">
-              <div className="stat-label">Taxa Conversão</div>
-              <div className="stat-value">
+            <div className="pacientes-stat-card">
+              <div className="pacientes-stat-label">Taxa Conversão</div>
+              <div className="pacientes-stat-value">
                 {pacientes.length > 0 
                   ? Math.round((pacientes.filter(p => p.status === 'fechado').length / pacientes.length) * 100)
                   : 0}%
@@ -3711,9 +3712,9 @@ const Pacientes = () => {
             </div>
           </div>
 
-          <div className="card" style={{ marginBottom: '1.5rem' }}>
-            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 className="card-title" style={{ fontSize: '1.1rem' }}>Filtros</h2>
+          <div className="pacientes-card" style={{ marginBottom: '1.5rem' }}>
+            <div className="pacientes-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 className="pacientes-card-title" style={{ fontSize: '1.1rem' }}>Filtros</h2>
               <button className="btn btn-secondary" onClick={() => setMostrarFiltros(!mostrarFiltros)}>
                 {mostrarFiltros ? 'Ocultar Filtros' : 'Filtros'}
               </button>
@@ -3852,8 +3853,8 @@ const Pacientes = () => {
             )}
           </div>
 
-          <div className="card">
-            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="pacientes-card">
+            <div className="pacientes-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h2 className="card-title">Lista de {t.paciente.toLowerCase()+'s'}</h2>
                 <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
@@ -4165,8 +4166,8 @@ const Pacientes = () => {
       {/* Conteúdo da aba Novos Leads */}
       {activeTab === 'novos-leads' && (
         <>
-          <div className="card">
-            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="pacientes-card">
+            <div className="pacientes-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h2 className="card-title">Novos Leads</h2>
                 <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
@@ -4560,7 +4561,7 @@ const Pacientes = () => {
           )}
 
           <div className="card" style={{ marginBottom: '1.5rem' }}>
-            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="pacientes-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 className="card-title" style={{ fontSize: '1.1rem' }}>Filtros</h2>
               <button className="btn btn-secondary" onClick={() => setMostrarFiltrosNegativos(!mostrarFiltrosNegativos)}>
                 {mostrarFiltrosNegativos ? 'Ocultar Filtros' : 'Filtros'}
@@ -4630,8 +4631,8 @@ const Pacientes = () => {
             )}
           </div>
 
-          <div className="card">
-            <div className="card-header">
+          <div className="pacientes-card">
+            <div className="pacientes-card-header">
               <h2 className="card-title">Leads Negativos</h2>
               <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                 {leadsNegativosFiltrados.length} lead(s) negativos
@@ -4878,8 +4879,8 @@ const Pacientes = () => {
       {/* Conteúdo da aba Leads (apenas para clínicas) */}
       {activeTab === 'leads-clinica' && isClinica && (
         <>
-          <div className="card">
-            <div className="card-header">
+          <div className="pacientes-card">
+            <div className="pacientes-card-header">
               <h2 className="card-title">Pacientes com Agendamento na Clínica</h2>
               <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                 Pacientes com agendamentos marcados para sua clínica que ainda não fecharam contrato
@@ -5044,10 +5045,10 @@ const Pacientes = () => {
       {activeTab === 'meus-pacientes' && isClinica && (
         <>
           {/* Resumo de Estatísticas para Clínicas */}
-          <div className="stats-grid" style={{ marginBottom: '2rem', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
-            <div className="stat-card">
-              <div className="stat-label">Total de Pacientes</div>
-              <div className="stat-value">
+          <div className="pacientes-stats-grid" style={{ marginBottom: '2rem', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+            <div className="pacientes-stat-card">
+              <div className="pacientes-stat-label">Total de Pacientes</div>
+              <div className="pacientes-stat-value">
                 {(() => {
                   const clinicaId = user?.clinica_id || user?.id;
                   // TODOS os fechamentos, não só aprovados
@@ -5058,9 +5059,9 @@ const Pacientes = () => {
               </div>
             </div>
             
-            <div className="stat-card">
-              <div className="stat-label">Fechamentos Aprovados</div>
-              <div className="stat-value">
+            <div className="pacientes-stat-card">
+              <div className="pacientes-stat-label">Fechamentos Aprovados</div>
+              <div className="pacientes-stat-value">
                 {(() => {
                   const clinicaId = user?.clinica_id || user?.id;
                   return fechamentos.filter(f => f.clinica_id === clinicaId && f.aprovado === 'aprovado').length;
@@ -5068,9 +5069,9 @@ const Pacientes = () => {
               </div>
             </div>
             
-            <div className="stat-card">
-              <div className="stat-label">Doc. Completa</div>
-              <div className="stat-value">
+            <div className="pacientes-stat-card">
+              <div className="pacientes-stat-label">Doc. Completa</div>
+              <div className="pacientes-stat-value">
                 {(() => {
                   const clinicaId = user?.clinica_id || user?.id;
                   const fechamentosClinica = fechamentos.filter(f => f.clinica_id === clinicaId);
@@ -5089,9 +5090,9 @@ const Pacientes = () => {
               </div>
             </div>
             
-            <div className="stat-card">
-              <div className="stat-label">Doc. Pendente</div>
-              <div className="stat-value">
+            <div className="pacientes-stat-card">
+              <div className="pacientes-stat-label">Doc. Pendente</div>
+              <div className="pacientes-stat-value">
                 {(() => {
                   const clinicaId = user?.clinica_id || user?.id;
                   const fechamentosClinica = fechamentos.filter(f => f.clinica_id === clinicaId);
@@ -5111,8 +5112,8 @@ const Pacientes = () => {
             </div>
           </div>
 
-          <div className="card">
-            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+          <div className="pacientes-card">
+            <div className="pacientes-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
               <div>
                 <h2 className="card-title" style={{ marginBottom: '0.5rem' }}>Lista de {t.paciente.toLowerCase()+'s'} com Fechamento</h2>
                 <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
@@ -5380,8 +5381,8 @@ const Pacientes = () => {
       {/* Conteúdo da aba Carteira Existente (apenas para clínicas, não para incorporadora) */}
       {activeTab === 'carteira-existente' && isClinica && !isIncorporadora && (
         <>
-          <div className="card">
-            <div className="card-header">
+          <div className="pacientes-card">
+            <div className="pacientes-card-header">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <h2 className="card-title">Carteira Existente</h2>
@@ -5495,7 +5496,7 @@ const Pacientes = () => {
           {/* Seção de Solicitações Enviadas para Clínicas */}
           {solicitacoesCarteira.length > 0 && (
             <div className="card" style={{ marginTop: '1.5rem' }}>
-              <div className="card-header">
+              <div className="pacientes-card-header">
                 <div>
                   <h2 className="card-title">Suas Solicitações</h2>
                   <p style={{ margin: 0, color: '#6b7280', fontSize: '0.875rem' }}>
@@ -5610,8 +5611,8 @@ const Pacientes = () => {
       {/* Conteúdo da aba Carteira Existente para Admin - Visualizar solicitações */}
       {activeTab === 'carteira-existente' && isAdmin && (
         <>
-          <div className="card">
-            <div className="card-header">
+          <div className="pacientes-card">
+            <div className="pacientes-card-header">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <h2 className="card-title">Solicitações de Carteira Existente</h2>
@@ -6733,40 +6734,32 @@ const Pacientes = () => {
       )}
       {/* Modal de visualização com abas */}
       {showViewModal && viewPaciente && (
-        <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: '1000px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div className="modal-header">
-              <h2 className="modal-title">
+        <div className="modal-overlay" style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}>
+          <div className="pacientes-view-modal" style={{ 
+            maxWidth: '1000px', 
+            maxHeight: window.innerWidth <= 768 ? '100vh' : '90vh',
+            width: '100%',
+            height: window.innerWidth <= 768 ? '100vh' : 'auto',
+            borderRadius: window.innerWidth <= 768 ? '0' : '12px'
+          }}>
+            <div className="pacientes-view-modal modal-header">
+              <h2 className="pacientes-view-modal modal-title">
                 {isIncorporadora ? 'Cliente' : 'Paciente'}: {viewPaciente.nome}
               </h2>
-              <button className="close-btn" onClick={closeViewModal}>×</button>
+              <button className="pacientes-view-modal close-btn" onClick={closeViewModal}>×</button>
             </div>
             
             {/* Abas de Navegação */}
-            <div style={{ 
-              borderBottom: '1px solid #e5e7eb',
-              padding: '0 1.5rem',
-              overflowX: 'auto',
-              WebkitOverflowScrolling: 'touch'
-            }}>
-              <div style={{ 
-                display: 'flex', 
-                gap: window.innerWidth <= 768 ? '0' : '2rem',
-                minWidth: 'max-content'
+            <div className="pacientes-view-tabs">
+              <div className="pacientes-view-tabs-container" style={{ 
+                gap: window.innerWidth <= 768 ? '0' : '2rem'
               }}>
                 <button
                   onClick={() => handleTabChange('informacoes')}
+                  className={`pacientes-view-tab ${activeViewTab === 'informacoes' ? 'active' : ''}`}
                   style={{
                     padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
-                    border: 'none',
-                    background: 'none',
-                    fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
-                    fontWeight: '500',
-                    color: activeViewTab === 'informacoes' ? '#3b82f6' : '#6b7280',
-                    borderBottom: activeViewTab === 'informacoes' ? '2px solid #3b82f6' : '2px solid transparent',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    whiteSpace: 'nowrap'
+                    fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem'
                   }}
                 >
                   {isIncorporadora ? 'Informações do Cliente' : 'Informações do Paciente'}
@@ -6776,17 +6769,10 @@ const Pacientes = () => {
                   <>
                     <button
                       onClick={() => handleTabChange('fechamento')}
+                      className={`pacientes-view-tab ${activeViewTab === 'fechamento' ? 'active' : ''}`}
                       style={{
                         padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
-                        border: 'none',
-                        background: 'none',
-                        fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
-                        fontWeight: '500',
-                        color: activeViewTab === 'fechamento' ? '#3b82f6' : '#6b7280',
-                        borderBottom: activeViewTab === 'fechamento' ? '2px solid #3b82f6' : '2px solid transparent',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        whiteSpace: 'nowrap'
+                        fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem'
                       }}
                     >
                       Fechamento
@@ -6794,17 +6780,10 @@ const Pacientes = () => {
 
                     <button
                       onClick={() => handleTabChange('parcelamento')}
+                      className={`pacientes-view-tab ${activeViewTab === 'parcelamento' ? 'active' : ''}`}
                       style={{
                         padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
-                        border: 'none',
-                        background: 'none',
-                        fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
-                        fontWeight: '500',
-                        color: activeViewTab === 'parcelamento' ? '#3b82f6' : '#6b7280',
-                        borderBottom: activeViewTab === 'parcelamento' ? '2px solid #3b82f6' : '2px solid transparent',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        whiteSpace: 'nowrap'
+                        fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem'
                       }}
                     >
                       Parcelamento
@@ -6812,17 +6791,10 @@ const Pacientes = () => {
                     
                     <button
                       onClick={() => handleTabChange('documentos')}
+                      className={`pacientes-view-tab ${activeViewTab === 'documentos' ? 'active' : ''}`}
                       style={{
                         padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
-                        border: 'none',
-                        background: 'none',
-                        fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
-                        fontWeight: '500',
-                        color: activeViewTab === 'documentos' ? '#3b82f6' : '#6b7280',
-                        borderBottom: activeViewTab === 'documentos' ? '2px solid #3b82f6' : '2px solid transparent',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        whiteSpace: 'nowrap'
+                        fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem'
                       }}
                     >
                       Documentos
@@ -6834,17 +6806,10 @@ const Pacientes = () => {
                 {!isClinica && (
                   <button
                     onClick={() => handleTabChange('evidencias')}
+                    className={`pacientes-view-tab ${activeViewTab === 'evidencias' ? 'active' : ''}`}
                     style={{
                       padding: window.innerWidth <= 768 ? '0.75rem 0.5rem' : '1rem 0',
-                      border: 'none',
-                      background: 'none',
                       fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.875rem',
-                      fontWeight: '500',
-                      color: activeViewTab === 'evidencias' ? '#3b82f6' : '#6b7280',
-                      borderBottom: activeViewTab === 'evidencias' ? '2px solid #3b82f6' : '2px solid transparent',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      whiteSpace: 'nowrap',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem'
@@ -6852,16 +6817,7 @@ const Pacientes = () => {
                   >
                     Evidências
                     {evidenciasPaciente.length > 0 && (
-                      <span style={{
-                        backgroundColor: '#3b82f6',
-                        color: 'white',
-                        fontSize: '0.7rem',
-                        fontWeight: '600',
-                        padding: '0.125rem 0.375rem',
-                        borderRadius: '9999px',
-                        minWidth: '20px',
-                        textAlign: 'center'
-                      }}>
+                      <span className="pacientes-view-tab-badge">
                         {evidenciasPaciente.length}
                       </span>
                     )}
@@ -6870,45 +6826,45 @@ const Pacientes = () => {
               </div>
             </div>
             
-            <div style={{ padding: '1.5rem' }}>
+            <div className="pacientes-view-content">
               {/* Aba de Informações do Paciente */}
               {activeViewTab === 'informacoes' && (
                 <div style={{ display: 'grid', gap: '1rem' }}>
-                  <div>
-                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Nome Completo</label>
-                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewPaciente.nome}</p>
+                  <div className="pacientes-view-section">
+                    <label className="pacientes-view-label">Nome Completo</label>
+                    <p className="pacientes-view-value primary">{viewPaciente.nome}</p>
               </div>
                   
               <div className="grid grid-2">
-                    <div>
-                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Telefone</label>
-                      <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{formatarTelefone(viewPaciente.telefone) || '-'}</p>
+                    <div className="pacientes-view-section">
+                      <label className="pacientes-view-label">Telefone</label>
+                      <p className="pacientes-view-value">{formatarTelefone(viewPaciente.telefone) || '-'}</p>
                 </div>
                     
-                    <div>
-                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>CPF</label>
-                      <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937', fontFamily: 'monospace' }}>{formatarCPF(viewPaciente.cpf) || '-'}</p>
+                    <div className="pacientes-view-section">
+                      <label className="pacientes-view-label">CPF</label>
+                      <p className="pacientes-view-value" style={{ fontFamily: 'monospace' }}>{formatarCPF(viewPaciente.cpf) || '-'}</p>
                 </div>
               </div>
 
                   <div className="grid grid-2">
-                    <div>
-                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Cidade</label>
-                      <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewPaciente.cidade || '-'}</p>
+                    <div className="pacientes-view-section">
+                      <label className="pacientes-view-label">Cidade</label>
+                      <p className="pacientes-view-value">{viewPaciente.cidade || '-'}</p>
                     </div>
                     
-                    <div>
-                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Estado</label>
-                      <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewPaciente.estado || '-'}</p>
+                    <div className="pacientes-view-section">
+                      <label className="pacientes-view-label">Estado</label>
+                      <p className="pacientes-view-value">{viewPaciente.estado || '-'}</p>
                     </div>
               </div>
 
               <div className="grid grid-2">
-                    <div>
-                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>
+                    <div className="pacientes-view-section">
+                      <label className="pacientes-view-label">
                         {isIncorporadora ? 'Empreendimento Desejado' : 'Tipo de Tratamento'}
                       </label>
-                      <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                      <p className="pacientes-view-value">
         {isIncorporadora ? (
           // Para incorporadora, mostrar empreendimento (prioriza externo)
           (() => {
@@ -6950,11 +6906,11 @@ const Pacientes = () => {
                       </p>
                 </div>
                     
-                    <div>
-                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>
+                    <div className="pacientes-view-section">
+                      <label className="pacientes-view-label">
                         {isIncorporadora ? 'Status do Cliente' : 'Status do Paciente'}
                       </label>
-                      <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                      <p className="pacientes-view-value">
                         {viewPaciente.status && (
                           <span 
                             className="badge"
@@ -6974,28 +6930,28 @@ const Pacientes = () => {
 
               {!isIncorporadora && (
                 <div className="grid grid-2">
-                  <div>
-                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Tratamento Específico</label>
-                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewPaciente.tratamento_especifico || '-'}</p>
+                  <div className="pacientes-view-section">
+                    <label className="pacientes-view-label">Tratamento Específico</label>
+                    <p className="pacientes-view-value">{viewPaciente.tratamento_especifico || '-'}</p>
                   </div>
                   
-                  <div>
-                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Grau de Parentesco de Quem Indicou</label>
-                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewPaciente.grau_parentesco || '-'}</p>
+                  <div className="pacientes-view-section">
+                    <label className="pacientes-view-label">Grau de Parentesco de Quem Indicou</label>
+                    <p className="pacientes-view-value">{viewPaciente.grau_parentesco || '-'}</p>
                   </div>
                 </div>
               )}
               
               {isIncorporadora && (
-                <div>
-                  <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Grau de Parentesco de Quem Indicou</label>
-                  <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>{viewPaciente.grau_parentesco || '-'}</p>
+                <div className="pacientes-view-section">
+                  <label className="pacientes-view-label">Grau de Parentesco de Quem Indicou</label>
+                  <p className="pacientes-view-value">{viewPaciente.grau_parentesco || '-'}</p>
                 </div>
               )}
                   
-                  <div>
-                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Responsável</label>
-                    <p style={{ margin: '0.25rem 0 0 0', color: '#1f2937' }}>
+                  <div className="pacientes-view-section">
+                    <label className="pacientes-view-label">Responsável</label>
+                    <p className="pacientes-view-value">
                       {(() => {
                         // Primeiro, tentar encontrar por consultor_id (freelancer)
                         const consultorResponsavel = consultores.find(c => String(c.id) === String(viewPaciente.consultor_id));
@@ -7017,88 +6973,68 @@ const Pacientes = () => {
               </div>
                   
                   {viewPaciente.observacoes && (
-                    <div>
-                      <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Observações</label>
-                      <div style={{ 
-                        margin: '0.5rem 0 0 0', 
-                        padding: '0.75rem',
-                        backgroundColor: '#f9fafb',
-                        borderRadius: '6px',
-                        border: '1px solid #e5e7eb',
-                        color: '#374151',
-                        whiteSpace: 'pre-wrap'
-                      }}>
-                        {viewPaciente.observacoes}
+                    <div className="pacientes-view-section">
+                      <label className="pacientes-view-label">Observações</label>
+                      <div className="pacientes-view-card">
+                        <div className="pacientes-view-card-content">
+                          {viewPaciente.observacoes}
+                        </div>
               </div>
               </div>
                   )}
                   
-                  <div>
-                    <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>Data de Cadastro</label>
-                    <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>
+                  <div className="pacientes-view-section">
+                    <label className="pacientes-view-label">Data de Cadastro</label>
+                    <p className="pacientes-view-value">
                       {viewPaciente.created_at ? formatarData(viewPaciente.created_at) : '-'}
                     </p>
             </div>
                   
                   {/* Seção de Login do Paciente (apenas para clínicas) */}
                   {isClinica && (
-                    <div style={{
-                      marginTop: '1.5rem',
-                      padding: '1rem',
-                      backgroundColor: '#f9fafb',
-                      borderRadius: '6px',
-                      border: '1px solid #e5e7eb'
-                    }}>
+                    <div className="pacientes-view-card" style={{ marginTop: '1.5rem' }}>
                       <div style={{
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
                         marginBottom: '0.5rem'
                       }}>
-                        <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>
+                        <label className="pacientes-view-label">
                           Acesso do Paciente
                         </label>
                         {viewPaciente.tem_login && viewPaciente.login_ativo && (
-                          <span style={{
-                            padding: '0.25rem 0.75rem',
-                            backgroundColor: '#d1fae5',
-                            color: '#065f46',
-                            borderRadius: '9999px',
-                            fontSize: '0.75rem',
-                            fontWeight: '600'
-                          }}>
+                          <span className="pacientes-badge pacientes-badge-success">
                             Login Ativo
                           </span>
                         )}
                       </div>
                       {viewPaciente.tem_login && viewPaciente.login_ativo ? (
                         <div>
-                          <p style={{ margin: '0.5rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>
+                          <p className="pacientes-view-value" style={{ margin: '0.5rem 0 0 0' }}>
                             Email: {viewPaciente.email_login || '-'}
                           </p>
                           {viewPaciente.ultimo_login && (
-                            <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>
+                            <p className="pacientes-view-value" style={{ margin: '0.25rem 0 0 0' }}>
                               Último acesso: {formatarData(viewPaciente.ultimo_login)}
                             </p>
                           )}
                           <div style={{ marginTop: '1rem' }}>
-                            <p style={{ margin: '0 0 0.5rem 0', color: '#6b7280', fontSize: '0.875rem' }}>
+                            <p className="pacientes-view-value" style={{ margin: '0 0 0.5rem 0' }}>
                               ⚠️ Gerar um novo login substituirá o login atual. O paciente precisará usar as novas credenciais.
                             </p>
                             {!viewPaciente.cpf || viewPaciente.cpf.trim() === '' ? (
-                              <div style={{
-                                padding: '0.75rem',
-                                backgroundColor: '#fef2f2',
-                                border: '1px solid #fecaca',
-                                borderRadius: '6px',
+                              <div className="pacientes-view-card" style={{
+                                backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                                borderColor: 'rgba(239, 68, 68, 0.5)',
                                 marginBottom: '0.75rem'
                               }}>
-                                <p style={{ margin: 0, fontSize: '0.875rem', color: '#991b1b' }}>
+                                <p className="pacientes-view-value" style={{ margin: 0, color: '#fca5a5' }}>
                                   ⚠️ É necessário cadastrar o CPF do paciente antes de gerar o login.
                                 </p>
                               </div>
                             ) : (
                               <button
+                                className="pacientes-btn-warning"
                                 onClick={async () => {
                                   if (!viewPaciente.cpf || viewPaciente.cpf.trim() === '') {
                                     showErrorToast('É necessário cadastrar o CPF do paciente antes de gerar o login.');
@@ -7153,27 +7089,6 @@ const Pacientes = () => {
                                   }
                                 }}
                                 disabled={gerandoLogin}
-                                style={{
-                                  padding: '0.5rem 1rem',
-                                  backgroundColor: gerandoLogin ? '#9ca3af' : '#f59e0b',
-                                  color: 'white',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  fontSize: '0.875rem',
-                                  fontWeight: '600',
-                                  cursor: gerandoLogin ? 'not-allowed' : 'pointer',
-                                  transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(e) => {
-                                  if (!gerandoLogin) {
-                                    e.target.style.backgroundColor = '#d97706';
-                                  }
-                                }}
-                                onMouseLeave={(e) => {
-                                  if (!gerandoLogin) {
-                                    e.target.style.backgroundColor = '#f59e0b';
-                                  }
-                                }}
                               >
                                 {gerandoLogin ? '⏳ Gerando...' : '🔄 Gerar Novo Login'}
                               </button>
@@ -7182,23 +7097,22 @@ const Pacientes = () => {
                         </div>
                       ) : (
                         <div>
-                          <p style={{ margin: '0.5rem 0 1rem 0', color: '#6b7280', fontSize: '0.875rem' }}>
+                          <p className="pacientes-view-value" style={{ margin: '0.5rem 0 1rem 0' }}>
                             Este paciente ainda não possui login para acessar o portal.
                           </p>
                           {!viewPaciente.cpf || viewPaciente.cpf.trim() === '' ? (
-                            <div style={{
-                              padding: '0.75rem',
-                              backgroundColor: '#fef2f2',
-                              border: '1px solid #fecaca',
-                              borderRadius: '6px',
+                            <div className="pacientes-view-card" style={{
+                              backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                              borderColor: 'rgba(239, 68, 68, 0.5)',
                               marginBottom: '0.75rem'
                             }}>
-                              <p style={{ margin: 0, fontSize: '0.875rem', color: '#991b1b' }}>
+                              <p className="pacientes-view-value" style={{ margin: 0, color: '#fca5a5' }}>
                                 ⚠️ É necessário cadastrar o CPF do paciente antes de gerar o login.
                               </p>
                             </div>
                           ) : (
                             <button
+                              className="pacientes-btn-primary"
                               onClick={async () => {
                                 if (!viewPaciente.cpf || viewPaciente.cpf.trim() === '') {
                                   showErrorToast('É necessário cadastrar o CPF do paciente antes de gerar o login.');
@@ -7244,27 +7158,6 @@ const Pacientes = () => {
                                 }
                               }}
                               disabled={gerandoLogin}
-                              style={{
-                                padding: '0.5rem 1rem',
-                                backgroundColor: gerandoLogin ? '#9ca3af' : '#1a1d23',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                fontSize: '0.875rem',
-                                fontWeight: '600',
-                                cursor: gerandoLogin ? 'not-allowed' : 'pointer',
-                                transition: 'all 0.2s'
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!gerandoLogin) {
-                                  e.target.style.backgroundColor = '#374151';
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                if (!gerandoLogin) {
-                                  e.target.style.backgroundColor = '#1a1d23';
-                                }
-                              }}
                             >
                               {gerandoLogin ? 'Gerando...' : 'Gerar Login Automaticamente'}
                             </button>
