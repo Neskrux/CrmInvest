@@ -1,11 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from './Toast';
+import ModalCadastroCompletoPaciente from './ModalCadastroCompletoPaciente';
 
 const DashboardPaciente = () => {
   const { user, makeRequest, pacienteId } = useAuth();
   const { success: showSuccessToast, error: showErrorToast } = useToast();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [showModalCadastro, setShowModalCadastro] = useState(false);
+  const [pacienteData, setPacienteData] = useState(null);
+  const [cadastroFinalizado, setCadastroFinalizado] = useState(false); // Flag para evitar loop
   const [dados, setDados] = useState({
     proximosAgendamentos: [],
     documentosPendentes: 0,
@@ -13,11 +19,7 @@ const DashboardPaciente = () => {
     totalBoletos: 0
   });
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       // TODO: Implementar endpoint específico para dashboard do paciente
@@ -34,7 +36,93 @@ const DashboardPaciente = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showErrorToast]);
+
+  const verificarCadastroCompleto = useCallback(async () => {
+    // Se o cadastro já foi finalizado, não verificar novamente
+    if (cadastroFinalizado) {
+      console.log('✅ [DashboardPaciente] Cadastro já finalizado. Pulando verificação.');
+      return;
+    }
+    
+    try {
+      const pacienteId = user?.paciente_id || user?.id;
+      
+      if (!pacienteId) {
+        console.log('⚠️ [DashboardPaciente] pacienteId não encontrado:', { 
+          paciente_id: user?.paciente_id, 
+          id: user?.id,
+          user 
+        });
+        setLoading(false);
+        return;
+      }
+
+      console.log('🔍 [DashboardPaciente] Verificando cadastro completo para paciente:', pacienteId);
+
+      const response = await makeRequest(`/pacientes/${pacienteId}`);
+      if (response.ok) {
+        const paciente = await response.json();
+        setPacienteData(paciente);
+        
+        console.log('📋 [DashboardPaciente] Dados do paciente:', {
+          cpf: paciente.cpf ? '✓' : '✗',
+          data_nascimento: paciente.data_nascimento ? '✓' : '✗',
+          comprovante_residencia_url: paciente.comprovante_residencia_url ? '✓' : '✗',
+          contrato_servico_url: paciente.contrato_servico_url ? '✓' : '✗'
+        });
+        
+        // Se o cadastro já foi finalizado, não verificar novamente
+        if (cadastroFinalizado) {
+          console.log('✅ [DashboardPaciente] Cadastro já foi finalizado. Pulando verificação.');
+          fetchDashboardData();
+          return;
+        }
+        
+        // Verificar se algum campo obrigatório está faltando
+        // IMPORTANTE: Mesmo que o CPF já exista, o paciente deve passar pelo step-by-step
+        // para confirmar cada informação
+        // NOTA: O contrato não é obrigatório, pois pode não existir fechamento ainda
+        const faltaCPF = !paciente.cpf || paciente.cpf.trim() === '';
+        const faltaDataNascimento = !paciente.data_nascimento || paciente.data_nascimento.trim() === '';
+        const faltaComprovante = !paciente.comprovante_residencia_url || paciente.comprovante_residencia_url.trim() === '';
+        
+        const cadastroIncompleto = faltaCPF || faltaDataNascimento || faltaComprovante;
+        
+        if (cadastroIncompleto) {
+          console.log('⚠️ [DashboardPaciente] Cadastro incompleto. Mostrando modal...');
+          // Mostrar modal para completar cadastro
+          setShowModalCadastro(true);
+          setLoading(false);
+          return;
+        }
+        
+        console.log('✅ [DashboardPaciente] Cadastro completo!');
+      } else {
+        console.error('❌ [DashboardPaciente] Erro ao buscar paciente:', response.status);
+      }
+      
+      // Se chegou aqui, cadastro está completo - carregar dados do dashboard
+      fetchDashboardData();
+    } catch (error) {
+      console.error('❌ [DashboardPaciente] Erro ao verificar cadastro:', error);
+      // Em caso de erro, tentar carregar dashboard mesmo assim
+      fetchDashboardData();
+    }
+  }, [user, makeRequest, fetchDashboardData, cadastroFinalizado]);
+
+  useEffect(() => {
+    // Aguardar o user estar disponível antes de verificar
+    // Não verificar se o cadastro já foi finalizado
+    if (user && !cadastroFinalizado) {
+      verificarCadastroCompleto();
+    } else if (!user) {
+      setLoading(false);
+    } else if (cadastroFinalizado) {
+      // Se o cadastro foi finalizado, apenas carregar o dashboard
+      fetchDashboardData();
+    }
+  }, [user, cadastroFinalizado, verificarCadastroCompleto, fetchDashboardData]);
 
   if (loading) {
     return (
@@ -152,6 +240,37 @@ const DashboardPaciente = () => {
           )}
         </div>
       </div>
+      
+      {/* Modal de Cadastro Completo */}
+      {showModalCadastro && pacienteData && (
+        <ModalCadastroCompletoPaciente 
+          paciente={pacienteData}
+          onClose={() => {
+            setShowModalCadastro(false);
+            // Não verificar imediatamente ao fechar, apenas se o usuário fechar manualmente
+          }}
+          onComplete={() => {
+            console.log('✅ [DashboardPaciente] onComplete chamado - finalizando cadastro');
+            
+            // Marcar cadastro como finalizado para evitar loop
+            setCadastroFinalizado(true);
+            
+            // Fechar o modal imediatamente
+            setShowModalCadastro(false);
+            setPacienteData(null);
+            
+            // Mostrar mensagem de sucesso
+            showSuccessToast('Cadastro completado com sucesso! Carregando seu dashboard...');
+            
+            // Aguardar um pouco e carregar o dashboard
+            setTimeout(() => {
+              console.log('✅ [DashboardPaciente] Carregando dashboard...');
+              setLoading(false);
+              fetchDashboardData();
+            }, 500);
+          }}
+        />
+      )}
     </div>
   );
 };

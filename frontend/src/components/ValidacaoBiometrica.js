@@ -220,14 +220,29 @@ const ValidacaoBiometrica = () => {
       console.log('🔐 [FRONTEND] Dados da resposta:', data);
 
       if (response.ok && data.aprovado) {
-        // APROVADO - Salvar token e redirecionar
+        // APROVADO - Fazer login automático e redirecionar para dashboard
         showSuccessToast('Identidade validada com sucesso!');
         
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.usuario));
-        
-        // Redirecionar para dashboard do paciente
-        navigate('/dashboard');
+        // Salvar token e fazer login automático
+        if (data.token && data.usuario) {
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.usuario));
+          localStorage.setItem('login_timestamp', new Date().toISOString());
+          localStorage.setItem('login_email', data.usuario.email_login || email);
+          
+          // Atualizar o contexto de autenticação diretamente
+          // O useEffect do AuthContext vai detectar o token e carregar o usuário
+          
+          // Aguardar um pouco para mostrar a mensagem de sucesso
+          setTimeout(() => {
+            window.location.href = '/dashboard';
+          }, 1500);
+        } else {
+          // Se não tiver token, redirecionar para login
+          setTimeout(() => {
+            navigate('/login');
+          }, 1500);
+        }
       } else {
         // NÃO APROVADO - Mostrar erro e permitir tentar novamente
         const errorMessage = data.error || data.message || 'As faces não correspondem. Por favor, tente novamente.';
