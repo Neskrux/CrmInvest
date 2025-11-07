@@ -82,13 +82,10 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
   const [hasAssinatura, setHasAssinatura] = useState(false);
   const [contratoPdfBytes, setContratoPdfBytes] = useState(null);
   const [contratoPdfUrl, setContratoPdfUrl] = useState(null);
-  const [posicaoAssinatura, setPosicaoAssinatura] = useState({ x: 100, y: 100 });
-  const [tamanhoAssinatura] = useState({ width: 150, height: 60 }); // Tamanho fixo menor e razoável
-  const [isDraggingAssinatura, setIsDraggingAssinatura] = useState(false);
-  const [dragStartAssinatura, setDragStartAssinatura] = useState({ x: 0, y: 0 });
   const [assinaturaBase64, setAssinaturaBase64] = useState(null);
   const [assinandoContrato, setAssinandoContrato] = useState(false);
   const [mostrarCanvasAssinatura, setMostrarCanvasAssinatura] = useState(false);
+  const [pdfKey, setPdfKey] = useState(0); // Para forçar re-render do iframe
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   
   // Detectar mudanças no tamanho da tela (apenas para layout, não para assinatura)
@@ -183,10 +180,11 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
     }
   }, [passoAtual, paciente, makeRequest]);
   
-  // Carregar PDF do contrato quando URL estiver disponível
+  // Carregar PDF do contrato quando URL estiver disponível (apenas uma vez)
   useEffect(() => {
     const carregarPdfContrato = async () => {
-      if (contratoUrl && passoAtual === 4) {
+      // Só carregar se estiver no passo 4 e ainda não tiver carregado
+      if (contratoUrl && passoAtual === 4 && !contratoPdfBytes) {
         try {
           console.log('📄 [ModalCadastro] Carregando PDF do contrato...');
           const response = await fetch(contratoUrl);
@@ -195,11 +193,13 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
             const bytes = new Uint8Array(arrayBuffer);
             setContratoPdfBytes(bytes);
             
-            // Criar URL para preview
-            const blob = new Blob([bytes], { type: 'application/pdf' });
-            const url = URL.createObjectURL(blob);
-            setContratoPdfUrl(url);
-            console.log('✅ [ModalCadastro] PDF do contrato carregado com sucesso');
+            // Criar URL para preview apenas se não existir
+            if (!contratoPdfUrl) {
+              const blob = new Blob([bytes], { type: 'application/pdf' });
+              const url = URL.createObjectURL(blob);
+              setContratoPdfUrl(url);
+              console.log('✅ [ModalCadastro] PDF do contrato carregado com sucesso');
+            }
           } else {
             console.error('❌ [ModalCadastro] Erro ao carregar PDF do contrato');
             showErrorToast('Erro ao carregar o contrato. Tente novamente.');
@@ -213,13 +213,12 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
     
     carregarPdfContrato();
     
-    // Cleanup: revogar URL quando componente desmontar ou URL mudar
+    // Cleanup: revogar URL quando componente desmontar
     return () => {
-      if (contratoPdfUrl) {
-        URL.revokeObjectURL(contratoPdfUrl);
-      }
+      // Não revogar aqui para evitar problemas com o preview
     };
-  }, [contratoUrl, passoAtual]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contratoUrl, passoAtual]); // Verificação interna evita loops
   
   // Fechar modal ao clicar fora
   useEffect(() => {
@@ -663,10 +662,10 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
     const assinaturaBase64Temp = assinaturaRef.toDataURL('image/png');
     setAssinaturaBase64(assinaturaBase64Temp);
     setMostrarCanvasAssinatura(false);
-    showSuccessToast('Assinatura criada! Posicione-a no contrato.');
+    showSuccessToast('Assinatura criada! Clique em "Aplicar Assinatura" para assinar o contrato.');
   };
   
-  // Aplicar assinatura ao contrato PDF
+  // Aplicar assinatura ao contrato PDF - automaticamente na área do paciente
   const aplicarAssinaturaAoContrato = async () => {
     if (!assinaturaBase64 || !contratoPdfBytes) {
       showErrorToast('Por favor, crie sua assinatura primeiro.');
@@ -681,130 +680,198 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
     setAssinandoContrato(true);
     
     try {
-      console.log('📝 [ModalCadastro] Aplicando assinatura ao contrato...');
+      console.log('📝 [ModalCadastro] Aplicando assinatura do paciente ao contrato...');
       
       // Carregar o PDF
       const pdfDoc = await PDFDocument.load(contratoPdfBytes);
       const pages = pdfDoc.getPages();
-      const primeiraPagina = pages[0]; // Assinar na primeira página
+      console.log('📄 [ModalCadastro] PDF carregado, número de páginas:', pages.length);
       
       // Converter assinatura base64 para imagem
       const signatureImage = await pdfDoc.embedPng(assinaturaBase64);
+      console.log('✅ [ModalCadastro] Assinatura convertida para imagem');
       
-      // Obter dimensões da página
-      const pageHeight = primeiraPagina.getHeight();
-      const pageWidth = primeiraPagina.getWidth();
+      // Adicionar rodapé estruturado apenas na última página
+      const ultimaPagina = pages[pages.length - 1];
+      const larguraPagina = ultimaPagina.getWidth();
+      const alturaPagina = ultimaPagina.getHeight();
       
-      // Obter dimensões do iframe para calcular escala
-      const viewerElement = document.querySelector('.contrato-pdf-viewer');
-      const iframeElement = viewerElement?.querySelector('iframe');
-      
-      let iframeWidth = 600;
-      let iframeHeight = 800;
-      
-      if (iframeElement) {
-        const iframeRect = iframeElement.getBoundingClientRect();
-        iframeWidth = iframeRect.width || 600;
-        iframeHeight = iframeRect.height || 800;
-      }
-      
-      // Calcular escala
-      const scaleX = pageWidth / iframeWidth;
-      const scaleY = pageHeight / iframeHeight;
-      
-      // Calcular posição no PDF (origem do PDF é inferior esquerdo)
-      const signatureHeight = tamanhoAssinatura.height + 60;
-      const x = posicaoAssinatura.x * scaleX;
-      const y = pageHeight - (posicaoAssinatura.y * scaleY) - (signatureHeight * scaleY);
-      
-      // Desenhar assinatura
-      primeiraPagina.drawImage(signatureImage, {
-        x: x,
-        y: y + 60,
-        width: tamanhoAssinatura.width,
-        height: tamanhoAssinatura.height,
+      console.log('📐 [ModalCadastro] Dimensões da última página:', {
+        largura: larguraPagina,
+        altura: alturaPagina
       });
       
-      // Adicionar informações abaixo da assinatura
-      const nomeCompleto = paciente.nome || 'Paciente';
-      const cpfFormatado = formData.cpf || paciente.cpf?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') || '';
+      // Configurações do rodapé estruturado - mesmo layout da clínica
+      const alturaRodape = 140;
+      const margemInferior = 20;
+      const yBaseRodape = margemInferior;
+      const margemLateral = 50;
+      const espacoEntreColunas = 20;
       
-      primeiraPagina.drawText(nomeCompleto, {
-        x: x,
-        y: y + 40,
-        size: 10,
+      // Desenhar área do rodapé
+      // Linha superior do rodapé
+      ultimaPagina.drawLine({
+        start: { x: margemLateral, y: yBaseRodape + alturaRodape },
+        end: { x: larguraPagina - margemLateral, y: yBaseRodape + alturaRodape },
+        thickness: 1.5,
         color: rgb(0.2, 0.2, 0.2),
       });
       
-      primeiraPagina.drawText(`CPF: ${cpfFormatado}`, {
-        x: x,
-        y: y + 25,
-        size: 8,
-        color: rgb(0.4, 0.4, 0.4),
-      });
+      // Calcular posições das 3 áreas de assinatura
+      const larguraTotal = larguraPagina - (2 * margemLateral);
+      const larguraArea = (larguraTotal - (2 * espacoEntreColunas)) / 3;
+      const yLinhaAssinatura = yBaseRodape + 90;
+      const alturaAssinatura = 35;
       
-      const dataFormatada = new Date().toLocaleDateString('pt-BR');
-      primeiraPagina.drawText(`Data: ${dataFormatada}`, {
-        x: x,
-        y: y + 10,
-        size: 8,
-        color: rgb(0.4, 0.4, 0.4),
-      });
-      
-      // Linha divisória acima da assinatura
-      primeiraPagina.drawLine({
-        start: { x: x, y: y + 55 },
-        end: { x: x + tamanhoAssinatura.width, y: y + 55 },
+      // Área 1: ASSINATURA CLÍNICA (já deve estar preenchida)
+      const x1 = margemLateral;
+      ultimaPagina.drawLine({
+        start: { x: x1, y: yLinhaAssinatura },
+        end: { x: x1 + larguraArea, y: yLinhaAssinatura },
         thickness: 0.5,
-        color: rgb(0.8, 0.8, 0.8),
+        color: rgb(0.4, 0.4, 0.4),
+      });
+      ultimaPagina.drawText('ASSINATURA CLÍNICA', {
+        x: x1 + (larguraArea - 'ASSINATURA CLÍNICA'.length * 4.5) / 2,
+        y: yLinhaAssinatura - 12,
+        size: 7,
+        color: rgb(0.3, 0.3, 0.3),
       });
       
-      // Salvar PDF com assinatura (antes de adicionar hash)
-      const pdfBytesAntesHash = await pdfDoc.save();
+      // Área 2: ASSINATURA PACIENTE - AQUI VAI A ASSINATURA DO PACIENTE
+      const x2 = x1 + larguraArea + espacoEntreColunas;
       
-      // Gerar hash SHA1
-      const hashRastreamento = await gerarHashSHA1(pdfBytesAntesHash);
-      console.log('✅ [ModalCadastro] Hash gerado:', hashRastreamento);
+      // Desenhar assinatura do paciente (acima da linha)
+      ultimaPagina.drawImage(signatureImage, {
+        x: x2 + (larguraArea - 100) / 2, // Centralizar assinatura
+        y: yLinhaAssinatura + 8,
+        width: 100,
+        height: alturaAssinatura,
+      });
+      console.log('✅ [ModalCadastro] Assinatura do paciente desenhada');
       
-      // Recarregar PDF para adicionar rodapé com hash
-      const pdfDocComRodape = await PDFDocument.load(pdfBytesAntesHash);
-      const pagesComRodape = pdfDocComRodape.getPages();
+      // Linha para assinatura
+      ultimaPagina.drawLine({
+        start: { x: x2, y: yLinhaAssinatura },
+        end: { x: x2 + larguraArea, y: yLinhaAssinatura },
+        thickness: 0.5,
+        color: rgb(0.4, 0.4, 0.4),
+      });
       
-      // Adicionar rodapé em todas as páginas
-      for (let i = 0; i < pagesComRodape.length; i++) {
-        const paginaAtual = pagesComRodape[i];
-        const larguraPagina = paginaAtual.getWidth();
-        const alturaPagina = paginaAtual.getHeight();
-        
-        const textoRodape = `HASH/ID: ${hashRastreamento}`;
-        const tamanhoFonte = 12;
-        const margemInferior = 25;
-        const yPosicaoTexto = margemInferior;
-        const yPosicaoLinha = margemInferior + 12;
-        
-        const larguraTextoAprox = textoRodape.length * 7.2;
-        const xPosicao = (larguraPagina - larguraTextoAprox) / 2;
-        const xPosicaoFinal = Math.max(20, Math.min(xPosicao, larguraPagina - larguraTextoAprox - 20));
-        
-        // Linha acima do rodapé
-        paginaAtual.drawLine({
-          start: { x: 40, y: yPosicaoLinha },
-          end: { x: larguraPagina - 40, y: yPosicaoLinha },
-          thickness: 1,
+      // Texto centralizado abaixo da linha
+      const textoPaciente = 'ASSINATURA PACIENTE';
+      const larguraTextoPaciente = textoPaciente.length * 4.5;
+      ultimaPagina.drawText(textoPaciente, {
+        x: x2 + (larguraArea - larguraTextoPaciente) / 2,
+        y: yLinhaAssinatura - 12,
+        size: 7,
+        color: rgb(0.3, 0.3, 0.3),
+      });
+      
+      const nomePaciente = paciente.nome || '';
+      const cpfPaciente = formData.cpf || paciente.cpf?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') || '';
+      
+      if (nomePaciente) {
+        const larguraNomePaciente = nomePaciente.length * 3.5;
+        ultimaPagina.drawText(nomePaciente, {
+          x: x2 + (larguraArea - larguraNomePaciente) / 2,
+          y: yLinhaAssinatura - 22,
+          size: 6,
           color: rgb(0.5, 0.5, 0.5),
         });
-        
-        // Texto do rodapé
-        paginaAtual.drawText(textoRodape, {
-          x: xPosicaoFinal,
-          y: yPosicaoTexto,
-          size: tamanhoFonte,
-          color: rgb(0.1, 0.1, 0.1),
+      }
+      if (cpfPaciente) {
+        const textoCpfPaciente = `CPF: ${cpfPaciente}`;
+        const larguraCpfPaciente = textoCpfPaciente.length * 3.5;
+        ultimaPagina.drawText(textoCpfPaciente, {
+          x: x2 + (larguraArea - larguraCpfPaciente) / 2,
+          y: yLinhaAssinatura - 32,
+          size: 6,
+          color: rgb(0.5, 0.5, 0.5),
         });
       }
       
-      // Salvar PDF final
-      const pdfBytesFinal = await pdfDocComRodape.save();
+      // Área 3: ASSINATURA GRUPO IM
+      const x3 = x2 + larguraArea + espacoEntreColunas;
+      ultimaPagina.drawLine({
+        start: { x: x3, y: yLinhaAssinatura },
+        end: { x: x3 + larguraArea, y: yLinhaAssinatura },
+        thickness: 0.5,
+        color: rgb(0.4, 0.4, 0.4),
+      });
+      const textoGrupoIM = 'ASSINATURA GRUPO IM';
+      const larguraTextoGrupoIM = textoGrupoIM.length * 4.5;
+      ultimaPagina.drawText(textoGrupoIM, {
+        x: x3 + (larguraArea - larguraTextoGrupoIM) / 2,
+        y: yLinhaAssinatura - 12,
+        size: 7,
+        color: rgb(0.3, 0.3, 0.3),
+      });
+      ultimaPagina.drawText('INVESTMONEY S.A.', {
+        x: x3 + (larguraArea - 'INVESTMONEY S.A.'.length * 3.5) / 2,
+        y: yLinhaAssinatura - 22,
+        size: 6,
+        color: rgb(0.5, 0.5, 0.5),
+      });
+      ultimaPagina.drawText('CNPJ: 41.267.440/0001-97', {
+        x: x3 + (larguraArea - 'CNPJ: 41.267.440/0001-97'.length * 3.5) / 2,
+        y: yLinhaAssinatura - 32,
+        size: 6,
+        color: rgb(0.5, 0.5, 0.5),
+      });
+      
+      // Linha separadora antes do hash e data
+      ultimaPagina.drawLine({
+        start: { x: margemLateral, y: yBaseRodape + 25 },
+        end: { x: larguraPagina - margemLateral, y: yBaseRodape + 25 },
+        thickness: 0.3,
+        color: rgb(0.6, 0.6, 0.6),
+      });
+      
+      console.log('✅ [ModalCadastro] Rodapé estruturado desenhado');
+      
+      // Salvar PDF com assinatura e rodapé (antes de adicionar hash)
+      const pdfBytesAntesHash = await pdfDoc.save();
+      console.log('💾 [ModalCadastro] PDF salvo antes do hash, tamanho:', pdfBytesAntesHash.length);
+      
+      // Gerar hash SHA1 do PDF com assinatura e rodapé
+      const hashRastreamento = await gerarHashSHA1(pdfBytesAntesHash);
+      console.log('✅ [ModalCadastro] Hash gerado:', hashRastreamento);
+      
+      // Recarregar PDF para adicionar hash no rodapé
+      const pdfDocComHash = await PDFDocument.load(pdfBytesAntesHash);
+      const ultimaPaginaComHash = pdfDocComHash.getPages()[pdfDocComHash.getPages().length - 1];
+      const larguraPaginaHash = ultimaPaginaComHash.getWidth();
+      
+      // Reutilizar as mesmas configurações de margem
+      const margemLateralHash = 50;
+      const yBaseRodapeHash = 20;
+      
+      // Data e Hash no final do rodapé
+      const dataFormatada = new Date().toLocaleDateString('pt-BR');
+      const horaFormatada = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      
+      ultimaPaginaComHash.drawText(`Data/Hora: ${dataFormatada} ${horaFormatada}`, {
+        x: margemLateralHash,
+        y: yBaseRodapeHash + 8,
+        size: 7,
+        color: rgb(0.4, 0.4, 0.4),
+      });
+      
+      // Hash centralizado no rodapé
+      const textoHash = `HASH/ID: ${hashRastreamento}`;
+      const larguraHashAprox = textoHash.length * 3.5;
+      ultimaPaginaComHash.drawText(textoHash, {
+        x: (larguraPaginaHash - larguraHashAprox) / 2,
+        y: yBaseRodapeHash + 8,
+        size: 7,
+        color: rgb(0.4, 0.4, 0.4),
+      });
+      
+      console.log('✅ [ModalCadastro] Hash adicionado ao rodapé');
+      
+      // Salvar PDF final COM hash
+      const pdfBytesFinal = await pdfDocComHash.save();
       console.log('✅ [ModalCadastro] PDF assinado gerado, tamanho:', pdfBytesFinal.length);
       
       // Coletar informações de rastreabilidade
@@ -896,6 +963,32 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
       
       showSuccessToast('Contrato assinado e salvo com sucesso!');
       
+      // Revogar URL antiga se existir
+      if (contratoPdfUrl) {
+        URL.revokeObjectURL(contratoPdfUrl);
+      }
+      
+      // Atualizar preview do PDF assinado (reutilizar o blob já criado)
+      const url = URL.createObjectURL(blob);
+      setContratoPdfUrl(url);
+      setContratoPdfBytes(pdfBytesFinal);
+      
+      // Forçar re-render do iframe mudando a key
+      setPdfKey(prev => prev + 1);
+      
+      // Aguardar um pouco para garantir que o estado foi atualizado
+      setTimeout(() => {
+        console.log('🔄 [ModalCadastro] Forçando atualização do iframe...');
+        const iframe = document.querySelector(`iframe[title="Contrato de Serviço"]`);
+        if (iframe) {
+          iframe.src = '';
+          setTimeout(() => {
+            iframe.src = url;
+            console.log('✅ [ModalCadastro] Iframe atualizado');
+          }, 100);
+        }
+      }, 100);
+      
       // Atualizar dados do paciente
       const pacienteResponse = await makeRequest(`/pacientes/${pacienteId}`);
       if (pacienteResponse.ok) {
@@ -915,100 +1008,6 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
       setAssinandoContrato(false);
     }
   };
-  
-  // Handlers para arrastar assinatura
-  const handleMouseDownAssinatura = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const viewerElement = document.querySelector('.contrato-pdf-viewer');
-    if (!viewerElement) return;
-    
-    const rect = viewerElement.getBoundingClientRect();
-    const clientX = e.clientX || (e.touches && e.touches[0]?.clientX);
-    const clientY = e.clientY || (e.touches && e.touches[0]?.clientY);
-    
-    if (clientX === undefined || clientY === undefined) return;
-    
-    setIsDraggingAssinatura(true);
-    
-    // Calcular offset do clique dentro do elemento de assinatura
-    const signatureRect = e.currentTarget.getBoundingClientRect();
-    const offsetX = clientX - signatureRect.left;
-    const offsetY = clientY - signatureRect.top;
-    
-    setDragStartAssinatura({
-      x: offsetX,
-      y: offsetY
-    });
-  };
-  
-  useEffect(() => {
-    if (isDraggingAssinatura) {
-      let animationFrameId = null;
-      
-      const handleMouseMove = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        // Cancelar frame anterior se existir
-        if (animationFrameId) {
-          cancelAnimationFrame(animationFrameId);
-        }
-        
-        animationFrameId = requestAnimationFrame(() => {
-          const viewerElement = document.querySelector('.contrato-pdf-viewer');
-          if (!viewerElement) return;
-          
-          const rect = viewerElement.getBoundingClientRect();
-          const clientX = e.clientX || (e.touches && e.touches[0]?.clientX);
-          const clientY = e.clientY || (e.touches && e.touches[0]?.clientY);
-          
-          if (clientX === undefined || clientY === undefined) return;
-          
-          // Calcular nova posição baseada no offset do clique
-          const x = clientX - rect.left - dragStartAssinatura.x;
-          const y = clientY - rect.top - dragStartAssinatura.y;
-          
-          // Limitar movimentação apenas dentro do PDF (dentro dos bounds do viewer)
-          const alturaTotalAssinatura = tamanhoAssinatura.height + 70; // altura da assinatura + informações
-          const maxX = Math.max(0, rect.width - tamanhoAssinatura.width);
-          const maxY = Math.max(0, rect.height - alturaTotalAssinatura);
-          
-          setPosicaoAssinatura({
-            x: Math.max(0, Math.min(x, maxX)),
-            y: Math.max(0, Math.min(y, maxY))
-          });
-        });
-      };
-      
-      const handleMouseUp = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (animationFrameId) {
-          cancelAnimationFrame(animationFrameId);
-        }
-        setIsDraggingAssinatura(false);
-      };
-      
-      document.addEventListener('mousemove', handleMouseMove, { passive: false });
-      document.addEventListener('touchmove', handleMouseMove, { passive: false });
-      document.addEventListener('mouseup', handleMouseUp, { passive: false });
-      document.addEventListener('touchend', handleMouseUp, { passive: false });
-      document.addEventListener('touchcancel', handleMouseUp, { passive: false });
-      
-      return () => {
-        if (animationFrameId) {
-          cancelAnimationFrame(animationFrameId);
-        }
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('touchmove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-        document.removeEventListener('touchend', handleMouseUp);
-        document.removeEventListener('touchcancel', handleMouseUp);
-      };
-    }
-  }, [isDraggingAssinatura, dragStartAssinatura, tamanhoAssinatura]);
   
   // Passo 4: Assinar contrato
   const handleFinalizarCadastro = async () => {
@@ -1688,7 +1687,7 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
               
               {contratoPdfUrl ? (
                 <>
-                  {/* Visualização do PDF com assinatura posicionada */}
+                  {/* Visualização do PDF */}
                   <div 
                     className="contrato-pdf-viewer"
                     style={{
@@ -1700,128 +1699,26 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
                       position: 'relative',
                       overflow: 'hidden',
                       minHeight: isMobile ? '300px' : '500px',
-                      maxHeight: isMobile ? '400px' : '600px',
-                      userSelect: 'none',
-                      WebkitUserSelect: 'none'
-                    }}
-                    onMouseDown={(e) => {
-                      // Prevenir interação com o container durante drag
-                      if (isDraggingAssinatura) {
-                        e.preventDefault();
-                      }
+                      maxHeight: isMobile ? '400px' : '600px'
                     }}
                   >
-                    <iframe
-                      key="contrato-pdf-iframe"
-                      src={contratoPdfUrl}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        minHeight: isMobile ? '300px' : '500px',
-                        border: 'none',
-                        borderRadius: '6px',
-                        pointerEvents: isDraggingAssinatura ? 'none' : 'auto',
-                        display: 'block'
-                      }}
-                      title="Contrato de Serviço"
-                    />
-                    
-                    {/* Overlay transparente durante drag para capturar eventos */}
-                    {isDraggingAssinatura && (
-                      <div
+                    {contratoPdfUrl && (
+                      <iframe
+                        key={`contrato-pdf-iframe-${pdfKey}`}
+                        src={contratoPdfUrl}
                         style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          zIndex: 5,
-                          cursor: 'grabbing',
-                          touchAction: 'none'
+                          width: '100%',
+                          height: '100%',
+                          minHeight: isMobile ? '300px' : '500px',
+                          border: 'none',
+                          borderRadius: '6px',
+                          display: 'block'
+                        }}
+                        title="Contrato de Serviço"
+                        onLoad={() => {
+                          console.log('✅ [ModalCadastro] Iframe carregado com sucesso');
                         }}
                       />
-                    )}
-                    
-                    {/* Overlay da assinatura (se já criada) - renderizado sobre o PDF para permitir movimentação livre */}
-                    {assinaturaBase64 && (
-                      <div
-                        onMouseDown={handleMouseDownAssinatura}
-                        onTouchStart={handleMouseDownAssinatura}
-                        style={{
-                          position: 'absolute',
-                          left: `${posicaoAssinatura.x}px`,
-                          top: `${posicaoAssinatura.y}px`,
-                          width: `${tamanhoAssinatura.width}px`,
-                          height: `${tamanhoAssinatura.height + 70}px`,
-                          cursor: isDraggingAssinatura ? 'grabbing' : 'grab',
-                          touchAction: 'none',
-                          zIndex: 10,
-                          border: '2px dashed #059669',
-                          borderRadius: '4px',
-                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                          padding: '0.5rem',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'flex-start',
-                          justifyContent: 'flex-start',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                          userSelect: 'none',
-                          WebkitUserSelect: 'none'
-                        }}
-                      >
-                        {/* Linha divisória acima */}
-                        <div style={{
-                          width: '100%',
-                          height: '1px',
-                          backgroundColor: '#e2e8f0',
-                          marginBottom: '0.5rem'
-                        }} />
-                        
-                        {/* Rabisco da assinatura */}
-                        <img 
-                          src={assinaturaBase64} 
-                          alt="Assinatura" 
-                          style={{
-                            width: `${tamanhoAssinatura.width - 16}px`,
-                            height: `${tamanhoAssinatura.height - 8}px`,
-                            objectFit: 'contain',
-                            marginBottom: '0.25rem'
-                          }}
-                        />
-                        
-                        {/* Nome */}
-                        <div style={{ 
-                          fontSize: isMobile ? '0.65rem' : '0.7rem', 
-                          color: '#1e293b', 
-                          fontWeight: '600',
-                          marginBottom: '0.15rem',
-                          width: '100%',
-                          textAlign: 'left'
-                        }}>
-                          {paciente?.nome || 'Paciente'}
-                        </div>
-                        
-                        {/* CPF */}
-                        <div style={{ 
-                          fontSize: isMobile ? '0.55rem' : '0.6rem', 
-                          color: '#6b7280',
-                          marginBottom: '0.15rem',
-                          width: '100%',
-                          textAlign: 'left'
-                        }}>
-                          CPF: {formData.cpf || paciente?.cpf?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') || 'N/A'}
-                        </div>
-                        
-                        {/* Data */}
-                        <div style={{ 
-                          fontSize: isMobile ? '0.55rem' : '0.6rem', 
-                          color: '#6b7280',
-                          width: '100%',
-                          textAlign: 'left'
-                        }}>
-                          Data: {new Date().toLocaleDateString('pt-BR')}
-                        </div>
-                      </div>
                     )}
                   </div>
                   

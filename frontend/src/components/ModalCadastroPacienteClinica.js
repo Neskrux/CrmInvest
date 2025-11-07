@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from './Toast';
 import useBranding from '../hooks/useBranding';
+import SignatureCanvas from 'react-signature-canvas';
+import { PDFDocument, rgb } from 'pdf-lib';
 import logoBrasaoPreto from '../images/logohorizontalpreto.png';
 
 const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
@@ -15,6 +17,16 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
   const [loading, setLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
+  
+  // Estados para assinatura digital do contrato
+  const [assinaturaRef, setAssinaturaRef] = useState(null);
+  const [hasAssinatura, setHasAssinatura] = useState(false);
+  const [assinaturaBase64, setAssinaturaBase64] = useState(null);
+  const [mostrarCanvasAssinatura, setMostrarCanvasAssinatura] = useState(false);
+  const [contratoPdfBytes, setContratoPdfBytes] = useState(null);
+  const [contratoPdfUrl, setContratoPdfUrl] = useState(null);
+  const [assinandoContrato, setAssinandoContrato] = useState(false);
+  const [pdfKey, setPdfKey] = useState(0); // Para forçar re-render do iframe
   
   // Log quando componente é montado
   useEffect(() => {
@@ -276,6 +288,359 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
     if (value && value.trim()) {
       const nomeFormatado = formatarNome(value);
       setFormData(prev => ({ ...prev, nome: nomeFormatado }));
+    }
+  };
+  
+  // Carregar PDF quando arquivo for selecionado
+  useEffect(() => {
+    const carregarPDF = async () => {
+      if (formData.contrato_arquivo && formData.contrato_arquivo instanceof File) {
+        try {
+          const arrayBuffer = await formData.contrato_arquivo.arrayBuffer();
+          setContratoPdfBytes(arrayBuffer);
+          
+          const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+          const url = URL.createObjectURL(blob);
+          setContratoPdfUrl(url);
+        } catch (error) {
+          console.error('Erro ao carregar PDF:', error);
+          showErrorToast('Erro ao carregar o PDF do contrato');
+        }
+      }
+    };
+    
+    carregarPDF();
+  }, [formData.contrato_arquivo]);
+  
+  // Funções para assinatura digital do contrato
+  
+  // Gerar hash SHA1
+  const gerarHashSHA1 = async (arrayBuffer) => {
+    const hashBuffer = await crypto.subtle.digest('SHA-1', arrayBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+    return hashHex;
+  };
+  
+  // Limpar assinatura
+  const limparAssinaturaContrato = () => {
+    if (assinaturaRef) {
+      assinaturaRef.clear();
+      setHasAssinatura(false);
+      setAssinaturaBase64(null);
+    }
+  };
+  
+  // Salvar assinatura temporariamente
+  const salvarAssinaturaTemporaria = () => {
+    if (!hasAssinatura || !assinaturaRef) {
+      showErrorToast('Por favor, desenhe sua assinatura primeiro.');
+      return;
+    }
+    
+    const assinaturaBase64Temp = assinaturaRef.toDataURL('image/png');
+    setAssinaturaBase64(assinaturaBase64Temp);
+    setMostrarCanvasAssinatura(false);
+    showSuccessToast('Assinatura salva! Pronta para ser aplicada ao contrato.');
+  };
+  
+  // Aplicar assinatura ao contrato PDF com áreas fixas para assinaturas
+  const aplicarAssinaturaAoContrato = async () => {
+    if (!assinaturaBase64 || !contratoPdfBytes) {
+      showErrorToast('Por favor, crie sua assinatura primeiro.');
+      return;
+    }
+    
+    setAssinandoContrato(true);
+    
+    try {
+      console.log('📝 [ModalCadastroClinica] Aplicando assinatura ao contrato...');
+      
+      // Carregar o PDF
+      const pdfDoc = await PDFDocument.load(contratoPdfBytes);
+      const pages = pdfDoc.getPages();
+      console.log('📄 [ModalCadastroClinica] PDF carregado, número de páginas:', pages.length);
+      
+      // Converter assinatura base64 para imagem
+      const signatureImage = await pdfDoc.embedPng(assinaturaBase64);
+      console.log('✅ [ModalCadastroClinica] Assinatura convertida para imagem');
+      
+      // Adicionar rodapé estruturado apenas na última página
+      const ultimaPagina = pages[pages.length - 1];
+      const larguraPagina = ultimaPagina.getWidth();
+      const alturaPagina = ultimaPagina.getHeight();
+      
+      console.log('📐 [ModalCadastroClinica] Dimensões da última página:', {
+        largura: larguraPagina,
+        altura: alturaPagina
+      });
+      
+      // Configurações do rodapé estruturado - melhor espaçamento
+      const alturaRodape = 140; // Altura total do rodapé (aumentada)
+      const margemInferior = 20;
+      const yBaseRodape = margemInferior;
+      const margemLateral = 50;
+      const espacoEntreColunas = 20;
+      
+      // Desenhar área do rodapé
+      // Linha superior do rodapé (mais grossa e escura)
+      ultimaPagina.drawLine({
+        start: { x: margemLateral, y: yBaseRodape + alturaRodape },
+        end: { x: larguraPagina - margemLateral, y: yBaseRodape + alturaRodape },
+        thickness: 1.5,
+        color: rgb(0.2, 0.2, 0.2),
+      });
+      
+      // Calcular posições das 3 áreas de assinatura com melhor distribuição
+      const larguraTotal = larguraPagina - (2 * margemLateral);
+      const larguraArea = (larguraTotal - (2 * espacoEntreColunas)) / 3;
+      const yLinhaAssinatura = yBaseRodape + 90; // Linha de assinatura mais abaixo
+      const alturaAssinatura = 35;
+      
+      // Área 1: ASSINATURA CLÍNICA
+      const x1 = margemLateral;
+      
+      // Desenhar assinatura da clínica primeiro (acima da linha)
+      ultimaPagina.drawImage(signatureImage, {
+        x: x1 + (larguraArea - 100) / 2, // Centralizar assinatura
+        y: yLinhaAssinatura + 8,
+        width: 100,
+        height: alturaAssinatura,
+      });
+      console.log('✅ [ModalCadastroClinica] Assinatura da clínica desenhada');
+      
+      // Linha para assinatura
+      ultimaPagina.drawLine({
+        start: { x: x1, y: yLinhaAssinatura },
+        end: { x: x1 + larguraArea, y: yLinhaAssinatura },
+        thickness: 0.5,
+        color: rgb(0.4, 0.4, 0.4),
+      });
+      
+      // Aplicar informações da clínica
+      const nomeClinica = user?.nome || user?.razao_social || 'Clínica';
+      const cnpjClinica = user?.cnpj || '';
+      
+      console.log('👤 [ModalCadastroClinica] Dados da clínica:', {
+        nomeClinica,
+        cnpjClinica
+      });
+      
+      // Texto centralizado abaixo da linha
+      const textoClinica = 'ASSINATURA CLÍNICA';
+      const larguraTextoClinica = textoClinica.length * 4.5;
+      ultimaPagina.drawText(textoClinica, {
+        x: x1 + (larguraArea - larguraTextoClinica) / 2,
+        y: yLinhaAssinatura - 12,
+        size: 7,
+        color: rgb(0.3, 0.3, 0.3),
+      });
+      
+      // Nome da clínica centralizado (com quebra de linha se necessário)
+      const larguraNomeClinica = nomeClinica.length * 3.5;
+      ultimaPagina.drawText(nomeClinica, {
+        x: x1 + (larguraArea - larguraNomeClinica) / 2,
+        y: yLinhaAssinatura - 22,
+        size: 6,
+        color: rgb(0.5, 0.5, 0.5),
+      });
+      
+      if (cnpjClinica) {
+        const textoCnpjClinica = `CNPJ: ${cnpjClinica}`;
+        const larguraCnpjClinica = textoCnpjClinica.length * 3.5;
+        ultimaPagina.drawText(textoCnpjClinica, {
+          x: x1 + (larguraArea - larguraCnpjClinica) / 2,
+          y: yLinhaAssinatura - 32,
+          size: 6,
+          color: rgb(0.5, 0.5, 0.5),
+        });
+      }
+      
+      // Área 2: ASSINATURA PACIENTE
+      const x2 = x1 + larguraArea + espacoEntreColunas;
+      
+      // Linha para assinatura
+      ultimaPagina.drawLine({
+        start: { x: x2, y: yLinhaAssinatura },
+        end: { x: x2 + larguraArea, y: yLinhaAssinatura },
+        thickness: 0.5,
+        color: rgb(0.4, 0.4, 0.4),
+      });
+      
+      // Texto centralizado abaixo da linha
+      const textoPaciente = 'ASSINATURA PACIENTE';
+      const larguraTextoPaciente = textoPaciente.length * 4.5;
+      ultimaPagina.drawText(textoPaciente, {
+        x: x2 + (larguraArea - larguraTextoPaciente) / 2,
+        y: yLinhaAssinatura - 12,
+        size: 7,
+        color: rgb(0.3, 0.3, 0.3),
+      });
+      
+      const nomePaciente = formData.nome || '';
+      const cpfPaciente = formData.cpf?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') || '';
+      
+      if (nomePaciente) {
+        const larguraNomePaciente = nomePaciente.length * 3.5;
+        ultimaPagina.drawText(nomePaciente, {
+          x: x2 + (larguraArea - larguraNomePaciente) / 2,
+          y: yLinhaAssinatura - 22,
+          size: 6,
+          color: rgb(0.5, 0.5, 0.5),
+        });
+      }
+      if (cpfPaciente) {
+        const textoCpfPaciente = `CPF: ${cpfPaciente}`;
+        const larguraCpfPaciente = textoCpfPaciente.length * 3.5;
+        ultimaPagina.drawText(textoCpfPaciente, {
+          x: x2 + (larguraArea - larguraCpfPaciente) / 2,
+          y: yLinhaAssinatura - 32,
+          size: 6,
+          color: rgb(0.5, 0.5, 0.5),
+        });
+      }
+      
+      // Área 3: ASSINATURA GRUPO IM
+      const x3 = x2 + larguraArea + espacoEntreColunas;
+      
+      // Linha para assinatura
+      ultimaPagina.drawLine({
+        start: { x: x3, y: yLinhaAssinatura },
+        end: { x: x3 + larguraArea, y: yLinhaAssinatura },
+        thickness: 0.5,
+        color: rgb(0.4, 0.4, 0.4),
+      });
+      
+      // Texto centralizado abaixo da linha
+      const textoGrupoIM = 'ASSINATURA GRUPO IM';
+      const larguraTextoGrupoIM = textoGrupoIM.length * 4.5;
+      ultimaPagina.drawText(textoGrupoIM, {
+        x: x3 + (larguraArea - larguraTextoGrupoIM) / 2,
+        y: yLinhaAssinatura - 12,
+        size: 7,
+        color: rgb(0.3, 0.3, 0.3),
+      });
+      
+      const nomeGrupoIM = 'INVESTMONEY S.A.';
+      const larguraNomeGrupoIM = nomeGrupoIM.length * 3.5;
+      ultimaPagina.drawText(nomeGrupoIM, {
+        x: x3 + (larguraArea - larguraNomeGrupoIM) / 2,
+        y: yLinhaAssinatura - 22,
+        size: 6,
+        color: rgb(0.5, 0.5, 0.5),
+      });
+      
+      const cnpjGrupoIM = 'CNPJ: 41.267.440/0001-97';
+      const larguraCnpjGrupoIM = cnpjGrupoIM.length * 3.5;
+      ultimaPagina.drawText(cnpjGrupoIM, {
+        x: x3 + (larguraArea - larguraCnpjGrupoIM) / 2,
+        y: yLinhaAssinatura - 32,
+        size: 6,
+        color: rgb(0.5, 0.5, 0.5),
+      });
+      
+      // Linha separadora antes do hash e data
+      ultimaPagina.drawLine({
+        start: { x: margemLateral, y: yBaseRodape + 25 },
+        end: { x: larguraPagina - margemLateral, y: yBaseRodape + 25 },
+        thickness: 0.3,
+        color: rgb(0.6, 0.6, 0.6),
+      });
+      
+      console.log('✅ [ModalCadastroClinica] Rodapé estruturado desenhado');
+      
+      // Salvar PDF com assinatura e rodapé (antes de adicionar hash)
+      const pdfBytesAntesHash = await pdfDoc.save();
+      console.log('💾 [ModalCadastroClinica] PDF salvo antes do hash, tamanho:', pdfBytesAntesHash.length);
+      
+      // Gerar hash SHA1 do PDF com assinatura e rodapé
+      const hashRastreamento = await gerarHashSHA1(pdfBytesAntesHash);
+      console.log('✅ [ModalCadastroClinica] Hash gerado:', hashRastreamento);
+      
+      // Recarregar PDF para adicionar hash no rodapé
+      const pdfDocComHash = await PDFDocument.load(pdfBytesAntesHash);
+      const ultimaPaginaComHash = pdfDocComHash.getPages()[pdfDocComHash.getPages().length - 1];
+      const larguraPaginaHash = ultimaPaginaComHash.getWidth();
+      
+      // Reutilizar as mesmas configurações de margem
+      const margemLateralHash = 50;
+      const yBaseRodapeHash = 20;
+      
+      // Data e Hash no final do rodapé - melhor posicionados
+      const dataFormatada = new Date().toLocaleDateString('pt-BR');
+      const horaFormatada = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      
+      ultimaPaginaComHash.drawText(`Data/Hora: ${dataFormatada} ${horaFormatada}`, {
+        x: margemLateralHash,
+        y: yBaseRodapeHash + 8,
+        size: 7,
+        color: rgb(0.4, 0.4, 0.4),
+      });
+      
+      // Hash centralizado no rodapé
+      const textoHash = `HASH/ID: ${hashRastreamento}`;
+      const larguraHashAprox = textoHash.length * 3.5;
+      ultimaPaginaComHash.drawText(textoHash, {
+        x: (larguraPaginaHash - larguraHashAprox) / 2,
+        y: yBaseRodapeHash + 8,
+        size: 7,
+        color: rgb(0.4, 0.4, 0.4),
+      });
+      
+      console.log('✅ [ModalCadastroClinica] Hash adicionado ao rodapé');
+      
+      // Salvar PDF final COM hash
+      const pdfBytesFinal = await pdfDocComHash.save();
+      console.log('✅ [ModalCadastroClinica] PDF final gerado:', {
+        tamanho: pdfBytesFinal.length,
+        hash: hashRastreamento
+      });
+      
+      // Revogar URL antiga se existir
+      if (contratoPdfUrl) {
+        URL.revokeObjectURL(contratoPdfUrl);
+      }
+      
+      // Atualizar o arquivo do contrato com o PDF assinado
+      const blob = new Blob([pdfBytesFinal], { type: 'application/pdf' });
+      const file = new File([blob], formData.contrato_arquivo.name, { type: 'application/pdf' });
+      setFormData(prev => ({ ...prev, contrato_arquivo: file }));
+      setContratoPdfBytes(pdfBytesFinal);
+      
+      // Criar nova URL do preview
+      const url = URL.createObjectURL(blob);
+      console.log('🔗 [ModalCadastroClinica] Nova URL criada:', url);
+      setContratoPdfUrl(url);
+      
+      // Forçar re-render do iframe mudando a key
+      setPdfKey(prev => prev + 1);
+      
+      // Aguardar um pouco para garantir que o estado foi atualizado
+      setTimeout(() => {
+        console.log('🔄 [ModalCadastroClinica] Forçando atualização do iframe...');
+        // Forçar atualização do iframe
+        const iframe = document.querySelector(`iframe[title="Preview do Contrato"]`);
+        if (iframe) {
+          iframe.src = '';
+          setTimeout(() => {
+            iframe.src = url;
+            console.log('✅ [ModalCadastroClinica] Iframe atualizado');
+          }, 100);
+        }
+      }, 100);
+      
+      showSuccessToast('Contrato assinado com sucesso! Hash: ' + hashRastreamento.substring(0, 8) + '...');
+      
+      // Limpar estados de assinatura
+      setAssinaturaBase64(null);
+      setHasAssinatura(false);
+      setMostrarCanvasAssinatura(false);
+      
+    } catch (error) {
+      console.error('❌ [ModalCadastroClinica] Erro ao assinar contrato:', error);
+      showErrorToast(error.message || 'Erro ao assinar contrato. Tente novamente.');
+    } finally {
+      setAssinandoContrato(false);
     }
   };
   
@@ -1086,6 +1451,208 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
                         <polyline points="20 6 9 17 4 12"></polyline>
                       </svg>
                       {formData.contrato_arquivo.name}
+                    </div>
+                  )}
+                  
+                  {/* Preview do PDF e Assinatura Digital */}
+                  {contratoPdfUrl && (
+                    <div style={{ marginTop: '1.5rem' }}>
+                      <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: '#1e293b' }}>
+                        Assinar Contrato
+                      </h3>
+                      
+                      {/* Botões de assinatura */}
+                      {!assinaturaBase64 && (
+                        <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          {!mostrarCanvasAssinatura ? (
+                            <button
+                              type="button"
+                              onClick={() => setMostrarCanvasAssinatura(true)}
+                              style={{
+                                padding: '0.75rem 1.5rem',
+                                backgroundColor: '#059669',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.target.style.backgroundColor = '#047857'}
+                              onMouseLeave={(e) => e.target.style.backgroundColor = '#059669'}
+                            >
+                              Criar Assinatura
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={salvarAssinaturaTemporaria}
+                                disabled={!hasAssinatura}
+                                style={{
+                                  padding: '0.75rem 1.5rem',
+                                  backgroundColor: hasAssinatura ? '#059669' : '#9ca3af',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '8px',
+                                  fontSize: '0.875rem',
+                                  fontWeight: '600',
+                                  cursor: hasAssinatura ? 'pointer' : 'not-allowed',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                Salvar Assinatura
+                              </button>
+                              <button
+                                type="button"
+                                onClick={limparAssinaturaContrato}
+                                style={{
+                                  padding: '0.75rem 1.5rem',
+                                  backgroundColor: '#dc2626',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '8px',
+                                  fontSize: '0.875rem',
+                                  fontWeight: '600',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                Limpar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMostrarCanvasAssinatura(false);
+                                  limparAssinaturaContrato();
+                                }}
+                                style={{
+                                  padding: '0.75rem 1.5rem',
+                                  backgroundColor: '#6b7280',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '8px',
+                                  fontSize: '0.875rem',
+                                  fontWeight: '600',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                Cancelar
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Canvas de assinatura */}
+                      {mostrarCanvasAssinatura && (
+                        <div style={{
+                          marginBottom: '1rem',
+                          padding: '1rem',
+                          border: '2px solid #e2e8f0',
+                          borderRadius: '8px',
+                          backgroundColor: '#f9fafb'
+                        }}>
+                          <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#1e293b' }}>
+                            Desenhe sua assinatura:
+                          </label>
+                          <div style={{
+                            border: '2px solid #d1d5db',
+                            borderRadius: '8px',
+                            backgroundColor: 'white',
+                            padding: '0.5rem'
+                          }}>
+                            <SignatureCanvas
+                              ref={(ref) => setAssinaturaRef(ref)}
+                              canvasProps={{
+                                width: 400,
+                                height: 150,
+                                className: 'signature-canvas',
+                                style: {
+                                  width: '100%',
+                                  height: '100%',
+                                  touchAction: 'none'
+                                }
+                              }}
+                              onEnd={() => setHasAssinatura(true)}
+                              backgroundColor="white"
+                            />
+                          </div>
+                        </div>
+                      )}
+                      
+                       {/* Preview do PDF */}
+                       <div style={{
+                         position: 'relative',
+                         border: '2px solid #e2e8f0',
+                         borderRadius: '8px',
+                         overflow: 'hidden',
+                         backgroundColor: '#f9fafb',
+                         minHeight: '500px'
+                       }}>
+                         {contratoPdfUrl && (
+                           <iframe
+                             key={`contrato-pdf-iframe-clinica-${pdfKey}`}
+                             src={contratoPdfUrl}
+                             style={{
+                               width: '100%',
+                               height: '500px',
+                               border: 'none'
+                             }}
+                             title="Preview do Contrato"
+                             onLoad={() => {
+                               console.log('✅ [ModalCadastroClinica] Iframe carregado com sucesso');
+                             }}
+                           />
+                         )}
+                       </div>
+                      
+                      {/* Botão para aplicar assinatura */}
+                      {assinaturaBase64 && (
+                        <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            type="button"
+                            onClick={aplicarAssinaturaAoContrato}
+                            disabled={assinandoContrato}
+                            style={{
+                              padding: '0.75rem 1.5rem',
+                              backgroundColor: assinandoContrato ? '#9ca3af' : '#059669',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              cursor: assinandoContrato ? 'not-allowed' : 'pointer',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            {assinandoContrato ? 'Assinando...' : 'Aplicar Assinatura ao Contrato'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAssinaturaBase64(null);
+                              setHasAssinatura(false);
+                              setMostrarCanvasAssinatura(false);
+                            }}
+                            style={{
+                              padding: '0.75rem 1.5rem',
+                              backgroundColor: '#6b7280',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            Remover Assinatura
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
