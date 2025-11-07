@@ -28,14 +28,36 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
   const [contratoPdfUrl, setContratoPdfUrl] = useState(null);
   const [assinandoContrato, setAssinandoContrato] = useState(false);
   const [pdfKey, setPdfKey] = useState(0); // Para forçar re-render do iframe
+  const [hashExistente, setHashExistente] = useState(null); // Hash do fechamento existente
+  const [dadosClinica, setDadosClinica] = useState(null); // Dados completos da clínica
   
   // Log quando componente é montado
   useEffect(() => {
     console.log('🚀🚀🚀 [ModalCadastroPacienteClinica] COMPONENTE MONTADO NO DOM!');
+    
+    // Buscar dados completos da clínica
+    const buscarDadosClinica = async () => {
+      if (user?.clinica_id || user?.id) {
+        try {
+          const clinicaId = user?.clinica_id || user?.id;
+          const response = await makeRequest(`/clinicas/${clinicaId}`);
+          if (response.ok) {
+            const dados = await response.json();
+            setDadosClinica(dados);
+            console.log('✅ [ModalCadastroClinica] Dados da clínica carregados:', dados.nome || dados.razao_social);
+          }
+        } catch (error) {
+          console.warn('⚠️ [ModalCadastroClinica] Erro ao buscar dados da clínica:', error);
+        }
+      }
+    };
+    
+    buscarDadosClinica();
+    
     return () => {
       console.log('🚀🚀🚀 [ModalCadastroPacienteClinica] COMPONENTE DESMONTADO!');
     };
-  }, []);
+  }, [user, makeRequest]);
   
   // Dados do formulário
   const [formData, setFormData] = useState({
@@ -398,6 +420,11 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
       const yLinhaAssinatura = yBaseRodape + 90; // Linha de assinatura mais abaixo
       const alturaAssinatura = 35;
       
+      // Posições Y para textos
+      const yTitulo = yBaseRodape + alturaRodape - 20;
+      const yAssinatura = yBaseRodape + alturaRodape - 50;
+      const yDados = yBaseRodape + alturaRodape - 80;
+      
       // Área 1: ASSINATURA CLÍNICA
       const x1 = margemLateral;
       
@@ -418,42 +445,50 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
         color: rgb(0.4, 0.4, 0.4),
       });
       
-      // Aplicar informações da clínica
-      const nomeClinica = user?.nome || user?.razao_social || 'Clínica';
-      const cnpjClinica = user?.cnpj || '';
+      // Aplicar informações da clínica (usar dados completos se disponíveis)
+      const nomeClinica = dadosClinica?.nome || dadosClinica?.razao_social || user?.nome || user?.razao_social || 'Clínica';
+      const cnpjClinica = dadosClinica?.cnpj || user?.cnpj || '';
+      
+      // Formatar CNPJ se necessário
+      const cnpjFormatado = cnpjClinica ? cnpjClinica.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : '';
       
       console.log('👤 [ModalCadastroClinica] Dados da clínica:', {
         nomeClinica,
-        cnpjClinica
+        cnpjClinica: cnpjFormatado || cnpjClinica,
+        dadosClinica: dadosClinica ? 'Carregados' : 'Não carregados'
       });
       
-      // Texto centralizado abaixo da linha
+      // Título da área de assinatura
       const textoClinica = 'ASSINATURA CLÍNICA';
-      const larguraTextoClinica = textoClinica.length * 4.5;
+      const fontBold = await pdfDoc.embedFont('Helvetica-Bold');
+      const larguraTextoClinica = fontBold.widthOfTextAtSize(textoClinica, 9);
       ultimaPagina.drawText(textoClinica, {
         x: x1 + (larguraArea - larguraTextoClinica) / 2,
-        y: yLinhaAssinatura - 12,
-        size: 7,
+        y: yTitulo,
+        size: 9,
+        color: rgb(0.2, 0.2, 0.2),
+        font: fontBold,
+      });
+      
+      // Nome da clínica (truncar se muito longo)
+      const nomeExibido = nomeClinica.length > 40 ? nomeClinica.substring(0, 37) + '...' : nomeClinica;
+      const larguraNomeClinica = nomeExibido.length * 3.2;
+      ultimaPagina.drawText(nomeExibido, {
+        x: x1 + (larguraArea - larguraNomeClinica) / 2,
+        y: yDados,
+        size: 8,
         color: rgb(0.3, 0.3, 0.3),
       });
       
-      // Nome da clínica centralizado (com quebra de linha se necessário)
-      const larguraNomeClinica = nomeClinica.length * 3.5;
-      ultimaPagina.drawText(nomeClinica, {
-        x: x1 + (larguraArea - larguraNomeClinica) / 2,
-        y: yLinhaAssinatura - 22,
-        size: 6,
-        color: rgb(0.5, 0.5, 0.5),
-      });
-      
-      if (cnpjClinica) {
-        const textoCnpjClinica = `CNPJ: ${cnpjClinica}`;
-        const larguraCnpjClinica = textoCnpjClinica.length * 3.5;
-        ultimaPagina.drawText(textoCnpjClinica, {
-          x: x1 + (larguraArea - larguraCnpjClinica) / 2,
-          y: yLinhaAssinatura - 32,
-          size: 6,
-          color: rgb(0.5, 0.5, 0.5),
+      // CNPJ formatado
+      if (cnpjFormatado || cnpjClinica) {
+        const textoCnpj = `CNPJ: ${cnpjFormatado || cnpjClinica}`;
+        const larguraCnpj = textoCnpj.length * 3.0;
+        ultimaPagina.drawText(textoCnpj, {
+          x: x1 + (larguraArea - larguraCnpj) / 2,
+          y: yDados - 12,
+          size: 7,
+          color: rgb(0.4, 0.4, 0.4),
         });
       }
       
@@ -470,34 +505,37 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
       
       // Texto centralizado abaixo da linha
       const textoPaciente = 'ASSINATURA PACIENTE';
-      const larguraTextoPaciente = textoPaciente.length * 4.5;
+      const fontBoldPaciente = await pdfDoc.embedFont('Helvetica-Bold');
+      const larguraTextoPaciente = fontBoldPaciente.widthOfTextAtSize(textoPaciente, 9);
       ultimaPagina.drawText(textoPaciente, {
         x: x2 + (larguraArea - larguraTextoPaciente) / 2,
-        y: yLinhaAssinatura - 12,
-        size: 7,
-        color: rgb(0.3, 0.3, 0.3),
+        y: yTitulo,
+        size: 9,
+        color: rgb(0.2, 0.2, 0.2),
+        font: fontBoldPaciente,
       });
       
       const nomePaciente = formData.nome || '';
       const cpfPaciente = formData.cpf?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') || '';
       
       if (nomePaciente) {
-        const larguraNomePaciente = nomePaciente.length * 3.5;
-        ultimaPagina.drawText(nomePaciente, {
+        const nomeExibidoPaciente = nomePaciente.length > 40 ? nomePaciente.substring(0, 37) + '...' : nomePaciente;
+        const larguraNomePaciente = nomeExibidoPaciente.length * 3.2;
+        ultimaPagina.drawText(nomeExibidoPaciente, {
           x: x2 + (larguraArea - larguraNomePaciente) / 2,
-          y: yLinhaAssinatura - 22,
-          size: 6,
-          color: rgb(0.5, 0.5, 0.5),
+          y: yDados,
+          size: 8,
+          color: rgb(0.3, 0.3, 0.3),
         });
       }
       if (cpfPaciente) {
         const textoCpfPaciente = `CPF: ${cpfPaciente}`;
-        const larguraCpfPaciente = textoCpfPaciente.length * 3.5;
+        const larguraCpfPaciente = textoCpfPaciente.length * 3.0;
         ultimaPagina.drawText(textoCpfPaciente, {
           x: x2 + (larguraArea - larguraCpfPaciente) / 2,
-          y: yLinhaAssinatura - 32,
-          size: 6,
-          color: rgb(0.5, 0.5, 0.5),
+          y: yDados - 12,
+          size: 7,
+          color: rgb(0.4, 0.4, 0.4),
         });
       }
       
@@ -514,30 +552,32 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
       
       // Texto centralizado abaixo da linha
       const textoGrupoIM = 'ASSINATURA GRUPO IM';
-      const larguraTextoGrupoIM = textoGrupoIM.length * 4.5;
+      const fontBoldGrupoIM = await pdfDoc.embedFont('Helvetica-Bold');
+      const larguraTextoGrupoIM = fontBoldGrupoIM.widthOfTextAtSize(textoGrupoIM, 9);
       ultimaPagina.drawText(textoGrupoIM, {
         x: x3 + (larguraArea - larguraTextoGrupoIM) / 2,
-        y: yLinhaAssinatura - 12,
-        size: 7,
-        color: rgb(0.3, 0.3, 0.3),
+        y: yTitulo,
+        size: 9,
+        color: rgb(0.2, 0.2, 0.2),
+        font: fontBoldGrupoIM,
       });
       
       const nomeGrupoIM = 'INVESTMONEY S.A.';
-      const larguraNomeGrupoIM = nomeGrupoIM.length * 3.5;
+      const larguraNomeGrupoIM = nomeGrupoIM.length * 3.2;
       ultimaPagina.drawText(nomeGrupoIM, {
         x: x3 + (larguraArea - larguraNomeGrupoIM) / 2,
-        y: yLinhaAssinatura - 22,
-        size: 6,
-        color: rgb(0.5, 0.5, 0.5),
+        y: yDados,
+        size: 8,
+        color: rgb(0.3, 0.3, 0.3),
       });
       
       const cnpjGrupoIM = 'CNPJ: 41.267.440/0001-97';
-      const larguraCnpjGrupoIM = cnpjGrupoIM.length * 3.5;
+      const larguraCnpjGrupoIM = cnpjGrupoIM.length * 3.0;
       ultimaPagina.drawText(cnpjGrupoIM, {
         x: x3 + (larguraArea - larguraCnpjGrupoIM) / 2,
-        y: yLinhaAssinatura - 32,
-        size: 6,
-        color: rgb(0.5, 0.5, 0.5),
+        y: yDados - 12,
+        size: 7,
+        color: rgb(0.4, 0.4, 0.4),
       });
       
       // Linha separadora antes do hash e data
@@ -554,9 +594,15 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
       const pdfBytesAntesHash = await pdfDoc.save();
       console.log('💾 [ModalCadastroClinica] PDF salvo antes do hash, tamanho:', pdfBytesAntesHash.length);
       
-      // Gerar hash SHA1 do PDF com assinatura e rodapé
-      const hashRastreamento = await gerarHashSHA1(pdfBytesAntesHash);
-      console.log('✅ [ModalCadastroClinica] Hash gerado:', hashRastreamento);
+      // Usar hash existente se disponível, senão gerar novo
+      let hashRastreamento;
+      if (hashExistente) {
+        hashRastreamento = hashExistente.toUpperCase();
+        console.log('✅ [ModalCadastroClinica] Usando hash existente do fechamento:', hashRastreamento);
+      } else {
+        hashRastreamento = await gerarHashSHA1(pdfBytesAntesHash);
+        console.log('✅ [ModalCadastroClinica] Hash gerado (novo):', hashRastreamento);
+      }
       
       // Recarregar PDF para adicionar hash no rodapé
       const pdfDocComHash = await PDFDocument.load(pdfBytesAntesHash);
@@ -829,6 +875,22 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
       if (!fechamentoResponse.ok) {
         const errorData = await fechamentoResponse.json();
         throw new Error(errorData.error || 'Erro ao criar fechamento');
+      }
+      
+      const fechamentoData = await fechamentoResponse.json();
+      
+      // Buscar hash do fechamento criado
+      if (fechamentoData.id || pacienteCriado.id) {
+        try {
+          const hashResponse = await makeRequest(`/fechamentos/hash/${pacienteCriado.id}`);
+          if (hashResponse.temHash && hashResponse.hash) {
+            setHashExistente(hashResponse.hash);
+            console.log('✅ [ModalCadastroClinica] Hash do fechamento carregado:', hashResponse.hash);
+          }
+        } catch (hashError) {
+          console.warn('⚠️ [ModalCadastroClinica] Não foi possível buscar hash do fechamento:', hashError);
+          // Não bloquear o processo se não conseguir buscar o hash
+        }
       }
       
       showSuccessToast(`Paciente ${formData.nome} cadastrado com sucesso! Valor: ${formData.valor_fechado_formatado}`);

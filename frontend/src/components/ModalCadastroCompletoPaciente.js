@@ -88,6 +88,7 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
   const [mostrarCanvasAssinatura, setMostrarCanvasAssinatura] = useState(false);
   const [pdfKey, setPdfKey] = useState(0); // Para forçar re-render do iframe
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const [hashExistente, setHashExistente] = useState(null); // Hash do fechamento existente
   
   // Detectar mudanças no tamanho da tela (apenas para layout, não para assinatura)
   useEffect(() => {
@@ -163,6 +164,18 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
                 setContratoUrl(contratoData.url);
               } else {
                 console.warn('⚠️ [ModalCadastro] Erro ao buscar URL do contrato');
+              }
+              
+              // Buscar hash do fechamento
+              try {
+                const hashResponse = await makeRequest(`/fechamentos/hash/${paciente.id}`);
+                if (hashResponse.temHash && hashResponse.hash) {
+                  setHashExistente(hashResponse.hash);
+                  console.log('✅ [ModalCadastro] Hash do fechamento carregado:', hashResponse.hash);
+                }
+              } catch (hashError) {
+                console.warn('⚠️ [ModalCadastro] Não foi possível buscar hash do fechamento:', hashError);
+                // Não bloquear o processo se não conseguir buscar o hash
               }
             } else {
               console.warn('⚠️ [ModalCadastro] Fechamento não tem contrato');
@@ -835,9 +848,15 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
       const pdfBytesAntesHash = await pdfDoc.save();
       console.log('💾 [ModalCadastro] PDF salvo antes do hash, tamanho:', pdfBytesAntesHash.length);
       
-      // Gerar hash SHA1 do PDF com assinatura e rodapé
-      const hashRastreamento = await gerarHashSHA1(pdfBytesAntesHash);
-      console.log('✅ [ModalCadastro] Hash gerado:', hashRastreamento);
+      // Usar hash existente se disponível, senão gerar novo
+      let hashRastreamento;
+      if (hashExistente) {
+        hashRastreamento = hashExistente.toUpperCase();
+        console.log('✅ [ModalCadastro] Usando hash existente do fechamento:', hashRastreamento);
+      } else {
+        hashRastreamento = await gerarHashSHA1(pdfBytesAntesHash);
+        console.log('✅ [ModalCadastro] Hash gerado (novo):', hashRastreamento);
+      }
       
       // Recarregar PDF para adicionar hash no rodapé
       const pdfDocComHash = await PDFDocument.load(pdfBytesAntesHash);

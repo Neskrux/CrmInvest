@@ -821,11 +821,25 @@ const Fechamentos = () => {
       
       if (response.ok) {
         const result = await response.json();
+        console.log('✅ Resposta da aprovação:', result);
+        
+        // Atualizar estado imediatamente antes de recarregar
+        setFechamentos(prev => prev.map(f => 
+          f.id === fechamentoId ? { ...f, aprovado: novoStatus } : f
+        ));
+        
+        // Se foi aprovado e estamos na aba "Em Análise", mudar para aba "Fechamentos"
+        if (novoStatus === 'aprovado' && activeTab === 'em_analise') {
+          setActiveTab('fechamentos');
+        }
         
         // Recarregar dados após alteração
         try {
           await carregarDados();
           showSuccessToast(`Fechamento ${novoStatus === 'aprovado' ? 'aprovado' : 'reprovado'} com sucesso!`);
+          
+          // Disparar evento para atualizar outras partes da aplicação
+          window.dispatchEvent(new Event('data_updated'));
         } catch (reloadError) {
           console.error('Erro ao recarregar dados:', reloadError);
           showWarningToast('Status alterado, mas houve erro ao atualizar a tela. Recarregue a página.');
@@ -1345,13 +1359,13 @@ const Fechamentos = () => {
                   if (!isIncorporadora) {
                 const totalDocs = 4;
                 const docsEnviados = [
-                  paciente.selfie_doc_url,
-                  paciente.documento_url,
+                  paciente.selfie_biometrica_url,
+                  paciente.documento_biometrica_url,
                   paciente.comprovante_residencia_url,
                   paciente.contrato_servico_url
                 ].filter(Boolean).length;
                 
-                if (docsEnviados < totalDocs && statusReal !== 'reprovado') {
+                if (docsEnviados < totalDocs && statusReal !== 'reprovado' && statusReal !== 'aprovado') {
                   statusReal = 'documentacao_pendente';
                     }
                 }
@@ -1441,16 +1455,19 @@ const Fechamentos = () => {
               
               if (!isIncorporadora) {
                 // Para outras empresas, verificar se documentação está completa
-              const totalDocs = 4;
-              const docsEnviados = [
-                paciente.selfie_doc_url,
-                paciente.documento_url,
-                paciente.comprovante_residencia_url,
-                paciente.contrato_servico_url
-              ].filter(Boolean).length;
-              
-              if (docsEnviados < totalDocs && statusReal !== 'reprovado') {
-                statusReal = 'documentacao_pendente';
+                // MAS: se já está aprovado, não sobrescrever o status
+                if (statusReal !== 'aprovado' && statusReal !== 'reprovado') {
+                  const totalDocs = 4;
+                  const docsEnviados = [
+                    paciente.selfie_biometrica_url,
+                    paciente.documento_biometrica_url,
+                    paciente.comprovante_residencia_url,
+                    paciente.contrato_servico_url
+                  ].filter(Boolean).length;
+                  
+                  if (docsEnviados < totalDocs) {
+                    statusReal = 'documentacao_pendente';
+                  }
                 }
               }
               
@@ -1689,14 +1706,15 @@ const Fechamentos = () => {
                             
                             if (!isIncorporadora) {
                               docsEnviados = [
-                              pacienteFechamento.selfie_doc_url,
-                              pacienteFechamento.documento_url,
+                              pacienteFechamento.selfie_biometrica_url,
+                              pacienteFechamento.documento_biometrica_url,
                               pacienteFechamento.comprovante_residencia_url,
                               pacienteFechamento.contrato_servico_url
                             ].filter(Boolean).length;
                             
                             // Se documentação incompleta, sempre mostrar "Documentação Pendente"
-                            if (docsEnviados < totalDocs && statusFechamento !== 'reprovado') {
+                            // MAS: se já está aprovado, não sobrescrever
+                            if (docsEnviados < totalDocs && statusFechamento !== 'reprovado' && statusFechamento !== 'aprovado') {
                               statusFechamento = 'documentacao_pendente';
                               }
                             }
@@ -2834,7 +2852,7 @@ const Fechamentos = () => {
                                     {docEnviado && (
                                       <button 
                                         className="btn btn-sm btn-secondary" 
-                                        style={{ fontSize: '0.75rem', padding: '0.5rem', 'justify-content': 'center' }}
+                                        style={{ fontSize: '0.75rem', padding: '0.5rem', justifyContent: 'center' }}
                                         onClick={() => window.open(pacienteFechamento[doc.key], '_blank')}
                                       >
                                         Visualizar
