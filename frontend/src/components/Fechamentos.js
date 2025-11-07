@@ -2739,8 +2739,8 @@ const Fechamentos = () => {
                       }
                       
                       const documentos = [
-                        { key: 'selfie_doc_url', label: '1. Selfie com Documento', required: true },
-                        { key: 'documento_url', label: '2. Documento (RG/CNH)', required: true },
+                        { key: 'selfie_biometrica_url', label: '1. Selfie', required: true },
+                        { key: 'documento_biometrica_url', label: '2. Documento (RG/CNH)', required: true },
                         { key: 'comprovante_residencia_url', label: '3. Comprovante de Residência', required: true },
                         { key: 'contrato_servico_url', label: '4. Contrato de Serviço', required: true }
                       ];

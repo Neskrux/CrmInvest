@@ -31,6 +31,7 @@ const movimentacoesRoutes = require('./movimentacoes.routes');
 const documentsRoutes = require('./documents.routes');
 const idsfRoutes = require('./idsf.routes');
 const documentosAssinadosRoutes = require('./documentos-assinados.routes');
+const assinaturasAdminRoutes = require('./assinaturas-admin.routes');
 
 // Importar rotas de solicitações de carteira ANTES das outras para evitar conflitos
 const solicitacoesCarteiraRoutes = require('./solicitacoes-carteira.routes');
@@ -74,6 +75,7 @@ router.use('/', movimentacoesRoutes); // /api/movimentacoes/*
 router.use('/documents', documentsRoutes);
 router.use('/idsf', idsfRoutes);
 router.use('/documentos-assinados', documentosAssinadosRoutes); // /api/documentos-assinados/*
+router.use('/', assinaturasAdminRoutes); // /api/assinaturas-admin/*
 
 // Importar rotas de contratos de carteira
 const contratosCarteiraRoutes = require('./contratos-carteira.routes');

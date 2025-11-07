@@ -9,6 +9,7 @@ import ModalCriarLoginPaciente from './ModalCriarLoginPaciente';
 import ModalCadastroPacienteClinica from './ModalCadastroPacienteClinica';
 import * as XLSX from 'xlsx';
 import useSmartPolling from '../hooks/useSmartPolling';
+import './Pacientes.css';
 
 const Pacientes = () => {
   const { t, empresaId, shouldShow } = useBranding();
@@ -5131,8 +5132,8 @@ const Pacientes = () => {
                   return pacientes.filter(p => {
                     if (!pacientesIds.includes(p.id) || p.status !== 'fechado') return false;
                     const docsEnviados = [
-                      p.selfie_doc_url,
-                      p.documento_url,
+                      p.selfie_biometrica_url,
+                      p.documento_biometrica_url,
                       p.comprovante_residencia_url,
                       p.contrato_servico_url
                     ].filter(Boolean).length;
@@ -5152,8 +5153,8 @@ const Pacientes = () => {
                   return pacientes.filter(p => {
                     if (!pacientesIds.includes(p.id) || p.status !== 'fechado') return false;
                     const docsEnviados = [
-                      p.selfie_doc_url,
-                      p.documento_url,
+                      p.selfie_biometrica_url,
+                      p.documento_biometrica_url,
                       p.comprovante_residencia_url,
                       p.contrato_servico_url
                     ].filter(Boolean).length;
@@ -5257,8 +5258,8 @@ const Pacientes = () => {
                             .map(paciente => {
                               const totalDocs = 4;
                               const docsEnviados = [
-                                paciente.selfie_doc_url,
-                                paciente.documento_url,
+                                paciente.selfie_biometrica_url,
+                                paciente.documento_biometrica_url,
                                 paciente.comprovante_residencia_url,
                                 paciente.contrato_servico_url
                               ].filter(Boolean).length;
@@ -5266,13 +5267,24 @@ const Pacientes = () => {
                               
                               // Determinar status do fechamento
                               let statusFechamento = fechamentoPaciente?.aprovado || 'documentacao_pendente';
-                              if (docsEnviados < totalDocs && statusFechamento !== 'reprovado') {
+                              
+                              // Se todos os documentos foram enviados, marcar como "Assinatura IM" (pendente de assinatura da InvestMoney)
+                              if (docsEnviados === totalDocs && statusFechamento !== 'reprovado') {
+                                // Se já foi aprovado, manter aprovado, senão mostrar como "Assinatura IM"
+                                if (statusFechamento === 'aprovado') {
+                                  statusFechamento = 'aprovado';
+                                } else {
+                                  // Documentação completa mas pendente de assinatura da InvestMoney
+                                  statusFechamento = 'assinatura_im';
+                                }
+                              } else if (docsEnviados < totalDocs && statusFechamento !== 'reprovado') {
                                 statusFechamento = 'documentacao_pendente';
                               }
                               
                               const statusColors = {
                                 'aprovado': { color: '#10b981', label: 'Aprovado' },
                                 'reprovado': { color: '#ef4444', label: 'Reprovado' },
+                                'assinatura_im': { color: '#3b82f6', label: 'Assinatura IM' },
                                 'documentacao_pendente': { color: '#f59e0b', label: 'Doc. Pendente' },
                                 'pendente': { color: '#f59e0b', label: 'Pendente' }
                               };
@@ -5303,10 +5315,19 @@ const Pacientes = () => {
                                       border: `1px solid ${statusInfo.color}`,
                                       padding: '0.25rem 0.5rem',
                                       borderRadius: '4px',
-                                      fontSize: '0.75rem'
+                                      fontSize: '0.75rem',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.25rem'
                                     }}
                                     title="Status de aprovação do fechamento pelo admin"
                                   >
+                                    {statusFechamento === 'assinatura_im' && (
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                      </svg>
+                                    )}
                                     {statusInfo.label}
                                   </span>
                                 </td>
@@ -7094,20 +7115,29 @@ const Pacientes = () => {
                     
                     const totalDocs = 4;
                     const docsEnviados = [
-                      viewPaciente.selfie_doc_url,
-                      viewPaciente.documento_url,
+                      viewPaciente.selfie_biometrica_url,
+                      viewPaciente.documento_biometrica_url,
                       viewPaciente.comprovante_residencia_url,
                       viewPaciente.contrato_servico_url
                     ].filter(Boolean).length;
                     
                     let statusFechamento = fechamentoPaciente.aprovado || 'documentacao_pendente';
-                    if (docsEnviados < totalDocs && statusFechamento !== 'reprovado') {
+                    
+                    // Se todos os documentos foram enviados, marcar como "Assinatura IM"
+                    if (docsEnviados === totalDocs && statusFechamento !== 'reprovado') {
+                      if (statusFechamento === 'aprovado') {
+                        statusFechamento = 'aprovado';
+                      } else {
+                        statusFechamento = 'assinatura_im';
+                      }
+                    } else if (docsEnviados < totalDocs && statusFechamento !== 'reprovado') {
                       statusFechamento = 'documentacao_pendente';
                     }
                     
                     const statusColors = {
                       'aprovado': { color: '#10b981', label: 'Aprovado' },
                       'reprovado': { color: '#ef4444', label: 'Reprovado' },
+                      'assinatura_im': { color: '#3b82f6', label: 'Assinatura IM' },
                       'documentacao_pendente': { color: '#f59e0b', label: 'Doc. Pendente' },
                       'pendente': { color: '#f59e0b', label: 'Pendente' }
                     };
@@ -7134,9 +7164,18 @@ const Pacientes = () => {
                                 border: `1px solid ${statusInfo.color}`,
                                 padding: '0.5rem 1rem',
                                 borderRadius: '6px',
-                                fontSize: '0.95rem'
+                                fontSize: '0.95rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
                               }}
                             >
+                              {statusFechamento === 'assinatura_im' && (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <circle cx="12" cy="12" r="10"></circle>
+                                  <polyline points="12 6 12 12 16 14"></polyline>
+                                </svg>
+                              )}
                               {statusInfo.label}
                             </span>
                           </p>
@@ -7262,8 +7301,8 @@ const Pacientes = () => {
                   
                   {(() => {
                     const documentos = [
-                      { key: 'selfie_doc_url', label: '1. Selfie com Documento', required: true },
-                      { key: 'documento_url', label: '2. Documento (RG/CNH)', required: true },
+                      { key: 'selfie_biometrica_url', label: '1. Selfie', required: true },
+                      { key: 'documento_biometrica_url', label: '2. Documento (RG/CNH)', required: true },
                       { key: 'comprovante_residencia_url', label: '3. Comprovante de Residência', required: true },
                       { key: 'contrato_servico_url', label: '4. Contrato de Serviço', required: true }
                     ];
@@ -8074,8 +8113,8 @@ const Pacientes = () => {
                         {(() => {
                           const totalDocs = 5;
                           const docsEnviados = [
-                            editingPaciente.selfie_doc_url,
-                            editingPaciente.documento_url,
+                            editingPaciente.selfie_biometrica_url,
+                            editingPaciente.documento_biometrica_url,
                             editingPaciente.comprovante_residencia_url,
                             editingPaciente.contrato_servico_url,
                           ].filter(Boolean).length;
@@ -8095,8 +8134,8 @@ const Pacientes = () => {
                         width: `${(() => {
                           const totalDocs = 5;
                           const docsEnviados = [
-                            editingPaciente.selfie_doc_url,
-                            editingPaciente.documento_url,
+                            editingPaciente.selfie_biometrica_url,
+                            editingPaciente.documento_biometrica_url,
                             editingPaciente.comprovante_residencia_url,
                             editingPaciente.contrato_servico_url,
                           ].filter(Boolean).length;
@@ -8129,7 +8168,7 @@ const Pacientes = () => {
                   }}>
                     {/* Campo de upload para cada tipo de documento */}
                     {[
-                  { key: 'selfie_doc', label: 'Selfie com Documento' },
+                  { key: 'selfie_doc', label: 'Selfie' },
                   { key: 'documento', label: 'Documento (RG/CNH)' },
                   { key: 'comprovante_residencia', label: 'Comprovante de Residência' },
                   { key: 'contrato_servico', label: 'Contrato de Serviço' },

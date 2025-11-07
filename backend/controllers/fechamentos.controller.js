@@ -1124,6 +1124,148 @@ const aprovarFechamento = async (req, res) => {
       }
     }
     
+    // ============================================
+    // ASSINATURA DIGITAL AUTOMÁTICA
+    // ============================================
+    // Aplicar assinatura digital do admin automaticamente quando fechamento for aprovado
+    if (!jaEstaAprovado && data && data[0]) {
+      try {
+        console.log('✍️ [ASSINATURA DIGITAL] Iniciando assinatura automática do fechamento aprovado');
+        
+        // Buscar assinatura ativa do admin
+        const { data: assinaturaAdmin, error: assinaturaError } = await supabaseAdmin
+          .from('assinaturas_admin')
+          .select('*')
+          .eq('usuario_id', req.user.id)
+          .eq('ativa', true)
+          .single();
+        
+        if (assinaturaError || !assinaturaAdmin) {
+          console.warn('⚠️ [ASSINATURA DIGITAL] Admin não possui assinatura cadastrada. Pulando assinatura automática.');
+        } else {
+          // Buscar dados do paciente
+          const { data: pacienteCompleto, error: pacienteError } = await supabaseAdmin
+            .from('pacientes')
+            .select('*')
+            .eq('id', fechamento.paciente_id)
+            .single();
+          
+          if (pacienteError || !pacienteCompleto) {
+            console.error('❌ [ASSINATURA DIGITAL] Erro ao buscar paciente:', pacienteError);
+          } else {
+            // Buscar dados da clínica (se houver)
+            let dadosClinica = null;
+            if (fechamento.clinica_id) {
+              const { data: clinicaData } = await supabaseAdmin
+                .from('clinicas')
+                .select('nome, cnpj')
+                .eq('id', fechamento.clinica_id)
+                .single();
+              
+              dadosClinica = clinicaData || null;
+            }
+            
+            // Buscar contrato do paciente
+            const contratoUrl = pacienteCompleto.contrato_servico_url;
+            
+            if (!contratoUrl) {
+              console.warn('⚠️ [ASSINATURA DIGITAL] Paciente não possui contrato. Pulando assinatura.');
+            } else {
+              // Baixar PDF do contrato
+              const contratoResponse = await fetch(contratoUrl);
+              if (!contratoResponse.ok) {
+                throw new Error('Erro ao baixar contrato');
+              }
+              
+              const contratoBuffer = await contratoResponse.arrayBuffer();
+              const contratoBytes = new Uint8Array(contratoBuffer);
+              
+              // Aplicar assinatura usando o serviço
+              const assinaturaService = require('../services/assinatura-admin.service');
+              
+              const resultadoAssinatura = await assinaturaService.aplicarAssinaturaAdminAutomatica(
+                contratoBytes,
+                assinaturaAdmin.assinatura_base64,
+                {
+                  nome: assinaturaAdmin.nome_admin,
+                  documento: assinaturaAdmin.documento_admin
+                },
+                {
+                  nome: pacienteCompleto.nome,
+                  cpf: pacienteCompleto.cpf?.replace(/\D/g, '') || ''
+                },
+                dadosClinica ? {
+                  nome: dadosClinica.nome,
+                  cnpj: dadosClinica.cnpj?.replace(/\D/g, '') || ''
+                } : null
+              );
+              
+              // Upload do contrato assinado para Supabase Storage
+              const documentsService = require('../services/documents.service');
+              const { STORAGE_BUCKET_DOCUMENTOS } = require('../config/constants');
+              
+              const timestamp = Date.now();
+              const fileName = `pacientes/${pacienteCompleto.id}/contrato_servico_assinado_${timestamp}.pdf`;
+              
+              const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+                .from(STORAGE_BUCKET_DOCUMENTOS)
+                .upload(fileName, Buffer.from(resultadoAssinatura.pdfAssinado), {
+                  contentType: 'application/pdf',
+                  upsert: false
+                });
+              
+              if (!uploadError && uploadData) {
+                const { data: { publicUrl } } = supabaseAdmin.storage
+                  .from(STORAGE_BUCKET_DOCUMENTOS)
+                  .getPublicUrl(fileName);
+                
+                // Atualizar URL do contrato no paciente
+                await supabaseAdmin
+                  .from('pacientes')
+                  .update({ contrato_servico_url: publicUrl })
+                  .eq('id', pacienteCompleto.id);
+                
+                // Salvar no sistema de rastreabilidade
+                const nomeDocumento = `Contrato_Assinado_Admin_${pacienteCompleto.nome?.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+                
+                await supabaseAdmin
+                  .from('documentos_assinados')
+                  .insert({
+                    nome: nomeDocumento,
+                    assinante: assinaturaAdmin.nome_admin,
+                    documento: assinaturaAdmin.documento_admin,
+                    hash_sha1: resultadoAssinatura.hashSHA1,
+                    chave_validacao: resultadoAssinatura.hashSHA1.substring(0, 10),
+                    data_assinatura: new Date().toISOString(),
+                    usuario_id: req.user.id,
+                    ip_assinatura: req.ip || req.headers['x-forwarded-for'] || 'desconhecido',
+                    dispositivo_info: {
+                      userAgent: req.headers['user-agent'],
+                      timestamp: new Date().toISOString()
+                    },
+                    integridade_status: 'nao_verificado',
+                    validade_juridica: 'simples',
+                    auditoria_log: [{
+                      tipo: 'assinatura_automatica',
+                      data: new Date().toISOString(),
+                      ip: req.ip || req.headers['x-forwarded-for'] || 'desconhecido',
+                      usuario: req.user.nome || req.user.email
+                    }]
+                  });
+                
+                console.log('✅ [ASSINATURA DIGITAL] Contrato assinado automaticamente com sucesso!');
+              } else {
+                console.error('❌ [ASSINATURA DIGITAL] Erro ao fazer upload do contrato assinado:', uploadError);
+              }
+            }
+          }
+        }
+      } catch (assinaturaError) {
+        console.error('❌ [ASSINATURA DIGITAL] Erro ao aplicar assinatura automática:', assinaturaError);
+        // Não bloquear a aprovação se houver erro na assinatura
+      }
+    }
+    
     res.json({ message: 'Fechamento aprovado com sucesso!' });
   } catch (error) {
     console.error('Erro ao aprovar fechamento:', error);

@@ -4,6 +4,7 @@ import { useToast } from './Toast';
 import useBranding from '../hooks/useBranding';
 import SignatureCanvas from 'react-signature-canvas';
 import { PDFDocument, rgb } from 'pdf-lib';
+import './ModalCadastroPacienteClinica.css';
 import logoBrasaoPreto from '../images/logohorizontalpreto.png';
 
 const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {

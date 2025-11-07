@@ -4,6 +4,7 @@ import { useToast } from './Toast';
 import SignatureCanvas from 'react-signature-canvas';
 import { PDFDocument, rgb } from 'pdf-lib';
 import logoBrasaoPreto from '../images/logohorizontalpreto.png';
+import './ModalCadastroCompletoPaciente.css';
 
 const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
   const { user, makeRequest, logout } = useAuth();
@@ -1242,78 +1243,50 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
         </div>
         
         {/* Indicador de progresso */}
-        <div style={{
-          padding: '1rem 1.5rem',
-          backgroundColor: '#f8fafc',
-          borderBottom: '1px solid #e2e8f0'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            position: 'relative'
-          }}>
-            {[1, 2, 3, 4].map((passo) => (
-              <React.Fragment key={passo}>
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  flex: 1,
-                  position: 'relative',
-                  zIndex: 2
-                }}>
-                  <div style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    backgroundColor: passo <= passoAtual ? '#059669' : '#e5e7eb',
-                    color: passo <= passoAtual ? 'white' : '#9ca3af',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: '700',
-                    fontSize: '0.875rem',
-                    border: `3px solid ${passo <= passoAtual ? '#059669' : '#e5e7eb'}`,
-                    transition: 'all 0.3s ease'
-                  }}>
-                    {passo < passoAtual ? '✓' : passo}
-                  </div>
-                  <span style={{
-                    marginTop: '0.25rem',
-                    fontSize: '0.7rem',
-                    color: passo <= passoAtual ? '#059669' : '#9ca3af',
-                    fontWeight: passo === passoAtual ? '600' : '400',
-                    textAlign: 'center'
-                  }}>
-                    {passo === 1 && 'CPF'}
-                    {passo === 2 && 'Nascimento'}
-                    {passo === 3 && 'Residência'}
-                    {passo === 4 && 'Contrato'}
-                  </span>
-                </div>
-                {passo < 4 && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '18px',
-                    left: `${(passo * 25)}%`,
-                    width: '25%',
-                    height: '2px',
-                    backgroundColor: passo < passoAtual ? '#059669' : '#e5e7eb',
-                    zIndex: 1
-                  }} />
-                )}
-              </React.Fragment>
-            ))}
-          </div>
+        <div className="cadastro-stepper">
+          {/* Linhas conectoras */}
+          {[1, 2, 3].map((index) => (
+            <div
+              key={`connector-${index}`}
+              className="step-connector"
+              style={{
+                left: `calc(${index * 25}% - 12.5%)`,
+                width: '25%',
+                backgroundColor: index < passoAtual ? '#059669' : '#e5e7eb'
+              }}
+            />
+          ))}
+          
+          {/* Steps */}
+          {[
+            { num: 1, label: 'CPF' },
+            { num: 2, label: 'Nascimento' },
+            { num: 3, label: 'Residência' },
+            { num: 4, label: 'Contrato' }
+          ].map((step) => (
+            <div key={step.num} className="cadastro-step">
+              <div 
+                className="step-number"
+                style={{
+                  backgroundColor: step.num <= passoAtual ? '#059669' : '#ffffff',
+                  color: step.num <= passoAtual ? 'white' : '#9ca3af',
+                  borderColor: step.num <= passoAtual ? '#059669' : '#e5e7eb'
+                }}
+              >
+                {step.num < passoAtual ? '✓' : step.num}
+              </div>
+              <span className="step-label" style={{
+                color: step.num <= passoAtual ? '#059669' : '#9ca3af',
+                fontWeight: step.num === passoAtual ? '600' : '400'
+              }}>
+                {step.label}
+              </span>
+            </div>
+          ))}
         </div>
         
         {/* Conteúdo */}
-        <div style={{
-          padding: '2rem',
-          overflowY: 'auto',
-          flex: 1
-        }}>
+        <div className="cadastro-form-content">
           {/* Passo 1: CPF */}
           {passoAtual === 1 && (
             <div>
@@ -1358,20 +1331,9 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
               </div>
               
               <button
+                className="btn-confirmar-cpf"
                 onClick={handleConfirmarCPF}
                 disabled={loading || !formData.cpf}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  backgroundColor: loading || !formData.cpf ? '#9ca3af' : '#059669',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '0.95rem',
-                  fontWeight: '600',
-                  cursor: loading || !formData.cpf ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s'
-                }}
               >
                 {loading ? 'Salvando...' : 'Confirmar CPF'}
               </button>
@@ -1421,39 +1383,18 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
                 />
               </div>
               
-              <div style={{ display: 'flex', gap: '1rem' }}>
+              <div className="cadastro-form-actions">
                 <button
+                  className="btn-voltar"
                   onClick={() => setPassoAtual(1)}
-                  style={{
-                    flex: 1,
-                    padding: '0.75rem',
-                    backgroundColor: 'white',
-                    color: '#6b7280',
-                    border: '2px solid #e2e8f0',
-                    borderRadius: '8px',
-                    fontSize: '0.95rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
                 >
                   Voltar
                 </button>
                 <button
+                  className="btn-proximo"
                   onClick={handleSalvarDataNascimento}
                   disabled={loading || !formData.data_nascimento}
-                  style={{
-                    flex: 2,
-                    padding: '0.75rem',
-                    backgroundColor: loading || !formData.data_nascimento ? '#9ca3af' : '#059669',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '0.95rem',
-                    fontWeight: '600',
-                    cursor: loading || !formData.data_nascimento ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s'
-                  }}
+                  style={{ flex: 2 }}
                 >
                   {loading ? 'Salvando...' : 'Continuar'}
                 </button>
