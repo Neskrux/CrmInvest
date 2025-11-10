@@ -69,7 +69,7 @@ router.use('/', novasClinicasRoutes); // /api/novas-clinicas/*
 router.use('/', pacientesFinanceiroRoutes); // /api/pacientes-financeiro/*
 router.use('/', metaAdsRoutes); // /api/meta-ads/*
 router.use('/', solicitacoesCarteiraRoutes); // /api/solicitacoes-carteira/* (ANTES de empreendimentos!)
-router.use('/', empreendimentosRoutes); // /api/empreendimentos/*
+router.use('/empreendimentos', empreendimentosRoutes); // /api/empreendimentos/*
 router.use('/', movimentacoesRoutes); // /api/movimentacoes/*
 
 // Rotas de APIs externas

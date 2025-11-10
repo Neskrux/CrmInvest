@@ -60,9 +60,24 @@ const CadastroConsultor = () => {
       s.parentNode.insertBefore(t,s)}(window, document,'script',
       'https://connect.facebook.net/en_US/fbevents.js');
       fbq('init', '1981637492627156');
-      ${isClienteIncorporadora 
-        ? `fbq('track', 'PageView', { content_name: 'Página Cadastro - Incorporadora' });`
-        : `fbq('track', 'PageView', { content_name: 'Página Cadastro - Consultor' });`
+      ${
+        isClienteIncorporadora
+          ? `fbq('track', 'PageView', {
+              content_name: 'Página Cadastro - Incorporadora',
+              content_category: 'Lead Generation - Incorporadora',
+              client_type: 'incorporadora'
+            });
+            fbq('trackCustom', 'PageViewCadastroIncorporadora', {
+              client_type: 'incorporadora'
+            });`
+          : `fbq('track', 'PageView', {
+              content_name: 'Página Cadastro - Consultor',
+              content_category: 'Lead Generation - Consultor',
+              client_type: 'consultor'
+            });
+            fbq('trackCustom', 'PageViewCadastroConsultor', {
+              client_type: 'consultor'
+            });`
       }
     `;
     document.head.appendChild(script);
@@ -562,12 +577,20 @@ const CadastroConsultor = () => {
       if (isClienteIncorporadora) {
         window.fbq('track', 'InitiateCheckout', {
           content_name: 'Formulário de Cadastro - Incorporadora',
-          content_category: 'Lead Generation - Incorporadora'
+          content_category: 'Lead Generation - Incorporadora',
+          client_type: 'incorporadora'
+        });
+        window.fbq('trackCustom', 'InitiateCadastroIncorporadora', {
+          client_type: 'incorporadora'
         });
       } else {
         window.fbq('track', 'InitiateCheckout', {
           content_name: 'Formulário de Cadastro - Consultor',
-          content_category: 'Lead Generation - Consultor'
+          content_category: 'Lead Generation - Consultor',
+          client_type: 'consultor'
+        });
+        window.fbq('trackCustom', 'InitiateCadastroConsultor', {
+          client_type: 'consultor'
         });
       }
     }
@@ -717,13 +740,21 @@ const CadastroConsultor = () => {
             // Evento específico para clientes da incorporadora
             window.fbq('track', 'CompleteRegistration', {
               content_name: 'Cadastro Concluído - Incorporadora',
-              content_category: 'Lead Generation - Incorporadora'
+              content_category: 'Lead Generation - Incorporadora',
+              client_type: 'incorporadora'
+            });
+            window.fbq('trackCustom', 'CadastroConcluidoIncorporadora', {
+              client_type: 'incorporadora'
             });
           } else {
             // Evento para consultores normais
             window.fbq('track', 'CompleteRegistration', {
               content_name: 'Cadastro Concluído - Consultor',
-              content_category: 'Lead Generation - Consultor'
+              content_category: 'Lead Generation - Consultor',
+              client_type: 'consultor'
+            });
+            window.fbq('trackCustom', 'CadastroConcluidoConsultor', {
+              client_type: 'consultor'
             });
           }
         }
@@ -739,12 +770,20 @@ const CadastroConsultor = () => {
           if (isClienteIncorporadora) {
             window.fbq('track', 'Lead', {
               content_name: 'Tentativa de Cadastro - Erro - Incorporadora',
-              content_category: 'Lead Generation - Incorporadora'
+              content_category: 'Lead Generation - Incorporadora',
+              client_type: 'incorporadora'
+            });
+            window.fbq('trackCustom', 'CadastroErroIncorporadora', {
+              client_type: 'incorporadora'
             });
           } else {
             window.fbq('track', 'Lead', {
               content_name: 'Tentativa de Cadastro - Erro - Consultor',
-              content_category: 'Lead Generation - Consultor'
+              content_category: 'Lead Generation - Consultor',
+              client_type: 'consultor'
+            });
+            window.fbq('trackCustom', 'CadastroErroConsultor', {
+              client_type: 'consultor'
             });
           }
         }
