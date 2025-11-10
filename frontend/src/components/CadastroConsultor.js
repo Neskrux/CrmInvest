@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logoBrasaoPreto from '../images/logohorizontalpreto.png';
+import { META_PIXEL_ID_CONSULTOR } from '../config/metaPixel';
 
 const CadastroConsultor = () => {
   const navigate = useNavigate();
@@ -48,6 +49,13 @@ const CadastroConsultor = () => {
 
   // Meta Pixel - Carregar script do Facebook
   useEffect(() => {
+    if (!META_PIXEL_ID_CONSULTOR) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[MetaPixel] META_PIXEL_ID_CONSULTOR não configurado. Meta Pixel não será carregado.');
+      }
+      return;
+    }
+
     // Carregar o script do Meta Pixel
     const script = document.createElement('script');
     script.innerHTML = `
@@ -59,7 +67,7 @@ const CadastroConsultor = () => {
       t.src=v;s=b.getElementsByTagName(e)[0];
       s.parentNode.insertBefore(t,s)}(window, document,'script',
       'https://connect.facebook.net/en_US/fbevents.js');
-      fbq('init', '1981637492627156');
+      fbq('init', '${META_PIXEL_ID_CONSULTOR}');
       ${
         isClienteIncorporadora
           ? `fbq('track', 'PageView', {

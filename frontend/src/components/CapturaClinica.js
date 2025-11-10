@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Sparkles, Trophy, Gem, Lock, Check, Star, Building2, MapPin, Phone, Mail } from 'lucide-react';
 import logoBrasao from '../images/logobrasao-selo.png';
 import config from '../config';
+import { META_PIXEL_ID_CAPTURA_CLINICA } from '../config/metaPixel';
 
 const CapturaClinica = () => {
   const navigate = useNavigate();
@@ -105,7 +106,14 @@ const CapturaClinica = () => {
 
   // Meta Pixel - Captura Clínica
   useEffect(() => {
-    const pixelId = '1329727945501849';
+    const pixelId = META_PIXEL_ID_CAPTURA_CLINICA;
+
+    if (!pixelId) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[MetaPixel] META_PIXEL_ID_CAPTURA_CLINICA não configurado. Meta Pixel não será carregado.');
+      }
+      return;
+    }
 
     const triggerPageView = () => {
       window.fbq('track', 'PageView', {
