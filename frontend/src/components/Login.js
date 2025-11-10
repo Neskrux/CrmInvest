@@ -58,10 +58,6 @@ const Login = () => {
     }
   };
 
-  const handleDemoLogin = () => {
-    setFormData({ email: 'admin@investmoneysa.com.br', senha: '123456' });
-  };
-
   const handleForgotPassword = async (e) => {
     e.preventDefault();
     setForgotPasswordMessage('');
