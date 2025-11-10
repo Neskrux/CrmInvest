@@ -3,19 +3,41 @@ const { JWT_SECRET } = require('../config/constants');
 
 // Middleware de autenticação
 const authenticateToken = (req, res, next) => {
+  // Log apenas para boletos-gestao para debug
+  if (req.path && req.path.includes('boletos-gestao')) {
+    console.log('🔍 [AUTH] authenticateToken chamado para:', req.path);
+  }
+  
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
   if (!token) {
+    if (req.path && req.path.includes('boletos-gestao')) {
+      console.error('❌ [AUTH] Token não encontrado para:', req.path);
+    }
     return res.status(401).json({ error: 'Token de acesso requerido' });
   }
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
+      if (req.path && req.path.includes('boletos-gestao')) {
+        console.error('❌ [AUTH] Erro ao verificar token:', err.message);
+      }
       return res.status(403).json({ error: 'Token inválido' });
     }
     req.user = user;
-    next();
+    if (req.path && req.path.includes('boletos-gestao')) {
+      console.log('✅ [AUTH] Token válido, usuário:', { id: user.id, tipo: user.tipo });
+      console.log('🔍 [AUTH] Chamando next()...');
+    }
+    try {
+      next();
+    } catch (error) {
+      console.error('❌ [AUTH] Erro ao chamar next():', error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Erro interno no servidor' });
+      }
+    }
   });
 };
 

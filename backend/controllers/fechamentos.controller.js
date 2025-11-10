@@ -1584,10 +1584,11 @@ const getBoletosFechamento = async (req, res) => {
     }
 
     // Buscar boletos da tabela boletos_caixa para este fechamento
+    // Também buscar boletos do paciente que não têm fechamento_id (boletos importados manualmente)
     const { data: boletosCaixa, error: boletosError } = await supabaseAdmin
       .from('boletos_caixa')
       .select('*')
-      .eq('fechamento_id', fechamentoId)
+      .or(`fechamento_id.eq.${fechamentoId},and(fechamento_id.is.null,paciente_id.eq.${fechamento.paciente_id})`)
       .order('data_vencimento', { ascending: true });
 
     if (boletosError) throw boletosError;
@@ -2025,7 +2026,7 @@ const visualizarBoleto = async (req, res) => {
         '9': 'NWNWN'  // 0-1-0-1-0
       };
       
-      let barrasHTML = '<div style="display: inline-block; height: 60px; background: white; padding: 5px 10px; white-space: nowrap; overflow-x: auto;">';
+      let barrasHTML = '<div style="display: inline-block; width: 390px; height: 49px; background: white; padding: 5px 10px; white-space: nowrap; overflow: hidden;">';
       
       // Start pattern (4 elementos: barra preta fina, espaço branco fino, barra preta fina, espaço branco fino)
       barrasHTML += '<span style="display: inline-block; width: 2px; height: 100%; background: black; margin-right: 0;"></span>';
@@ -2252,10 +2253,10 @@ const visualizarBoleto = async (req, res) => {
       color: white;
     }
     .linha-digitavel-header {
-      font-size: 12px;
+      font-size: 10px; /* Ajustado conforme especificação: 3,5-4mm */
       font-family: 'Courier New', monospace;
       font-weight: bold;
-      letter-spacing: 1.2px;
+      letter-spacing: 1px; /* Reduzido para melhor proporção */
       color: white;
       flex: 1;
       text-align: right;
@@ -2353,10 +2354,12 @@ const visualizarBoleto = async (req, res) => {
     }
     .codigo-barras-visual {
       display: inline-block;
-      height: 50px;
+      width: 390px; /* 103mm conforme especificação */
+      height: 49px; /* 13mm conforme especificação */
       background: white;
       padding: 5px 10px;
       white-space: nowrap;
+      overflow: hidden; /* Garante que não ultrapasse o limite */
     }
     .codigo-barras-numero {
       margin-top: 2px;
@@ -2396,6 +2399,12 @@ const visualizarBoleto = async (req, res) => {
     /* Ajustes de altura para células específicas */
     .altura-instrucoes {
       height: 60px;
+    }
+    
+    /* Ficha de Compensação - Dimensões conforme especificação */
+    .ficha-compensacao {
+      min-height: 360px; /* 95mm em 96dpi */
+      max-height: 408px; /* 108mm em 96dpi */
     }
     
     @media print {
@@ -2537,12 +2546,12 @@ const visualizarBoleto = async (req, res) => {
         </tr>
         <tr>
           <td colspan="4">
-            <span class="campo-label">Sacador/Beneficiário Final</span>
-            <span class="campo-valor">${(clinica?.nome || 'CLINICA CIRURGICA ODONTOLOGICA RECIFE LT').toUpperCase()}</span>
+            <span class="campo-label">Sacador/Avalista</span>
+            <span class="campo-valor"></span>
           </td>
           <td colspan="2" class="td-right">
             <span class="campo-label">CPF/CNPJ</span>
-            <span class="campo-valor-numero">33.910.210/0001-76</span>
+            <span class="campo-valor-numero"></span>
           </td>
         </tr>
         <tr>
@@ -2660,21 +2669,17 @@ const visualizarBoleto = async (req, res) => {
             <span class="campo-label">Espécie Moeda</span>
             <span class="campo-valor-numero">R$</span>
           </td>
-          <td colspan="2">
+          <td>
             <span class="campo-label">Qtde. Moeda</span>
             <span class="campo-valor-numero">&nbsp;</span>
           </td>
           <td>
-            <span class="campo-label">Valor</span>
+            <span class="campo-label">xValor</span>
             <span class="campo-valor-numero">&nbsp;</span>
           </td>
-          <td class="vencimento td-right">
-            <span class="campo-label">Vencimento</span>
-            <span class="campo-valor-numero" style="font-size: 12px;">${dataVencimentoFormatada}</span>
-          </td>
-          <td class="td-right">
-            <span class="campo-label">Ag./Cod. Beneficiário</span>
-            <span class="campo-valor-numero">0374/1242669</span>
+          <td class="valor-documento td-right">
+            <span class="campo-label">(=) Valor do Documento</span>
+            <span class="campo-valor-numero">${valorFormatado}</span>
           </td>
         </tr>
         <tr>
@@ -2739,12 +2744,12 @@ const visualizarBoleto = async (req, res) => {
         </tr>
         <tr>
           <td colspan="5">
-            <span class="campo-label">Beneficiário Final</span>
-            <span class="campo-valor">${(clinica?.nome || 'CLINICA CIRURGICA ODONTOLOGICA RECIFE LT').toUpperCase()}</span>
+            <span class="campo-label">Sacador/Avalista</span>
+            <span class="campo-valor"></span>
           </td>
           <td colspan="3" class="td-right">
             <span class="campo-label">CPF/CNPJ</span>
-            <span class="campo-valor-numero">33.910.210/0001-76</span>
+            <span class="campo-valor-numero"></span>
           </td>
         </tr>
       </table>

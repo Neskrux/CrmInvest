@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from './Toast';
+import config from '../config';
 import './GestaoBoletosAdmin.css';
 
 const GestaoBoletosAdmin = () => {
@@ -19,11 +20,14 @@ const GestaoBoletosAdmin = () => {
     boleto_gerado: ''
   });
   
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [importData, setImportData] = useState({
-    fechamento_id: '',
-    gerar_automatico: false,
-    dias_antes_vencimento: 20
+  const [showImportArquivoModal, setShowImportArquivoModal] = useState(false);
+  const [pacientes, setPacientes] = useState([]);
+  const [loadingPacientes, setLoadingPacientes] = useState(false);
+  const [importArquivoData, setImportArquivoData] = useState({
+    paciente_id: '',
+    data_vencimento: '',
+    valor: '',
+    arquivo: null
   });
   
   const [selectedBoletos, setSelectedBoletos] = useState([]);
@@ -66,43 +70,88 @@ const GestaoBoletosAdmin = () => {
 
   useEffect(() => {
     buscarBoletos();
+    buscarPacientes();
   }, [paginacao.page, filtros]);
 
-  // Importar boletos
-  const handleImportarBoletos = async () => {
-    if (!importData.fechamento_id) {
-      showErrorToast('Informe o ID do fechamento');
-      return;
-    }
-    
-    setLoading(true);
+  // Buscar lista de pacientes
+  const buscarPacientes = async () => {
+    setLoadingPacientes(true);
     try {
-      const response = await makeRequest('/boletos-gestao/importar', {
-        method: 'POST',
-        body: JSON.stringify(importData)
-      });
-      
+      const response = await makeRequest('/pacientes');
       const data = await response.json();
       
       if (response.ok) {
+        setPacientes(data || []);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar pacientes:', error);
+    } finally {
+      setLoadingPacientes(false);
+    }
+  };
+
+  // Importar boleto com arquivo PDF
+  const handleImportarBoletoArquivo = async () => {
+    if (!importArquivoData.paciente_id) {
+      showErrorToast('Selecione um paciente');
+      return;
+    }
+
+    if (!importArquivoData.data_vencimento) {
+      showErrorToast('Informe a data de vencimento');
+      return;
+    }
+
+    if (!importArquivoData.valor) {
+      showErrorToast('Informe o valor do boleto');
+      return;
+    }
+
+    if (!importArquivoData.arquivo) {
+      showErrorToast('Selecione o arquivo PDF do boleto');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('paciente_id', importArquivoData.paciente_id);
+      formData.append('data_vencimento', importArquivoData.data_vencimento);
+      formData.append('valor', importArquivoData.valor);
+      formData.append('arquivo', importArquivoData.arquivo);
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${config.API_BASE_URL}/boletos-gestao/importar-arquivo`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
         showSuccessToast(data.message);
-        setShowImportModal(false);
-        setImportData({
-          fechamento_id: '',
-          gerar_automatico: false,
-          dias_antes_vencimento: 20
+        setShowImportArquivoModal(false);
+        setImportArquivoData({
+          paciente_id: '',
+          data_vencimento: '',
+          valor: '',
+          arquivo: null
         });
         buscarBoletos();
       } else {
-        showErrorToast(data.error);
+        showErrorToast(data.error || 'Erro ao importar boleto');
       }
     } catch (error) {
-      console.error('Erro ao importar boletos:', error);
-      showErrorToast('Erro ao importar boletos');
+      console.error('Erro ao importar boleto:', error);
+      showErrorToast('Erro ao importar boleto');
     } finally {
       setLoading(false);
     }
   };
+
 
   // Atualizar status do boleto
   const handleAtualizarStatus = async (boletoId, novoStatus) => {
@@ -175,31 +224,6 @@ const GestaoBoletosAdmin = () => {
     }
   };
 
-  // Gerar boletos pendentes
-  const handleGerarBoletosPendentes = async () => {
-    if (!window.confirm('Deseja gerar os boletos pendentes na Caixa?')) return;
-    
-    setLoading(true);
-    try {
-      const response = await makeRequest('/boletos-gestao/gerar-pendentes', {
-        method: 'POST'
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        showSuccessToast(data.message);
-        buscarBoletos();
-      } else {
-        showErrorToast(data.error);
-      }
-    } catch (error) {
-      console.error('Erro ao gerar boletos:', error);
-      showErrorToast('Erro ao gerar boletos');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Formatar data
   const formatarData = (data) => {
@@ -231,16 +255,9 @@ const GestaoBoletosAdmin = () => {
         <div className="header-actions">
           <button 
             className="btn btn-primary"
-            onClick={() => setShowImportModal(true)}
+            onClick={() => setShowImportArquivoModal(true)}
           >
-            Importar Boletos
-          </button>
-          <button 
-            className="btn btn-success"
-            onClick={handleGerarBoletosPendentes}
-            disabled={loading}
-          >
-            Gerar Boletos Pendentes
+            Importar Boleto
           </button>
         </div>
       </div>
@@ -474,60 +491,89 @@ const GestaoBoletosAdmin = () => {
         </button>
       </div>
 
-      {/* Modal de importação */}
-      {showImportModal && (
+      {/* Modal de importação de boleto com arquivo */}
+      {showImportArquivoModal && (
         <div className="modal-overlay">
           <div className="modal">
-            <h2>Importar Boletos de Fechamento</h2>
+            <h2>Importar Boleto</h2>
+            <p style={{ marginBottom: '20px', color: '#666', fontSize: '14px' }}>
+              Selecione o paciente, informe a data de vencimento e faça upload do arquivo PDF do boleto.
+              O boleto ficará visível para o paciente e para a clínica.
+            </p>
             
             <div className="form-group">
-              <label>ID do Fechamento</label>
+              <label>Paciente *</label>
+              <select
+                value={importArquivoData.paciente_id}
+                onChange={(e) => setImportArquivoData({...importArquivoData, paciente_id: e.target.value})}
+                disabled={loadingPacientes}
+                required
+              >
+                <option value="">Selecione um paciente</option>
+                {pacientes.map(paciente => (
+                  <option key={paciente.id} value={paciente.id}>
+                    {paciente.nome} {paciente.telefone && `- ${paciente.telefone}`}
+                  </option>
+                ))}
+              </select>
+              {loadingPacientes && <small style={{ color: '#666' }}>Carregando pacientes...</small>}
+            </div>
+            
+            <div className="form-group">
+              <label>Data de Vencimento *</label>
               <input 
-                type="number"
-                value={importData.fechamento_id}
-                onChange={(e) => setImportData({...importData, fechamento_id: e.target.value})}
-                placeholder="Digite o ID do fechamento"
+                type="date"
+                value={importArquivoData.data_vencimento}
+                onChange={(e) => setImportArquivoData({...importArquivoData, data_vencimento: e.target.value})}
+                required
               />
             </div>
             
             <div className="form-group">
-              <label>
-                <input 
-                  type="checkbox"
-                  checked={importData.gerar_automatico}
-                  onChange={(e) => setImportData({...importData, gerar_automatico: e.target.checked})}
-                />
-                Gerar boleto automaticamente na Caixa
-              </label>
+              <label>Valor (R$) *</label>
+              <input 
+                type="number"
+                step="0.01"
+                min="0"
+                value={importArquivoData.valor}
+                onChange={(e) => setImportArquivoData({...importArquivoData, valor: e.target.value})}
+                placeholder="0.00"
+                required
+              />
             </div>
             
-            {importData.gerar_automatico && (
-              <div className="form-group">
-                <label>Dias antes do vencimento para gerar</label>
-                <input 
-                  type="number"
-                  value={importData.dias_antes_vencimento}
-                  onChange={(e) => setImportData({...importData, dias_antes_vencimento: e.target.value})}
-                />
-              </div>
-            )}
+            <div className="form-group">
+              <label>Arquivo PDF do Boleto *</label>
+              <input 
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={(e) => setImportArquivoData({...importArquivoData, arquivo: e.target.files[0]})}
+                required
+              />
+              {importArquivoData.arquivo && (
+                <small style={{ color: '#666', display: 'block', marginTop: '5px' }}>
+                  Arquivo selecionado: {importArquivoData.arquivo.name}
+                </small>
+              )}
+            </div>
             
             <div className="modal-actions">
               <button 
                 className="btn btn-primary"
-                onClick={handleImportarBoletos}
+                onClick={handleImportarBoletoArquivo}
                 disabled={loading}
               >
-                Importar
+                {loading ? 'Importando...' : 'Importar Boleto'}
               </button>
               <button 
                 className="btn btn-secondary"
                 onClick={() => {
-                  setShowImportModal(false);
-                  setImportData({
-                    fechamento_id: '',
-                    gerar_automatico: false,
-                    dias_antes_vencimento: 20
+                  setShowImportArquivoModal(false);
+                  setImportArquivoData({
+                    paciente_id: '',
+                    data_vencimento: '',
+                    valor: '',
+                    arquivo: null
                   });
                 }}
               >
@@ -537,6 +583,7 @@ const GestaoBoletosAdmin = () => {
           </div>
         </div>
       )}
+
     </div>
   );
 };

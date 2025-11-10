@@ -316,6 +316,14 @@ const AppContent = () => {
             </Suspense>
           } 
         />
+        <Route 
+          path="/gestao-boletos" 
+          element={
+            <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Carregando...</div>}>
+              <GestaoBoletosAdmin />
+            </Suspense>
+          } 
+        />
         <Route path="/perfil" element={<Perfil />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -42,8 +42,8 @@ const solicitacoesCarteiraRoutes = require('./solicitacoes-carteira.routes');
 
 // Middleware de log para debug (antes de authRoutes)
 router.use((req, res, next) => {
-  if (req.path.includes('validar-biometria')) {
-    console.log('🔍 [ROUTES-INDEX] Antes de authRoutes - Path:', req.path);
+  if (req.path.includes('validar-biometria') || req.path.includes('boletos-gestao')) {
+    console.log('🔍 [ROUTES-INDEX] Requisição recebida - Path:', req.path);
     console.log('🔍 [ROUTES-INDEX] URL:', req.url);
     console.log('🔍 [ROUTES-INDEX] Method:', req.method);
   }
