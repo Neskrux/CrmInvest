@@ -73,10 +73,7 @@ const getAllPacientes = async (req, res) => {
     
     let query = supabaseAdmin
       .from('pacientes')
-      .select(`
-        *,
-        empreendimentos(nome, cidade, estado)
-      `);
+      .select('*');
     
     // Para freelancers, não excluir nenhum status (mostrar todos os pacientes atribuídos)
     // Para outros usuários, excluir status que devem aparecer apenas em Novos Leads e Negativas
@@ -177,6 +174,31 @@ const getAllPacientes = async (req, res) => {
 
     if (error) throw error;
     
+    const empreendimentoIds = [...new Set(
+      data
+        .map(p => {
+          if (p.empreendimento_id === null || p.empreendimento_id === undefined) return null;
+          const parsed = Number(p.empreendimento_id);
+          return Number.isFinite(parsed) ? parsed : null;
+        })
+        .filter(id => id !== null)
+    )];
+
+    let empreendimentosMap = {};
+    if (empreendimentoIds.length > 0) {
+      const { data: empreendimentosData, error: empreendimentosError } = await supabaseAdmin
+        .from('empreendimentos')
+        .select('id, nome, cidade, estado')
+        .in('id', empreendimentoIds);
+
+      if (empreendimentosError) throw empreendimentosError;
+
+      empreendimentosMap = (empreendimentosData || []).reduce((acc, empreendimento) => {
+        acc[empreendimento.id] = empreendimento;
+        return acc;
+      }, {});
+    }
+
     // Buscar nomes dos consultores separadamente
     const consultoresIds = [...new Set(data.map(p => p.consultor_id).filter(Boolean))];
     const sdrIds = [...new Set(data.map(p => p.sdr_id).filter(Boolean))];
@@ -203,9 +225,10 @@ const getAllPacientes = async (req, res) => {
       consultor_nome: consultoresNomes[paciente.consultor_id] || null,
       sdr_nome: consultoresNomes[paciente.sdr_id] || null,
       consultor_interno_nome: consultoresNomes[paciente.consultor_interno_id] || null,
-      empreendimento_nome: paciente.empreendimentos?.nome,
-      empreendimento_cidade: paciente.empreendimentos?.cidade,
-      empreendimento_estado: paciente.empreendimentos?.estado
+      empreendimento_nome: empreendimentosMap[Number(paciente.empreendimento_id)]?.nome || null,
+      empreendimento_cidade: empreendimentosMap[Number(paciente.empreendimento_id)]?.cidade || null,
+      empreendimento_estado: empreendimentosMap[Number(paciente.empreendimento_id)]?.estado || null,
+      empreendimento_detalhes: empreendimentosMap[Number(paciente.empreendimento_id)] || null
     }));
 
     res.json(formattedData);
@@ -224,10 +247,7 @@ const getDashboardPacientes = async (req, res) => {
     
     let query = supabaseAdmin
       .from('pacientes')
-      .select(`
-        *,
-        empreendimentos(nome, cidade, estado)
-      `);
+      .select('*');
     
     // Para freelancers, não excluir nenhum status (mostrar todos os pacientes atribuídos)
     // Para outros usuários, excluir status que devem aparecer apenas em Novos Leads e Negativas
@@ -307,6 +327,31 @@ const getDashboardPacientes = async (req, res) => {
 
     if (error) throw error;
     
+    const empreendimentoIds = [...new Set(
+      data
+        .map(p => {
+          if (p.empreendimento_id === null || p.empreendimento_id === undefined) return null;
+          const parsed = Number(p.empreendimento_id);
+          return Number.isFinite(parsed) ? parsed : null;
+        })
+        .filter(id => id !== null)
+    )];
+
+    let empreendimentosMap = {};
+    if (empreendimentoIds.length > 0) {
+      const { data: empreendimentosData, error: empreendimentosError } = await supabaseAdmin
+        .from('empreendimentos')
+        .select('id, nome, cidade, estado')
+        .in('id', empreendimentoIds);
+
+      if (empreendimentosError) throw empreendimentosError;
+
+      empreendimentosMap = (empreendimentosData || []).reduce((acc, empreendimento) => {
+        acc[empreendimento.id] = empreendimento;
+        return acc;
+      }, {});
+    }
+
     // Buscar nomes dos consultores separadamente
     const consultoresIds = [...new Set(data.map(p => p.consultor_id).filter(Boolean))];
     const sdrIds = [...new Set(data.map(p => p.sdr_id).filter(Boolean))];
@@ -333,9 +378,10 @@ const getDashboardPacientes = async (req, res) => {
       consultor_nome: consultoresNomes[paciente.consultor_id] || null,
       sdr_nome: consultoresNomes[paciente.sdr_id] || null,
       consultor_interno_nome: consultoresNomes[paciente.consultor_interno_id] || null,
-      empreendimento_nome: paciente.empreendimentos?.nome,
-      empreendimento_cidade: paciente.empreendimentos?.cidade,
-      empreendimento_estado: paciente.empreendimentos?.estado
+      empreendimento_nome: empreendimentosMap[Number(paciente.empreendimento_id)]?.nome || null,
+      empreendimento_cidade: empreendimentosMap[Number(paciente.empreendimento_id)]?.cidade || null,
+      empreendimento_estado: empreendimentosMap[Number(paciente.empreendimento_id)]?.estado || null,
+      empreendimento_detalhes: empreendimentosMap[Number(paciente.empreendimento_id)] || null
     }));
 
     res.json(formattedData);

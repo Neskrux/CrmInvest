@@ -103,6 +103,56 @@ const CapturaClinica = () => {
     }
   }, [location]);
 
+  // Meta Pixel - Captura Clínica
+  useEffect(() => {
+    const pixelId = '1329727945501849';
+
+    const triggerPageView = () => {
+      window.fbq('track', 'PageView', {
+        content_name: 'Página Captura Clínica',
+        content_category: 'Lead Generation - Clínica',
+        page_section: 'captura-clinica'
+      });
+      window.fbq('trackCustom', 'PageViewCapturaClinica', {
+        page_section: 'captura-clinica'
+      });
+    };
+
+    if (!window.fbq) {
+      const script = document.createElement('script');
+      script.innerHTML = `
+        !function(f,b,e,v,n,t,s)
+        {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+        n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+        n.queue=[];t=b.createElement(e);t.async=!0;
+        t.src=v;s=b.getElementsByTagName(e)[0];
+        s.parentNode.insertBefore(t,s)}(window, document,'script',
+        'https://connect.facebook.net/en_US/fbevents.js');
+        fbq('init', '${pixelId}');
+        fbq('track', 'PageView', {
+          content_name: 'Página Captura Clínica',
+          content_category: 'Lead Generation - Clínica',
+          page_section: 'captura-clinica'
+        });
+        fbq('trackCustom', 'PageViewCapturaClinica', {
+          page_section: 'captura-clinica'
+        });
+      `;
+      document.head.appendChild(script);
+      return;
+    }
+
+    const pixelState = window.fbq.getState ? window.fbq.getState() : null;
+    const existingPixels = pixelState?.pixels?.map((pixel) => pixel.id) || [];
+
+    if (!existingPixels.includes(pixelId)) {
+      window.fbq('init', pixelId);
+    }
+
+    triggerPageView();
+  }, []);
+
   // Google Analytics
   useEffect(() => {
     // Carregar o script do Google Analytics
@@ -282,6 +332,17 @@ const CapturaClinica = () => {
       const data = await response.json();
       
       if (response.ok) {
+        if (window.fbq) {
+          window.fbq('track', 'Lead', {
+            content_name: 'Cadastro Clínica Concluído',
+            content_category: 'Lead Generation - Clínica',
+            page_section: 'captura-clinica'
+          });
+          window.fbq('trackCustom', 'ClinicaCadastroSucesso', {
+            page_section: 'captura-clinica'
+          });
+        }
+
         navigate('/captura-clinica-sucesso', { 
           state: { 
             nome: data.nome,
@@ -290,6 +351,18 @@ const CapturaClinica = () => {
           } 
         });
       } else {
+        if (window.fbq) {
+          window.fbq('track', 'Lead', {
+            content_name: 'Cadastro Clínica Erro',
+            content_category: 'Lead Generation - Clínica',
+            page_section: 'captura-clinica',
+            error: data.error || 'unknown'
+          });
+          window.fbq('trackCustom', 'ClinicaCadastroErro', {
+            page_section: 'captura-clinica'
+          });
+        }
+
         setErrors({ general: data.error || 'Erro ao enviar cadastro' });
       }
     } catch (error) {
