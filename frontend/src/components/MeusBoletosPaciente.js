@@ -311,6 +311,7 @@ const MeusBoletosPaciente = () => {
                     gap: '0.5rem',
                     flexWrap: 'wrap'
                   }}>
+                    {/* Botão para boletos com fechamento_id (gerados pela Caixa) */}
                     {boleto.fechamento_id && boleto.id && (
                       <button
                         onClick={async () => {
@@ -357,6 +358,34 @@ const MeusBoletosPaciente = () => {
                         }}
                       >
                         Ver Boleto
+                      </button>
+                    )}
+                    {/* Botão para boletos importados manualmente (com URL direta) */}
+                    {boleto.url && !boleto.fechamento_id && (
+                      <button
+                        onClick={() => {
+                          // Abrir o PDF em nova aba
+                          window.open(boleto.url, '_blank');
+                        }}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          backgroundColor: '#1a1d23',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.backgroundColor = '#374151';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.backgroundColor = '#1a1d23';
+                        }}
+                      >
+                        📥 Baixar Boleto
                       </button>
                     )}
                     {boleto.linha_digitavel && (

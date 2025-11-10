@@ -54,5 +54,8 @@ router.put('/fechamentos/:id/reprovar', authenticateToken, requireAdmin, fechame
 // POST /api/fechamentos/:id/criar-acesso-freelancer - Criar acesso freelancer para paciente fechado
 router.post('/fechamentos/:id/criar-acesso-freelancer', authenticateToken, fechamentosController.criarAcessoFreelancer);
 
+// GET /api/fechamentos/hash/:paciente_id - Buscar hash do fechamento pelo paciente_id
+router.get('/fechamentos/hash/:paciente_id', authenticateToken, fechamentosController.getHashFechamentoPorPaciente);
+
 module.exports = router;
 

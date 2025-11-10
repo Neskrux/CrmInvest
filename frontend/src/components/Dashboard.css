@@ -1,0 +1,568 @@
+/* ===== DASHBOARD - MOBILE RESPONSIVE ===== */
+
+/* Container principal */
+.dashboard-container {
+  padding: 20px;
+  max-width: 100%;
+  overflow-x: hidden;
+  min-height: 100vh;
+  background-color: #f8fafc;
+}
+
+/* Mobile: Padding reduzido */
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 10px;
+  }
+}
+
+/* ===== HEADER DO DASHBOARD ===== */
+.dashboard-header {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-welcome {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.welcome-text h1 {
+  font-size: clamp(1.25rem, 4vw, 1.75rem);
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 5px 0;
+}
+
+.welcome-text p {
+  font-size: clamp(0.875rem, 2.5vw, 1rem);
+  color: #6b7280;
+  margin: 0;
+}
+
+.welcome-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Mobile: Header responsivo */
+@media (max-width: 640px) {
+  .dashboard-header {
+    padding: 15px;
+  }
+  
+  .dashboard-welcome {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .welcome-actions {
+    width: 100%;
+  }
+  
+  .welcome-actions button {
+    flex: 1;
+  }
+}
+
+/* ===== LIMITE DE CRÉDITO (CLÍNICA) ===== */
+.limite-credito-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 25px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.limite-credito-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+  animation: pulse 3s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.1); opacity: 0.3; }
+}
+
+.limite-credito-content {
+  position: relative;
+  z-index: 1;
+}
+
+.limite-label {
+  font-size: clamp(0.875rem, 2.5vw, 1rem);
+  opacity: 0.9;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.limite-valor {
+  font-size: clamp(2rem, 5vw, 2.5rem);
+  font-weight: 700;
+  margin: 0;
+}
+
+.limite-info {
+  font-size: clamp(0.75rem, 2vw, 0.875rem);
+  opacity: 0.8;
+  margin-top: 10px;
+}
+
+/* Mobile: Card de limite ajustado */
+@media (max-width: 640px) {
+  .limite-credito-card {
+    padding: 20px;
+  }
+}
+
+/* ===== CARDS DE ESTATÍSTICAS ===== */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.stat-card {
+  background: white;
+  padding: 25px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 15px;
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.stat-icon.primary {
+  background-color: #eff6ff;
+  color: #3b82f6;
+}
+
+.stat-icon.success {
+  background-color: #f0fdf4;
+  color: #10b981;
+}
+
+.stat-icon.warning {
+  background-color: #fef3c7;
+  color: #f59e0b;
+}
+
+.stat-icon.danger {
+  background-color: #fee2e2;
+  color: #ef4444;
+}
+
+.stat-value {
+  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: clamp(0.75rem, 2vw, 0.875rem);
+  color: #6b7280;
+  margin-top: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-trend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #e5e7eb;
+  font-size: clamp(0.75rem, 2vw, 0.875rem);
+}
+
+.trend-up {
+  color: #10b981;
+}
+
+.trend-down {
+  color: #ef4444;
+}
+
+/* Mobile: Grid de estatísticas */
+@media (max-width: 640px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  
+  .stat-card {
+    padding: 20px;
+  }
+}
+
+/* ===== GRÁFICOS E CHARTS ===== */
+.charts-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.chart-card {
+  background: white;
+  padding: 25px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.chart-title {
+  font-size: clamp(1rem, 3vw, 1.25rem);
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.chart-period {
+  font-size: clamp(0.75rem, 2vw, 0.875rem);
+  color: #6b7280;
+  padding: 5px 10px;
+  background-color: #f3f4f6;
+  border-radius: 4px;
+}
+
+/* Mobile: Gráficos responsivos */
+@media (max-width: 768px) {
+  .charts-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .chart-card {
+    padding: 15px;
+  }
+}
+
+/* ===== ATIVIDADES RECENTES ===== */
+.activities-card {
+  background: white;
+  padding: 25px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+.activities-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.activities-title {
+  font-size: clamp(1rem, 3vw, 1.25rem);
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.activities-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.activity-item {
+  display: flex;
+  gap: 15px;
+  padding: 15px;
+  background-color: #f9fafb;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.activity-item:hover {
+  background-color: #f3f4f6;
+}
+
+.activity-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.activity-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity-text {
+  font-size: clamp(0.875rem, 2.5vw, 1rem);
+  color: #1f2937;
+  margin: 0 0 5px 0;
+}
+
+.activity-time {
+  font-size: clamp(0.75rem, 2vw, 0.875rem);
+  color: #6b7280;
+}
+
+/* Mobile: Atividades ajustadas */
+@media (max-width: 640px) {
+  .activities-card {
+    padding: 15px;
+  }
+  
+  .activity-item {
+    padding: 10px;
+    gap: 10px;
+  }
+  
+  .activity-icon {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* ===== QUICK ACTIONS ===== */
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.quick-action-btn {
+  background: white;
+  border: 2px solid #e5e7eb;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  color: #374151;
+}
+
+.quick-action-btn:hover {
+  border-color: #3b82f6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.quick-action-icon {
+  font-size: 32px;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.quick-action-label {
+  font-size: clamp(0.875rem, 2.5vw, 1rem);
+  font-weight: 500;
+}
+
+/* Mobile: Quick actions grid */
+@media (max-width: 640px) {
+  .quick-actions {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  
+  .quick-action-btn {
+    padding: 15px;
+  }
+  
+  .quick-action-icon {
+    font-size: 24px;
+  }
+}
+
+/* ===== NOTIFICAÇÕES ===== */
+.notifications-badge {
+  position: relative;
+  display: inline-block;
+}
+
+.notification-dot {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 10px;
+  height: 10px;
+  background-color: #ef4444;
+  border-radius: 50%;
+  border: 2px solid white;
+  animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ===== LOADING SKELETON ===== */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+  border-radius: 4px;
+}
+
+@keyframes loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-text {
+  height: 20px;
+  margin-bottom: 10px;
+}
+
+.skeleton-card {
+  height: 150px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+/* ===== SCROLLBAR CUSTOMIZADA ===== */
+.dashboard-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dashboard-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.dashboard-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.dashboard-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* ===== AJUSTES PARA iOS ===== */
+@supports (-webkit-touch-callout: none) {
+  .dashboard-container {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ===== MODO LANDSCAPE MOBILE ===== */
+@media (max-width: 768px) and (orientation: landscape) {
+  .dashboard-container {
+    padding: 10px;
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .quick-actions {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ===== TABLETS ===== */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .charts-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== DARK MODE SUPPORT ===== */
+@media (prefers-color-scheme: dark) {
+  .dashboard-container {
+    background-color: #111827;
+  }
+  
+  .dashboard-header,
+  .stat-card,
+  .chart-card,
+  .activities-card,
+  .quick-action-btn {
+    background: #1f2937;
+    color: #f9fafb;
+  }
+  
+  .welcome-text h1,
+  .stat-value,
+  .chart-title,
+  .activities-title {
+    color: #f9fafb;
+  }
+  
+  .welcome-text p,
+  .stat-label,
+  .activity-time {
+    color: #9ca3af;
+  }
+  
+  .activity-item {
+    background-color: #374151;
+  }
+  
+  .quick-action-btn {
+    border-color: #4b5563;
+    color: #f9fafb;
+  }
+  
+  .quick-action-btn:hover {
+    border-color: #60a5fa;
+    background-color: #374151;
+  }
+}

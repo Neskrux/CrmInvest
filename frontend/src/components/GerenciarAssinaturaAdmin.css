@@ -1,0 +1,390 @@
+/* Container Principal */
+.gerenciar-assinatura-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Header */
+.assinatura-header {
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.assinatura-header h2 {
+  color: #2c3e50;
+  font-size: 28px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.assinatura-header h2 i {
+  color: #3498db;
+}
+
+.assinatura-subtitle {
+  color: #7f8c8d;
+  font-size: 14px;
+}
+
+/* Loading */
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  color: #7f8c8d;
+}
+
+.loading-spinner i {
+  font-size: 48px;
+  color: #3498db;
+  margin-bottom: 15px;
+}
+
+/* Assinatura Existente */
+.assinatura-existente {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+}
+
+.assinatura-card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  margin-bottom: 20px;
+}
+
+.assinatura-info {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.info-item label {
+  font-size: 12px;
+  color: #7f8c8d;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.info-item span {
+  font-size: 14px;
+  color: #2c3e50;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.status-badge.ativo {
+  background: #d4edda;
+  color: #155724;
+}
+
+/* Preview da Assinatura */
+.assinatura-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.assinatura-preview label {
+  font-size: 12px;
+  color: #7f8c8d;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.preview-box {
+  background: #f8f9fa;
+  border: 2px dashed #dee2e6;
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
+}
+
+.assinatura-img {
+  max-width: 100%;
+  max-height: 120px;
+  object-fit: contain;
+}
+
+/* Actions */
+.assinatura-actions {
+  display: flex;
+  justify-content: center;
+  padding-top: 20px;
+  border-top: 1px solid #dee2e6;
+}
+
+.btn-atualizar {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.btn-atualizar:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+/* Formulário */
+.assinatura-formulario {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+}
+
+.form-section {
+  margin-bottom: 30px;
+}
+
+.form-section h3 {
+  color: #2c3e50;
+  font-size: 18px;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-size: 14px;
+  color: #495057;
+  font-weight: 600;
+}
+
+.form-input {
+  padding: 10px 15px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+/* Área de Assinatura */
+.signature-area {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.signature-canvas-wrapper {
+  position: relative;
+  border: 2px solid #dee2e6;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.signature-canvas {
+  display: block;
+  border: none;
+  cursor: crosshair;
+}
+
+.signature-hint {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  pointer-events: none;
+}
+
+.btn-limpar {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  transition: all 0.3s ease;
+}
+
+.btn-limpar:hover {
+  background: #5a6268;
+}
+
+/* Form Actions */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 15px;
+  padding-top: 20px;
+  border-top: 1px solid #dee2e6;
+}
+
+.btn-cancelar {
+  background: white;
+  color: #6c757d;
+  border: 1px solid #dee2e6;
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-cancelar:hover:not(:disabled) {
+  background: #f8f9fa;
+}
+
+.btn-salvar {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.btn-salvar:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-salvar:disabled,
+.btn-cancelar:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Info Box */
+.assinatura-info-box {
+  margin-top: 30px;
+  background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+  border: 1px solid #667eea30;
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  gap: 15px;
+  align-items: start;
+}
+
+.assinatura-info-box > i {
+  font-size: 24px;
+  color: #667eea;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.assinatura-info-box h4 {
+  color: #2c3e50;
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.assinatura-info-box p {
+  color: #495057;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .gerenciar-assinatura-container {
+    padding: 15px;
+  }
+  
+  .assinatura-header h2 {
+    font-size: 24px;
+  }
+  
+  .assinatura-card {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .signature-canvas {
+    width: 100% !important;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .btn-salvar,
+  .btn-cancelar,
+  .btn-atualizar {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .assinatura-info-box {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+

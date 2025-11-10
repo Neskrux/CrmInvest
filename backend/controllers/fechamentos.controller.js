@@ -271,8 +271,22 @@ const createFechamento = async (req, res) => {
     let printConfirmacaoTamanho = null;
     
     // Se houver arquivo de contrato, fazer upload para Supabase Storage
+    let contratoHashSHA1 = null;
+    let contratoHashCriadoEm = null;
+    
     if (req.files?.contrato && req.files.contrato[0]) {
       try {
+        // Gerar hash SHA1 do contrato original ANTES do upload
+        const crypto = require('crypto');
+        const contratoBuffer = req.files.contrato[0].buffer;
+        contratoHashSHA1 = crypto.createHash('sha1')
+          .update(contratoBuffer)
+          .digest('hex')
+          .toUpperCase();
+        contratoHashCriadoEm = new Date().toISOString();
+        
+        console.log('🔐 [HASH INICIAL] Hash SHA1 do contrato gerado:', contratoHashSHA1);
+        
         const uploadResult = await uploadToSupabase(req.files.contrato[0], STORAGE_BUCKET_CONTRATOS, 'fechamentos', 'contrato');
         contratoArquivo = uploadResult.path; // Usar o caminho completo em vez de apenas o nome
         contratoNomeOriginal = uploadResult.originalName;
@@ -331,6 +345,8 @@ const createFechamento = async (req, res) => {
         contrato_arquivo: contratoArquivo,
         contrato_nome_original: contratoNomeOriginal,
         contrato_tamanho: contratoTamanho,
+        contrato_hash_sha1: contratoHashSHA1,
+        contrato_hash_criado_em: contratoHashCriadoEm,
         valor_parcela: valorParcela,
         numero_parcelas: numeroParcelas,
         vencimento: vencimentoData,
@@ -1027,16 +1043,18 @@ const aprovarFechamento = async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Primeiro, verificar se o fechamento existe
+    // Primeiro, verificar se o fechamento existe (incluindo o hash do contrato)
     const { data: fechamento, error: fetchError } = await supabaseAdmin
       .from('fechamentos')
-      .select('*')
+      .select('*, contrato_hash_sha1')
       .eq('id', id)
       .single();
     
     if (fetchError || !fechamento) {
       return res.status(404).json({ error: 'Fechamento não encontrado' });
     }
+    
+    console.log('🔐 [HASH] Fechamento tem hash existente?', fechamento.contrato_hash_sha1 ? 'SIM' : 'NÃO');
     
     // Verificar se já está aprovado (evitar criar boletos duplicados)
     const jaEstaAprovado = fechamento.aprovado === 'aprovado';
@@ -1049,100 +1067,254 @@ const aprovarFechamento = async (req, res) => {
       .select();
     
     if (error) {
-      // Campo aprovado não existe na tabela, mas continuar
-      return res.json({ message: 'Fechamento aprovado com sucesso!' });
+      console.error('❌ Erro ao atualizar status aprovado:', error);
+      return res.status(500).json({ error: 'Erro ao aprovar fechamento' });
+    }
+    
+    // Atualizar status do paciente para "fechado" quando o fechamento for aprovado
+    if (!jaEstaAprovado && fechamento.paciente_id) {
+      try {
+        const { error: pacienteError } = await supabaseAdmin
+          .from('pacientes')
+          .update({ status: 'fechado' })
+          .eq('id', fechamento.paciente_id);
+          
+        if (pacienteError) {
+          console.error('❌ Erro ao atualizar status do paciente:', pacienteError);
+        } else {
+          console.log('✅ Status do paciente atualizado para "fechado"');
+        }
+      } catch (err) {
+        console.error('❌ Erro ao atualizar paciente:', err);
+      }
     }
     
     // ============================================
-    // INTEGRAÇÃO COM API CAIXA - Criar boletos
+    // BOLETOS - Importar para gestão manual
     // ============================================
-    // Criar boletos automaticamente para empresa_id 3 quando aprovado
+    // Importar boletos para gestão manual (não gerar automaticamente)
     if (!jaEstaAprovado && fechamento.empresa_id === 3 && data && data[0]) {
       try {
-        console.log('🏦 [CAIXA] Fechamento aprovado - Iniciando criação de boletos para empresa_id 3');
+        console.log('📋 [BOLETOS] Fechamento aprovado - Importando boletos para gestão manual');
         
-        // Buscar dados completos do paciente
-        const { data: pacienteCompleto, error: pacienteError } = await supabaseAdmin
-          .from('pacientes')
-          .select('*')
-          .eq('id', fechamento.paciente_id)
-          .single();
-
-        if (pacienteError || !pacienteCompleto) {
-          console.error('❌ [CAIXA] Erro ao buscar paciente:', pacienteError);
+        // Importar boletos para gestão manual
+        const { data: boletosImportados, error: importError } = await supabaseAdmin
+          .rpc('importar_boletos_fechamento', {
+            p_fechamento_id: fechamento.id,
+            p_usuario_id: req.user.id,
+            p_gerar_automatico: false, // Não gerar automaticamente
+            p_dias_antes: 20 // 20 dias antes do vencimento
+          });
+        
+        if (importError) {
+          console.error('❌ [BOLETOS] Erro ao importar boletos:', importError);
         } else {
-          // Buscar CNPJ da empresa beneficiária (necessário para o payload conforme manual)
-          const { data: empresaData, error: empresaError } = await supabaseAdmin
-            .from('empresas')
-            .select('cnpj')
-            .eq('id', data[0].empresa_id)
+          console.log(`✅ [BOLETOS] ${boletosImportados} boletos importados para gestão manual`);
+        }
+        
+        // REMOVIDO: Geração automática de boletos na Caixa
+        // Os boletos agora serão gerados manualmente ou por job agendado
+      } catch (caixaError) {
+        console.error('❌ [BOLETOS] Erro ao importar boletos para gestão manual:', caixaError);
+        // Não bloquear a aprovação se houver erro na importação de boletos
+      }
+    }
+    
+    // ============================================
+    // ASSINATURA DIGITAL AUTOMÁTICA
+    // ============================================
+    // Aplicar assinatura digital do admin automaticamente quando fechamento for aprovado
+    if (!jaEstaAprovado && data && data[0]) {
+      try {
+        console.log('✍️ [ASSINATURA DIGITAL] Iniciando assinatura automática do fechamento aprovado');
+        console.log('📋 [ASSINATURA DIGITAL] Dados do usuário:', {
+          id: req.user.id,
+          nome: req.user.nome,
+          tipo: req.user.tipo,
+          email: req.user.email
+        });
+        
+        // Buscar assinatura ativa do admin
+        const { data: assinaturaAdmin, error: assinaturaError } = await supabaseAdmin
+          .from('assinaturas_admin')
+          .select('*')
+          .eq('usuario_id', req.user.id)
+          .eq('ativa', true)
+          .single();
+        
+        if (assinaturaError || !assinaturaAdmin) {
+          console.warn('⚠️ [ASSINATURA DIGITAL] Admin não possui assinatura cadastrada. Pulando assinatura automática.');
+          console.log('Erro ao buscar assinatura:', assinaturaError);
+          console.log('ID do admin:', req.user.id);
+        } else {
+          console.log('✅ [ASSINATURA DIGITAL] Assinatura do admin encontrada:', {
+            id: assinaturaAdmin.id,
+            nome: assinaturaAdmin.nome_admin,
+            documento: assinaturaAdmin.documento_admin
+          });
+          // Buscar dados do paciente
+          const { data: pacienteCompleto, error: pacienteError } = await supabaseAdmin
+            .from('pacientes')
+            .select('*')
+            .eq('id', fechamento.paciente_id)
             .single();
-
-          // CNPJ correto da INVESTMONEY SECURITIZADORA DE CREDITOS S/A
-          const CNPJ_CORRETO = '41267440000197';
-          let cnpjParaUsar = null;
-
-          if (empresaError || !empresaData || !empresaData.cnpj) {
-            console.warn('⚠️ [CAIXA] Não foi possível buscar CNPJ da empresa. Usando CNPJ padrão da INVESTMONEY.');
-            cnpjParaUsar = CNPJ_CORRETO;
-          } else {
-            // Normalizar CNPJ (remover formatação)
-            const cnpjNormalizado = empresaData.cnpj.replace(/\D/g, '');
-            
-            // Validar se o CNPJ está correto (14 dígitos e corresponde ao da INVESTMONEY)
-            if (cnpjNormalizado.length === 14 && cnpjNormalizado === CNPJ_CORRETO) {
-              cnpjParaUsar = cnpjNormalizado;
-              console.log(`✅ [CAIXA] CNPJ validado e correto: ${cnpjParaUsar}`);
-            } else {
-              console.warn(`⚠️ [CAIXA] CNPJ do banco (${cnpjNormalizado}) não corresponde ao CNPJ cadastrado na Caixa (${CNPJ_CORRETO}). Usando CNPJ correto.`);
-              cnpjParaUsar = CNPJ_CORRETO;
-            }
-          }
-
-          // Obter ID do beneficiário (configurável por empresa)
-          const idBeneficiarioRaw = process.env.CAIXA_ID_BENEFICIARIO;
           
-          if (!idBeneficiarioRaw) {
-            console.warn('⚠️ [CAIXA] CAIXA_ID_BENEFICIARIO não configurado. Configure no .env');
+          if (pacienteError || !pacienteCompleto) {
+            console.error('❌ [ASSINATURA DIGITAL] Erro ao buscar paciente:', pacienteError);
           } else {
-            // Normalizar ID do beneficiário (pode vir como "0374/1242669" ou apenas "1242669")
-            const idBeneficiario = idBeneficiarioRaw.includes('/') 
-              ? idBeneficiarioRaw.split('/')[1].trim() 
-              : idBeneficiarioRaw.trim();
+            // Buscar dados da clínica (se houver)
+            let dadosClinica = null;
+            if (fechamento.clinica_id) {
+              const { data: clinicaData } = await supabaseAdmin
+                .from('clinicas')
+                .select('nome, cnpj')
+                .eq('id', fechamento.clinica_id)
+                .single();
+              
+              dadosClinica = clinicaData || null;
+            }
             
-            // Verificar se já existem boletos para este fechamento
-            const { data: boletosExistentes } = await supabaseAdmin
-              .from('boletos_caixa')
-              .select('id')
-              .eq('fechamento_id', id)
-              .limit(1);
-
-            if (boletosExistentes && boletosExistentes.length > 0) {
-              console.log('ℹ️ [CAIXA] Boletos já existem para este fechamento. Pulando criação.');
+            // Buscar contrato do paciente
+            const contratoUrl = pacienteCompleto.contrato_servico_url;
+            
+            if (!contratoUrl) {
+              console.warn('⚠️ [ASSINATURA DIGITAL] Paciente não possui contrato. Pulando assinatura.');
             } else {
-              // Criar boletos na Caixa
-              const boletosCriados = await criarBoletosCaixa(
-                data[0],
-                pacienteCompleto,
-                idBeneficiario,
-                cnpjParaUsar // Passar CNPJ validado/correto da empresa beneficiária
+              // Verificar se o paciente já assinou o contrato (verificar no sistema de rastreabilidade)
+              let contratoJaAssinadoPeloPaciente = false;
+              const cpfPaciente = pacienteCompleto.cpf?.replace(/\D/g, '') || '';
+              
+              if (cpfPaciente) {
+                // Verificar se há algum documento assinado por este paciente recentemente
+                // (últimos 30 dias, para garantir que é relacionado a este contrato)
+                const dataLimite = new Date();
+                dataLimite.setDate(dataLimite.getDate() - 30);
+                
+                const { data: documentosAssinados } = await supabaseAdmin
+                  .from('documentos_assinados')
+                  .select('*')
+                  .eq('documento', cpfPaciente)
+                  .ilike('nome', '%Contrato%')
+                  .gte('data_assinatura', dataLimite.toISOString())
+                  .order('data_assinatura', { ascending: false })
+                  .limit(1);
+                
+                if (documentosAssinados && documentosAssinados.length > 0) {
+                  contratoJaAssinadoPeloPaciente = true;
+                  console.log('✅ [ASSINATURA DIGITAL] Contrato já foi assinado pelo paciente');
+                }
+              }
+              
+              // Baixar PDF do contrato
+              const contratoResponse = await fetch(contratoUrl);
+              if (!contratoResponse.ok) {
+                throw new Error('Erro ao baixar contrato');
+              }
+              
+              const contratoBuffer = await contratoResponse.arrayBuffer();
+              const contratoBytes = new Uint8Array(contratoBuffer);
+              
+              // Aplicar assinatura usando o serviço
+              const assinaturaService = require('../services/assinatura-admin.service');
+              
+              // Se o paciente já assinou, passar um flag para preservar as assinaturas existentes
+              const resultadoAssinatura = await assinaturaService.aplicarAssinaturaAdminAutomatica(
+                contratoBytes,
+                assinaturaAdmin.assinatura_base64,
+                {
+                  nome: assinaturaAdmin.nome_admin,
+                  documento: assinaturaAdmin.documento_admin
+                },
+                {
+                  nome: pacienteCompleto.nome,
+                  cpf: pacienteCompleto.cpf?.replace(/\D/g, '') || ''
+                },
+                dadosClinica ? {
+                  nome: dadosClinica.nome,
+                  cnpj: dadosClinica.cnpj?.replace(/\D/g, '') || ''
+                } : null,
+                contratoJaAssinadoPeloPaciente ? fechamento.contrato_hash_sha1 : null, // Passar hash apenas se paciente já assinou
+                contratoJaAssinadoPeloPaciente // Flag indicando que o PDF já foi assinado pelo paciente
               );
               
-              if (boletosCriados.length > 0) {
-                console.log(`✅ [CAIXA] ${boletosCriados.length} boleto(s) criado(s) com sucesso após aprovação`);
+              // Upload do contrato assinado para Supabase Storage
+              const documentsService = require('../services/documents.service');
+              const { STORAGE_BUCKET_DOCUMENTOS } = require('../config/constants');
+              
+              const timestamp = Date.now();
+              const fileName = `pacientes/${pacienteCompleto.id}/contrato_servico_assinado_${timestamp}.pdf`;
+              
+              const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+                .from(STORAGE_BUCKET_DOCUMENTOS)
+                .upload(fileName, Buffer.from(resultadoAssinatura.pdfAssinado), {
+                  contentType: 'application/pdf',
+                  upsert: false
+                });
+              
+              if (!uploadError && uploadData) {
+                const { data: { publicUrl } } = supabaseAdmin.storage
+                  .from(STORAGE_BUCKET_DOCUMENTOS)
+                  .getPublicUrl(fileName);
+                
+                // Atualizar URL do contrato no paciente
+                await supabaseAdmin
+                  .from('pacientes')
+                  .update({ contrato_servico_url: publicUrl })
+                  .eq('id', pacienteCompleto.id);
+                
+                // Salvar no sistema de rastreabilidade
+                const nomeDocumento = `Contrato_Assinado_Admin_${pacienteCompleto.nome?.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+                
+                await supabaseAdmin
+                  .from('documentos_assinados')
+                  .insert({
+                    nome: nomeDocumento,
+                    assinante: assinaturaAdmin.nome_admin,
+                    documento: assinaturaAdmin.documento_admin,
+                    hash_sha1: resultadoAssinatura.hashSHA1,
+                    chave_validacao: resultadoAssinatura.hashSHA1.substring(0, 10),
+                    data_assinatura: new Date().toISOString(),
+                    usuario_id: req.user.id,
+                    ip_assinatura: req.ip || req.headers['x-forwarded-for'] || 'desconhecido',
+                    dispositivo_info: {
+                      userAgent: req.headers['user-agent'],
+                      timestamp: new Date().toISOString()
+                    },
+                    integridade_status: 'nao_verificado',
+                    validade_juridica: 'simples',
+                    auditoria_log: [{
+                      tipo: 'assinatura_automatica',
+                      data: new Date().toISOString(),
+                      ip: req.ip || req.headers['x-forwarded-for'] || 'desconhecido',
+                      usuario: req.user.nome || req.user.email
+                    }]
+                  });
+                
+                console.log('✅ [ASSINATURA DIGITAL] Contrato assinado automaticamente com sucesso!');
               } else {
-                console.warn('⚠️ [CAIXA] Nenhum boleto foi criado após aprovação');
+                console.error('❌ [ASSINATURA DIGITAL] Erro ao fazer upload do contrato assinado:', uploadError);
               }
             }
           }
         }
-      } catch (caixaError) {
-        console.error('❌ [CAIXA] Erro ao criar boletos após aprovação:', caixaError);
-        // Não bloquear a aprovação se houver erro na criação de boletos
+      } catch (assinaturaError) {
+        console.error('❌ [ASSINATURA DIGITAL] Erro ao aplicar assinatura automática:', assinaturaError);
+        // Não bloquear a aprovação se houver erro na assinatura
       }
     }
     
-    res.json({ message: 'Fechamento aprovado com sucesso!' });
+    // Buscar o fechamento atualizado para retornar
+    const { data: fechamentoAtualizado, error: errorBuscaAtualizado } = await supabaseAdmin
+      .from('fechamentos')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    res.json({ 
+      message: 'Fechamento aprovado com sucesso!',
+      fechamento: fechamentoAtualizado || data[0],
+      success: true
+    });
   } catch (error) {
     console.error('Erro ao aprovar fechamento:', error);
     res.status(500).json({ error: error.message });
@@ -1430,10 +1602,11 @@ const getBoletosFechamento = async (req, res) => {
     }
 
     // Buscar boletos da tabela boletos_caixa para este fechamento
+    // Também buscar boletos do paciente que não têm fechamento_id (boletos importados manualmente)
     const { data: boletosCaixa, error: boletosError } = await supabaseAdmin
       .from('boletos_caixa')
       .select('*')
-      .eq('fechamento_id', fechamentoId)
+      .or(`fechamento_id.eq.${fechamentoId},and(fechamento_id.is.null,paciente_id.eq.${fechamento.paciente_id})`)
       .order('data_vencimento', { ascending: true });
 
     if (boletosError) throw boletosError;
@@ -1871,7 +2044,7 @@ const visualizarBoleto = async (req, res) => {
         '9': 'NWNWN'  // 0-1-0-1-0
       };
       
-      let barrasHTML = '<div style="display: inline-block; height: 60px; background: white; padding: 5px 10px; white-space: nowrap; overflow-x: auto;">';
+      let barrasHTML = '<div style="display: inline-block; width: 390px; height: 49px; background: white; padding: 5px 10px; white-space: nowrap; overflow: hidden;">';
       
       // Start pattern (4 elementos: barra preta fina, espaço branco fino, barra preta fina, espaço branco fino)
       barrasHTML += '<span style="display: inline-block; width: 2px; height: 100%; background: black; margin-right: 0;"></span>';
@@ -2098,10 +2271,10 @@ const visualizarBoleto = async (req, res) => {
       color: white;
     }
     .linha-digitavel-header {
-      font-size: 12px;
+      font-size: 10px; /* Ajustado conforme especificação: 3,5-4mm */
       font-family: 'Courier New', monospace;
       font-weight: bold;
-      letter-spacing: 1.2px;
+      letter-spacing: 1px; /* Reduzido para melhor proporção */
       color: white;
       flex: 1;
       text-align: right;
@@ -2199,10 +2372,12 @@ const visualizarBoleto = async (req, res) => {
     }
     .codigo-barras-visual {
       display: inline-block;
-      height: 50px;
+      width: 390px; /* 103mm conforme especificação */
+      height: 49px; /* 13mm conforme especificação */
       background: white;
       padding: 5px 10px;
       white-space: nowrap;
+      overflow: hidden; /* Garante que não ultrapasse o limite */
     }
     .codigo-barras-numero {
       margin-top: 2px;
@@ -2242,6 +2417,12 @@ const visualizarBoleto = async (req, res) => {
     /* Ajustes de altura para células específicas */
     .altura-instrucoes {
       height: 60px;
+    }
+    
+    /* Ficha de Compensação - Dimensões conforme especificação */
+    .ficha-compensacao {
+      min-height: 360px; /* 95mm em 96dpi */
+      max-height: 408px; /* 108mm em 96dpi */
     }
     
     @media print {
@@ -2383,12 +2564,12 @@ const visualizarBoleto = async (req, res) => {
         </tr>
         <tr>
           <td colspan="4">
-            <span class="campo-label">Sacador/Beneficiário Final</span>
-            <span class="campo-valor">${(clinica?.nome || 'CLINICA CIRURGICA ODONTOLOGICA RECIFE LT').toUpperCase()}</span>
+            <span class="campo-label">Sacador/Avalista</span>
+            <span class="campo-valor"></span>
           </td>
           <td colspan="2" class="td-right">
             <span class="campo-label">CPF/CNPJ</span>
-            <span class="campo-valor-numero">33.910.210/0001-76</span>
+            <span class="campo-valor-numero"></span>
           </td>
         </tr>
         <tr>
@@ -2506,21 +2687,17 @@ const visualizarBoleto = async (req, res) => {
             <span class="campo-label">Espécie Moeda</span>
             <span class="campo-valor-numero">R$</span>
           </td>
-          <td colspan="2">
+          <td>
             <span class="campo-label">Qtde. Moeda</span>
             <span class="campo-valor-numero">&nbsp;</span>
           </td>
           <td>
-            <span class="campo-label">Valor</span>
+            <span class="campo-label">xValor</span>
             <span class="campo-valor-numero">&nbsp;</span>
           </td>
-          <td class="vencimento td-right">
-            <span class="campo-label">Vencimento</span>
-            <span class="campo-valor-numero" style="font-size: 12px;">${dataVencimentoFormatada}</span>
-          </td>
-          <td class="td-right">
-            <span class="campo-label">Ag./Cod. Beneficiário</span>
-            <span class="campo-valor-numero">0374/1242669</span>
+          <td class="valor-documento td-right">
+            <span class="campo-label">(=) Valor do Documento</span>
+            <span class="campo-valor-numero">${valorFormatado}</span>
           </td>
         </tr>
         <tr>
@@ -2585,12 +2762,12 @@ const visualizarBoleto = async (req, res) => {
         </tr>
         <tr>
           <td colspan="5">
-            <span class="campo-label">Beneficiário Final</span>
-            <span class="campo-valor">${(clinica?.nome || 'CLINICA CIRURGICA ODONTOLOGICA RECIFE LT').toUpperCase()}</span>
+            <span class="campo-label">Sacador/Avalista</span>
+            <span class="campo-valor"></span>
           </td>
           <td colspan="3" class="td-right">
             <span class="campo-label">CPF/CNPJ</span>
-            <span class="campo-valor-numero">33.910.210/0001-76</span>
+            <span class="campo-valor-numero"></span>
           </td>
         </tr>
       </table>
@@ -2633,6 +2810,44 @@ const visualizarBoleto = async (req, res) => {
   }
 };
 
+// GET /api/fechamentos/hash/:paciente_id - Buscar hash do fechamento pelo paciente_id
+const getHashFechamentoPorPaciente = async (req, res) => {
+  try {
+    const { paciente_id } = req.params;
+    
+    // Buscar o fechamento mais recente do paciente com hash
+    const { data: fechamento, error } = await supabaseAdmin
+      .from('fechamentos')
+      .select('id, contrato_hash_sha1, contrato_hash_criado_em')
+      .eq('paciente_id', paciente_id)
+      .not('contrato_hash_sha1', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') { // PGRST116 = não encontrado
+      throw error;
+    }
+    
+    if (!fechamento || !fechamento.contrato_hash_sha1) {
+      return res.status(404).json({ 
+        error: 'Hash do contrato não encontrado para este paciente',
+        temHash: false 
+      });
+    }
+    
+    res.json({
+      hash: fechamento.contrato_hash_sha1,
+      hash_criado_em: fechamento.contrato_hash_criado_em,
+      fechamento_id: fechamento.id,
+      temHash: true
+    });
+  } catch (error) {
+    console.error('Erro ao buscar hash do fechamento:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getAllFechamentos,
   getDashboardFechamentos,
@@ -2647,5 +2862,6 @@ module.exports = {
   reprovarFechamento,
   criarAcessoFreelancer,
   gerarBoletosFechamento,
-  visualizarBoleto
+  visualizarBoleto,
+  getHashFechamentoPorPaciente
 };

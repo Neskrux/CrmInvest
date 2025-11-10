@@ -7,6 +7,7 @@ import useIncorporadoraNotifications from '../hooks/useIncorporadoraNotification
 import { useToast } from '../components/Toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, Area, ReferenceLine, ComposedChart } from 'recharts';
 import { TrendingUp, Calendar, BarChart3, CheckCircle, XCircle, RotateCcw, UserPlus } from 'lucide-react';
+import './Dashboard.css';
 
 const Dashboard = () => {
   // Hook para textos dinâmicos baseados no empresa_id

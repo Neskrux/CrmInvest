@@ -1,0 +1,458 @@
+/* ===== GLOBAL MOBILE RESPONSIVE STYLES ===== */
+
+/* ===== RESET E BASE ===== */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+select {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Previne zoom automático no iOS */
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="number"],
+input[type="password"],
+input[type="date"],
+input[type="datetime-local"],
+select,
+textarea {
+  font-size: 16px !important;
+}
+
+/* ===== VIEWPORT META TAG SUPPORT ===== */
+@viewport {
+  width: device-width;
+  initial-scale: 1;
+  maximum-scale: 1;
+  user-scalable: no;
+}
+
+/* ===== SAFE AREA INSETS (iPhone X+) ===== */
+.app-container {
+  padding-top: env(safe-area-inset-top);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+}
+
+/* ===== BOTÕES GLOBAIS MOBILE ===== */
+.btn,
+button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+  .btn,
+  button {
+    min-height: 44px; /* Tamanho mínimo recomendado pela Apple */
+    min-width: 44px;
+  }
+}
+
+/* ===== MODAIS MOBILE ===== */
+@media (max-width: 768px) {
+  .modal-overlay {
+    padding: 0 !important;
+    align-items: flex-start !important;
+  }
+  
+  .modal-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  @keyframes slideUp {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+}
+
+/* ===== SIDEBAR MOBILE ===== */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed !important;
+    left: -100% !important;
+    top: 0 !important;
+    height: 100vh !important;
+    width: 280px !important;
+    z-index: 9999 !important;
+    transition: left 0.3s ease-in-out !important;
+  }
+  
+  .sidebar.open {
+    left: 0 !important;
+  }
+  
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9998;
+  }
+  
+  .sidebar.open + .sidebar-overlay {
+    display: block;
+  }
+  
+  .main-content {
+    margin-left: 0 !important;
+    padding: 15px !important;
+  }
+  
+  .mobile-menu-toggle {
+    display: block !important;
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 10000;
+    width: 44px;
+    height: 44px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* ===== FORMULÁRIOS MOBILE ===== */
+@media (max-width: 768px) {
+  .form-row,
+  .form-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 15px !important;
+  }
+  
+  .form-group {
+    width: 100% !important;
+    margin-bottom: 15px !important;
+  }
+  
+  label {
+    font-size: 14px !important;
+    margin-bottom: 8px !important;
+    display: block !important;
+  }
+  
+  input,
+  select,
+  textarea {
+    width: 100% !important;
+    padding: 12px !important;
+    border-radius: 8px !important;
+    border: 1px solid #d1d5db !important;
+    box-sizing: border-box !important;
+  }
+  
+  input:focus,
+  select:focus,
+  textarea:focus {
+    outline: none !important;
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+  }
+}
+
+/* ===== TABELAS MOBILE ===== */
+@media (max-width: 768px) {
+  .table-responsive {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    margin: 0 -15px !important;
+    padding: 0 15px !important;
+  }
+  
+  table {
+    min-width: 600px !important;
+  }
+  
+  th, td {
+    padding: 10px !important;
+    font-size: 14px !important;
+  }
+}
+
+/* ===== CARDS MOBILE ===== */
+@media (max-width: 768px) {
+  .card {
+    border-radius: 12px !important;
+    padding: 15px !important;
+    margin-bottom: 15px !important;
+  }
+  
+  .card-header {
+    padding: 15px !important;
+    font-size: 16px !important;
+  }
+  
+  .card-body {
+    padding: 15px !important;
+  }
+  
+  .card-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 15px !important;
+  }
+}
+
+/* ===== NAVIGATION MOBILE ===== */
+@media (max-width: 768px) {
+  .nav-tabs {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    white-space: nowrap !important;
+    padding-bottom: 2px !important;
+  }
+  
+  .nav-tab {
+    display: inline-block !important;
+    padding: 12px 20px !important;
+    font-size: 14px !important;
+  }
+  
+  .breadcrumb {
+    font-size: 12px !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+  }
+}
+
+/* ===== TOAST NOTIFICATIONS MOBILE ===== */
+@media (max-width: 768px) {
+  .toast-container {
+    left: 10px !important;
+    right: 10px !important;
+    bottom: 20px !important;
+    top: auto !important;
+  }
+  
+  .toast {
+    width: 100% !important;
+    margin-bottom: 10px !important;
+    font-size: 14px !important;
+    padding: 12px !important;
+  }
+}
+
+/* ===== DROPDOWN MOBILE ===== */
+@media (max-width: 768px) {
+  .dropdown-menu {
+    position: fixed !important;
+    left: 10px !important;
+    right: 10px !important;
+    top: auto !important;
+    bottom: 10px !important;
+    width: auto !important;
+    max-height: 70vh !important;
+    overflow-y: auto !important;
+    border-radius: 12px !important;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.2) !important;
+  }
+  
+  .dropdown-item {
+    padding: 15px !important;
+    font-size: 16px !important;
+  }
+}
+
+/* ===== IMAGENS RESPONSIVAS ===== */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+.img-container {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%; /* 16:9 aspect ratio */
+}
+
+.img-container img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ===== LOADING STATES MOBILE ===== */
+.spinner-mobile {
+  width: 30px !important;
+  height: 30px !important;
+}
+
+.skeleton-mobile {
+  animation: shimmer 2s infinite !important;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -100% 0;
+  }
+  100% {
+    background-position: 100% 0;
+  }
+}
+
+/* ===== PERFORMANCE OPTIMIZATIONS ===== */
+@media (max-width: 768px) {
+  /* Desabilita animações complexas em mobile */
+  * {
+    animation-duration: 0.2s !important;
+  }
+  
+  /* Usa GPU para elementos que mudam frequentemente */
+  .modal-content,
+  .sidebar,
+  .dropdown-menu {
+    transform: translateZ(0);
+    will-change: transform;
+  }
+  
+  /* Reduz sombras para melhor performance */
+  .card,
+  .modal-content,
+  .dropdown-menu {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  }
+}
+
+/* ===== ACESSIBILIDADE MOBILE ===== */
+@media (max-width: 768px) {
+  /* Aumenta área de toque */
+  a,
+  button,
+  input[type="submit"],
+  input[type="button"],
+  .clickable {
+    position: relative;
+  }
+  
+  a::after,
+  button::after,
+  input[type="submit"]::after,
+  input[type="button"]::after,
+  .clickable::after {
+    content: '';
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    bottom: -10px;
+    left: -10px;
+  }
+  
+  /* Focus visível para navegação por teclado */
+  *:focus-visible {
+    outline: 3px solid #3b82f6 !important;
+    outline-offset: 2px !important;
+  }
+}
+
+/* ===== PRINT STYLES ===== */
+@media print {
+  .no-print,
+  .sidebar,
+  .mobile-menu-toggle,
+  .toast-container,
+  .modal-overlay {
+    display: none !important;
+  }
+  
+  .main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
+
+/* ===== ORIENTAÇÃO LANDSCAPE MOBILE ===== */
+@media (max-width: 768px) and (orientation: landscape) {
+  .modal-content {
+    height: 100vh !important;
+    overflow-y: auto !important;
+  }
+  
+  .form-group {
+    margin-bottom: 10px !important;
+  }
+  
+  input,
+  select,
+  textarea {
+    padding: 8px !important;
+  }
+}
+
+/* ===== SUPORTE PARA TELAS PEQUENAS ===== */
+@media (max-width: 360px) {
+  body {
+    font-size: 14px !important;
+  }
+  
+  h1 { font-size: 1.5rem !important; }
+  h2 { font-size: 1.25rem !important; }
+  h3 { font-size: 1.1rem !important; }
+  h4 { font-size: 1rem !important; }
+  
+  .btn {
+    padding: 10px 15px !important;
+    font-size: 14px !important;
+  }
+  
+  .card {
+    padding: 10px !important;
+  }
+}
+
+/* ===== MELHORIAS PARA TOQUE ===== */
+@media (pointer: coarse) {
+  /* Aumenta tamanho de checkboxes e radios */
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 20px !important;
+    height: 20px !important;
+    margin: 5px !important;
+  }
+  
+  /* Melhora espaçamento de links */
+  a {
+    display: inline-block;
+    padding: 5px;
+  }
+  
+  /* Aumenta tamanho de ícones clicáveis */
+  .icon-button {
+    min-width: 44px !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+}
