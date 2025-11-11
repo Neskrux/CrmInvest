@@ -71,6 +71,10 @@ const Fechamentos = () => {
   const [carregandoBoletos, setCarregandoBoletos] = useState(false);
   const [gerandoBoletos, setGerandoBoletos] = useState(false);
   
+  // Estados para aba de histórico
+  const [movimentacoesPaciente, setMovimentacoesPaciente] = useState([]);
+  const [carregandoHistorico, setCarregandoHistorico] = useState(false);
+  
   // Estados para modal de seleção de parcelas
   const [showParcelasModal, setShowParcelasModal] = useState(false);
   const [fechamentoParaGerar, setFechamentoParaGerar] = useState(null);
@@ -555,6 +559,31 @@ const Fechamentos = () => {
     }
   };
 
+  // Função para buscar histórico completo do paciente
+  const fetchHistoricoPaciente = async (pacienteId) => {
+    if (!pacienteId) return;
+    
+    setCarregandoHistorico(true);
+    try {
+      const response = await makeRequest(`/movimentacoes/paciente/${pacienteId}`, {
+        method: 'GET'
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao buscar histórico');
+      }
+
+      const data = await response.json();
+      setMovimentacoesPaciente(data.movimentacoes || []);
+    } catch (error) {
+      console.error('Erro ao buscar histórico:', error);
+      showErrorToast('Erro ao carregar histórico do paciente');
+      setMovimentacoesPaciente([]);
+    } finally {
+      setCarregandoHistorico(false);
+    }
+  };
+
   const gerarBoletosFechamento = async (fechamentoId, numeroParcelas = null) => {
     if (!fechamentoId) return;
     
@@ -611,13 +640,18 @@ const Fechamentos = () => {
     }
   };
 
-  // Quando mudar para aba de boletos, buscar os dados
+  // Quando mudar para aba de boletos ou histórico, buscar os dados
   const handleTabChange = (tab) => {
     setActiveViewTab(tab);
     
     // Se mudar para aba de boletos e houver fechamento selecionado, buscar boletos
     if (tab === 'boletos' && viewingFechamento?.id) {
       buscarBoletosFechamento(viewingFechamento.id);
+    }
+    
+    // Se mudar para aba de histórico e houver paciente selecionado, buscar histórico
+    if (tab === 'historico' && viewingFechamento?.paciente_id) {
+      fetchHistoricoPaciente(viewingFechamento.paciente_id);
     }
   };
 
@@ -627,6 +661,7 @@ const Fechamentos = () => {
     setActiveViewTab('informacoes');
     setEvidenciasFechamento([]);
     setBoletosFechamento([]);
+    setMovimentacoesPaciente([]);
   };
 
   const salvarFechamento = async () => {
@@ -3180,51 +3215,202 @@ const Fechamentos = () => {
                     color: '#374151', 
                     marginBottom: '1rem' 
                   }}>
-                    Histórico do Fechamento
+                    Histórico do Paciente
                   </h3>
                   
-                  <div style={{
-                    backgroundColor: '#f9fafb',
-                    borderRadius: '8px',
-                    border: '1px solid #e5e7eb',
-                    padding: '1rem'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                  {carregandoHistorico ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#6b7280'
+                    }}>
                       <div style={{
-                        width: '8px',
-                        height: '8px',
+                        display: 'inline-block',
+                        width: '20px',
+                        height: '20px',
+                        border: '3px solid #e5e7eb',
+                        borderTopColor: '#3b82f6',
                         borderRadius: '50%',
-                        backgroundColor: '#10b981'
+                        animation: 'spin 1s linear infinite',
+                        marginRight: '0.5rem'
                       }}></div>
-                      <div>
-                        <div style={{ fontWeight: '600', color: '#374151' }}>
-                          Fechamento criado
-                        </div>
-                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                          {new Date(viewingFechamento.created_at).toLocaleString('pt-BR')}
-                        </div>
+                      Carregando histórico...
+                    </div>
+                  ) : movimentacoesPaciente.length === 0 ? (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: '0 auto 1rem', opacity: 0.3, color: '#6b7280' }}>
+                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                      </svg>
+                      <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                        Nenhum histórico disponível
                       </div>
                     </div>
-                    
-                    {viewingFechamento.aprovado === 1 && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <div style={{
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
-                          backgroundColor: '#3b82f6'
-                        }}></div>
-                        <div>
-                          <div style={{ fontWeight: '600', color: '#374151' }}>
-                            Fechamento aprovado
+                  ) : (
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem'
+                    }}>
+                      {movimentacoesPaciente.map((mov, index) => {
+                        // Mapear tipos de movimentação para ícones e cores
+                        const getMovimentacaoInfo = (tipo) => {
+                          const tipos = {
+                            'lead_atribuido': {
+                              icon: '👤',
+                              color: '#10b981',
+                              label: 'Lead Atribuído',
+                              bgColor: '#d1fae5'
+                            },
+                            'agendamento_criado': {
+                              icon: '📅',
+                              color: '#3b82f6',
+                              label: 'Agendamento Criado',
+                              bgColor: '#dbeafe'
+                            },
+                            'agendamento_atribuido': {
+                              icon: '📋',
+                              color: '#8b5cf6',
+                              label: 'Agendamento Atribuído',
+                              bgColor: '#ede9fe'
+                            },
+                            'fechamento_criado': {
+                              icon: '💰',
+                              color: '#059669',
+                              label: 'Fechamento Criado',
+                              bgColor: '#d1fae5'
+                            },
+                            'status_alterado': {
+                              icon: '🔄',
+                              color: '#f59e0b',
+                              label: 'Status Alterado',
+                              bgColor: '#fef3c7'
+                            }
+                          };
+                          return tipos[tipo] || {
+                            icon: '📝',
+                            color: '#6b7280',
+                            label: tipo || 'Movimentação',
+                            bgColor: '#f3f4f6'
+                          };
+                        };
+
+                        const info = getMovimentacaoInfo(mov.tipo);
+                        const dataFormatada = new Date(mov.created_at).toLocaleString('pt-BR');
+                        const executadoPor = mov.executado_por_nome || mov.consultores?.nome || mov.sdr?.nome || mov.consultor_interno?.nome || 'Sistema';
+
+                        return (
+                          <div
+                            key={mov.id}
+                            style={{
+                              display: 'flex',
+                              gap: '1rem',
+                              padding: '1rem',
+                              backgroundColor: info.bgColor,
+                              borderRadius: '8px',
+                              border: `1px solid ${info.color}40`,
+                              position: 'relative'
+                            }}
+                          >
+                            {/* Linha conectora (exceto no último item) */}
+                            {index < movimentacoesPaciente.length - 1 && (
+                              <div style={{
+                                position: 'absolute',
+                                left: '23px',
+                                top: '48px',
+                                width: '2px',
+                                height: 'calc(100% + 0.5rem)',
+                                backgroundColor: '#e5e7eb',
+                                zIndex: 0
+                              }}></div>
+                            )}
+                            
+                            {/* Ícone */}
+                            <div style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '50%',
+                              backgroundColor: info.color,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '1.25rem',
+                              flexShrink: 0,
+                              zIndex: 1,
+                              position: 'relative'
+                            }}>
+                              {info.icon}
+                            </div>
+                            
+                            {/* Conteúdo */}
+                            <div style={{ flex: 1 }}>
+                              <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'start',
+                                marginBottom: '0.25rem'
+                              }}>
+                                <div style={{
+                                  fontWeight: '600',
+                                  color: '#374151',
+                                  fontSize: '0.95rem'
+                                }}>
+                                  {info.label}
+                                </div>
+                                <div style={{
+                                  fontSize: '0.75rem',
+                                  color: '#6b7280'
+                                }}>
+                                  {dataFormatada}
+                                </div>
+                              </div>
+                              
+                              {mov.acao_descricao && (
+                                <div style={{
+                                  fontSize: '0.875rem',
+                                  color: '#6b7280',
+                                  marginBottom: '0.25rem'
+                                }}>
+                                  {mov.acao_descricao}
+                                </div>
+                              )}
+                              
+                              <div style={{
+                                fontSize: '0.75rem',
+                                color: '#9ca3af',
+                                display: 'flex',
+                                gap: '0.5rem',
+                                flexWrap: 'wrap'
+                              }}>
+                                <span>Por: <strong>{executadoPor}</strong></span>
+                                {mov.consultores?.nome && (
+                                  <span>• Freelancer: {mov.consultores.nome}</span>
+                                )}
+                                {mov.sdr?.nome && (
+                                  <span>• SDR: {mov.sdr.nome}</span>
+                                )}
+                                {mov.consultor_interno?.nome && (
+                                  <span>• Consultor: {mov.consultor_interno.nome}</span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                            {viewingFechamento.updated_at && new Date(viewingFechamento.updated_at).toLocaleString('pt-BR')}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  
+                  {/* Estilo para animação de loading */}
+                  <style>{`
+                    @keyframes spin {
+                      to { transform: rotate(360deg); }
+                    }
+                  `}</style>
                 </div>
               )}
               

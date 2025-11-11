@@ -76,6 +76,53 @@ const getMovimentacoesUsuario = async (req, res) => {
 const getMovimentacoesPaciente = async (req, res) => {
   try {
     const { pacienteId } = req.params;
+    console.log('🔍 [MOVIMENTACOES] Buscando histórico do paciente ID:', pacienteId);
+    
+    // Primeiro, buscar IDs de agendamentos e fechamentos do paciente
+    const { data: agendamentos, error: agendamentosError } = await supabaseAdmin
+      .from('agendamentos')
+      .select('id')
+      .eq('paciente_id', pacienteId);
+    
+    if (agendamentosError) {
+      console.error('❌ Erro ao buscar agendamentos:', agendamentosError);
+    }
+    
+    const { data: fechamentos, error: fechamentosError } = await supabaseAdmin
+      .from('fechamentos')
+      .select('id')
+      .eq('paciente_id', pacienteId);
+    
+    if (fechamentosError) {
+      console.error('❌ Erro ao buscar fechamentos:', fechamentosError);
+    }
+    
+    const agendamentoIds = agendamentos?.map(a => a.id) || [];
+    const fechamentoIds = fechamentos?.map(f => f.id) || [];
+    
+    // Construir condições para buscar movimentações
+    const conditions = [];
+    
+    // Movimentações diretas do paciente
+    conditions.push(`and(registro_tipo.eq.paciente,registro_id.eq.${pacienteId})`);
+    
+    // Movimentações de agendamentos do paciente
+    if (agendamentoIds.length > 0) {
+      conditions.push(`and(registro_tipo.eq.agendamento,registro_id.in.(${agendamentoIds.join(',')}))`);
+    }
+    
+    // Movimentações de fechamentos do paciente
+    if (fechamentoIds.length > 0) {
+      conditions.push(`and(registro_tipo.eq.fechamento,registro_id.in.(${fechamentoIds.join(',')}))`);
+    }
+    
+    // Se não houver condições, retornar array vazio
+    if (conditions.length === 0) {
+      return res.json({
+        movimentacoes: [],
+        total: 0
+      });
+    }
     
     const { data, error } = await supabaseAdmin
       .from('movimentacoes')
@@ -85,8 +132,7 @@ const getMovimentacoesPaciente = async (req, res) => {
         sdr:consultores!movimentacoes_sdr_id_fkey(nome),
         consultor_interno:consultores!movimentacoes_consultor_interno_id_fkey(nome)
       `)
-      .or(`registro_tipo.eq.paciente,registro_tipo.eq.agendamento,registro_tipo.eq.fechamento`)
-      .or(`registro_id.eq.${pacienteId}`)
+      .or(conditions.join(','))
       .order('created_at', { ascending: true });
     
     if (error) throw error;
