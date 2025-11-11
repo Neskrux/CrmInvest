@@ -557,44 +557,30 @@ const importarBoletoArquivo = async (req, res) => {
       return res.status(404).json({ error: 'Paciente não encontrado' });
     }
 
-    // Buscar clínica do paciente (pode estar no paciente ou no fechamento mais recente)
-    let clinicaId = paciente.clinica_id;
-    let fechamentoIdParaVincular = null;
-    
-    if (!clinicaId) {
-      // Tentar buscar do fechamento mais recente
-      const { data: fechamentoRecente } = await supabaseAdmin
-        .from('fechamentos')
-        .select('clinica_id, id')
-        .eq('paciente_id', paciente_id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      
-      if (fechamentoRecente) {
-        clinicaId = fechamentoRecente.clinica_id;
-        fechamentoIdParaVincular = fechamentoRecente.id; // Vincular ao fechamento mais recente
-      }
-    } else {
-      // Se já tem clínica, buscar fechamento mais recente para vincular
-      const { data: fechamentoRecente } = await supabaseAdmin
-        .from('fechamentos')
-        .select('id')
-        .eq('paciente_id', paciente_id)
-        .eq('clinica_id', clinicaId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      
-      if (fechamentoRecente) {
-        fechamentoIdParaVincular = fechamentoRecente.id;
-      }
+    // Verificar se há fechamento aprovado para o paciente
+    const { data: fechamentosAprovados, error: fechamentosAprovadosError } = await supabaseAdmin
+      .from('fechamentos')
+      .select('id, clinica_id, aprovado')
+      .eq('paciente_id', paciente_id)
+      .eq('aprovado', 'aprovado')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (fechamentosAprovadosError) throw fechamentosAprovadosError;
+
+    const fechamentoAprovado = Array.isArray(fechamentosAprovados) ? fechamentosAprovados[0] : null;
+
+    if (!fechamentoAprovado) {
+      return res.status(400).json({
+        error: 'Este paciente ainda não possui um fechamento aprovado. Conclua a aprovação antes de importar boletos.'
+      });
     }
 
-    // Se ainda não tiver clínica, usar null (a view deve lidar com isso)
-    // Mas vamos logar para debug
+    const fechamentoIdParaVincular = fechamentoAprovado.id;
+    let clinicaId = fechamentoAprovado.clinica_id || paciente.clinica_id || null;
+
     if (!clinicaId) {
-      console.warn(`⚠️ [IMPORTAR ARQUIVO] Paciente ${paciente_id} não tem clínica associada. Boleto será criado sem clinica_id.`);
+      console.warn(`⚠️ [IMPORTAR ARQUIVO] Fechamento aprovado ${fechamentoIdParaVincular} ou paciente ${paciente_id} sem clínica associada.`);
     }
 
     console.log(`📋 [IMPORTAR ARQUIVO] Vinculando boleto ao fechamento: ${fechamentoIdParaVincular || 'null'}`);

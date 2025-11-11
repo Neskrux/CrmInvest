@@ -7,6 +7,35 @@ import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import config from '../config';
 
+const removerAcentos = (texto = '') =>
+  texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+const gerarEmailPadraoClinica = (clinica = {}) => {
+  const nome = removerAcentos((clinica.nome || '').trim().toLowerCase());
+  const partes = nome.split(/\s+/).filter(Boolean);
+
+  let primeiro = partes[0] || '';
+  let segundo = partes[1] || '';
+
+  if (partes.length === 1) {
+    segundo = 'clinica';
+  }
+
+  primeiro = primeiro.replace(/[^a-z0-9]/g, '');
+  segundo = segundo.replace(/[^a-z0-9]/g, '');
+
+  if (!primeiro) primeiro = 'clinica';
+  if (!segundo) segundo = 'grupoim';
+
+  return `${primeiro}.${segundo}@grupoim.com.br`;
+};
+
+const extrairSenhaPadraoCnpj = (clinica = {}) => {
+  const cnpj = clinica.cnpj || clinica.documento || '';
+  const somenteNumeros = String(cnpj).replace(/\D/g, '');
+  return somenteNumeros;
+};
+
 const Clinicas = () => {
   const { makeRequest, user, isAdmin, podeAlterarStatus, isFreelancer, isConsultorInterno, isClinica } = useAuth();
   
@@ -555,34 +584,29 @@ const Clinicas = () => {
   };
 
   const handleGerenciarAcesso = (clinica) => {
+    const emailPadrao = gerarEmailPadraoClinica(clinica);
+    const senhaPadrao = extrairSenhaPadraoCnpj(clinica);
+
     setClinicaParaAcesso(clinica);
     setAcessoFormData({
-      email: (clinica.email_login || clinica.email || '').toLowerCase(),
-      senha: '',
-      confirmarSenha: ''
+      email: emailPadrao || (clinica.email_login || clinica.email || '').toLowerCase(),
+      senha: senhaPadrao,
+      confirmarSenha: senhaPadrao
     });
     setShowAcessoModal(true);
   };
 
   const handleSalvarAcesso = async () => {
-    // Validações
-    if (!acessoFormData.email) {
-      showWarningToast('Por favor, informe o email de login');
+    const emailPadrao = gerarEmailPadraoClinica(clinicaParaAcesso);
+    const senhaPadrao = extrairSenhaPadraoCnpj(clinicaParaAcesso);
+
+    if (!emailPadrao) {
+      showWarningToast('Não foi possível gerar o e-mail padrão da clínica.');
       return;
     }
 
-    if (!acessoFormData.senha) {
-      showWarningToast('Por favor, informe a senha');
-      return;
-    }
-
-    if (acessoFormData.senha.length < 6) {
-      showWarningToast('A senha deve ter pelo menos 6 caracteres');
-      return;
-    }
-
-    if (acessoFormData.senha !== acessoFormData.confirmarSenha) {
-      showWarningToast('As senhas não coincidem');
+    if (!senhaPadrao) {
+      showWarningToast('Não foi possível gerar a senha padrão da clínica (CNPJ).');
       return;
     }
 
@@ -591,8 +615,8 @@ const Clinicas = () => {
       const response = await makeRequest(`/clinicas/${clinicaParaAcesso.id}/criar-acesso`, {
         method: 'POST',
         body: JSON.stringify({
-          email: acessoFormData.email.toLowerCase().trim(),
-          senha: acessoFormData.senha
+          email: emailPadrao.toLowerCase().trim(),
+          senha: senhaPadrao
         })
       });
 
@@ -4454,7 +4478,26 @@ const Clinicas = () => {
                         type="checkbox"
                         name="criar_acesso"
                         checked={formData.criar_acesso}
-                        onChange={(e) => setFormData({ ...formData, criar_acesso: e.target.checked })}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          if (checked) {
+                            const emailPadrao = gerarEmailPadraoClinica(formData);
+                            const senhaPadrao = extrairSenhaPadraoCnpj(formData);
+                            setFormData({
+                              ...formData,
+                              criar_acesso: true,
+                              email_login: emailPadrao,
+                              senha: senhaPadrao
+                            });
+                          } else {
+                            setFormData({
+                              ...formData,
+                              criar_acesso: false,
+                              email_login: '',
+                              senha: ''
+                            });
+                          }
+                        }}
                       />
                       <span style={{ marginLeft: '0.5rem' }}>Criar acesso para a clínica</span>
                     </label>
@@ -4472,6 +4515,7 @@ const Clinicas = () => {
                           onChange={handleInputChange}
                           placeholder="email@clinica.com.br"
                           required={formData.criar_acesso}
+                          readOnly
                         />
                       </div>
                       <div className="form-group">
@@ -4484,6 +4528,7 @@ const Clinicas = () => {
                           onChange={handleInputChange}
                           placeholder="Mínimo 6 caracteres"
                           required={formData.criar_acesso}
+                          readOnly
                         />
                       </div>
                     </div>

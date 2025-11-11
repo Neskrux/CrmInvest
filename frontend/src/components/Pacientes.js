@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -32,6 +32,10 @@ const Pacientes = () => {
   const [empreendimentos, setEmpreendimentos] = useState([]);
   const [agendamentos, setAgendamentos] = useState([]);
   const [fechamentos, setFechamentos] = useState([]);
+  const [boletosPorPaciente, setBoletosPorPaciente] = useState({});
+  const [carregandoBoletosClinica, setCarregandoBoletosClinica] = useState(false);
+  const [antecipacaoEdicoes, setAntecipacaoEdicoes] = useState({});
+  const [antecipacaoSalvando, setAntecipacaoSalvando] = useState({});
   const [showModal, setShowModal] = useState(false);
   const [editingPaciente, setEditingPaciente] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -317,6 +321,64 @@ const Pacientes = () => {
       calcularCarteiraExistente();
     }, dadosTeste.length * 100 + 500);
   };
+
+  const carregarBoletosClinica = useCallback(async (fechamentosClinicaLista = []) => {
+    if (!isClinica || !user?.clinica_id) {
+      return;
+    }
+    setCarregandoBoletosClinica(true);
+    try {
+      const clinicaIdNumber = Number(user.clinica_id);
+      const fechamentosParaConsulta = (Array.isArray(fechamentosClinicaLista) && fechamentosClinicaLista.length > 0)
+        ? fechamentosClinicaLista
+        : fechamentos.filter(f => Number(f.clinica_id || 0) === clinicaIdNumber);
+
+      if (!Array.isArray(fechamentosParaConsulta) || fechamentosParaConsulta.length === 0) {
+        setBoletosPorPaciente({});
+        return;
+      }
+
+      const resultados = await Promise.allSettled(
+        fechamentosParaConsulta.map(async (fechamento) => {
+          try {
+            const response = await makeRequest(`/fechamentos/${fechamento.id}/boletos`);
+            if (!response.ok) {
+              const texto = await response.text();
+              throw new Error(texto || `Erro ao buscar boletos do fechamento ${fechamento.id}`);
+            }
+            const data = await response.json();
+            return Array.isArray(data?.boletos) ? data.boletos : [];
+          } catch (erro) {
+            throw erro;
+          }
+        })
+      );
+
+      const mapaBoletos = {};
+      resultados.forEach((resultado, index) => {
+        const fechamentoAtual = fechamentosParaConsulta[index];
+        const pacienteId = Number(fechamentoAtual?.paciente_id);
+        if (!Number.isFinite(pacienteId)) return;
+
+        if (resultado.status !== 'fulfilled') {
+          console.error('Erro ao buscar boletos do fechamento', fechamentoAtual?.id, resultado.reason);
+          return;
+        }
+
+        const boletosFechamento = resultado.value || [];
+        boletosFechamento.forEach(boleto => {
+          if ((boleto.status || '').toLowerCase() === 'cancelado') return;
+          mapaBoletos[pacienteId] = (mapaBoletos[pacienteId] || 0) + 1;
+        });
+      });
+
+      setBoletosPorPaciente(mapaBoletos);
+    } catch (error) {
+      console.error('Erro ao carregar boletos da clínica:', error);
+    } finally {
+      setCarregandoBoletosClinica(false);
+    }
+  }, [isClinica, makeRequest, user?.clinica_id, fechamentos]);
 
 
 
@@ -705,6 +767,12 @@ const Pacientes = () => {
     }
   }, []);
 
+  useEffect(() => {
+    if (isClinica && user?.clinica_id) {
+      carregarBoletosClinica();
+    }
+  }, [isClinica, user?.clinica_id, carregarBoletosClinica]);
+
 
   // Carregar contratos quando modal de análise abrir
   useEffect(() => {
@@ -734,6 +802,10 @@ const Pacientes = () => {
       if (podeAlterarStatus || isConsultorInterno) {
         promises.push(fetchNovosLeads());
         promises.push(fetchLeadsNegativos());
+      }
+
+      if (isClinica) {
+        promises.push(carregarBoletosClinica());
       }
 
       await Promise.allSettled(promises);
@@ -770,7 +842,24 @@ const Pacientes = () => {
       document.body.style.overflow = 'unset';
     };
   }, [showModal, showViewModal, showObservacoesModal, showAgendamentoModal, showPermissaoModal, showAtribuirConsultorModal, showEvidenciaModal, showCadastroCompletoModal]);
-  
+
+  useEffect(() => {
+    if (!isClinica) return;
+    const clinicaId = user?.clinica_id || user?.id;
+    setAntecipacaoEdicoes(prev => {
+      const atualizados = { ...prev };
+      fechamentos.forEach(fechamento => {
+        if (fechamento.clinica_id === clinicaId) {
+          const valor = Number.isFinite(fechamento.antecipacao_meses) && fechamento.antecipacao_meses !== null
+            ? fechamento.antecipacao_meses
+            : 0;
+          atualizados[fechamento.paciente_id] = valor.toString();
+        }
+      });
+      return atualizados;
+    });
+  }, [isClinica, fechamentos, user?.clinica_id, user?.id]);
+
   //Sempre que FILTROS mudarem, voltar para a primeira página
   useEffect(() => {
     setCurrentPage(1);
@@ -1041,15 +1130,29 @@ const Pacientes = () => {
       
       if (response.ok) {
         const isUserAdmin = Boolean(isAdmin);
+        const isUserClinica = user?.tipo === 'clinica';
+        const clinicaAtualId = Number(user?.clinica_id || 0);
         const currentUserId = Number(user?.id || 0);
         const currentConsultorId = Number(user?.consultor_id || 0);
-        const filtered = isUserAdmin ? data : (Array.isArray(data) ? data.filter(f => {
-          const sdrMatch = Number(f.sdr_id || 0) === currentUserId;
-          const consultorMatch = Number(f.consultor_id || 0) === currentConsultorId;
-          const consultorInternoMatch = Number(f.consultor_interno_id || 0) === currentConsultorId;
-          return sdrMatch || consultorMatch || consultorInternoMatch;
-        }) : []);
+        let filtered = [];
+        if (isUserAdmin) {
+          filtered = data;
+        } else if (isUserClinica) {
+          filtered = Array.isArray(data)
+            ? data.filter(f => Number(f.clinica_id || 0) === clinicaAtualId)
+            : [];
+        } else {
+          filtered = Array.isArray(data) ? data.filter(f => {
+            const sdrMatch = Number(f.sdr_id || 0) === currentUserId;
+            const consultorMatch = Number(f.consultor_id || 0) === currentConsultorId;
+            const consultorInternoMatch = Number(f.consultor_interno_id || 0) === currentConsultorId;
+            return sdrMatch || consultorMatch || consultorInternoMatch;
+          }) : [];
+        }
         setFechamentos(filtered);
+        if (isUserClinica) {
+          carregarBoletosClinica(filtered);
+        }
       } else {
         console.error('Erro ao carregar fechamentos:', data.error);
       }
@@ -2916,6 +3019,79 @@ const Pacientes = () => {
       style: 'currency',
       currency: 'BRL'
     }).format(valor);
+  };
+
+  const handleAntecipacaoChange = (pacienteId, valor) => {
+    const somenteNumeros = valor.replace(/\D/g, '');
+    setAntecipacaoEdicoes(prev => ({
+      ...prev,
+      [pacienteId]: somenteNumeros
+    }));
+  };
+
+  const handleAntecipacaoSalvar = async (paciente, fechamento) => {
+    if (!fechamento?.id) {
+      showErrorToast('Fechamento não encontrado para este paciente.');
+      return;
+    }
+
+    const valorEntrada = antecipacaoEdicoes.hasOwnProperty(paciente.id)
+      ? antecipacaoEdicoes[paciente.id]
+      : (Number.isFinite(fechamento.antecipacao_meses) && fechamento.antecipacao_meses !== null
+          ? fechamento.antecipacao_meses.toString()
+          : '0');
+
+    const valorNumero = valorEntrada === '' ? 0 : parseInt(valorEntrada, 10);
+
+    if (Number.isNaN(valorNumero) || valorNumero < 0) {
+      showErrorToast('Informe um valor de antecipação válido.');
+      return;
+    }
+
+    const valorAtualFechamento = Number.isFinite(fechamento.antecipacao_meses) && fechamento.antecipacao_meses !== null
+      ? fechamento.antecipacao_meses
+      : 0;
+
+    if (valorNumero === valorAtualFechamento) {
+      if (showInfoToast) {
+        showInfoToast('O valor de antecipação já está atualizado.');
+      }
+      return;
+    }
+
+    setAntecipacaoSalvando(prev => ({ ...prev, [paciente.id]: true }));
+
+    try {
+      const response = await makeRequest(`/fechamentos/${fechamento.id}/antecipacao`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ antecipacao_meses: valorNumero })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Erro ao atualizar antecipação');
+      }
+
+      setFechamentos(prev =>
+        prev.map(f => (f.id === fechamento.id ? { ...f, antecipacao_meses: valorNumero } : f))
+      );
+
+      setAntecipacaoEdicoes(prev => ({
+        ...prev,
+        [paciente.id]: valorNumero.toString()
+      }));
+
+      showSuccessToast('Antecipação atualizada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao atualizar antecipação:', error);
+      showErrorToast(error.message || 'Erro ao atualizar antecipação');
+    } finally {
+      setAntecipacaoSalvando(prev => ({ ...prev, [paciente.id]: false }));
+    }
   };
 
   const downloadContrato = async (fechamento) => {
@@ -5306,7 +5482,9 @@ const Pacientes = () => {
                       <thead>
                         <tr>
                           <th style={{ minWidth: '180px', width: '20%' }}>Nome</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', minWidth: '120px' }}>Telefone</th>
+                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', minWidth: '120px' }}>
+                            {isClinica ? 'Antecipação (meses)' : 'Telefone'}
+                          </th>
                           <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', minWidth: '100px' }}>Valor</th>
                           <th style={{ minWidth: '120px' }}>Status</th>
                           <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', minWidth: '140px' }}>Documentação</th>
@@ -5349,6 +5527,10 @@ const Pacientes = () => {
                                 statusFechamento = 'documentacao_pendente';
                               }
                               
+                              const boletosPacienteCount = boletosPorPaciente[paciente.id] || 0;
+                              const nenhumBoletoDisponivel = boletosPacienteCount <= 0;
+                              const verBoletosDesabilitado = isClinica && (carregandoBoletosClinica || nenhumBoletoDisponivel);
+                              
                               const statusColors = {
                                 'aprovado': { color: '#10b981', label: 'Aprovado' },
                                 'reprovado': { color: '#ef4444', label: 'Reprovado' },
@@ -5357,13 +5539,60 @@ const Pacientes = () => {
                                 'pendente': { color: '#f59e0b', label: 'Pendente' }
                               };
                               const statusInfo = statusColors[statusFechamento] || statusColors['pendente'];
+                              const valorAntecipacaoPadrao = Number.isFinite(fechamentoPaciente?.antecipacao_meses) && fechamentoPaciente?.antecipacao_meses !== null
+                                ? fechamentoPaciente.antecipacao_meses
+                                : 0;
+                              const valorAntecipacaoInput = antecipacaoEdicoes.hasOwnProperty(paciente.id)
+                                ? antecipacaoEdicoes[paciente.id]
+                                : valorAntecipacaoPadrao.toString();
+                              const salvandoAntecipacao = Boolean(antecipacaoSalvando[paciente.id]);
                               
                               return (
                             <tr key={paciente.id}>
                                 <td style={{ padding: '0.75rem 1rem' }}>
                                   <strong title={paciente.nome} style={{ fontSize: '0.875rem' }}>{paciente.nome}</strong>
                                 </td>
-                                <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{formatarTelefone(paciente.telefone)}</td>
+                                <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                                  {isClinica ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', maxWidth: '50px' }}>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={valorAntecipacaoInput}
+                                        onChange={(e) => handleAntecipacaoChange(paciente.id, e.target.value)}
+                                        style={{
+                                          width: '50px',
+                                          padding: '0.3rem 0.4rem',
+                                          border: '1px solid #d1d5db',
+                                          borderRadius: '6px',
+                                          fontSize: '0.875rem',
+                                          backgroundColor: '#ffffff',
+                                          color: '#1f2937'
+                                        }}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleAntecipacaoSalvar(paciente, fechamentoPaciente)}
+                                        disabled={salvandoAntecipacao}
+                                        style={{
+                                          padding: '0.3rem 0.6rem',
+                                          borderRadius: '6px',
+                                          border: 'none',
+                                          backgroundColor: salvandoAntecipacao ? '#9ca3af' : '#059669',
+                                          color: '#ffffff',
+                                          fontSize: '0.75rem',
+                                          fontWeight: 600,
+                                          cursor: salvandoAntecipacao ? 'not-allowed' : 'pointer',
+                                          transition: 'background-color 0.2s ease'
+                                        }}
+                                      >
+                                        {salvandoAntecipacao ? 'Salvando...' : 'Salvar'}
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    formatarTelefone(paciente.telefone)
+                                  )}
+                                </td>
                                 <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell'}}>
                                   {fechamentoPaciente?.valor_fechado ? (
                                     <div style={{ fontWeight: '700', color: '#059669', fontSize: '0.95rem' }}>
@@ -5509,40 +5738,61 @@ const Pacientes = () => {
                                   {/* Botão de ver boletos */}
                                   <button
                                     className="btn-action"
+                                    disabled={verBoletosDesabilitado}
                                     onClick={() => {
-                                      // Navegar para a aba de fechamentos mostrando os boletos do fechamento
-                                      const clinicaId = user?.clinica_id || user?.id;
-                                      const fechamentoPaciente = fechamentos.find(f => f.paciente_id === paciente.id && f.clinica_id === clinicaId);
-                                      if (fechamentoPaciente) {
+                                      if (isClinica) {
+                                        if (carregandoBoletosClinica) {
+                                          showErrorToast('Carregando boletos, tente novamente em instantes.');
+                                          return;
+                                        }
+                                        if (nenhumBoletoDisponivel) {
+                                          showErrorToast('Este paciente ainda não possui boletos gerados.');
+                                          return;
+                                        }
+                                        navigate('/gestao-boletos', { state: { pacienteId: paciente.id } });
+                                        return;
+                                      }
+                                      const clinicaIdAtual = user?.clinica_id || user?.id;
+                                      const fechamentoPacienteSelecionado = fechamentos.find(f => f.paciente_id === paciente.id && f.clinica_id === clinicaIdAtual);
+                                      if (fechamentoPacienteSelecionado) {
                                         navigate('/fechamentos', { state: { pacienteId: paciente.id, expandirBoletos: true } });
                                       } else {
                                         showErrorToast('Nenhum fechamento encontrado para este paciente');
                                       }
                                     }}
-                                    title="Ver boletos do paciente"
+                                    title={
+                                      isClinica
+                                        ? (carregandoBoletosClinica
+                                            ? 'Carregando boletos...'
+                                            : (nenhumBoletoDisponivel ? 'Paciente sem boletos disponíveis' : 'Ver boletos do paciente'))
+                                        : 'Ver boletos do paciente'
+                                    }
                                     style={{
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
                                       gap: '0.25rem',
                                       padding: '0.375rem 0.75rem',
-                                      backgroundColor: '#f3f4f6',
+                                      backgroundColor: verBoletosDesabilitado ? '#f9fafb' : '#f3f4f6',
                                       border: '1px solid #e5e7eb',
                                       borderRadius: '6px',
-                                      color: '#6b7280',
-                                      cursor: 'pointer',
+                                      color: verBoletosDesabilitado ? '#9ca3af' : '#6b7280',
+                                      cursor: verBoletosDesabilitado ? 'not-allowed' : 'pointer',
                                       transition: 'all 0.2s',
                                       fontSize: '0.75rem',
                                       fontWeight: '500',
                                       whiteSpace: 'nowrap',
                                       height: '32px',
-                                      minWidth: '120px'
+                                      minWidth: '120px',
+                                      opacity: verBoletosDesabilitado ? 0.6 : 1
                                     }}
                                     onMouseEnter={(e) => {
+                                      if (verBoletosDesabilitado) return;
                                       e.currentTarget.style.backgroundColor = '#e5e7eb';
                                       e.currentTarget.style.borderColor = '#d1d5db';
                                     }}
                                     onMouseLeave={(e) => {
+                                      if (verBoletosDesabilitado) return;
                                       e.currentTarget.style.backgroundColor = '#f3f4f6';
                                       e.currentTarget.style.borderColor = '#e5e7eb';
                                     }}

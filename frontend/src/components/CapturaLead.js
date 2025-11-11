@@ -419,7 +419,8 @@ const CapturaLead = () => {
       ...formData,
       observacoes: observacoesComDias,
       ref_consultor: refConsultor, // Incluir código de referência se existir
-      origem_formulario: 'captura-lead' // Identificar origem do formulário
+      origem_formulario: 'captura-lead', // Identificar origem do formulário
+      empresa_id: 3
     };
 
 

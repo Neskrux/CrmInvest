@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from './Toast';
@@ -18,17 +18,45 @@ const DashboardPaciente = () => {
     boletosPendentes: 0,
     totalBoletos: 0
   });
+  const pacienteInfoRef = useRef(null);
 
-  const fetchDashboardData = useCallback(async () => {
+  const fetchDashboardData = useCallback(async (pacienteInfo = null) => {
     try {
       setLoading(true);
-      // TODO: Implementar endpoint específico para dashboard do paciente
-      // Por enquanto, retornar dados básicos
+      let boletosPendentes = 0;
+      let totalBoletos = 0;
+
+      try {
+        const boletosResponse = await makeRequest('/paciente/boletos', { method: 'GET' });
+        if (boletosResponse.ok) {
+          const boletosData = await boletosResponse.json();
+          const lista = Array.isArray(boletosData?.boletos) ? boletosData.boletos : [];
+          totalBoletos = lista.length;
+          boletosPendentes = lista.filter((boleto) => {
+            const status = (boleto.status || '').toLowerCase();
+            return status === 'pendente' || status === 'vencido';
+          }).length;
+        } else {
+          console.warn('⚠️ [DashboardPaciente] Falha ao carregar boletos:', boletosResponse.status);
+        }
+      } catch (boletosError) {
+        console.error('❌ [DashboardPaciente] Erro ao buscar boletos:', boletosError);
+      }
+
+      const pacienteReferencia = pacienteInfo || pacienteInfoRef.current;
+      let documentosPendentes = 0;
+      if (pacienteReferencia) {
+        const faltaCPF = !pacienteReferencia.cpf || pacienteReferencia.cpf.trim() === '';
+        const faltaDataNascimento = !pacienteReferencia.data_nascimento || pacienteReferencia.data_nascimento.trim() === '';
+        const faltaComprovante = !pacienteReferencia.comprovante_residencia_url || pacienteReferencia.comprovante_residencia_url.trim() === '';
+        documentosPendentes = [faltaCPF, faltaDataNascimento, faltaComprovante].filter(Boolean).length;
+      }
+
       setDados({
         proximosAgendamentos: [],
-        documentosPendentes: 0,
-        boletosPendentes: 0,
-        totalBoletos: 0
+        documentosPendentes,
+        boletosPendentes,
+        totalBoletos
       });
     } catch (error) {
       console.error('Erro ao buscar dados do dashboard:', error);
@@ -36,7 +64,7 @@ const DashboardPaciente = () => {
     } finally {
       setLoading(false);
     }
-  }, [showErrorToast]);
+  }, [makeRequest, showErrorToast, user?.id, user?.paciente_id]);
 
   const verificarCadastroCompleto = useCallback(async () => {
     // Se o cadastro já foi finalizado, não verificar novamente
@@ -64,6 +92,7 @@ const DashboardPaciente = () => {
       if (response.ok) {
         const paciente = await response.json();
         setPacienteData(paciente);
+        pacienteInfoRef.current = paciente;
         
         console.log('📋 [DashboardPaciente] Dados do paciente:', {
           cpf: paciente.cpf ? '✓' : '✗',
@@ -98,6 +127,7 @@ const DashboardPaciente = () => {
         }
         
         console.log('✅ [DashboardPaciente] Cadastro completo!');
+        fetchDashboardData(paciente);
       } else {
         console.error('❌ [DashboardPaciente] Erro ao buscar paciente:', response.status);
       }

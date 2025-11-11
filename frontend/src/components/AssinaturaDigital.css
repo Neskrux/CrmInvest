@@ -848,7 +848,7 @@
   color: #1a1d23;
 }
 
-.modal-close {
+.close-btn {
   background: none;
   border: none;
   font-size: 2rem;
@@ -864,7 +864,7 @@
   transition: all 0.2s;
 }
 
-.modal-close:hover {
+.close-btn:hover {
   background-color: #f3f4f6;
   color: #1a1d23;
 }

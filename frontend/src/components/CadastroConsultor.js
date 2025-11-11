@@ -734,7 +734,7 @@ const CadastroConsultor = () => {
           cidade: formData.cidade,
           estado: formData.estado,
           tipo: 'consultor',
-          empresa_id: isClienteIncorporadora ? 5 : null, // Incorporadora
+          empresa_id: isClienteIncorporadora ? 5 : 3, // Incorporadora ou Solumn
           is_freelancer: isClienteIncorporadora ? true : false
         })
       });

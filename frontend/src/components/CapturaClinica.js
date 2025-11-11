@@ -325,7 +325,8 @@ const CapturaClinica = () => {
     
     const formDataToSend = {
       ...formData,
-      ref_consultor: refConsultor // Incluir código de referência se existir
+      ref_consultor: refConsultor, // Incluir código de referência se existir
+      empresa_id: 3
     };
 
     try {
