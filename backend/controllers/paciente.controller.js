@@ -14,29 +14,97 @@ const getBoletosPaciente = async (req, res) => {
     const pacienteId = req.user.paciente_id || req.user.id;
 
     // Buscar boletos da tabela boletos_caixa (prioridade)
-    const { data: boletosCaixa, error: boletosError } = await supabaseAdmin
+    let boletosCaixa = [];
+    const boletosCaixaResponse = await supabaseAdmin
       .from('boletos_caixa')
       .select('*')
       .eq('paciente_id', pacienteId)
       .order('data_vencimento', { ascending: true });
 
-    if (boletosError) throw boletosError;
+    if (boletosCaixaResponse.error) throw boletosCaixaResponse.error;
+    boletosCaixa = boletosCaixaResponse.data || [];
 
-    // Se há boletos na tabela boletos_caixa, usar eles
-    if (boletosCaixa && boletosCaixa.length > 0) {
-      // Calcular status para cada boleto
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
 
-      const boletosComStatus = boletosCaixa.map(boleto => {
-        let status = boleto.status || 'pendente';
+    const boletosCaixaFormatados = boletosCaixa.map(boleto => {
+      let status = boleto.status || 'pendente';
 
-        // Se já tem status explícito (pago, cancelado), manter
-        if (boleto.status === 'pago' || boleto.status === 'cancelado') {
-          status = boleto.status;
+      if (boleto.status === 'pago' || boleto.status === 'cancelado') {
+        status = boleto.status;
+      } else {
+        const vencimento = boleto.data_vencimento ? new Date(boleto.data_vencimento) : null;
+        if (vencimento) {
+          vencimento.setHours(0, 0, 0, 0);
+          if (vencimento < hoje) {
+            status = 'vencido';
+          } else {
+            status = 'pendente';
+          }
+        }
+      }
+
+      return {
+        id: boleto.id,
+        nosso_numero: boleto.nosso_numero,
+        numero_documento: boleto.numero_documento,
+        valor: parseFloat(boleto.valor || 0),
+        valor_pago: boleto.valor_pago ? parseFloat(boleto.valor_pago) : null,
+        data_vencimento: boleto.data_vencimento,
+        data_emissao: boleto.data_emissao,
+        data_hora_pagamento: boleto.data_hora_pagamento,
+        situacao: boleto.situacao,
+        status: status,
+        codigo_barras: boleto.codigo_barras,
+        linha_digitavel: boleto.linha_digitavel,
+        url: boleto.url,
+        qrcode: boleto.qrcode,
+        url_qrcode: boleto.url_qrcode,
+        parcela_numero: boleto.parcela_numero,
+        fechamento_id: boleto.fechamento_id,
+        origem: 'caixa'
+      };
+    });
+
+    // Buscar boletos da tabela boletos_gestao (parcelas cadastradas pelo admin)
+    let boletosGestao = [];
+    try {
+      const boletosGestaoResponse = await supabaseAdmin
+        .from('boletos_gestao')
+        .select('*')
+        .eq('paciente_id', pacienteId)
+        .order('data_vencimento', { ascending: true });
+
+      if (boletosGestaoResponse.error) {
+        if (boletosGestaoResponse.error.code === 'PGRST205' || boletosGestaoResponse.error.message?.includes('does not exist')) {
+          console.warn('⚠️ [BoletosPaciente] Tabela boletos_gestao não encontrada. Ignorando...');
         } else {
-          // Caso contrário, calcular baseado na data de vencimento
-          const vencimento = boleto.data_vencimento ? new Date(boleto.data_vencimento) : null;
+          throw boletosGestaoResponse.error;
+        }
+      } else {
+        boletosGestao = boletosGestaoResponse.data || [];
+      }
+    } catch (gestaoError) {
+      if (gestaoError.code === 'PGRST205' || gestaoError.message?.includes('does not exist')) {
+        console.warn('⚠️ [BoletosPaciente] Tabela boletos_gestao não disponível. Prosseguindo apenas com boletos_caixa.');
+      } else {
+        throw gestaoError;
+      }
+    }
+
+    const boletosCaixaIds = new Set(boletosCaixa.map(b => b.id));
+
+    const boletosGestaoFormatados = boletosGestao
+      .filter(bg => !bg.boleto_caixa_id || !boletosCaixaIds.has(bg.boleto_caixa_id))
+      .map(bg => {
+        let status = bg.status || 'pendente';
+
+        if (bg.status === 'pago' || bg.status === 'cancelado') {
+          status = bg.status;
+        } else if (bg.data_pagamento) {
+          status = 'pago';
+        } else {
+          const vencimento = bg.data_vencimento ? new Date(bg.data_vencimento) : null;
           if (vencimento) {
             vencimento.setHours(0, 0, 0, 0);
             if (vencimento < hoje) {
@@ -47,75 +115,37 @@ const getBoletosPaciente = async (req, res) => {
           }
         }
 
+        const numeroDocumento = bg.numero_documento || (bg.fechamento_id ? `FEC-${bg.fechamento_id}-PARC-${bg.numero_parcela || bg.parcela_numero || ''}` : `PARC-${bg.numero_parcela || bg.parcela_numero || bg.id}`);
+
         return {
-          id: boleto.id,
-          nosso_numero: boleto.nosso_numero,
-          numero_documento: boleto.numero_documento,
-          valor: parseFloat(boleto.valor || 0),
-          valor_pago: boleto.valor_pago ? parseFloat(boleto.valor_pago) : null,
-          data_vencimento: boleto.data_vencimento,
-          data_emissao: boleto.data_emissao,
-          data_hora_pagamento: boleto.data_hora_pagamento,
-          situacao: boleto.situacao,
-          status: status,
-          codigo_barras: boleto.codigo_barras,
-          linha_digitavel: boleto.linha_digitavel,
-          url: boleto.url,
-          qrcode: boleto.qrcode,
-          url_qrcode: boleto.url_qrcode,
-          parcela_numero: boleto.parcela_numero,
-          fechamento_id: boleto.fechamento_id
+          id: `GESTAO-${bg.id}`,
+          nosso_numero: bg.nosso_numero || null,
+          numero_documento: numeroDocumento,
+          valor: parseFloat(bg.valor || 0),
+          valor_pago: bg.valor_pago ? parseFloat(bg.valor_pago) : null,
+          data_vencimento: bg.data_vencimento,
+          data_emissao: bg.data_emissao || bg.created_at,
+          data_hora_pagamento: bg.data_pagamento || null,
+          situacao: bg.status ? bg.status.toUpperCase() : 'EM ABERTO',
+          status,
+          codigo_barras: bg.codigo_barras || null,
+          linha_digitavel: bg.linha_digitavel || null,
+          url: bg.url_boleto || bg.url || null,
+          qrcode: bg.qrcode || null,
+          url_qrcode: bg.url_qrcode || null,
+          parcela_numero: bg.numero_parcela || bg.parcela_numero || null,
+          fechamento_id: bg.fechamento_id,
+          origem: 'gestao'
         };
       });
 
-      return res.json({ boletos: boletosComStatus });
-    }
-
-    // Fallback: buscar de fechamentos (compatibilidade)
-    const { data: fechamentos, error: fechamentosError } = await supabaseAdmin
-      .from('fechamentos')
-      .select('*')
-      .eq('paciente_id', pacienteId)
-      .order('data_fechamento', { ascending: false });
-
-    if (fechamentosError) throw fechamentosError;
-
-    // Converter fechamentos em boletos (formato simplificado)
-    const boletosFromFechamentos = fechamentos.map(fechamento => {
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
-      
-      let status = 'pendente';
-      const vencimento = fechamento.vencimento ? new Date(fechamento.vencimento) : null;
-      if (vencimento) {
-        vencimento.setHours(0, 0, 0, 0);
-        if (vencimento < hoje) {
-          status = 'vencido';
-        }
-      }
-
-      return {
-        id: fechamento.id,
-        nosso_numero: null,
-        numero_documento: `FEC-${fechamento.id}`,
-        valor: parseFloat(fechamento.valor_fechado || 0),
-        valor_pago: null,
-        data_vencimento: fechamento.vencimento || fechamento.data_fechamento,
-        data_emissao: fechamento.data_fechamento,
-        data_hora_pagamento: null,
-        situacao: 'EM ABERTO',
-        status: status,
-        codigo_barras: null,
-        linha_digitavel: null,
-        url: null,
-        qrcode: null,
-        url_qrcode: null,
-        parcela_numero: null,
-        fechamento_id: fechamento.id
-      };
+    const boletosCombinados = [...boletosCaixaFormatados, ...boletosGestaoFormatados].sort((a, b) => {
+      const dataA = a.data_vencimento ? new Date(a.data_vencimento) : (a.data_emissao ? new Date(a.data_emissao) : new Date(0));
+      const dataB = b.data_vencimento ? new Date(b.data_vencimento) : (b.data_emissao ? new Date(b.data_emissao) : new Date(0));
+      return dataA - dataB;
     });
 
-    return res.json({ boletos: boletosFromFechamentos });
+    return res.json({ boletos: boletosCombinados });
 
   } catch (error) {
     console.error('Erro ao buscar boletos do paciente:', error);

@@ -1518,7 +1518,7 @@
   background: #f8f9fa;
 }
 
-.modal-close {
+.close-btn {
   position: absolute;
   top: 1rem;
   right: 1rem;
@@ -1536,12 +1536,12 @@
   z-index: 1;
 }
 
-.modal-close:hover {
+.close-btn:hover {
   background: #ef4444;
   transform: rotate(90deg);
 }
 
-.modal-close:hover svg {
+.close-btn:hover svg {
   stroke: white;
 }
 

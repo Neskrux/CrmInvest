@@ -124,6 +124,7 @@ const AppContent = () => {
     if (path.includes('/perfil')) return 'perfil';
     if (path.includes('/assinatura-digital')) return 'assinatura-digital';
     if (path.includes('/gerenciar-assinatura')) return 'gerenciar-assinatura';
+    if (path.includes('/gestao-boletos')) return 'gestao-boletos';
     return 'dashboard';
   };
   
@@ -251,6 +252,14 @@ const AppContent = () => {
           <Route path="/meus-documentos" element={<MeusDocumentos />} />
           <Route path="/materiais" element={<Materiais />} />
           <Route path="/perfil" element={<Perfil />} />
+          <Route 
+            path="/gestao-boletos" 
+            element={
+              <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Carregando...</div>}>
+                <GestaoBoletosAdmin />
+              </Suspense>
+            } 
+          />
           {/* Redirecionar qualquer outra rota para dashboard */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -966,8 +975,8 @@ const AppContent = () => {
             </div>
           )}
 
-          {/* Gestão de Boletos - Apenas Admin */}
-          {user.tipo === 'admin' && (
+          {/* Gestão de Boletos - Admin e Clínicas */}
+          {(user.tipo === 'admin' || user.tipo === 'clinica') && (
             <div className="nav-item">
               <Link
                 to="/gestao-boletos"
@@ -1198,7 +1207,13 @@ const AppContent = () => {
                   {user.nome}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                  {user.tipo === 'admin' ? 'Administrador' : user.tipo === 'parceiro' ? 'Empresa' : user.tipo === 'clinica' ? 'Clínica' : 'Consultor'}
+                  {user.tipo === 'admin' ? 'Administrador' :
+                   user.tipo === 'parceiro' ? 'Empresa' :
+                   user.tipo === 'clinica' ? 'Clínica' :
+                   user.tipo === 'paciente' ? 'Paciente' :
+                   user.is_freelancer ? 'Freelancer' :
+                   user.tipo === 'consultor' ? 'Consultor' :
+                   'Usuário'}
                 </div>
               </div>
               <svg 

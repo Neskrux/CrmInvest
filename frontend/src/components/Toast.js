@@ -117,7 +117,7 @@ const Toast = ({ toast, onClose }) => {
       border: '1px solid rgba(255, 255, 255, 0.2)',
       transform: isExiting ? 'translateX(100%) scale(0.95)' : 'translateX(0) scale(1)',
       opacity: isExiting ? 0 : 1,
-      zIndex: 1000
+      zIndex: 1000000
     };
 
     const typeStyles = {

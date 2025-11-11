@@ -24,6 +24,8 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
   });
   
   // Inicializar formData quando paciente mudar (apenas na primeira vez ou se campos estiverem vazios)
+  const isPacienteLogado = user?.tipo === 'paciente';
+
   useEffect(() => {
     if (paciente) {
       console.log('📋 [ModalCadastro] Dados do paciente recebidos:', {
@@ -37,7 +39,7 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
       setFormData(prev => {
         // Formatar CPF se existir no paciente E não estiver preenchido no formData
         let cpfFormatado = prev.cpf;
-        if (!cpfFormatado && paciente.cpf) {
+        if (!isPacienteLogado && !cpfFormatado && paciente.cpf) {
           const cpfLimpo = paciente.cpf.replace(/\D/g, '');
           if (cpfLimpo.length === 11) {
             cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
@@ -61,22 +63,24 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
         }
         
         return {
-          cpf: cpfFormatado,
+          cpf: isPacienteLogado ? prev.cpf : cpfFormatado,
           data_nascimento: dataFormatada,
           comprovante_residencia: prev.comprovante_residencia // Preservar comprovante se existir
         };
       });
     }
-  }, [paciente]);
+  }, [paciente, isPacienteLogado]);
   
   // Estados para upload
   const [uploadingComprovante, setUploadingComprovante] = useState(false);
   const [comprovantePreview, setComprovantePreview] = useState(null);
   const [modoComprovante, setModoComprovante] = useState(null); // 'camera' ou 'arquivo'
+  const [cameraPronta, setCameraPronta] = useState(false);
   const [streamCamera, setStreamCamera] = useState(null);
   const [fotoCapturada, setFotoCapturada] = useState(null);
   const videoRefComprovante = React.useRef(null);
   const canvasRefComprovante = React.useRef(null);
+  const cameraCheckTimeoutRef = useRef(null);
   
   // Estados para assinatura digital do contrato
   const [assinaturaRef, setAssinaturaRef] = useState(null);
@@ -84,22 +88,51 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
   const [contratoPdfBytes, setContratoPdfBytes] = useState(null);
   const [contratoPdfUrl, setContratoPdfUrl] = useState(null);
   const [assinaturaBase64, setAssinaturaBase64] = useState(null);
+  const [assinaturaAplicada, setAssinaturaAplicada] = useState(false);
   const [assinandoContrato, setAssinandoContrato] = useState(false);
   const [mostrarCanvasAssinatura, setMostrarCanvasAssinatura] = useState(false);
   const [pdfKey, setPdfKey] = useState(0); // Para forçar re-render do iframe
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [hashExistente, setHashExistente] = useState(null); // Hash do fechamento existente
+  const assinaturaCanvasContainerRef = useRef(null);
+  const [assinaturaCanvasSize, setAssinaturaCanvasSize] = useState({ width: 400, height: 150 });
   
   // Detectar mudanças no tamanho da tela (apenas para layout, não para assinatura)
+  const ajustarDimensoesCanvasAssinatura = () => {
+    if (!assinaturaCanvasContainerRef.current) return;
+    const { width } = assinaturaCanvasContainerRef.current.getBoundingClientRect();
+    if (!width) return;
+
+    const novoWidth = Math.round(width);
+    const novoHeight = Math.round(Math.max(120, Math.min(220, width * 0.4))); // Mantém proporção aproximada
+
+    setAssinaturaCanvasSize(prev => {
+      if (prev.width === novoWidth && prev.height === novoHeight) return prev;
+      return { width: novoWidth, height: novoHeight };
+    });
+  };
+
+  useEffect(() => {
+    setAssinaturaAplicada(Boolean(paciente?.contrato_servico_url));
+  }, [paciente]);
+
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
+      ajustarDimensoesCanvasAssinatura();
     };
     
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+  useEffect(() => {
+    if (mostrarCanvasAssinatura) {
+      // Ajustar dimensões ao abrir o canvas
+      setTimeout(ajustarDimensoesCanvasAssinatura, 0);
+    }
+  }, [mostrarCanvasAssinatura]);
+
   
   // Determinar qual passo iniciar - SEMPRE começar do passo 1 apenas na primeira vez
   // O paciente DEVE passar por TODOS os passos sequencialmente para confirmar cada informação
@@ -329,9 +362,14 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
       return;
     }
     
+    const cpfPacienteExistente = paciente?.cpf ? paciente.cpf.replace(/\D/g, '') : null;
     if (!validarCPF(formData.cpf)) {
-      showErrorToast('CPF inválido. Verifique os dígitos informados.');
-      return;
+      if (cpfPacienteExistente && cpfPacienteExistente === cpfLimpo) {
+        console.warn('⚠️ [ModalCadastro] CPF informado falhou na validação local, mas corresponde ao CPF armazenado. Prosseguindo com o envio.');
+      } else {
+        showErrorToast('CPF inválido. Verifique os dígitos informados.');
+        return;
+      }
     }
     
     setLoading(true);
@@ -440,17 +478,15 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: 'environment', // Câmera traseira no mobile
+          facingMode: { ideal: 'environment' }, // Câmera traseira no mobile quando disponível
           width: { ideal: 1920 },
           height: { ideal: 1080 }
-        }
+        },
+        audio: false
       });
       setStreamCamera(stream);
       setModoComprovante('camera');
-      if (videoRefComprovante.current) {
-        videoRefComprovante.current.srcObject = stream;
-        await videoRefComprovante.current.play();
-      }
+      setCameraPronta(false);
     } catch (error) {
       console.error('Erro ao acessar câmera:', error);
       if (error.name === 'NotAllowedError') {
@@ -465,12 +501,23 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
 
   // Parar câmera
   const pararCameraComprovante = () => {
+    setCameraPronta(false);
+    if (cameraCheckTimeoutRef.current) {
+      clearTimeout(cameraCheckTimeoutRef.current);
+      cameraCheckTimeoutRef.current = null;
+    }
     if (streamCamera) {
       streamCamera.getTracks().forEach(track => track.stop());
       setStreamCamera(null);
     }
     if (videoRefComprovante.current) {
-      videoRefComprovante.current.srcObject = null;
+      const videoElement = videoRefComprovante.current;
+      try {
+        videoElement.pause();
+      } catch (e) {
+        // ignore
+      }
+      videoElement.srcObject = null;
     }
     setModoComprovante(null);
     setFotoCapturada(null);
@@ -483,10 +530,21 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
       console.error('❌ [ModalCadastro] Video ou canvas não disponível');
       return;
     }
+    if (!cameraPronta) {
+      console.error('❌ [ModalCadastro] Câmera ainda não está pronta para captura');
+      showErrorToast('Aguarde a câmera carregar antes de tirar a foto.');
+      return;
+    }
     
     const video = videoRefComprovante.current;
     const canvas = canvasRefComprovante.current;
     const context = canvas.getContext('2d');
+
+    if (!video.videoWidth || !video.videoHeight) {
+      console.error('❌ [ModalCadastro] Dimensões do vídeo indefinidas para captura');
+      showErrorToast('Não foi possível capturar a imagem. Tente novamente.');
+      return;
+    }
     
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -513,6 +571,89 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
       }
     }, 'image/jpeg', 0.9);
   };
+
+  // Sincronizar stream da câmera com o elemento de vídeo
+  useEffect(() => {
+    const videoElement = videoRefComprovante.current;
+
+    if (!videoElement) return undefined;
+
+    if (modoComprovante !== 'camera') {
+      videoElement.srcObject = null;
+      setCameraPronta(false);
+      return undefined;
+    }
+
+    if (!streamCamera) {
+      setCameraPronta(false);
+      return undefined;
+    }
+
+    setCameraPronta(false);
+
+    const marcarProntoSePossivel = () => {
+      if (videoElement.readyState >= 2 && videoElement.videoWidth > 0) {
+        setCameraPronta(true);
+        if (cameraCheckTimeoutRef.current) {
+          clearTimeout(cameraCheckTimeoutRef.current);
+          cameraCheckTimeoutRef.current = null;
+        }
+      }
+    };
+
+    videoElement.srcObject = streamCamera;
+    const playPromise = videoElement.play();
+
+    if (playPromise && typeof playPromise.then === 'function') {
+      playPromise
+        .then(() => {
+          marcarProntoSePossivel();
+        })
+        .catch((err) => {
+          console.error('❌ [ModalCadastro] Erro ao iniciar vídeo da câmera:', err);
+          showErrorToast('Erro ao iniciar a câmera. Verifique as permissões e tente novamente.');
+          setCameraPronta(false);
+        });
+    } else {
+      marcarProntoSePossivel();
+    }
+
+    const intervalId = setInterval(() => {
+      if (videoElement.videoWidth > 0 && videoElement.readyState >= 2) {
+        marcarProntoSePossivel();
+        clearInterval(intervalId);
+      }
+    }, 200);
+
+    if (cameraCheckTimeoutRef.current) {
+      clearTimeout(cameraCheckTimeoutRef.current);
+    }
+    cameraCheckTimeoutRef.current = setTimeout(() => {
+      console.error('❌ [ModalCadastro] Timeout aguardando câmera iniciar (verificação periódica).');
+      showErrorToast('Não foi possível iniciar a câmera. Feche outros aplicativos que estejam usando a câmera e tente novamente.');
+      setCameraPronta(false);
+      if (streamCamera) {
+        streamCamera.getTracks().forEach(track => track.stop());
+        setStreamCamera(null);
+      }
+      try {
+        videoElement.pause();
+      } catch (error) {
+        // ignore
+      }
+      videoElement.srcObject = null;
+      setModoComprovante(null);
+      setFotoCapturada(null);
+    }, 8000);
+
+    return () => {
+      clearInterval(intervalId);
+      if (cameraCheckTimeoutRef.current) {
+        clearTimeout(cameraCheckTimeoutRef.current);
+        cameraCheckTimeoutRef.current = null;
+      }
+    };
+  }, [modoComprovante, streamCamera, showErrorToast]);
 
   // Limpar foto capturada
   const limparFotoComprovante = () => {
@@ -992,6 +1133,7 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
       const url = URL.createObjectURL(blob);
       setContratoPdfUrl(url);
       setContratoPdfBytes(pdfBytesFinal);
+      setAssinaturaAplicada(true);
       
       // Forçar re-render do iframe mudando a key
       setPdfKey(prev => prev + 1);
@@ -1514,9 +1656,31 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
                       width: '100%',
                       maxHeight: '400px',
                       borderRadius: '8px',
-                      display: 'block'
+                      display: 'block',
+                      backgroundColor: '#000'
                     }}
                   />
+                  {!cameraPronta && (
+                    <div style={{
+                      position: 'absolute',
+                      inset: '1rem',
+                      borderRadius: '8px',
+                      backgroundColor: 'rgba(0,0,0,0.65)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      gap: '0.5rem',
+                      fontSize: '0.875rem',
+                      textAlign: 'center',
+                      padding: '1rem'
+                    }}>
+                      <div className="spinner" style={{ width: '28px', height: '28px', borderWidth: '3px' }}></div>
+                      <span>Aguardando câmera iniciar...</span>
+                      <small style={{ opacity: 0.75 }}>Verifique se concedeu permissão ao navegador.</small>
+                    </div>
+                  )}
                   <canvas ref={canvasRefComprovante} style={{ display: 'none' }} />
                   <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                     <button
@@ -1694,13 +1858,15 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
                       <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem', color: '#1e293b' }}>
                         Desenhe sua assinatura
                       </h3>
-                      <div style={{
+                    <div
+                      ref={assinaturaCanvasContainerRef}
+                      style={{
                         border: '2px solid #e2e8f0',
                         borderRadius: '8px',
                         backgroundColor: '#fff',
                         position: 'relative',
                         width: '100%',
-                        height: '150px',
+                        height: `${assinaturaCanvasSize.height}px`,
                         touchAction: 'none'
                       }}>
                         <SignatureCanvas
@@ -1710,8 +1876,8 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
                             }
                           }}
                           canvasProps={{
-                            width: 400,
-                            height: 150,
+                            width: assinaturaCanvasSize.width,
+                            height: assinaturaCanvasSize.height,
                             className: 'signature-canvas',
                             style: {
                               width: '100%',
@@ -1767,7 +1933,7 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
                   )}
                   
                   {/* Botões de ação */}
-                  {!mostrarCanvasAssinatura && !assinaturaBase64 && (
+                  {!mostrarCanvasAssinatura && !assinaturaBase64 && !assinaturaAplicada && (
                     <div style={{ marginBottom: '1rem' }}>
                       <button
                         onClick={() => setMostrarCanvasAssinatura(true)}
@@ -1801,7 +1967,7 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
                   {assinaturaBase64 && (
                     <div style={{ marginBottom: '1rem' }}>
                       <p style={{ fontSize: '0.875rem', color: '#059669', marginBottom: '0.5rem', fontWeight: '600' }}>
-                        ✓ Assinatura criada! Arraste para posicionar no contrato
+                        ✓ Assinatura criada!
                       </p>
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <button
@@ -1862,6 +2028,20 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
                           )}
                         </button>
                       </div>
+                    </div>
+                  )}
+                  
+                  {assinaturaAplicada && (
+                    <div style={{
+                      marginBottom: '1rem',
+                      padding: '0.875rem',
+                      backgroundColor: '#ecfdf3',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '8px',
+                      fontSize: '0.85rem',
+                      color: '#166534'
+                    }}>
+                      ✓ Contrato assinado e salvo. Você pode finalizar o cadastro.
                     </div>
                   )}
                   

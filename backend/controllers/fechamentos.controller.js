@@ -816,6 +816,63 @@ const updateFechamento = async (req, res) => {
   }
 };
 
+// PUT /api/fechamentos/:id/antecipacao - Atualizar apenas o campo de antecipação
+const updateAntecipacaoFechamento = async (req, res) => {
+  try {
+    const { id } = req.params;
+    let { antecipacao_meses } = req.body;
+
+    if (antecipacao_meses === undefined || antecipacao_meses === null || antecipacao_meses === '') {
+      antecipacao_meses = 0;
+    }
+
+    const antecipacaoVal = parseInt(antecipacao_meses, 10);
+    if (Number.isNaN(antecipacaoVal) || antecipacaoVal < 0) {
+      return res.status(400).json({ error: 'Valor de antecipação inválido' });
+    }
+
+    const { data: fechamento, error: selectError } = await supabaseAdmin
+      .from('fechamentos')
+      .select('id, clinica_id')
+      .eq('id', id)
+      .single();
+
+    if (selectError) throw selectError;
+
+    if (!fechamento) {
+      return res.status(404).json({ error: 'Fechamento não encontrado' });
+    }
+
+    if (req.user.tipo === 'clinica') {
+      const clinicaIdUsuario = req.user.clinica_id || req.user.id;
+      if (fechamento.clinica_id !== clinicaIdUsuario) {
+        return res.status(403).json({ error: 'Você não tem permissão para editar este fechamento' });
+      }
+    } else if (req.user.tipo !== 'admin') {
+      return res.status(403).json({ error: 'Você não tem permissão para editar este fechamento' });
+    }
+
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from('fechamentos')
+      .update({ antecipacao_meses: antecipacaoVal })
+      .eq('id', id)
+      .select('id, antecipacao_meses, paciente_id')
+      .single();
+
+    if (updateError) throw updateError;
+
+    res.json({
+      success: true,
+      fechamento_id: updated.id,
+      paciente_id: updated.paciente_id,
+      antecipacao_meses: updated.antecipacao_meses
+    });
+  } catch (error) {
+    console.error('Erro ao atualizar antecipação do fechamento:', error);
+    res.status(500).json({ error: error.message || 'Erro ao atualizar antecipação do fechamento' });
+  }
+};
+
 // DELETE /api/fechamentos/:id - Excluir fechamento
 const deleteFechamento = async (req, res) => {
   try {
@@ -2853,6 +2910,7 @@ module.exports = {
   getDashboardFechamentos,
   createFechamento,
   updateFechamento,
+  updateAntecipacaoFechamento,
   deleteFechamento,
   getContratoUrl,
   downloadContrato,

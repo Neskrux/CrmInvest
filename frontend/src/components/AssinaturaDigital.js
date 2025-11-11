@@ -987,7 +987,7 @@ const AssinaturaDigital = () => {
             }}>
               <div className="modal-header">
                 <h2>🔍 Validação Detalhada do Documento</h2>
-                <button className="modal-close" onClick={fecharValidacao}>×</button>
+                <button className="close-btn" onClick={fecharValidacao}>×</button>
               </div>
 
               <div className="modal-body">

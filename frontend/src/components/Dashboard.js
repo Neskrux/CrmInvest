@@ -9,6 +9,117 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { TrendingUp, Calendar, BarChart3, CheckCircle, XCircle, RotateCcw, UserPlus } from 'lucide-react';
 import './Dashboard.css';
 
+const createDefaultKpisFinanceiros = () => ({
+  valorPago: 0,
+  valorPendente: 0,
+  valorVencido: 0,
+  inadimplencia: 0,
+  totalEmitido: 0,
+  totalBoletos: 0
+});
+
+const parseValorNumerico = (valor) => {
+  if (valor === null || valor === undefined || valor === '') return 0;
+  if (typeof valor === 'number') return Number.isFinite(valor) ? valor : 0;
+  if (typeof valor === 'string') {
+    const normalizado = valor.replace(/\s/g, '').replace(',', '.');
+    const numero = parseFloat(normalizado);
+    return Number.isFinite(numero) ? numero : 0;
+  }
+  return 0;
+};
+
+const normalizarStatusFinanceiroBoleto = (boleto, hojeRef = new Date()) => {
+  const hoje = new Date(hojeRef);
+  hoje.setHours(0, 0, 0, 0);
+
+  const sanitize = (text) => (text || '').toLowerCase().trim();
+
+  let status = sanitize(boleto.status);
+  if (status === 'em_atraso' || status === 'atrasado') status = 'vencido';
+  if (status === 'em aberto' || status === 'aberto') status = 'pendente';
+  if (status === 'recebido') status = 'pago';
+  if (['pago', 'pendente', 'vencido', 'cancelado'].includes(status)) {
+    return status;
+  }
+
+  const display = sanitize(boleto.status_display);
+  if (display.includes('pago') || display.includes('receb')) return 'pago';
+  if (display.includes('venc')) return 'vencido';
+  if (display.includes('cancel')) return 'cancelado';
+  if (display.includes('pend') || display.includes('abert')) return 'pendente';
+
+  const situacao = sanitize(boleto.situacao);
+  if (situacao.includes('liquid')) return 'pago';
+  if (situacao.includes('venc')) return 'vencido';
+  if (situacao.includes('cancel')) return 'cancelado';
+  if (situacao.includes('pend') || situacao.includes('abert')) return 'pendente';
+
+  if (boleto.data_pagamento) return 'pago';
+
+  const dataVencStr = boleto.data_vencimento || boleto.vencimento;
+  if (dataVencStr) {
+    const dataVenc = new Date(dataVencStr);
+    if (!Number.isNaN(dataVenc.getTime())) {
+      dataVenc.setHours(0, 0, 0, 0);
+      if (dataVenc < hoje) return 'vencido';
+      return 'pendente';
+    }
+  }
+
+  return 'pendente';
+};
+
+const calcularIndicadoresFinanceirosClinica = (boletosLista = []) => {
+  let valorPago = 0;
+  let valorPendente = 0;
+  let valorVencido = 0;
+  let totalEmitido = 0;
+  let totalBoletos = 0;
+
+  const idsProcessados = new Set();
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+
+  (Array.isArray(boletosLista) ? boletosLista : []).forEach((boleto) => {
+    if (!boleto) return;
+
+    const chave = boleto.id ?? `${boleto.numero_documento || ''}-${boleto.parcela_numero || ''}-${boleto.data_vencimento || boleto.created_at || ''}`;
+    if (idsProcessados.has(chave)) return;
+    idsProcessados.add(chave);
+
+    const status = normalizarStatusFinanceiroBoleto(boleto, hoje);
+    if (status === 'cancelado') return;
+
+    const valor = parseValorNumerico(boleto.valor ?? boleto.valor_parcela);
+    const valorPagoBoleto = parseValorNumerico(boleto.valor_pago);
+    const referencia = valor > 0 ? valor : valorPagoBoleto;
+    if (referencia <= 0) return;
+
+    totalEmitido += referencia;
+    totalBoletos += 1;
+
+    if (status === 'pago') {
+      valorPago += valorPagoBoleto > 0 ? valorPagoBoleto : referencia;
+    } else if (status === 'vencido' || status === 'em atraso' || status === 'atrasado') {
+      valorVencido += referencia;
+    } else {
+      valorPendente += referencia;
+    }
+  });
+
+  const inadimplencia = totalEmitido > 0 ? (valorVencido / totalEmitido) * 100 : 0;
+
+  return {
+    valorPago,
+    valorPendente,
+    valorVencido,
+    inadimplencia,
+    totalEmitido,
+    totalBoletos
+  };
+};
+
 const Dashboard = () => {
   // Hook para textos dinâmicos baseados no empresa_id
   const { t, shouldShow } = useBranding();
@@ -81,6 +192,7 @@ const Dashboard = () => {
     valorTotalFechamentos: 0,
     agendamentosHoje: 0
   });
+  const [kpisFinanceirosClinica, setKpisFinanceirosClinica] = useState(createDefaultKpisFinanceiros);
   const [periodo, setPeriodo] = useState('total'); // total, semanal, mensal
   const [subPeriodo, setSubPeriodo] = useState(null); // para dias da semana
   const [semanaOpcao, setSemanaOpcao] = useState('atual'); // atual, proxima
@@ -725,6 +837,32 @@ const Dashboard = () => {
           
           // Filtrar pacientes baseado nos IDs encontrados
           pacientes = pacientes.filter(paciente => pacientesIdsComRegiao.has(paciente.id));
+        }
+        
+        if (isClinica && user?.clinica_id) {
+          let boletosGestaoClinica = [];
+          try {
+            const paramsBoletos = new URLSearchParams();
+            paramsBoletos.append('page', '1');
+            paramsBoletos.append('limit', '500');
+            paramsBoletos.append('clinica_id', user.clinica_id);
+            const boletosResponse = await makeRequest(`/boletos-gestao?${paramsBoletos.toString()}`);
+            if (boletosResponse.ok) {
+              const boletosData = await boletosResponse.json();
+              const lista = Array.isArray(boletosData?.boletos) ? boletosData.boletos : [];
+              boletosGestaoClinica = lista.filter(
+                (boleto) => String(boleto?.clinica_id) === String(user.clinica_id)
+              );
+            } else {
+              const erroTexto = await boletosResponse.text();
+              console.error('Erro ao carregar boletos da clínica:', erroTexto);
+            }
+          } catch (erroBoletosClinica) {
+            console.error('Erro ao carregar boletos da clínica:', erroBoletosClinica);
+          }
+          setKpisFinanceirosClinica(calcularIndicadoresFinanceirosClinica(boletosGestaoClinica));
+        } else {
+          setKpisFinanceirosClinica(createDefaultKpisFinanceiros());
         }
         
         setDadosFiltrados({ pacientes, agendamentos, fechamentos });
@@ -1698,6 +1836,11 @@ const Dashboard = () => {
     return `${signal}${absValue.toFixed(1)}%`;
   };
 
+  const formatPercentagePlain = (value) => {
+    const numero = Number.isFinite(value) ? value : 0;
+    return `${numero.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+  };
+
   const formatarMesAno = (data) => {
     const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
                    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -2376,49 +2519,98 @@ const Dashboard = () => {
         }}>
           Indicadores Principais
         </h3>
-        <div className="grid grid-2">
-          <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
-            <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600' }}>Total de {t.pacientes}</div>
-            <div className="stat-value" style={{ fontSize: '2.5rem' }}>{kpisPrincipais.totalPacientes}</div>
-            <div className={`stat-change ${(isAdmin ? stats.crescimentoPacientes : crescimentosFiltrados.crescimentoPacientes) >= 0 ? 'positive' : 'negative'}`}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                {(isAdmin ? stats.crescimentoPacientes : crescimentosFiltrados.crescimentoPacientes) >= 0 ? (
-                  <>
-                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                    <polyline points="17 6 23 6 23 12"></polyline>
-                  </>
-                ) : (
-                  <>
-                    <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
-                    <polyline points="17 18 23 18 23 12"></polyline>
-                  </>
-                )}
-              </svg>
-              {formatPercentage(isAdmin ? stats.crescimentoPacientes : crescimentosFiltrados.crescimentoPacientes)} este mês
+        {isClinica ? (
+          <div className="grid grid-2">
+            <div className="stat-card" style={{ background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)', border: '1px solid #34d399' }}>
+              <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600', color: '#065f46' }}>
+                Valor Recebido
+              </div>
+              <div className="stat-value" style={{ fontSize: '2.5rem', color: '#065f46' }}>
+                {formatCurrency(kpisFinanceirosClinica.valorPago)}
+              </div>
+              <div className="stat-subtitle" style={{ color: '#047857', fontSize: '0.8rem', fontWeight: '500' }}>
+                Boletos pagos
+              </div>
+            </div>
+            <div className="stat-card" style={{ background: 'linear-gradient(135deg, #e0f2fe 0%, #bfdbfe 100%)', border: '1px solid #60a5fa' }}>
+              <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600', color: '#1d4ed8' }}>
+                A Receber
+              </div>
+              <div className="stat-value" style={{ fontSize: '2.5rem', color: '#1d4ed8' }}>
+                {formatCurrency(kpisFinanceirosClinica.valorPendente)}
+              </div>
+              <div className="stat-subtitle" style={{ color: '#1d4ed8', fontSize: '0.8rem', fontWeight: '500' }}>
+                Boletos pendentes
+              </div>
+            </div>
+            <div className="stat-card" style={{ background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)', border: '1px solid #f87171' }}>
+              <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600', color: '#b91c1c' }}>
+                Em Atraso
+              </div>
+              <div className="stat-value" style={{ fontSize: '2.5rem', color: '#b91c1c' }}>
+                {formatCurrency(kpisFinanceirosClinica.valorVencido)}
+              </div>
+              <div className="stat-subtitle" style={{ color: '#b91c1c', fontSize: '0.8rem', fontWeight: '500' }}>
+                Boletos vencidos
+              </div>
+            </div>
+            <div className="stat-card" style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', border: '1px solid #fbbf24' }}>
+              <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600', color: '#92400e' }}>
+                Taxa de inadimplência
+              </div>
+              <div className="stat-value" style={{ fontSize: '2.5rem', color: '#b45309' }}>
+                {formatPercentagePlain(kpisFinanceirosClinica.inadimplencia)}
+              </div>
+              <div className="stat-subtitle" style={{ color: '#b45309', fontSize: '0.8rem', fontWeight: '500' }}>
+                Base: {formatCurrency(kpisFinanceirosClinica.totalEmitido)} · {kpisFinanceirosClinica.totalBoletos} boletos
+              </div>
             </div>
           </div>
-          <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
-            <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600' }}>Agendamentos</div>
-            <div className="stat-value" style={{ fontSize: '2.5rem' }}>{kpisPrincipais.totalAgendamentos}</div>
-          </div>
-          <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
-            <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600' }}>Fechamentos</div>
-            <div className="stat-value" style={{ fontSize: '2.5rem' }}>{kpisPrincipais.totalFechamentos}</div>
-          </div>
-          <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
-            <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600' }}>Valor Total</div>
-            <div className="stat-value" style={{ fontSize: '2.5rem' }}>{formatCurrency(kpisPrincipais.valorTotalFechamentos)}</div>
-            {(isAdmin ? stats.crescimentoValor : crescimentosFiltrados.crescimentoValor) > 0 && (
-              <div className="stat-change positive">
+        ) : (
+          <div className="grid grid-2">
+            <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
+              <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600' }}>Total de {t.pacientes}</div>
+              <div className="stat-value" style={{ fontSize: '2.5rem' }}>{kpisPrincipais.totalPacientes}</div>
+              <div className={`stat-change ${(isAdmin ? stats.crescimentoPacientes : crescimentosFiltrados.crescimentoPacientes) >= 0 ? 'positive' : 'negative'}`}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                  <polyline points="17 6 23 6 23 12"></polyline>
+                  {(isAdmin ? stats.crescimentoPacientes : crescimentosFiltrados.crescimentoPacientes) >= 0 ? (
+                    <>
+                      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                      <polyline points="17 6 23 6 23 12"></polyline>
+                    </>
+                  ) : (
+                    <>
+                      <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
+                      <polyline points="17 18 23 18 23 12"></polyline>
+                    </>
+                  )}
                 </svg>
-                {formatPercentage(isAdmin ? stats.crescimentoValor : crescimentosFiltrados.crescimentoValor)} este mês
+                {formatPercentage(isAdmin ? stats.crescimentoPacientes : crescimentosFiltrados.crescimentoPacientes)} este mês
               </div>
-            )}
+            </div>
+            <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
+              <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600' }}>Agendamentos</div>
+              <div className="stat-value" style={{ fontSize: '2.5rem' }}>{kpisPrincipais.totalAgendamentos}</div>
+            </div>
+            <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
+              <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600' }}>Fechamentos</div>
+              <div className="stat-value" style={{ fontSize: '2.5rem' }}>{kpisPrincipais.totalFechamentos}</div>
+            </div>
+            <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
+              <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600' }}>Valor Total</div>
+              <div className="stat-value" style={{ fontSize: '2.5rem' }}>{formatCurrency(kpisPrincipais.valorTotalFechamentos)}</div>
+              {(isAdmin ? stats.crescimentoValor : crescimentosFiltrados.crescimentoValor) > 0 && (
+                <div className="stat-change positive">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                    <polyline points="17 6 23 6 23 12"></polyline>
+                  </svg>
+                  {formatPercentage(isAdmin ? stats.crescimentoValor : crescimentosFiltrados.crescimentoValor)} este mês
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Seção Exclusiva para Clínicas */}

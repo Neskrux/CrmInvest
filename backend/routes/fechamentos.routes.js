@@ -24,6 +24,9 @@ router.put('/fechamentos/:id', authenticateUpload, upload.fields([
   { name: 'print_confirmacao', maxCount: 1 }
 ]), fechamentosController.updateFechamento);
 
+// PUT /api/fechamentos/:id/antecipacao - Atualizar somente a antecipação (clínicas/admin)
+router.put('/fechamentos/:id/antecipacao', authenticateToken, fechamentosController.updateAntecipacaoFechamento);
+
 // DELETE /api/fechamentos/:id - Excluir fechamento
 router.delete('/fechamentos/:id', authenticateToken, fechamentosController.deleteFechamento);
 

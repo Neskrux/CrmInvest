@@ -1,94 +1,275 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from './Toast';
 import config from '../config';
 import './GestaoBoletosAdmin.css';
 
+const FILTROS_PADRAO = {
+  status: '',
+  vencimento_de: '',
+  vencimento_ate: '',
+  paciente_id: '',
+  clinica_id: '',
+  gerar_boleto: '',
+  boleto_gerado: ''
+};
+
+const STATUS_OPTIONS = [
+  { value: 'pendente', label: 'Pendente', color: '#ab6400', bg: '#fef3c7' },
+  { value: 'pago', label: 'Pago', color: '#065f46', bg: '#dcfce7' },
+  { value: 'vencido', label: 'Vencido', color: '#991b1b', bg: '#fee2e2' },
+  { value: 'cancelado', label: 'Cancelado', color: '#475569', bg: '#e2e8f0' }
+];
+
+const STATUS_LOOKUP = STATUS_OPTIONS.reduce((acc, option) => {
+  acc[option.value] = option;
+  return acc;
+}, {});
+
 const GestaoBoletosAdmin = () => {
-  const { makeRequest } = useAuth();
+  const { makeRequest, user } = useAuth();
+  const location = useLocation();
   const { success: showSuccessToast, error: showErrorToast } = useToast();
+  const pacienteIdInicial = location.state?.pacienteId ? String(location.state?.pacienteId) : '';
+  const isClinicaUser = user?.tipo === 'clinica';
+  const clinicaIdAtual = user?.clinica_id ? String(user.clinica_id) : '';
   
+  const [todosBoletos, setTodosBoletos] = useState([]);
   const [boletos, setBoletos] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filtros, setFiltros] = useState({
-    status: '',
-    vencimento_de: '',
-    vencimento_ate: '',
-    paciente_id: '',
-    clinica_id: '',
-    gerar_boleto: '',
-    boleto_gerado: ''
-  });
+  const [filtros, setFiltros] = useState(FILTROS_PADRAO);
+  const [filtrosIniciaisAplicados, setFiltrosIniciaisAplicados] = useState(false);
   
   const [showImportArquivoModal, setShowImportArquivoModal] = useState(false);
   const [pacientes, setPacientes] = useState([]);
   const [loadingPacientes, setLoadingPacientes] = useState(false);
+  const [clinicas, setClinicas] = useState([]);
+  const [loadingClinicas, setLoadingClinicas] = useState(false);
   const [importArquivoData, setImportArquivoData] = useState({
     paciente_id: '',
     data_vencimento: '',
     valor: '',
     arquivo: null
   });
+  const [valorDisplay, setValorDisplay] = useState('');
   
   const [selectedBoletos, setSelectedBoletos] = useState([]);
-  const [editingBoleto, setEditingBoleto] = useState(null);
-  
-  const [paginacao, setPaginacao] = useState({
-    page: 1,
-    limit: 50,
-    total: 0,
-    totalPages: 0
-  });
 
-  // Buscar boletos
-  const buscarBoletos = async () => {
+  const aplicarFiltros = useCallback((listaBase, filtrosAplicar) => {
+    const base = Array.isArray(listaBase) ? listaBase : [];
+    const filtrosAtuais = filtrosAplicar || FILTROS_PADRAO;
+
+    const parseData = (valor) => {
+      if (!valor) return null;
+      const data = new Date(valor);
+      return Number.isNaN(data.getTime()) ? null : data;
+    };
+
+    const dataInicial = parseData(filtrosAtuais.vencimento_de);
+    const dataFinal = parseData(filtrosAtuais.vencimento_ate);
+
+    return base.filter((boleto) => {
+      const statusBoleto = (boleto.status || '').toLowerCase();
+      if (filtrosAtuais.status && statusBoleto !== filtrosAtuais.status) return false;
+
+      const dataBoleto = boleto.data_vencimento ? new Date(boleto.data_vencimento) : null;
+      if (dataInicial && (!dataBoleto || dataBoleto < dataInicial)) return false;
+      if (dataFinal && (!dataBoleto || dataBoleto > dataFinal)) return false;
+
+      if (filtrosAtuais.paciente_id && String(boleto.paciente_id) !== filtrosAtuais.paciente_id) return false;
+      if (filtrosAtuais.clinica_id && String(boleto.clinica_id) !== filtrosAtuais.clinica_id) return false;
+
+      if (filtrosAtuais.gerar_boleto) {
+        const filtroGerar = filtrosAtuais.gerar_boleto === 'true';
+        const valorAtual = Boolean(boleto.gerar_boleto || boleto.deve_gerar_hoje);
+        if (valorAtual !== filtroGerar) return false;
+      }
+
+      if (filtrosAtuais.boleto_gerado) {
+        const filtroGerado = filtrosAtuais.boleto_gerado === 'true';
+        const valorAtual = Boolean(boleto.boleto_gerado);
+        if (valorAtual !== filtroGerado) return false;
+      }
+
+      return true;
+    });
+  }, []);
+
+  const atualizarFiltros = useCallback((patch) => {
+    setFiltros(prev => ({ ...prev, ...patch }));
+    setSelectedBoletos([]);
+  }, []);
+
+  const limparFiltros = useCallback(() => {
+    const filtrosReset = {
+      ...FILTROS_PADRAO,
+      ...(isClinicaUser && clinicaIdAtual ? { clinica_id: clinicaIdAtual } : {})
+    };
+    setFiltros(filtrosReset);
+    setSelectedBoletos([]);
+  }, [isClinicaUser, clinicaIdAtual]);
+
+  const buscarBoletos = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      Object.keys(filtros).forEach(key => {
-        if (filtros[key]) params.append(key, filtros[key]);
-      });
-      params.append('page', paginacao.page);
-      params.append('limit', paginacao.limit);
-      
+      params.append('page', '1');
+      params.append('limit', '500');
+
       const response = await makeRequest(`/boletos-gestao?${params.toString()}`);
       const data = await response.json();
-      
-      setBoletos(data.boletos || []);
-      setPaginacao(prev => ({
-        ...prev,
-        total: data.total,
-        totalPages: data.totalPages
-      }));
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Erro ao buscar boletos');
+      }
+
+      let listaBoletos = Array.isArray(data?.boletos) ? data.boletos : [];
+      if (isClinicaUser && clinicaIdAtual) {
+        listaBoletos = listaBoletos.filter(boleto => String(boleto?.clinica_id) === clinicaIdAtual);
+      }
+
+      setTodosBoletos(listaBoletos);
+      setSelectedBoletos([]);
     } catch (error) {
       console.error('Erro ao buscar boletos:', error);
       showErrorToast('Erro ao buscar boletos');
     } finally {
       setLoading(false);
     }
-  };
+  }, [makeRequest, isClinicaUser, clinicaIdAtual, showErrorToast]);
 
   useEffect(() => {
+    if (!filtrosIniciaisAplicados) return;
     buscarBoletos();
-    buscarPacientes();
-  }, [paginacao.page, filtros]);
+  }, [buscarBoletos, filtrosIniciaisAplicados]);
 
-  // Buscar lista de pacientes
-  const buscarPacientes = async () => {
+  const buscarPacientes = useCallback(async () => {
     setLoadingPacientes(true);
     try {
       const response = await makeRequest('/pacientes');
       const data = await response.json();
-      
+
       if (response.ok) {
-        setPacientes(data || []);
+        const lista = Array.isArray(data) ? data : [];
+        const filtrada = isClinicaUser && clinicaIdAtual
+          ? lista.filter(paciente => String(paciente?.clinica_id) === clinicaIdAtual)
+          : lista;
+        setPacientes(filtrada);
       }
     } catch (error) {
       console.error('Erro ao buscar pacientes:', error);
     } finally {
       setLoadingPacientes(false);
     }
-  };
+  }, [makeRequest, isClinicaUser, clinicaIdAtual]);
+
+  const buscarClinicas = useCallback(async () => {
+    if (isClinicaUser) return;
+    setLoadingClinicas(true);
+    try {
+      const response = await makeRequest('/clinicas');
+      const data = await response.json();
+
+      if (response.ok) {
+        setClinicas(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar clínicas:', error);
+    } finally {
+      setLoadingClinicas(false);
+    }
+  }, [makeRequest, isClinicaUser]);
+
+  useEffect(() => {
+    if (!filtrosIniciaisAplicados) return;
+    buscarPacientes();
+    if (!isClinicaUser) {
+      buscarClinicas();
+    }
+  }, [buscarPacientes, buscarClinicas, filtrosIniciaisAplicados, isClinicaUser]);
+
+  useEffect(() => {
+    if (filtrosIniciaisAplicados) return;
+    const filtrosBase = {
+      ...FILTROS_PADRAO,
+      ...(isClinicaUser && clinicaIdAtual ? { clinica_id: clinicaIdAtual } : {}),
+      ...(pacienteIdInicial ? { paciente_id: pacienteIdInicial } : {})
+    };
+    setFiltros(filtrosBase);
+    setFiltrosIniciaisAplicados(true);
+  }, [isClinicaUser, clinicaIdAtual, pacienteIdInicial, filtrosIniciaisAplicados]);
+
+  const pacientesMap = useMemo(() => {
+    const map = {};
+    pacientes.forEach(paciente => {
+      map[String(paciente.id)] = paciente.nome || '';
+    });
+    return map;
+  }, [pacientes]);
+
+  const clinicasMap = useMemo(() => {
+    const map = {};
+    clinicas.forEach(clinica => {
+      map[String(clinica.id)] = clinica.nome || '';
+    });
+    if (isClinicaUser && clinicaIdAtual && user?.nome) {
+      map[clinicaIdAtual] = user.nome;
+    }
+    return map;
+  }, [clinicas, isClinicaUser, clinicaIdAtual, user?.nome]);
+
+  const enriquecerBoletos = useCallback((lista) => {
+    return (Array.isArray(lista) ? lista : []).map(boleto => {
+      const pacienteNome = boleto.paciente_nome || pacientesMap[String(boleto.paciente_id)] || '—';
+      const clinicaNome = boleto.clinica_nome || clinicasMap[String(boleto.clinica_id)] || (isClinicaUser && user?.nome ? user.nome : '—');
+      return {
+        ...boleto,
+        paciente_nome: pacienteNome,
+        clinica_nome: clinicaNome
+      };
+    });
+  }, [pacientesMap, clinicasMap, isClinicaUser, user?.nome]);
+
+  useEffect(() => {
+    const enriquecidos = enriquecerBoletos(todosBoletos);
+    setBoletos(aplicarFiltros(enriquecidos, filtros));
+  }, [todosBoletos, filtros, aplicarFiltros, enriquecerBoletos]);
+
+  useEffect(() => {
+    if (!importArquivoData.valor) {
+      setValorDisplay('');
+      return;
+    }
+    const numero = parseFloat(importArquivoData.valor);
+    if (Number.isNaN(numero)) {
+      setValorDisplay('');
+      return;
+    }
+    setValorDisplay(
+      numero.toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      })
+    );
+  }, [importArquivoData.valor]);
+
+  const handleValorInputChange = useCallback((value) => {
+    const digitsOnly = value.replace(/\D/g, '');
+    if (!digitsOnly) {
+      setValorDisplay('');
+      setImportArquivoData(prev => ({ ...prev, valor: '' }));
+      return;
+    }
+    const numero = parseInt(digitsOnly, 10) / 100;
+    setValorDisplay(
+      numero.toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      })
+    );
+    setImportArquivoData(prev => ({ ...prev, valor: numero.toFixed(2) }));
+  }, []);
 
   // Importar boleto com arquivo PDF
   const handleImportarBoletoArquivo = async () => {
@@ -140,6 +321,7 @@ const GestaoBoletosAdmin = () => {
           valor: '',
           arquivo: null
         });
+        setValorDisplay('');
         buscarBoletos();
       } else {
         showErrorToast(data.error || 'Erro ao importar boleto');
@@ -240,26 +422,24 @@ const GestaoBoletosAdmin = () => {
     }).format(valor);
   };
 
-  // Calcular status visual
-  const getStatusColor = (boleto) => {
-    if (boleto.status === 'pago') return '#10b981';
-    if (boleto.status === 'cancelado') return '#6b7280';
-    if (new Date(boleto.data_vencimento) < new Date() && boleto.status !== 'pago') return '#ef4444';
-    return '#3b82f6';
-  };
+  const podeGerenciar = !isClinicaUser;
+  const colunasTotais = podeGerenciar ? 9 : 8;
+  const statusSelectOptions = useMemo(() => STATUS_OPTIONS, []);
 
   return (
     <div className="gestao-boletos-container">
       <div className="header">
         <h1>Gestão de Boletos</h1>
-        <div className="header-actions">
-          <button 
-            className="btn btn-primary"
-            onClick={() => setShowImportArquivoModal(true)}
-          >
-            Importar Boleto
-          </button>
-        </div>
+        {podeGerenciar && (
+          <div className="header-actions">
+            <button 
+              className="btn btn-primary"
+              onClick={() => setShowImportArquivoModal(true)}
+            >
+              Importar Boleto
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Filtros */}
@@ -268,13 +448,14 @@ const GestaoBoletosAdmin = () => {
           <label>Status</label>
           <select 
             value={filtros.status}
-            onChange={(e) => setFiltros({...filtros, status: e.target.value})}
+            onChange={(e) => atualizarFiltros({ status: e.target.value })}
           >
             <option value="">Todos</option>
-            <option value="pendente">Pendente</option>
-            <option value="pago">Pago</option>
-            <option value="vencido">Vencido</option>
-            <option value="cancelado">Cancelado</option>
+            {statusSelectOptions.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -283,7 +464,7 @@ const GestaoBoletosAdmin = () => {
           <input 
             type="date"
             value={filtros.vencimento_de}
-            onChange={(e) => setFiltros({...filtros, vencimento_de: e.target.value})}
+            onChange={(e) => atualizarFiltros({ vencimento_de: e.target.value })}
           />
         </div>
 
@@ -292,7 +473,7 @@ const GestaoBoletosAdmin = () => {
           <input 
             type="date"
             value={filtros.vencimento_ate}
-            onChange={(e) => setFiltros({...filtros, vencimento_ate: e.target.value})}
+            onChange={(e) => atualizarFiltros({ vencimento_ate: e.target.value })}
           />
         </div>
 
@@ -300,7 +481,7 @@ const GestaoBoletosAdmin = () => {
           <label>Gerar Boleto</label>
           <select 
             value={filtros.gerar_boleto}
-            onChange={(e) => setFiltros({...filtros, gerar_boleto: e.target.value})}
+            onChange={(e) => atualizarFiltros({ gerar_boleto: e.target.value })}
           >
             <option value="">Todos</option>
             <option value="true">Sim</option>
@@ -312,7 +493,7 @@ const GestaoBoletosAdmin = () => {
           <label>Boleto Gerado</label>
           <select 
             value={filtros.boleto_gerado}
-            onChange={(e) => setFiltros({...filtros, boleto_gerado: e.target.value})}
+            onChange={(e) => atualizarFiltros({ boleto_gerado: e.target.value })}
           >
             <option value="">Todos</option>
             <option value="true">Sim</option>
@@ -320,24 +501,52 @@ const GestaoBoletosAdmin = () => {
           </select>
         </div>
 
-        <button 
-          className="btn btn-secondary"
-          onClick={() => setFiltros({
-            status: '',
-            vencimento_de: '',
-            vencimento_ate: '',
-            paciente_id: '',
-            clinica_id: '',
-            gerar_boleto: '',
-            boleto_gerado: ''
-          })}
-        >
-          Limpar Filtros
-        </button>
+        <div className="filtro-group filtro-paciente">
+          <label>Paciente</label>
+          <select 
+            value={filtros.paciente_id}
+            onChange={(e) => atualizarFiltros({ paciente_id: e.target.value })}
+            disabled={loadingPacientes}
+          >
+            <option value="">Todos</option>
+            {pacientes.map((paciente) => (
+              <option key={paciente.id} value={paciente.id}>
+                {paciente.nome} {paciente.telefone ? `- ${paciente.telefone}` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {!isClinicaUser && (
+          <div className="filtro-group filtro-clinica">
+            <label>Clínica</label>
+            <select 
+              value={filtros.clinica_id}
+              onChange={(e) => atualizarFiltros({ clinica_id: e.target.value })}
+              disabled={loadingClinicas}
+            >
+              <option value="">Todas</option>
+              {clinicas.map((clinica) => (
+                <option key={clinica.id} value={clinica.id}>
+                  {clinica.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div className="filtro-actions">
+          <button 
+            className="btn btn-secondary"
+            onClick={limparFiltros}
+          >
+            Limpar Filtros
+          </button>
+        </div>
       </div>
 
       {/* Ações em lote */}
-      {selectedBoletos.length > 0 && (
+      {podeGerenciar && selectedBoletos.length > 0 && (
         <div className="acoes-lote">
           <span>{selectedBoletos.length} boleto(s) selecionado(s)</span>
           <button 
@@ -369,19 +578,21 @@ const GestaoBoletosAdmin = () => {
           <table className="tabela-boletos">
             <thead>
               <tr>
-                <th>
-                  <input 
-                    type="checkbox"
-                    checked={selectedBoletos.length === boletos.length && boletos.length > 0}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedBoletos(boletos.map(b => b.id));
-                      } else {
-                        setSelectedBoletos([]);
-                      }
-                    }}
-                  />
-                </th>
+                {podeGerenciar && (
+                  <th>
+                    <input 
+                      type="checkbox"
+                      checked={selectedBoletos.length === boletos.length && boletos.length > 0}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedBoletos(boletos.map(b => b.id));
+                        } else {
+                          setSelectedBoletos([]);
+                        }
+                      }}
+                    />
+                  </th>
+                )}
                 <th>Paciente</th>
                 <th>Clínica</th>
                 <th>Parcela</th>
@@ -389,30 +600,40 @@ const GestaoBoletosAdmin = () => {
                 <th>Vencimento</th>
                 <th>Status</th>
                 <th>Boleto Gerado</th>
-                <th>Nosso Número</th>
                 <th>Ações</th>
               </tr>
             </thead>
             <tbody>
               {boletos.map(boleto => (
                 <tr key={boleto.id}>
+                  {podeGerenciar && (
+                    <td>
+                      <input 
+                        type="checkbox"
+                        checked={selectedBoletos.includes(boleto.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedBoletos([...selectedBoletos, boleto.id]);
+                          } else {
+                            setSelectedBoletos(selectedBoletos.filter(id => id !== boleto.id));
+                          }
+                        }}
+                      />
+                    </td>
+                  )}
+                  <td>{boleto.paciente_nome || '—'}</td>
+                  <td>{boleto.clinica_nome || '—'}</td>
                   <td>
-                    <input 
-                      type="checkbox"
-                      checked={selectedBoletos.includes(boleto.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedBoletos([...selectedBoletos, boleto.id]);
-                        } else {
-                          setSelectedBoletos(selectedBoletos.filter(id => id !== boleto.id));
-                        }
-                      }}
-                    />
+                    {(() => {
+                      const parcelaNumero = boleto.numero_parcela || boleto.parcela_atual;
+                      const totalParcelas = boleto.total_parcelas ?? boleto.qtd_parcelas ?? boleto.numero_parcelas_total ?? boleto.parcelas_totais;
+                      if (!parcelaNumero && !totalParcelas) return '—';
+                      if (parcelaNumero && totalParcelas) return `${parcelaNumero}/${totalParcelas}`;
+                      if (parcelaNumero) return `Parcela ${parcelaNumero}`;
+                      return `Total ${totalParcelas}`;
+                    })()}
                   </td>
-                  <td>{boleto.paciente_nome}</td>
-                  <td>{boleto.clinica_nome}</td>
-                  <td>{boleto.numero_parcela}/{boleto.total_parcelas || '-'}</td>
-                  <td>{formatarValor(boleto.valor)}</td>
+                  <td>{formatarValor(boleto.valor || boleto.valor_parcela)}</td>
                   <td>
                     {formatarData(boleto.data_vencimento)}
                     {boleto.dias_ate_vencimento && (
@@ -422,12 +643,16 @@ const GestaoBoletosAdmin = () => {
                     )}
                   </td>
                   <td>
-                    <span 
-                      className="status-badge"
-                      style={{ backgroundColor: getStatusColor(boleto) }}
-                    >
-                      {boleto.status_display}
-                    </span>
+                    {(() => {
+                      const statusKey = (boleto.status || '').toLowerCase();
+                      const info = STATUS_LOOKUP[statusKey] || { label: boleto.status_display || 'Indefinido', color: '#334155', bg: '#e2e8f0' };
+                      const label = boleto.status_display || info.label;
+                      return (
+                        <span className="status-pill" style={{ backgroundColor: info.bg, color: info.color }}>
+                          {label}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td>
                     {boleto.boleto_gerado ? (
@@ -438,20 +663,31 @@ const GestaoBoletosAdmin = () => {
                       <span className="badge-nao">Não</span>
                     )}
                   </td>
-                  <td>{boleto.nosso_numero || '-'}</td>
                   <td>
                     <div className="acoes">
-                      <select 
-                        value=""
-                        onChange={(e) => handleAtualizarStatus(boleto.id, e.target.value)}
-                        disabled={boleto.status === 'pago' || boleto.status === 'cancelado'}
-                      >
-                        <option value="">Alterar Status</option>
-                        <option value="pendente">Pendente</option>
-                        <option value="pago">Pago</option>
-                        <option value="vencido">Vencido</option>
-                        <option value="cancelado">Cancelado</option>
-                      </select>
+                      {podeGerenciar && (
+                        <div className="acoes-status-group">
+                          {statusSelectOptions.map(option => {
+                            const ativo = option.value === (boleto.status || '').toLowerCase();
+                            return (
+                              <button
+                                key={option.value}
+                                type="button"
+                                className={`acao-status-btn ${ativo ? 'ativo' : ''}`}
+                                style={{
+                                  borderColor: option.color,
+                                  color: ativo ? '#ffffff' : option.color,
+                                  backgroundColor: ativo ? option.color : 'transparent'
+                                }}
+                                disabled={ativo || loading}
+                                onClick={() => handleAtualizarStatus(boleto.id, option.value)}
+                              >
+                                {option.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                       
                       {boleto.url_boleto && (
                         <a 
@@ -472,27 +708,8 @@ const GestaoBoletosAdmin = () => {
         )}
       </div>
 
-      {/* Paginação */}
-      <div className="paginacao">
-        <button 
-          onClick={() => setPaginacao({...paginacao, page: paginacao.page - 1})}
-          disabled={paginacao.page === 1}
-        >
-          Anterior
-        </button>
-        <span>
-          Página {paginacao.page} de {paginacao.totalPages || 1} ({paginacao.total} registros)
-        </span>
-        <button 
-          onClick={() => setPaginacao({...paginacao, page: paginacao.page + 1})}
-          disabled={paginacao.page >= paginacao.totalPages}
-        >
-          Próxima
-        </button>
-      </div>
-
       {/* Modal de importação de boleto com arquivo */}
-      {showImportArquivoModal && (
+      {podeGerenciar && showImportArquivoModal && (
         <div className="modal-overlay">
           <div className="modal">
             <h2>Importar Boleto</h2>
@@ -531,15 +748,37 @@ const GestaoBoletosAdmin = () => {
             
             <div className="form-group">
               <label>Valor (R$) *</label>
-              <input 
-                type="number"
-                step="0.01"
-                min="0"
-                value={importArquivoData.valor}
-                onChange={(e) => setImportArquivoData({...importArquivoData, valor: e.target.value})}
-                placeholder="0.00"
-                required
-              />
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                backgroundColor: '#f9fafb'
+              }}>
+                <input 
+                  type="text"
+                  inputMode="decimal"
+                  value={valorDisplay}
+                  onChange={(e) => handleValorInputChange(e.target.value)}
+                  placeholder="0,00"
+                  style={{
+                    flex: 1,
+                    border: 'none',
+                    padding: '0.75rem',
+                    fontSize: '1rem',
+                    background: 'transparent',
+                    color: '#111827'
+                  }}
+                  onFocus={(e) => {
+                    e.target.parentElement.style.boxShadow = '0 0 0 3px rgba(14, 165, 233, 0.25)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.parentElement.style.boxShadow = 'none';
+                  }}
+                  required
+                />
+              </div>
             </div>
             
             <div className="form-group">
@@ -575,6 +814,7 @@ const GestaoBoletosAdmin = () => {
                     valor: '',
                     arquivo: null
                   });
+                  setValorDisplay('');
                 }}
               >
                 Cancelar
