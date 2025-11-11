@@ -15,7 +15,13 @@ const createDefaultKpisFinanceiros = () => ({
   valorVencido: 0,
   inadimplencia: 0,
   totalEmitido: 0,
-  totalBoletos: 0
+  totalBoletos: 0,
+  faixasAtraso: {
+    faixa0a15: { label: '0-15 dias', valor: 0, quantidade: 0 },
+    faixa30a60: { label: '30-60 dias', valor: 0, quantidade: 0 },
+    faixa90mais: { label: '90+ dias', valor: 0, quantidade: 0 },
+    faixaOutros: { label: 'Outros', valor: 0, quantidade: 0 }
+  }
 });
 
 const parseValorNumerico = (valor) => {
@@ -71,11 +77,8 @@ const normalizarStatusFinanceiroBoleto = (boleto, hojeRef = new Date()) => {
 };
 
 const calcularIndicadoresFinanceirosClinica = (boletosLista = []) => {
-  let valorPago = 0;
-  let valorPendente = 0;
-  let valorVencido = 0;
-  let totalEmitido = 0;
-  let totalBoletos = 0;
+  const resultado = createDefaultKpisFinanceiros();
+  let { valorPago, valorPendente, valorVencido, totalEmitido, totalBoletos, faixasAtraso } = resultado;
 
   const idsProcessados = new Set();
   const hoje = new Date();
@@ -103,6 +106,30 @@ const calcularIndicadoresFinanceirosClinica = (boletosLista = []) => {
       valorPago += valorPagoBoleto > 0 ? valorPagoBoleto : referencia;
     } else if (status === 'vencido' || status === 'em atraso' || status === 'atrasado') {
       valorVencido += referencia;
+
+      let faixaSelecionada = 'faixaOutros';
+      const dataVencStr = boleto.data_vencimento || boleto.vencimento;
+      if (dataVencStr) {
+        const dataVenc = new Date(dataVencStr);
+        if (!Number.isNaN(dataVenc.getTime())) {
+          dataVenc.setHours(0, 0, 0, 0);
+          const diffMs = hoje.getTime() - dataVenc.getTime();
+          const diffDias = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+
+          if (diffDias <= 15) {
+            faixaSelecionada = 'faixa0a15';
+          } else if (diffDias >= 30 && diffDias <= 60) {
+            faixaSelecionada = 'faixa30a60';
+          } else if (diffDias >= 90) {
+            faixaSelecionada = 'faixa90mais';
+          }
+        }
+      }
+
+      if (faixasAtraso[faixaSelecionada]) {
+        faixasAtraso[faixaSelecionada].valor += referencia;
+        faixasAtraso[faixaSelecionada].quantidade += 1;
+      }
     } else {
       valorPendente += referencia;
     }
@@ -111,12 +138,14 @@ const calcularIndicadoresFinanceirosClinica = (boletosLista = []) => {
   const inadimplencia = totalEmitido > 0 ? (valorVencido / totalEmitido) * 100 : 0;
 
   return {
+    ...resultado,
     valorPago,
     valorPendente,
     valorVencido,
     inadimplencia,
     totalEmitido,
-    totalBoletos
+    totalBoletos,
+    faixasAtraso
   };
 };
 
@@ -2552,6 +2581,37 @@ const Dashboard = () => {
               </div>
               <div className="stat-subtitle" style={{ color: '#b91c1c', fontSize: '0.8rem', fontWeight: '500' }}>
                 Boletos vencidos
+              </div>
+              <div style={{ 
+                marginTop: '1rem', 
+                padding: '0.75rem', 
+                borderRadius: '10px',
+                background: 'rgba(248, 113, 113, 0.12)',
+                border: '1px solid rgba(248, 113, 113, 0.35)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem'
+              }}>
+                {['faixa0a15', 'faixa30a60', 'faixa90mais'].map((faixaKey) => {
+                  const faixa = kpisFinanceirosClinica.faixasAtraso?.[faixaKey];
+                  if (!faixa) return null;
+                  return (
+                    <div key={faixaKey} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#7f1d1d' }}>
+                      <span style={{ fontWeight: '600' }}>{faixa.label}</span>
+                      <span style={{ fontWeight: '600' }}>
+                        {formatCurrency(faixa.valor)}{' '}
+                        <span style={{ fontWeight: '400', color: '#9f1239' }}>
+                          ({faixa.quantidade} {faixa.quantidade === 1 ? 'boleto' : 'boletos'})
+                        </span>
+                      </span>
+                    </div>
+                  );
+                })}
+                {(kpisFinanceirosClinica.faixasAtraso?.faixaOutros?.valor || 0) > 0 && (
+                  <div style={{ fontSize: '0.7rem', color: '#9f1239', lineHeight: 1.4 }}>
+                    <strong>Observação:</strong> valores fora das faixas solicitadas (16-29 e 61-89 dias) totalizam {formatCurrency(kpisFinanceirosClinica.faixasAtraso.faixaOutros.valor)}.
+                  </div>
+                )}
               </div>
             </div>
             <div className="stat-card" style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', border: '1px solid #fbbf24' }}>
