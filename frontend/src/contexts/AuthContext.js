@@ -240,21 +240,6 @@ export const AuthProvider = ({ children }) => {
         return;
       }
       
-      // Tentar fazer parse do usuário se existir
-      if (savedUser) {
-        const parsedUser = JSON.parse(savedUser);
-        
-        // VALIDAÇÃO CRÍTICA: Verificar se o email do usuário salvo bate com o email de login
-        // (apenas se login_email existir - para compatibilidade com sessões antigas)
-        if (loginEmail && parsedUser.email) {
-          if (parsedUser.email.toLowerCase() !== loginEmail.toLowerCase()) {
-            clearAllData();
-            setLoading(false);
-            return;
-          }
-        }
-      }
-      
     } catch (error) {
       clearAllData();
       setLoading(false);
