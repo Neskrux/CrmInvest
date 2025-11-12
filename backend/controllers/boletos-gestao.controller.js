@@ -806,9 +806,13 @@ const importarBoletosCaixa = async (req, res) => {
 
       // Determinar status baseado na situação do boleto
       let status = 'pendente';
-      if (boletoCaixa.situacao === 'PAGO' || boletoCaixa.situacao === 'LIQUIDADO') {
+      const situacaoUpper = (boletoCaixa.situacao || '').toUpperCase();
+      if (situacaoUpper === 'PAGO' || 
+          situacaoUpper === 'LIQUIDADO' || 
+          situacaoUpper.includes('PAGO') || 
+          situacaoUpper === 'TITULO JA PAGO NO DIA') {
         status = 'pago';
-      } else if (boletoCaixa.situacao === 'CANCELADO') {
+      } else if (situacaoUpper === 'CANCELADO') {
         status = 'cancelado';
       } else {
         // Verificar se está vencido

@@ -2,6 +2,106 @@ const { supabase, supabaseAdmin } = require('../config/database');
 const caixaBoletoService = require('../services/caixa-boleto.service');
 
 /**
+ * Criar registro em boletos_gestao quando um boleto é criado em boletos_caixa
+ * @param {Object} boletoCaixa - Boleto criado em boletos_caixa
+ * @param {Object} fechamento - Dados do fechamento
+ * @param {Number} parcelaNumero - Número da parcela (padrão: 1)
+ * @param {String} urlBoletoPublica - URL pública do boleto
+ * @param {String} numeroDocumento - Número do documento
+ */
+async function criarBoletoGestao(boletoCaixa, fechamento, parcelaNumero = 1, urlBoletoPublica = null, numeroDocumento = null) {
+  try {
+    // Verificar se já existe em boletos_gestao
+    const { data: boletoGestaoExistente } = await supabaseAdmin
+      .from('boletos_gestao')
+      .select('id')
+      .eq('boleto_caixa_id', boletoCaixa.id)
+      .maybeSingle();
+    
+    if (boletoGestaoExistente) {
+      console.log(`ℹ️ Boleto já existe em boletos_gestao (id: ${boletoGestaoExistente.id})`);
+      return boletoGestaoExistente;
+    }
+
+    // Buscar dados do fechamento para obter clinica_id
+    const { data: fechamentoCompleto, error: fechamentoError } = await supabaseAdmin
+      .from('fechamentos')
+      .select('clinica_id, empresa_id')
+      .eq('id', fechamento.id)
+      .single();
+    
+    if (fechamentoError || !fechamentoCompleto) {
+      console.warn(`⚠️ Não foi possível obter dados do fechamento ${fechamento.id} para criar em boletos_gestao`);
+      return null;
+    }
+
+    // Determinar status baseado na situação do boleto
+    let status = 'pendente';
+    const situacaoUpper = (boletoCaixa.situacao || '').toUpperCase();
+    if (situacaoUpper === 'PAGO' || 
+        situacaoUpper === 'LIQUIDADO' || 
+        situacaoUpper.includes('PAGO') || 
+        situacaoUpper === 'TITULO JA PAGO NO DIA') {
+      status = 'pago';
+    } else if (situacaoUpper === 'CANCELADO') {
+      status = 'cancelado';
+    } else {
+      // Verificar se está vencido
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const vencimento = boletoCaixa.data_vencimento ? new Date(boletoCaixa.data_vencimento) : null;
+      if (vencimento) {
+        vencimento.setHours(0, 0, 0, 0);
+        if (vencimento < hoje && status === 'pendente') {
+          status = 'vencido';
+        }
+      }
+    }
+
+    // Criar registro em boletos_gestao
+    const { data: boletoGestaoCriado, error: gestaoError } = await supabaseAdmin
+      .from('boletos_gestao')
+      .insert([{
+        fechamento_id: fechamento.id,
+        paciente_id: boletoCaixa.paciente_id,
+        clinica_id: fechamentoCompleto.clinica_id,
+        empresa_id: fechamentoCompleto.empresa_id,
+        numero_parcela: parcelaNumero,
+        valor: parseFloat(boletoCaixa.valor) || 0,
+        data_vencimento: boletoCaixa.data_vencimento,
+        status: status,
+        boleto_gerado: true,
+        data_geracao_boleto: boletoCaixa.sincronizado_em || boletoCaixa.created_at || new Date().toISOString(),
+        gerar_boleto: false,
+        dias_antes_vencimento: 20,
+        boleto_caixa_id: boletoCaixa.id,
+        nosso_numero: boletoCaixa.nosso_numero,
+        numero_documento: numeroDocumento || boletoCaixa.numero_documento,
+        linha_digitavel: boletoCaixa.linha_digitavel,
+        codigo_barras: boletoCaixa.codigo_barras,
+        url_boleto: urlBoletoPublica || boletoCaixa.url,
+        valor_pago: boletoCaixa.valor_pago || null,
+        data_pagamento: boletoCaixa.data_hora_pagamento 
+          ? boletoCaixa.data_hora_pagamento.split(' ')[0] // Extrair apenas a data (YYYY-MM-DD)
+          : null
+      }])
+      .select()
+      .single();
+    
+    if (gestaoError) {
+      console.error(`⚠️ Erro ao criar em boletos_gestao:`, gestaoError);
+      return null;
+    }
+    
+    console.log(`✅ Boleto também criado em boletos_gestao (id: ${boletoGestaoCriado.id})`);
+    return boletoGestaoCriado;
+  } catch (error) {
+    console.error(`❌ Erro ao criar em boletos_gestao:`, error);
+    return null;
+  }
+}
+
+/**
  * Criar boletos na Caixa para um fechamento
  * @param {Object} fechamento - Dados do fechamento criado
  * @param {Object} paciente - Dados do paciente
@@ -95,6 +195,9 @@ async function criarBoletosCaixa(fechamento, paciente, idBeneficiario, cnpjBenef
           // Log detalhado para debug
           console.log(`📊 [${i + 1}/${fechamento.numero_parcelas}] Boleto criado na API Caixa:`);
           console.log(`   - nosso_numero: ${resultadoBoleto.nosso_numero}`);
+          console.log(`   - nosso_numero (tipo): ${typeof resultadoBoleto.nosso_numero}`);
+          console.log(`   - nosso_numero (valor exato):`, resultadoBoleto.nosso_numero);
+          console.log(`   - nosso_numero (string): "${String(resultadoBoleto.nosso_numero)}"`);
           console.log(`   - numero_documento: ${numeroDocumento}`);
           console.log(`   - valor: ${fechamento.valor_parcela}`);
 
@@ -118,6 +221,8 @@ async function criarBoletosCaixa(fechamento, paciente, idBeneficiario, cnpjBenef
 
           if (boletoExistente && !erroPorDoc) {
             console.log(`⚠️ [${i + 1}/${fechamento.numero_parcelas}] Boleto já existe no banco por numero_documento: ${numeroDocumento} (id: ${boletoExistente.id}, nosso_numero: ${boletoExistente.nosso_numero})`);
+            // Garantir que também existe em boletos_gestao
+            await criarBoletoGestao(boletoExistente, fechamento, i + 1, urlBoletoPublica, numeroDocumento);
             // Adicionar ao array de retorno mesmo que já exista
             boletosCriados.push(boletoExistente);
             sucessos++;
@@ -129,6 +234,12 @@ async function criarBoletosCaixa(fechamento, paciente, idBeneficiario, cnpjBenef
           // (a API da Caixa Sandbox às vezes retorna nosso_numero duplicados)
 
           // Salvar boleto no banco
+          console.log(`💾 [${i + 1}/${fechamento.numero_parcelas}] Salvando boleto no banco:`);
+          console.log(`   - nosso_numero a ser salvo: ${resultadoBoleto.nosso_numero}`);
+          console.log(`   - nosso_numero (tipo): ${typeof resultadoBoleto.nosso_numero}`);
+          console.log(`   - nosso_numero (valor exato):`, resultadoBoleto.nosso_numero);
+          console.log(`   - nosso_numero (string): "${String(resultadoBoleto.nosso_numero)}"`);
+          
           const { data: boletoSalvo, error: boletoError } = await supabaseAdmin
             .from('boletos_caixa')
             .insert([{
@@ -171,6 +282,8 @@ async function criarBoletosCaixa(fechamento, paciente, idBeneficiario, cnpjBenef
               if (boletoPorDoc) {
                 // Boleto existe pelo numero_documento correto - usar ele
                 console.log(`✅ [${i + 1}/${fechamento.numero_parcelas}] Boleto encontrado por numero_documento: ${numeroDocumento} (id: ${boletoPorDoc.id})`);
+                // Garantir que também existe em boletos_gestao
+                await criarBoletoGestao(boletoPorDoc, fechamento, i + 1, urlBoletoPublica, numeroDocumento);
                 boletosCriados.push(boletoPorDoc);
                 sucessos++;
                 continue;
@@ -212,6 +325,8 @@ async function criarBoletosCaixa(fechamento, paciente, idBeneficiario, cnpjBenef
                 
                 if (boletoSemNossoNumero && !erroSemNossoNumero) {
                   console.log(`✅ [${i + 1}/${fechamento.numero_parcelas}] Boleto criado SEM nosso_numero (id: ${boletoSemNossoNumero.id}, numero_documento: ${numeroDocumento})`);
+                  // Criar também em boletos_gestao
+                  await criarBoletoGestao(boletoSemNossoNumero, fechamento, i + 1, urlBoletoPublica, numeroDocumento);
                   boletosCriados.push(boletoSemNossoNumero);
                   sucessos++;
                   continue;
@@ -230,9 +345,20 @@ async function criarBoletosCaixa(fechamento, paciente, idBeneficiario, cnpjBenef
           }
 
           if (boletoSalvo) {
+            console.log(`✅ [${i + 1}/${fechamento.numero_parcelas}] Boleto salvo no banco:`);
+            console.log(`   - nosso_numero salvo: ${boletoSalvo.nosso_numero}`);
+            console.log(`   - nosso_numero salvo (tipo): ${typeof boletoSalvo.nosso_numero}`);
+            console.log(`   - nosso_numero salvo (valor exato):`, boletoSalvo.nosso_numero);
+            console.log(`   - nosso_numero salvo (string): "${String(boletoSalvo.nosso_numero)}"`);
+            console.log(`   - Comparação: API retornou "${resultadoBoleto.nosso_numero}" vs Banco salvou "${boletoSalvo.nosso_numero}"`);
+            console.log(`   - São iguais? ${String(resultadoBoleto.nosso_numero) === String(boletoSalvo.nosso_numero)}`);
+            console.log(`   - ID do boleto: ${boletoSalvo.id}`);
+            
+            // Criar também em boletos_gestao
+            await criarBoletoGestao(boletoSalvo, fechamento, i + 1, urlBoletoPublica, numeroDocumento);
+            
             boletosCriados.push(boletoSalvo);
             sucessos++;
-            console.log(`✅ [${i + 1}/${fechamento.numero_parcelas}] Boleto salvo no banco (nosso_numero: ${resultadoBoleto.nosso_numero}, id: ${boletoSalvo.id})`);
           } else {
             console.warn(`⚠️ [${i + 1}/${fechamento.numero_parcelas}] Boleto criado na API mas não foi retornado pelo insert. Tentando buscar...`);
             
@@ -246,6 +372,8 @@ async function criarBoletosCaixa(fechamento, paciente, idBeneficiario, cnpjBenef
             
             if (boletoBuscado) {
               console.log(`✅ [${i + 1}/${fechamento.numero_parcelas}] Boleto encontrado após insert (id: ${boletoBuscado.id})`);
+              // Criar também em boletos_gestao
+              await criarBoletoGestao(boletoBuscado, fechamento, i + 1, urlBoletoPublica, numeroDocumento);
               boletosCriados.push(boletoBuscado);
               sucessos++;
             } else {
@@ -345,7 +473,19 @@ async function criarBoletosCaixa(fechamento, paciente, idBeneficiario, cnpjBenef
           console.log(`🔄 URL normalizada: ${resultadoBoleto.url} -> ${urlBoletoPublica}`);
         }
 
+        // Log detalhado para boleto único
+        console.log(`📊 Boleto único criado na API Caixa:`);
+        console.log(`   - nosso_numero: ${resultadoBoleto.nosso_numero}`);
+        console.log(`   - nosso_numero (tipo): ${typeof resultadoBoleto.nosso_numero}`);
+        console.log(`   - nosso_numero (valor exato):`, resultadoBoleto.nosso_numero);
+        console.log(`   - nosso_numero (string): "${String(resultadoBoleto.nosso_numero)}"`);
+
         // Salvar boleto no banco
+        console.log(`💾 Salvando boleto único no banco:`);
+        console.log(`   - nosso_numero a ser salvo: ${resultadoBoleto.nosso_numero}`);
+        console.log(`   - nosso_numero (tipo): ${typeof resultadoBoleto.nosso_numero}`);
+        console.log(`   - nosso_numero (valor exato):`, resultadoBoleto.nosso_numero);
+        
         const { data: boletoSalvo, error: boletoError } = await supabaseAdmin
           .from('boletos_caixa')
           .insert([{
@@ -373,6 +513,20 @@ async function criarBoletosCaixa(fechamento, paciente, idBeneficiario, cnpjBenef
         if (boletoError) {
           console.error('❌ Erro ao salvar boleto:', boletoError);
           throw boletoError;
+        }
+
+        if (boletoSalvo) {
+          console.log(`✅ Boleto único salvo no banco:`);
+          console.log(`   - nosso_numero salvo: ${boletoSalvo.nosso_numero}`);
+          console.log(`   - nosso_numero salvo (tipo): ${typeof boletoSalvo.nosso_numero}`);
+          console.log(`   - nosso_numero salvo (valor exato):`, boletoSalvo.nosso_numero);
+          console.log(`   - nosso_numero salvo (string): "${String(boletoSalvo.nosso_numero)}"`);
+          console.log(`   - Comparação: API retornou "${resultadoBoleto.nosso_numero}" vs Banco salvou "${boletoSalvo.nosso_numero}"`);
+          console.log(`   - São iguais? ${String(resultadoBoleto.nosso_numero) === String(boletoSalvo.nosso_numero)}`);
+          console.log(`   - ID do boleto: ${boletoSalvo.id}`);
+          
+          // Criar também em boletos_gestao
+          await criarBoletoGestao(boletoSalvo, fechamento, 1, urlBoletoPublica, numeroDocumento);
         }
 
         boletosCriados.push(boletoSalvo);

@@ -192,9 +192,13 @@ const sincronizarStatusBoleto = async (req, res) => {
 
       // Determinar status baseado na situação retornada pela Caixa
       let status = 'pendente';
-      if (dadosBoleto.situacao === 'PAGO' || dadosBoleto.situacao === 'LIQUIDADO') {
+      const situacaoUpper = (dadosBoleto.situacao || '').toUpperCase();
+      if (situacaoUpper === 'PAGO' || 
+          situacaoUpper === 'LIQUIDADO' || 
+          situacaoUpper.includes('PAGO') || 
+          situacaoUpper === 'TITULO JA PAGO NO DIA') {
         status = 'pago';
-      } else if (dadosBoleto.situacao === 'BAIXADO' || dadosBoleto.situacao === 'CANCELADO') {
+      } else if (situacaoUpper === 'BAIXADO' || situacaoUpper === 'CANCELADO') {
         status = 'cancelado';
       } else {
         // Verificar se está vencido baseado na data
@@ -211,12 +215,32 @@ const sincronizarStatusBoleto = async (req, res) => {
         }
       }
 
+      // Converter formato da data da Caixa para timestamp válido do PostgreSQL
+      // Formato da Caixa: "2025-11-12-11.43.06" -> Formato PostgreSQL: "2025-11-12 11:43:06"
+      let dataHoraPagamentoFormatada = null;
+      if (dadosBoleto.data_hora_pagamento) {
+        const dataHoraCaixa = dadosBoleto.data_hora_pagamento;
+        // Converter "2025-11-12-11.43.06" para "2025-11-12 11:43:06"
+        if (dataHoraCaixa.includes('-') && dataHoraCaixa.includes('.')) {
+          // Substituir o 4º hífen por espaço e os pontos por dois pontos
+          const partes = dataHoraCaixa.split('-');
+          if (partes.length >= 4) {
+            const data = `${partes[0]}-${partes[1]}-${partes[2]}`;
+            const hora = partes[3].replace(/\./g, ':');
+            dataHoraPagamentoFormatada = `${data} ${hora}`;
+          }
+        } else {
+          // Se já estiver em formato válido, usar como está
+          dataHoraPagamentoFormatada = dataHoraCaixa;
+        }
+      }
+
       // Atualizar boleto no banco
       const updateData = {
         situacao: dadosBoleto.situacao || boleto.situacao,
         status: status,
         valor_pago: dadosBoleto.valor_pago || boleto.valor_pago,
-        data_hora_pagamento: dadosBoleto.data_hora_pagamento || boleto.data_hora_pagamento,
+        data_hora_pagamento: dataHoraPagamentoFormatada || boleto.data_hora_pagamento,
         sincronizado_em: new Date().toISOString()
       };
 
@@ -235,6 +259,43 @@ const sincronizarStatusBoleto = async (req, res) => {
         .single();
 
       if (updateError) throw updateError;
+
+      // Atualizar também boletos_gestao se existir registro relacionado
+      const { data: boletoGestao, error: gestaoError } = await supabaseAdmin
+        .from('boletos_gestao')
+        .select('id')
+        .eq('boleto_caixa_id', boleto_id)
+        .maybeSingle();
+
+      if (boletoGestao && !gestaoError) {
+        // Extrair data de data_hora_pagamento (formato: "2025-11-12-11.20.30" -> "2025-11-12")
+        let dataPagamento = null;
+        if (boletoAtualizado.data_hora_pagamento) {
+          // Formato da Caixa: "2025-11-12-11.20.30" - extrair apenas a data (primeiros 10 caracteres)
+          const dataHoraPagamento = boletoAtualizado.data_hora_pagamento;
+          if (dataHoraPagamento.length >= 10) {
+            dataPagamento = dataHoraPagamento.substring(0, 10); // "2025-11-12"
+          }
+        }
+
+        const updateDataGestao = {
+          status: status,
+          valor_pago: boletoAtualizado.valor_pago,
+          data_pagamento: dataPagamento,
+          atualizado_em: new Date().toISOString()
+        };
+
+        const { error: updateGestaoError } = await supabaseAdmin
+          .from('boletos_gestao')
+          .update(updateDataGestao)
+          .eq('id', boletoGestao.id);
+        
+        if (updateGestaoError) {
+          console.error(`⚠️ Erro ao atualizar boletos_gestao ${boletoGestao.id}:`, updateGestaoError);
+        } else {
+          console.log(`✅ Boleto gestão ${boletoGestao.id} também atualizado (status: ${status})`);
+        }
+      }
 
       res.json({
         success: true,
@@ -324,9 +385,13 @@ const sincronizarTodosBoletos = async (req, res) => {
 
         // Determinar status
         let status = 'pendente';
-        if (dadosBoleto.situacao === 'PAGO' || dadosBoleto.situacao === 'LIQUIDADO') {
+        const situacaoUpper = (dadosBoleto.situacao || '').toUpperCase();
+        if (situacaoUpper === 'PAGO' || 
+            situacaoUpper === 'LIQUIDADO' || 
+            situacaoUpper.includes('PAGO') || 
+            situacaoUpper === 'TITULO JA PAGO NO DIA') {
           status = 'pago';
-        } else if (dadosBoleto.situacao === 'BAIXADO' || dadosBoleto.situacao === 'CANCELADO') {
+        } else if (situacaoUpper === 'BAIXADO' || situacaoUpper === 'CANCELADO') {
           status = 'cancelado';
         } else {
           const hoje = new Date();
@@ -340,19 +405,84 @@ const sincronizarTodosBoletos = async (req, res) => {
           }
         }
 
+        // Converter formato da data da Caixa para timestamp válido do PostgreSQL
+        // Formato da Caixa: "2025-11-12-11.43.06" -> Formato PostgreSQL: "2025-11-12 11:43:06"
+        let dataHoraPagamentoFormatada = null;
+        if (dadosBoleto.data_hora_pagamento) {
+          const dataHoraCaixa = dadosBoleto.data_hora_pagamento;
+          // Converter "2025-11-12-11.43.06" para "2025-11-12 11:43:06"
+          if (dataHoraCaixa.includes('-') && dataHoraCaixa.includes('.')) {
+            // Substituir o 4º hífen por espaço e os pontos por dois pontos
+            const partes = dataHoraCaixa.split('-');
+            if (partes.length >= 4) {
+              const data = `${partes[0]}-${partes[1]}-${partes[2]}`;
+              const hora = partes[3].replace(/\./g, ':');
+              dataHoraPagamentoFormatada = `${data} ${hora}`;
+            }
+          } else {
+            // Se já estiver em formato válido, usar como está
+            dataHoraPagamentoFormatada = dataHoraCaixa;
+          }
+        }
+
         // Atualizar no banco
         const updateData = {
           situacao: dadosBoleto.situacao || boleto.situacao,
           status: status,
           valor_pago: dadosBoleto.valor_pago || boleto.valor_pago,
-          data_hora_pagamento: dadosBoleto.data_hora_pagamento || boleto.data_hora_pagamento,
+          data_hora_pagamento: dataHoraPagamentoFormatada || boleto.data_hora_pagamento,
           sincronizado_em: new Date().toISOString()
         };
 
-        await supabaseAdmin
+        const { data: boletoAtualizado, error: updateError } = await supabaseAdmin
           .from('boletos_caixa')
           .update(updateData)
-          .eq('id', boleto.id);
+          .eq('id', boleto.id)
+          .select()
+          .single();
+
+        if (updateError) {
+          console.error(`⚠️ Erro ao atualizar boletos_caixa ${boleto.id}:`, updateError);
+          resultados.erros++;
+          continue; // Pular para o próximo boleto
+        }
+
+        // Atualizar também boletos_gestao se existir registro relacionado
+        const { data: boletoGestao, error: gestaoError } = await supabaseAdmin
+          .from('boletos_gestao')
+          .select('id')
+          .eq('boleto_caixa_id', boleto.id)
+          .maybeSingle();
+
+        if (boletoGestao && !gestaoError) {
+          // Extrair data de data_hora_pagamento (formato: "2025-11-12-11.20.30" -> "2025-11-12")
+          let dataPagamento = null;
+          if (updateData.data_hora_pagamento) {
+            // Formato da Caixa: "2025-11-12-11.20.30" - extrair apenas a data (primeiros 10 caracteres)
+            const dataHoraPagamento = updateData.data_hora_pagamento;
+            if (dataHoraPagamento.length >= 10) {
+              dataPagamento = dataHoraPagamento.substring(0, 10); // "2025-11-12"
+            }
+          }
+
+          const updateDataGestao = {
+            status: status,
+            valor_pago: updateData.valor_pago,
+            data_pagamento: dataPagamento,
+            atualizado_em: new Date().toISOString()
+          };
+
+          const { error: updateGestaoError } = await supabaseAdmin
+            .from('boletos_gestao')
+            .update(updateDataGestao)
+            .eq('id', boletoGestao.id);
+          
+          if (updateGestaoError) {
+            console.error(`⚠️ Erro ao atualizar boletos_gestao ${boletoGestao.id}:`, updateGestaoError);
+          } else {
+            console.log(`✅ Boleto gestão ${boletoGestao.id} também atualizado (status: ${status})`);
+          }
+        }
 
         resultados.sincronizados++;
         resultados.atualizados.push({
@@ -370,7 +500,40 @@ const sincronizarTodosBoletos = async (req, res) => {
 
       } catch (error) {
         console.error(`Erro ao sincronizar boleto ${boleto.id}:`, error);
-        resultados.erros++;
+        
+        // Tratar erro específico: "NOSSO NUMERO NAO CADASTRADO"
+        // Isso significa que o boleto foi cancelado ou não existe mais na Caixa
+        const errorMessage = error.message || '';
+        if (errorMessage.includes('NOSSO NUMERO NAO CADASTRADO') || 
+            errorMessage.includes('NAO CADASTRADO PARA O BENEFICIARIO')) {
+          console.log(`⚠️ Boleto ${boleto.id} não encontrado na Caixa. Marcando como cancelado.`);
+          
+          try {
+            // Marcar boleto como cancelado no banco
+            await supabaseAdmin
+              .from('boletos_caixa')
+              .update({
+                status: 'cancelado',
+                situacao: 'BOLETO NAO ENCONTRADO NA CAIXA',
+                sincronizado_em: new Date().toISOString()
+              })
+              .eq('id', boleto.id);
+            
+            resultados.sincronizados++;
+            resultados.atualizados.push({
+              id: boleto.id,
+              nosso_numero: boleto.nosso_numero,
+              status_anterior: boleto.status,
+              status_novo: 'cancelado',
+              situacao: 'BOLETO NAO ENCONTRADO NA CAIXA'
+            });
+          } catch (updateError) {
+            console.error(`Erro ao atualizar boleto ${boleto.id} como cancelado:`, updateError);
+            resultados.erros++;
+          }
+        } else {
+          resultados.erros++;
+        }
       }
     }
 
