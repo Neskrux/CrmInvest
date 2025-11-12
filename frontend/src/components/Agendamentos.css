@@ -1,0 +1,161 @@
+/* ===== AGENDAMENTOS - MOBILE RESPONSIVE ===== */
+
+/* ===== LAYOUT MOBILE - CARDS ===== */
+.agendamentos-cards-mobile {
+  display: none;
+}
+
+.agendamento-card {
+  background: white;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.agendamento-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.agendamento-card-nome {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #1e293b;
+  flex: 1;
+}
+
+.agendamento-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.agendamento-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f1f5f9;
+  gap: 0.5rem;
+}
+
+.agendamento-card-row:last-child {
+  border-bottom: none;
+}
+
+.agendamento-card-label {
+  font-size: 0.875rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.agendamento-card-value {
+  font-size: 0.875rem;
+  color: #1e293b;
+  font-weight: 500;
+  text-align: right;
+}
+
+.agendamento-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.agendamento-card-actions .btn-action {
+  width: 100%;
+  text-align: center;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.agendamento-card-status-select {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  border: 1px solid #d1d5db;
+}
+
+.permissao-info-btn {
+  margin-left: 8px;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 12px;
+  position: relative;
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: #e5e7eb;
+  border: 1px solid #d1d5db;
+  text-align: center;
+  line-height: 14px;
+  font-weight: bold;
+  padding: 0;
+  outline: none;
+}
+
+.permissao-info-btn:hover {
+  background-color: #d1d5db;
+  border-color: #9ca3af;
+}
+
+/* Classes para ocultar colunas em desktop */
+.col-agendamento-freelancer,
+.col-agendamento-sdr,
+.col-agendamento-consultor,
+.col-agendamento-clinica,
+.col-agendamento-data,
+.col-agendamento-horario {
+  display: table-cell;
+}
+
+/* Responsividade - Cards em Mobile */
+@media (max-width: 768px) {
+  .table-container {
+    overflow-x: visible;
+  }
+  
+  /* Ocultar tabela em mobile para clínicas */
+  .table.tabela-agendamentos-desktop {
+    display: none;
+  }
+  
+  /* Mostrar cards em mobile para clínicas */
+  .agendamentos-cards-mobile {
+    display: block;
+  }
+  
+  /* Ocultar colunas específicas na tabela desktop */
+  .col-agendamento-freelancer,
+  .col-agendamento-sdr,
+  .col-agendamento-consultor,
+  .col-agendamento-clinica,
+  .col-agendamento-data,
+  .col-agendamento-horario {
+    display: none;
+  }
+}
+
+/* Desktop - Ocultar cards e mostrar tabela */
+@media (min-width: 769px) {
+  .agendamentos-cards-mobile {
+    display: none;
+  }
+  
+  .table.tabela-agendamentos-desktop {
+    display: table;
+  }
+}
+

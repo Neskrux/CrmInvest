@@ -1017,7 +1017,7 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
-            fontSize: '0.75rem',
+            fontSize: '0.65rem',
             color: '#6b7280',
             marginTop: '0.5rem'
           }}>

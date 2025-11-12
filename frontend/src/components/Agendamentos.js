@@ -4,6 +4,7 @@ import useBranding from '../hooks/useBranding';
 import { useToast } from '../components/Toast';
 import ModalEvidencia from './ModalEvidencia';
 import useSmartPolling from '../hooks/useSmartPolling';
+import './Agendamentos.css';
 
 const Agendamentos = () => {
   const { t } = useBranding();
@@ -947,222 +948,250 @@ const Agendamentos = () => {
             }
           </p>
         ) : (
-          <div className="table-container">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t.paciente}</th>
-                  {user?.empresa_id !== 5 && (
-                    <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
-                  )}
-                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>SDR</th>
-                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Corretor' : 'Consultor'}</th>
-                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{user?.empresa_id === 5 ? 'Empreendimento' : 'Clínica'}</th>
-                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Data</th>
-                  <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Horário</th>
-                  <th>
-                    Status
-                    {!podeAlterarStatus && (
-                      <button
-                        onClick={() => setShowPermissaoModal(true)}
-                        style={{
-                          marginLeft: '8px',
-                          color: '#6b7280',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          position: 'relative',
-                          display: 'inline-block',
-                          width: '16px',
-                          height: '16px',
-                          borderRadius: '50%',
-                          backgroundColor: '#e5e7eb',
-                          border: '1px solid #d1d5db',
-                          textAlign: 'center',
-                          lineHeight: '14px',
-                          fontWeight: 'bold',
-                          padding: 0,
-                          outline: 'none'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.target.style.backgroundColor = '#d1d5db';
-                          e.target.style.borderColor = '#9ca3af';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.backgroundColor = '#e5e7eb';
-                          e.target.style.borderColor = '#d1d5db';
-                        }}
-                        title="Clique para saber mais sobre permissões"
-                      >
-                        ?
-                      </button>
+          <>
+            {/* Layout Desktop - Tabela */}
+            <div className="table-container">
+              <table className="table tabela-agendamentos-desktop">
+                <thead>
+                  <tr>
+                    <th className="col-agendamento-paciente">{t.paciente}</th>
+                    {user?.empresa_id !== 5 && (
+                      <th className="col-agendamento-freelancer">Freelancer</th>
                     )}
-                  </th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
+                    <th className="col-agendamento-sdr">SDR</th>
+                    <th className="col-agendamento-consultor">{isIncorporadora ? 'Corretor' : 'Consultor'}</th>
+                    <th className="col-agendamento-clinica">{user?.empresa_id === 5 ? 'Empreendimento' : 'Clínica'}</th>
+                    <th className="col-agendamento-data">Data</th>
+                    <th className="col-agendamento-horario">Horário</th>
+                    <th className="col-agendamento-status">
+                      Status
+                      {!podeAlterarStatus && (
+                        <button
+                          onClick={() => setShowPermissaoModal(true)}
+                          className="permissao-info-btn"
+                          title="Clique para saber mais sobre permissões"
+                        >
+                          ?
+                        </button>
+                      )}
+                    </th>
+                    <th className="col-agendamento-acoes">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {agendamentosFiltrados.map(agendamento => {
+                    const statusInfo = getStatusInfo(agendamento.status);
+                    return (
+                      <tr key={agendamento.id} style={{
+                        backgroundColor: ehHoje(agendamento.data_agendamento) ? '#fef3c7' : 'transparent'
+                      }}>
+                        <td className="col-agendamento-paciente">
+                          <div>
+                            <strong>{agendamento.paciente_nome}</strong>
+                          </div>
+                        </td>
+                        {user?.empresa_id !== 5 && (
+                          <td className="col-agendamento-freelancer">{agendamento.consultor_nome || '-'}</td>
+                        )}
+                        <td className="col-agendamento-sdr">{agendamento.sdr_nome || '-'}</td>
+                        <td className="col-agendamento-consultor">{agendamento.consultor_interno_nome || '-'}</td>
+                        <td className="col-agendamento-clinica" style={{ maxWidth: '150px' }}>
+                        {user?.empresa_id === 5 ? (
+                          // Para incorporadora, mostrar empreendimento baseado em externo ou id com truncamento (sempre com fallback)
+                          (() => {
+                            const empreendimentoMap = {
+                              4: 'Laguna Sky Garden',
+                              5: 'Residencial Girassol',
+                              6: 'Sintropia Sky Garden',
+                              7: 'Residencial Lotus',
+                              8: 'River Sky Garden',
+                              9: 'Condomínio Figueira Garcia'
+                            };
+                            const externoNome = (agendamento.empreendimento_externo || '').trim();
+                            const nomeBase = externoNome || empreendimentoMap[agendamento.empreendimento_id || agendamento.clinica_id] || 'Empreendimento Externo';
+                            return nomeBase.length > 15 ? (
+                              <div style={{ fontSize: '0.8rem', lineHeight: '1.2' }}>
+                                {nomeBase.substring(0, 15)}...
+                              </div>
+                            ) : nomeBase;
+                          })()
+                        ) : (
+                            // Para outras empresas, mostrar nome da clínica
+                            agendamento.clinica_nome ? (
+                              agendamento.clinica_nome.length > 15 ? (
+                                <div style={{ fontSize: '0.8rem', lineHeight: '1.2' }}>
+                                  {agendamento.clinica_nome.substring(0, 15)}...
+                                </div>
+                              ) : agendamento.clinica_nome
+                            ) : '-'
+                          )}
+                        </td>
+                        <td className="col-agendamento-data">
+                          <span style={{
+                            fontWeight: ehHoje(agendamento.data_agendamento) ? 'bold' : 'normal',
+                            color: ehHoje(agendamento.data_agendamento) ? '#f59e0b' : 'inherit'
+                          }}>
+                            {formatarData(agendamento.data_agendamento)}
+                            {ehHoje(agendamento.data_agendamento) && (
+                              <div style={{ fontSize: '0.75rem', color: '#f59e0b' }}>
+                                HOJE
+                              </div>
+                            )}
+                          </span>
+                        </td>
+                        <td className="col-agendamento-horario">
+                          <strong style={{ color: '#2563eb' }}>
+                            {formatarHorario(agendamento.horario)}
+                          </strong>
+                        </td>
+                        <td className="col-agendamento-status">
+                          <select
+                            value={agendamento.status}
+                            onChange={(e) => updateStatus(agendamento.id, e.target.value)}
+                            disabled={!podeAlterarStatus}
+                            className="status-select"
+                            style={{
+                                  padding: '0.25rem 0.5rem',
+                                  borderRadius: '4px',
+                                  fontSize: '0.75rem',
+                                  backgroundColor: statusInfo.color + '10',
+                                  color: statusInfo.color,
+                                  border: `1px solid ${statusInfo.color}`,
+                                  cursor: podeAlterarStatus ? 'pointer' : 'not-allowed',
+                                  opacity: podeAlterarStatus ? 1 : 0.5
+                            }}
+                            title={statusInfo.description || statusInfo.label}
+                          >
+                            {statusOptions.map(option => (
+                              <option key={option.value} value={option.value} title={option.description}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="col-agendamento-acoes">
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button
+                              onClick={() => handleViewPaciente(agendamento)}
+                              className="btn-action"
+                              title={`Visualizar informações do ${t.paciente.toLowerCase()}`}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                              </svg>
+                            </button>
+                            {!isConsultor && !isClinica && (
+                              <button
+                                onClick={() => handleEdit(agendamento)}
+                                className="btn-action"
+                                title="Editar"
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                </svg>
+                              </button>
+                            )}
+                            {isAdmin && (
+                              <button
+                                onClick={() => excluirAgendamento(agendamento.id)}
+                                className="btn-action"
+                                title="Excluir agendamento"
+                                style={{ color: '#dc2626' }}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <polyline points="3 6 5 6 21 6"></polyline>
+                                  <path d="m19 6-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                                  <path d="m10 11 0 6"></path>
+                                  <path d="m14 11 0 6"></path>
+                                  <path d="M5 6l1-2a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1l1 2"></path>
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Layout Mobile - Cards para Clínicas */}
+            {isClinica && (
+              <div className="agendamentos-cards-mobile">
                 {agendamentosFiltrados.map(agendamento => {
                   const statusInfo = getStatusInfo(agendamento.status);
                   return (
-                    <tr key={agendamento.id} style={{
-                      backgroundColor: ehHoje(agendamento.data_agendamento) ? '#fef3c7' : 'transparent'
+                    <div key={agendamento.id} className="agendamento-card" style={{
+                      backgroundColor: ehHoje(agendamento.data_agendamento) ? '#fef3c7' : 'white'
                     }}>
-                      <td>
-                        <div>
-                          <strong>{agendamento.paciente_nome}</strong>
-                          {(agendamento.paciente_telefone || agendamento.observacoes) && (
-                            <div style={{ marginTop: '0.25rem' }}>
-                              <button
-                                onClick={() => handleViewDetalhes(agendamento.paciente_telefone, agendamento.observacoes, agendamento)}
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  color: '#6b7280',
-                                  cursor: 'pointer',
-                                  fontSize: '0.75rem',
-                                  padding: '0.25rem',
-                                  borderRadius: '4px',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center'
-                                }}
-                                title="Ver detalhes"
-                                onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
-                                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                              >
-                                •••
-                              </button>
-                            </div>
-                          )}
+                      <div className="agendamento-card-header">
+                        <div className="agendamento-card-nome">{agendamento.paciente_nome}</div>
+                      </div>
+                      <div className="agendamento-card-body">
+                        <div className="agendamento-card-row">
+                          <span className="agendamento-card-label">Data:</span>
+                          <span className="agendamento-card-value" style={{
+                            fontWeight: ehHoje(agendamento.data_agendamento) ? 'bold' : 'normal',
+                            color: ehHoje(agendamento.data_agendamento) ? '#f59e0b' : 'inherit'
+                          }}>
+                            {formatarData(agendamento.data_agendamento)}
+                            {ehHoje(agendamento.data_agendamento) && (
+                              <span style={{ fontSize: '0.7rem', marginLeft: '0.25rem' }}>HOJE</span>
+                            )}
+                          </span>
                         </div>
-                      </td>
-                      {user?.empresa_id !== 5 && (
-                        <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{agendamento.consultor_nome || '-'}</td>
-                      )}
-                      <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{agendamento.sdr_nome || '-'}</td>
-                      <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{agendamento.consultor_interno_nome || '-'}</td>
-                      <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', maxWidth: '150px' }}>
-                      {user?.empresa_id === 5 ? (
-                        // Para incorporadora, mostrar empreendimento baseado em externo ou id com truncamento (sempre com fallback)
-                        (() => {
-                          const empreendimentoMap = {
-                            4: 'Laguna Sky Garden',
-                            5: 'Residencial Girassol',
-                            6: 'Sintropia Sky Garden',
-                            7: 'Residencial Lotus',
-                            8: 'River Sky Garden',
-                            9: 'Condomínio Figueira Garcia'
-                          };
-                          const externoNome = (agendamento.empreendimento_externo || '').trim();
-                          const nomeBase = externoNome || empreendimentoMap[agendamento.empreendimento_id || agendamento.clinica_id] || 'Empreendimento Externo';
-                          return nomeBase.length > 15 ? (
-                            <div style={{ fontSize: '0.8rem', lineHeight: '1.2' }}>
-                              {nomeBase.substring(0, 15)}...
-                            </div>
-                          ) : nomeBase;
-                        })()
-                      ) : (
-                          // Para outras empresas, mostrar nome da clínica
-                          agendamento.clinica_nome ? (
-                            agendamento.clinica_nome.length > 15 ? (
-                              <div style={{ fontSize: '0.8rem', lineHeight: '1.2' }}>
-                                {agendamento.clinica_nome.substring(0, 15)}...
-                              </div>
-                            ) : agendamento.clinica_nome
-                          ) : '-'
-                        )}
-                      </td>
-                      <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                        <span style={{
-                          fontWeight: ehHoje(agendamento.data_agendamento) ? 'bold' : 'normal',
-                          color: ehHoje(agendamento.data_agendamento) ? '#f59e0b' : 'inherit'
-                        }}>
-                          {formatarData(agendamento.data_agendamento)}
-                          {ehHoje(agendamento.data_agendamento) && (
-                            <div style={{ fontSize: '0.75rem', color: '#f59e0b' }}>
-                              HOJE
-                            </div>
-                          )}
-                        </span>
-                      </td>
-                      <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
-                        <strong style={{ color: '#2563eb' }}>
-                          {formatarHorario(agendamento.horario)}
-                        </strong>
-                      </td>
-                      <td>
-                        <select
-                          value={agendamento.status}
-                          onChange={(e) => updateStatus(agendamento.id, e.target.value)}
-                          disabled={!podeAlterarStatus}
-                          className="status-select"
-                          style={{
-                                padding: '0.25rem 0.5rem',
-                                borderRadius: '4px',
-                                fontSize: '0.75rem',
-                                backgroundColor: statusInfo.color + '10',
-                                color: statusInfo.color,
-                                border: `1px solid ${statusInfo.color}`,
-                                cursor: podeAlterarStatus ? 'pointer' : 'not-allowed',
-                                opacity: podeAlterarStatus ? 1 : 0.5
-                          }}
-                          title={statusInfo.description || statusInfo.label}
-                        >
-                          {statusOptions.map(option => (
-                            <option key={option.value} value={option.value} title={option.description}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button
-                            onClick={() => handleViewPaciente(agendamento)}
-                            className="btn-action"
-                            title={`Visualizar informações do ${t.paciente.toLowerCase()}`}
+                        <div className="agendamento-card-row">
+                          <span className="agendamento-card-label">Horário:</span>
+                          <span className="agendamento-card-value" style={{ color: '#2563eb', fontWeight: '600' }}>
+                            {formatarHorario(agendamento.horario)}
+                          </span>
+                        </div>
+                        <div className="agendamento-card-row">
+                          <span className="agendamento-card-label">Status:</span>
+                          <select
+                            value={agendamento.status}
+                            onChange={(e) => updateStatus(agendamento.id, e.target.value)}
+                            disabled={!podeAlterarStatus}
+                            className="agendamento-card-status-select"
+                            style={{
+                              backgroundColor: statusInfo.color + '10',
+                              color: statusInfo.color,
+                              border: `1px solid ${statusInfo.color}`,
+                              cursor: podeAlterarStatus ? 'pointer' : 'not-allowed',
+                              opacity: podeAlterarStatus ? 1 : 0.5
+                            }}
+                            title={statusInfo.description || statusInfo.label}
                           >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                              <circle cx="12" cy="12" r="3"></circle>
-                            </svg>
-                          </button>
-                          {!isConsultor && !isClinica && (
-                            <button
-                              onClick={() => handleEdit(agendamento)}
-                              className="btn-action"
-                              title="Editar"
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                              </svg>
-                            </button>
-                          )}
-                          {isAdmin && (
-                            <button
-                              onClick={() => excluirAgendamento(agendamento.id)}
-                              className="btn-action"
-                              title="Excluir agendamento"
-                              style={{ color: '#dc2626' }}
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <polyline points="3 6 5 6 21 6"></polyline>
-                                <path d="m19 6-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
-                                <path d="m10 11 0 6"></path>
-                                <path d="m14 11 0 6"></path>
-                                <path d="M5 6l1-2a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1l1 2"></path>
-                              </svg>
-                            </button>
-                          )}
+                            {statusOptions.map(option => (
+                              <option key={option.value} value={option.value} title={option.description}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
                         </div>
-                      </td>
-                    </tr>
+                      </div>
+                      <div className="agendamento-card-actions">
+                        <button
+                          onClick={() => handleViewPaciente(agendamento)}
+                          className="btn-action"
+                          title={`Visualizar informações do ${t.paciente.toLowerCase()}`}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                          </svg>
+                          Visualizar
+                        </button>
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -1414,7 +1443,7 @@ const Agendamentos = () => {
               </button>
             </div>
             
-            <div style={{ padding: '1.5rem', flex: 1, overflowY: 'auto' }}>
+            <div style={{ padding: '1.5rem', flex: 1, overflowY: 'auto', display: 'block' }}>
               {/* Aba de Informações/Detalhes */}
               {activeDetalhesTab === 'observacoes' && detalhesAtual.nome && (
                 <>
