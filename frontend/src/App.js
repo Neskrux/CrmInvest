@@ -602,13 +602,7 @@ const AppContent = () => {
       )}
       
       <aside 
-        className="sidebar" 
-        style={isMobile ? {
-          transform: showMobileSidebar ? 'translateX(0)' : 'translateX(-100%)',
-          transition: 'transform 0.3s ease-in-out',
-          position: 'fixed',
-          zIndex: 999
-        } : {}}
+        className={`sidebar ${isMobile && showMobileSidebar ? 'sidebar-open' : ''}`}
       >
         <div className="sidebar-header">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
@@ -1132,12 +1126,15 @@ const AppContent = () => {
                   justifyContent: 'center',
                   borderRadius: '0.5rem',
                   transition: 'background-color 0.2s',
-                  ':hover': {
-                    backgroundColor: '#f3f4f6'
-                  }
+                  position: 'relative',
+                  minWidth: '44px',
+                  minHeight: '44px'
                 }}
                 onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
+                onTouchStart={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                onTouchEnd={(e) => e.target.style.backgroundColor = 'white'}
+                aria-label="Abrir menu"
               >
                 <svg 
                   width="24" 

@@ -575,39 +575,145 @@ const GestaoBoletosAdmin = () => {
         {loading ? (
           <div className="loading">Carregando...</div>
         ) : (
-          <table className="tabela-boletos">
-            <thead>
-              <tr>
-                {podeGerenciar && (
-                  <th>
-                    <input 
-                      type="checkbox"
-                      checked={selectedBoletos.length === boletos.length && boletos.length > 0}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedBoletos(boletos.map(b => b.id));
-                        } else {
-                          setSelectedBoletos([]);
-                        }
-                      }}
-                    />
-                  </th>
-                )}
-                <th>Paciente</th>
-                <th>Clínica</th>
-                <th>Parcela</th>
-                <th>Valor</th>
-                <th>Vencimento</th>
-                <th>Status</th>
-                <th>Boleto Gerado</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {boletos.map(boleto => (
-                <tr key={boleto.id}>
+          <>
+            {/* Layout Desktop - Tabela */}
+            <table className="tabela-boletos tabela-desktop">
+              <thead>
+                <tr>
                   {podeGerenciar && (
-                    <td>
+                    <th className="col-checkbox">
+                      <input 
+                        type="checkbox"
+                        checked={selectedBoletos.length === boletos.length && boletos.length > 0}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedBoletos(boletos.map(b => b.id));
+                          } else {
+                            setSelectedBoletos([]);
+                          }
+                        }}
+                      />
+                    </th>
+                  )}
+                  <th className="col-paciente">Paciente</th>
+                  <th className="col-clinica">Clínica</th>
+                  <th className="col-parcela">Parcela</th>
+                  <th className="col-valor">Valor</th>
+                  <th className="col-vencimento">Vencimento</th>
+                  <th className="col-status">Status</th>
+                  <th className="col-boleto-gerado">Boleto Gerado</th>
+                  <th className="col-acoes">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {boletos.map(boleto => (
+                  <tr key={boleto.id}>
+                    {podeGerenciar && (
+                      <td className="col-checkbox">
+                        <input 
+                          type="checkbox"
+                          checked={selectedBoletos.includes(boleto.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedBoletos([...selectedBoletos, boleto.id]);
+                            } else {
+                              setSelectedBoletos(selectedBoletos.filter(id => id !== boleto.id));
+                            }
+                          }}
+                        />
+                      </td>
+                    )}
+                    <td className="col-paciente">{boleto.paciente_nome || '—'}</td>
+                    <td className="col-clinica">{boleto.clinica_nome || '—'}</td>
+                    <td className="col-parcela">
+                      {(() => {
+                        const parcelaNumero = boleto.numero_parcela || boleto.parcela_atual;
+                        const totalParcelas = boleto.total_parcelas ?? boleto.qtd_parcelas ?? boleto.numero_parcelas_total ?? boleto.parcelas_totais;
+                        if (!parcelaNumero && !totalParcelas) return '—';
+                        if (parcelaNumero && totalParcelas) return `${parcelaNumero}/${totalParcelas}`;
+                        if (parcelaNumero) return `Parcela ${parcelaNumero}`;
+                        return `Total ${totalParcelas}`;
+                      })()}
+                    </td>
+                    <td className="col-valor">{formatarValor(boleto.valor || boleto.valor_parcela)}</td>
+                    <td className="col-vencimento">
+                      {formatarData(boleto.data_vencimento)}
+                      {boleto.dias_ate_vencimento && (
+                        <span className="dias-vencimento">
+                          ({boleto.dias_ate_vencimento > 0 ? `${boleto.dias_ate_vencimento}d` : 'Vencido'})
+                        </span>
+                      )}
+                    </td>
+                    <td className="col-status">
+                      {(() => {
+                        const statusKey = (boleto.status || '').toLowerCase();
+                        const info = STATUS_LOOKUP[statusKey] || { label: boleto.status_display || 'Indefinido', color: '#334155', bg: '#e2e8f0' };
+                        const label = boleto.status_display || info.label;
+                        return (
+                          <span className="status-pill" style={{ backgroundColor: info.bg, color: info.color }}>
+                            {label}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="col-boleto-gerado">
+                      {boleto.boleto_gerado ? (
+                        <span className="badge-sim">Sim</span>
+                      ) : boleto.deve_gerar_hoje ? (
+                        <span className="badge-pendente">Pendente</span>
+                      ) : (
+                        <span className="badge-nao">Não</span>
+                      )}
+                    </td>
+                    <td className="col-acoes">
+                      <div className="acoes">
+                        {podeGerenciar && (
+                          <div className="acoes-status-group">
+                            {statusSelectOptions.map(option => {
+                              const ativo = option.value === (boleto.status || '').toLowerCase();
+                              return (
+                                <button
+                                  key={option.value}
+                                  type="button"
+                                  className={`acao-status-btn ${ativo ? 'ativo' : ''}`}
+                                  style={{
+                                    borderColor: option.color,
+                                    color: ativo ? '#ffffff' : option.color,
+                                    backgroundColor: ativo ? option.color : 'transparent'
+                                  }}
+                                  disabled={ativo || loading}
+                                  onClick={() => handleAtualizarStatus(boleto.id, option.value)}
+                                >
+                                  {option.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                        
+                        {boleto.url_boleto && (
+                          <a 
+                            href={boleto.url_boleto}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-sm btn-link"
+                          >
+                            Ver
+                          </a>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Layout Mobile - Cards */}
+            <div className="boletos-cards-mobile">
+              {boletos.map(boleto => (
+                <div key={boleto.id} className="boleto-card">
+                  {podeGerenciar && (
+                    <div className="card-checkbox">
                       <input 
                         type="checkbox"
                         checked={selectedBoletos.includes(boleto.id)}
@@ -619,30 +725,10 @@ const GestaoBoletosAdmin = () => {
                           }
                         }}
                       />
-                    </td>
+                    </div>
                   )}
-                  <td>{boleto.paciente_nome || '—'}</td>
-                  <td>{boleto.clinica_nome || '—'}</td>
-                  <td>
-                    {(() => {
-                      const parcelaNumero = boleto.numero_parcela || boleto.parcela_atual;
-                      const totalParcelas = boleto.total_parcelas ?? boleto.qtd_parcelas ?? boleto.numero_parcelas_total ?? boleto.parcelas_totais;
-                      if (!parcelaNumero && !totalParcelas) return '—';
-                      if (parcelaNumero && totalParcelas) return `${parcelaNumero}/${totalParcelas}`;
-                      if (parcelaNumero) return `Parcela ${parcelaNumero}`;
-                      return `Total ${totalParcelas}`;
-                    })()}
-                  </td>
-                  <td>{formatarValor(boleto.valor || boleto.valor_parcela)}</td>
-                  <td>
-                    {formatarData(boleto.data_vencimento)}
-                    {boleto.dias_ate_vencimento && (
-                      <span className="dias-vencimento">
-                        ({boleto.dias_ate_vencimento > 0 ? `${boleto.dias_ate_vencimento}d` : 'Vencido'})
-                      </span>
-                    )}
-                  </td>
-                  <td>
+                  <div className="card-header">
+                    <div className="card-paciente">{boleto.paciente_nome || '—'}</div>
                     {(() => {
                       const statusKey = (boleto.status || '').toLowerCase();
                       const info = STATUS_LOOKUP[statusKey] || { label: boleto.status_display || 'Indefinido', color: '#334155', bg: '#e2e8f0' };
@@ -653,58 +739,63 @@ const GestaoBoletosAdmin = () => {
                         </span>
                       );
                     })()}
-                  </td>
-                  <td>
-                    {boleto.boleto_gerado ? (
-                      <span className="badge-sim">Sim</span>
-                    ) : boleto.deve_gerar_hoje ? (
-                      <span className="badge-pendente">Pendente</span>
-                    ) : (
-                      <span className="badge-nao">Não</span>
-                    )}
-                  </td>
-                  <td>
-                    <div className="acoes">
-                      {podeGerenciar && (
-                        <div className="acoes-status-group">
-                          {statusSelectOptions.map(option => {
-                            const ativo = option.value === (boleto.status || '').toLowerCase();
-                            return (
-                              <button
-                                key={option.value}
-                                type="button"
-                                className={`acao-status-btn ${ativo ? 'ativo' : ''}`}
-                                style={{
-                                  borderColor: option.color,
-                                  color: ativo ? '#ffffff' : option.color,
-                                  backgroundColor: ativo ? option.color : 'transparent'
-                                }}
-                                disabled={ativo || loading}
-                                onClick={() => handleAtualizarStatus(boleto.id, option.value)}
-                              >
-                                {option.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                      
-                      {boleto.url_boleto && (
-                        <a 
-                          href={boleto.url_boleto}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn btn-sm btn-link"
-                        >
-                          Ver
-                        </a>
-                      )}
+                  </div>
+                  <div className="card-body">
+                    <div className="card-row">
+                      <span className="card-label">Valor:</span>
+                      <span className="card-value card-valor">{formatarValor(boleto.valor || boleto.valor_parcela)}</span>
                     </div>
-                  </td>
-                </tr>
+                    <div className="card-row">
+                      <span className="card-label">Vencimento:</span>
+                      <span className="card-value">
+                        {formatarData(boleto.data_vencimento)}
+                        {boleto.dias_ate_vencimento && (
+                          <span className="dias-vencimento">
+                            {' '}({boleto.dias_ate_vencimento > 0 ? `${boleto.dias_ate_vencimento}d` : 'Vencido'})
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="card-actions">
+                    {podeGerenciar && (
+                      <div className="acoes-status-group">
+                        {statusSelectOptions.map(option => {
+                          const ativo = option.value === (boleto.status || '').toLowerCase();
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              className={`acao-status-btn ${ativo ? 'ativo' : ''}`}
+                              style={{
+                                borderColor: option.color,
+                                color: ativo ? '#ffffff' : option.color,
+                                backgroundColor: ativo ? option.color : 'transparent'
+                              }}
+                              disabled={ativo || loading}
+                              onClick={() => handleAtualizarStatus(boleto.id, option.value)}
+                            >
+                              {option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {boleto.url_boleto && (
+                      <a 
+                        href={boleto.url_boleto}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-sm btn-link"
+                      >
+                        Ver Boleto
+                      </a>
+                    )}
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
 

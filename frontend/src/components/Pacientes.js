@@ -4510,54 +4510,30 @@ const Pacientes = () => {
               </div>
             ) : (
               <>
+                {/* Layout Desktop - Tabela */}
                 <div className="table-container">
-                  <table className="table">
+                  <table className="table tabela-desktop">
                   <thead>
                     <tr>
-                      <th>Nome</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>Freelancer</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>SDR</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Corretor' : 'Consultor'}</th>
-                      <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>{isIncorporadora ? 'Empreendimento' : 'Tipo'}</th>
+                      <th className="col-nome">Nome</th>
+                      <th className="col-freelancer">Freelancer</th>
+                      <th className="col-sdr">SDR</th>
+                      <th className="col-consultor">{isIncorporadora ? 'Corretor' : 'Consultor'}</th>
+                      <th className="col-tipo">{isIncorporadora ? 'Empreendimento' : 'Tipo'}</th>
                       
-                      <th>
+                      <th className="col-status">
                         Status
                         {!podeAlterarStatus && (
                           <button
                             onClick={() => setShowPermissaoModal(true)}
-                            style={{
-                              marginLeft: '8px',
-                              color: '#6b7280',
-                              cursor: 'pointer',
-                              fontSize: '12px',
-                              position: 'relative',
-                              display: 'inline-block',
-                              width: '16px',
-                              height: '16px',
-                              borderRadius: '50%',
-                              backgroundColor: '#e5e7eb',
-                              border: '1px solid #d1d5db',
-                              textAlign: 'center',
-                              lineHeight: '14px',
-                              fontWeight: 'bold',
-                              padding: 0,
-                              outline: 'none'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.target.style.backgroundColor = '#d1d5db';
-                              e.target.style.borderColor = '#9ca3af';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.backgroundColor = '#e5e7eb';
-                              e.target.style.borderColor = '#d1d5db';
-                            }}
+                            className="permissao-info-btn"
                             title="Clique para saber mais sobre permissões"
                           >
                             ?
                           </button>
                         )}
                       </th>
-                      <th style={{ width: isConsultor || isClinica ? '80px' : '140px' }}>Ações</th>
+                      <th className="col-acoes" style={{ width: isConsultor || isClinica ? '80px' : '140px' }}>Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -4565,28 +4541,15 @@ const Pacientes = () => {
                       const statusInfo = getStatusInfo(paciente.status);
                       return (
                         <tr key={paciente.id}>
-                          <td>
+                          <td className="col-nome">
                             <div>
                               <strong title={paciente.nome}>{limitarCaracteres(paciente.nome, 18)}</strong>
                               {paciente.observacoes && (
                                 <div style={{ marginTop: '0.25rem' }}>
                                   <button
                                     onClick={() => handleViewObservacoes(paciente.observacoes, paciente)}
-                                    style={{
-                                      background: 'none',
-                                      border: 'none',
-                                      color: '#6b7280',
-                                      cursor: 'pointer',
-                                      fontSize: '0.75rem',
-                                      padding: '0.25rem',
-                                      borderRadius: '4px',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center'
-                                    }}
+                                    className="paciente-card-observacoes-btn"
                                     title="Ver observações"
-                                    onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
-                                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                                   >
                                     •••
                                   </button>
@@ -4594,7 +4557,7 @@ const Pacientes = () => {
                               )}
                             </div>
                           </td>
-                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                          <td className="col-freelancer">
                             {paciente.consultor_nome ? (
                               <span title={paciente.consultor_nome}>{limitarCaracteres(paciente.consultor_nome, 20)}</span>
                             ) : (
@@ -4603,7 +4566,7 @@ const Pacientes = () => {
                               </span>
                             )}
                           </td>
-                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                          <td className="col-sdr">
                             {paciente.sdr_nome ? (
                               <span title={paciente.sdr_nome}>{limitarCaracteres(paciente.sdr_nome, 20)}</span>
                             ) : (
@@ -4612,7 +4575,7 @@ const Pacientes = () => {
                               </span>
                             )}
                           </td>
-                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                          <td className="col-consultor">
                             {paciente.consultor_interno_nome ? (
                               <span title={paciente.consultor_interno_nome}>{limitarCaracteres(paciente.consultor_interno_nome, 20)}</span>
                             ) : (
@@ -4621,7 +4584,7 @@ const Pacientes = () => {
                               </span>
                             )}
                           </td>
-                          <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', maxWidth: '180px' }}>
+                          <td className="col-tipo" style={{ maxWidth: '180px' }}>
                             {isIncorporadora ? (
                               // Para incorporadora, mostrar empreendimento (prioriza externo)
                               (() => {
@@ -4654,7 +4617,7 @@ const Pacientes = () => {
                             )}
                           </td>
                           
-                          <td>
+                          <td className="col-status">
                             <select
                               value={statusTemporario[paciente.id] || paciente.status}
                               onChange={(e) => updateStatus(paciente.id, e.target.value)}
@@ -4704,7 +4667,7 @@ const Pacientes = () => {
                               ))}
                             </select>
                           </td>
-                          <td style={{ display: 'flex', gap: '0.5rem' }}> 
+                          <td className="col-acoes" style={{ display: 'flex', gap: '0.5rem' }}> 
                               <button
                                 onClick={() => handleView(paciente)}
                                 className="btn-action"
@@ -4749,6 +4712,199 @@ const Pacientes = () => {
                     })}
                   </tbody>
                   </table>
+                </div>
+
+                {/* Layout Mobile - Cards */}
+                <div className="pacientes-cards-mobile">
+                  {pacientesPaginados.map(paciente => {
+                    const statusInfo = getStatusInfo(paciente.status);
+                    return (
+                      <div key={paciente.id} className="paciente-card">
+                        <div className="paciente-card-header">
+                          <div className="paciente-card-nome">
+                            <div>{paciente.nome}</div>
+                            {paciente.observacoes && (
+                              <button
+                                onClick={() => handleViewObservacoes(paciente.observacoes, paciente)}
+                                className="paciente-card-observacoes-btn"
+                                title="Ver observações"
+                              >
+                                •••
+                              </button>
+                            )}
+                          </div>
+                          {paciente.tipo_tratamento && !isIncorporadora && (
+                            <span className={`paciente-card-badge badge-${paciente.tipo_tratamento === 'estetico' ? 'info' : 'warning'}`}>
+                              {paciente.tipo_tratamento === 'estetico' ? 'Estético' : 
+                               paciente.tipo_tratamento === 'odontologico' ? 'Odontológico' : 
+                               paciente.tipo_tratamento === 'ambos' ? 'Ambos' :
+                               paciente.tipo_tratamento}
+                            </span>
+                          )}
+                        </div>
+                        <div className="paciente-card-body">
+                          {paciente.consultor_nome && (
+                            <div className="paciente-card-row">
+                              <span className="paciente-card-label">Freelancer:</span>
+                              <span className="paciente-card-value">{paciente.consultor_nome}</span>
+                            </div>
+                          )}
+                          {paciente.sdr_nome && (
+                            <div className="paciente-card-row">
+                              <span className="paciente-card-label">SDR:</span>
+                              <span className="paciente-card-value">{paciente.sdr_nome}</span>
+                            </div>
+                          )}
+                          {paciente.consultor_interno_nome && (
+                            <div className="paciente-card-row">
+                              <span className="paciente-card-label">{isIncorporadora ? 'Corretor' : 'Consultor'}:</span>
+                              <span className="paciente-card-value">{paciente.consultor_interno_nome}</span>
+                            </div>
+                          )}
+                          {isIncorporadora && paciente.empreendimento_id && (
+                            <div className="paciente-card-row">
+                              <span className="paciente-card-label">Empreendimento:</span>
+                              <span className="paciente-card-value">
+                                {(() => {
+                                  const empreendimentoMap = {
+                                    4: 'Laguna Sky Garden',
+                                    5: 'Residencial Girassol',
+                                    6: 'Sintropia Sky Garden',
+                                    7: 'Residencial Lotus',
+                                    8: 'River Sky Garden',
+                                    9: 'Condomínio Figueira Garcia'
+                                  };
+                                  const externo = (paciente.empreendimento_externo || '').trim();
+                                  return externo || empreendimentoMap[paciente.empreendimento_id] || 'Externo';
+                                })()}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="paciente-card-actions">
+                          <select
+                            value={statusTemporario[paciente.id] || paciente.status}
+                            onChange={(e) => updateStatus(paciente.id, e.target.value)}
+                            disabled={!podeAlterarStatus}
+                            className="paciente-card-status-select"
+                            style={{
+                              opacity: podeAlterarStatus ? 1 : 0.5,
+                              cursor: podeAlterarStatus ? 'pointer' : 'not-allowed',
+                              backgroundColor: statusInfo.color + '10',
+                              color: statusInfo.color,
+                              border: `1px solid ${statusInfo.color}`
+                            }}
+                            title={statusInfo.description || statusInfo.label}
+                          >
+                            {statusOptions
+                              .filter(option => {
+                                if (isFreelancer) return true;
+                                if (user?.empresa_id === 5) return true;
+                                return ![
+                                  'lead',
+                                  'sem_primeiro_contato',
+                                  'nao_existe',
+                                  'nao_tem_interesse',
+                                  'nao_reconhece',
+                                  'nao_responde',
+                                  'nao_passou_cpf',
+                                  'nao_tem_outro_cpf',
+                                  'cpf_reprovado'
+                                ].includes(option.value);
+                              })
+                              .map(option => (
+                              <option 
+                                key={option.value} 
+                                value={option.value} 
+                                title={option.description}
+                                disabled={option.value === 'fechado' && paciente.status !== 'fechado'}
+                              >
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                          <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
+                            <button
+                              onClick={() => handleView(paciente)}
+                              className="btn-action"
+                              title="Visualizar"
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                              </svg>
+                              Visualizar
+                            </button>
+                            <button
+                              onClick={() => handleGerarLoginRapido(paciente)}
+                              className="btn-action"
+                              title={paciente.tem_login && paciente.login_ativo ? "Gerar novo login" : "Gerar login para o paciente"}
+                              disabled={gerandoLoginPacienteId === paciente.id}
+                              style={{
+                                backgroundColor: gerandoLoginPacienteId === paciente.id ? '#e5e7eb' : '#fef3c7',
+                                color: gerandoLoginPacienteId === paciente.id ? '#6b7280' : '#92400e',
+                                border: `1px solid ${gerandoLoginPacienteId === paciente.id ? '#d1d5db' : '#fde68a'}`,
+                                opacity: gerandoLoginPacienteId === paciente.id ? 0.7 : 1,
+                                cursor: gerandoLoginPacienteId === paciente.id ? 'not-allowed' : 'pointer'
+                              }}
+                            >
+                              {gerandoLoginPacienteId === paciente.id ? (
+                                <>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                                    <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="32">
+                                      <animate attributeName="stroke-dasharray" dur="2s" values="0 32;16 16;0 32;0 32" repeatCount="indefinite" />
+                                      <animate attributeName="stroke-dashoffset" dur="2s" values="0;-16;-32;-32" repeatCount="indefinite" />
+                                    </circle>
+                                  </svg>
+                                  <span>Gerando...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="8.5" cy="7" r="4"></circle>
+                                    <line x1="20" y1="8" x2="20" y2="14"></line>
+                                    <line x1="23" y1="11" x2="17" y2="11"></line>
+                                  </svg>
+                                  <span>Gerar Login</span>
+                                </>
+                              )}
+                            </button>
+                            {!isConsultor && !isClinica && (
+                              <button
+                                onClick={() => handleEdit(paciente)}
+                                className="btn-action"
+                                title="Editar"
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                </svg>
+                                Editar
+                              </button>
+                            )}
+                            {isAdmin && (
+                              <button
+                                onClick={() => excluirPaciente(paciente.id)}
+                                className="btn-action"
+                                title="Excluir Paciente"
+                                style={{ color: '#dc2626' }}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <polyline points="3 6 5 6 21 6"></polyline>
+                                  <path d="m19 6-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                                  <path d="m10 11 0 6"></path>
+                                  <path d="m14 11 0 6"></path>
+                                  <path d="M5 6l1-2a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1l1 2"></path>
+                                </svg>
+                                Excluir
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', padding: '0.5rem' }}>
                   <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
@@ -5734,6 +5890,11 @@ const Pacientes = () => {
 
             {isClinica && (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ fontSize: '0.85rem', color: '#4b5563', fontWeight: 500 }}>
+                  {selectedPacientesAntecipacao.length === 0
+                    ? 'Selecione os pacientes com fechamento aprovado para solicitar antecipação.'
+                    : `${selectedPacientesAntecipacao.length} paciente${selectedPacientesAntecipacao.length > 1 ? 's' : ''} selecionado${selectedPacientesAntecipacao.length > 1 ? 's' : ''}`}
+                </div>
                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                   <button
                     type="button"
@@ -5772,11 +5933,6 @@ const Pacientes = () => {
                     </button>
                   )}
                 </div>
-                <div style={{ fontSize: '0.85rem', color: '#4b5563', fontWeight: 500 }}>
-                  {selectedPacientesAntecipacao.length === 0
-                    ? 'Selecione os pacientes com fechamento aprovado para solicitar antecipação.'
-                    : `${selectedPacientesAntecipacao.length} paciente${selectedPacientesAntecipacao.length > 1 ? 's' : ''} selecionado${selectedPacientesAntecipacao.length > 1 ? 's' : ''}`}
-                </div>
               </div>
             )}
 
@@ -5810,26 +5966,28 @@ const Pacientes = () => {
                     </p>
                   </div>
                 ) : (
-                  <div className="table-container" style={{ position: 'relative', zIndex: 1 }}>
-                    <table className="table">
-                      <thead>
-                        <tr>
-                          {isClinica && (
-                            <th style={{ width: '110px' }}>
-                              <span className="sr-only">Selecionar</span>
+                  <>
+                    {/* Layout Desktop - Tabela */}
+                    <div className="table-container" style={{ position: 'relative', zIndex: 1 }}>
+                      <table className="table tabela-fechamento-desktop">
+                        <thead>
+                          <tr>
+                            {isClinica && (
+                              <th className="col-fechamento-checkbox" style={{ width: '110px' }}>
+                                <span className="sr-only">Selecionar</span>
+                              </th>
+                            )}
+                            <th className="col-fechamento-nome" style={{ minWidth: '180px', width: '20%' }}>Nome</th>
+                            <th className="col-fechamento-antecipacao" style={{ minWidth: '120px' }}>
+                              {isClinica ? 'Antecipação atual' : 'Telefone'}
                             </th>
-                          )}
-                          <th style={{ minWidth: '180px', width: '20%' }}>Nome</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', minWidth: '120px' }}>
-                            {isClinica ? 'Antecipação atual' : 'Telefone'}
-                          </th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', minWidth: '100px' }}>Valor</th>
-                          <th style={{ minWidth: '120px' }}>Status</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', minWidth: '140px' }}>Documentação</th>
-                          <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', minWidth: '100px' }}>Data</th>
-                          <th style={{ minWidth: '200px', width: 'auto' }}>Ações</th>
-                        </tr>
-                      </thead>
+                            <th className="col-fechamento-valor" style={{ minWidth: '100px' }}>Valor</th>
+                            <th className="col-fechamento-status" style={{ minWidth: '120px' }}>Status</th>
+                            <th className="col-fechamento-documentacao" style={{ minWidth: '140px' }}>Documentação</th>
+                            <th className="col-fechamento-data" style={{ minWidth: '100px' }}>Data</th>
+                            <th className="col-fechamento-acoes" style={{ minWidth: '200px', width: 'auto' }}>Ações</th>
+                          </tr>
+                        </thead>
                       <tbody>
                         {(() => {
                           const clinicaId = user?.clinica_id || user?.id;
@@ -5888,7 +6046,7 @@ const Pacientes = () => {
                               return (
                             <tr key={paciente.id}>
                                 {isClinica && (
-                                  <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
+                                  <td className="col-fechamento-checkbox" style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
                                     <input
                                       type="checkbox"
                                       checked={selecionado}
@@ -5898,10 +6056,10 @@ const Pacientes = () => {
                                     />
                                   </td>
                                 )}
-                                <td style={{ padding: '0.75rem 1rem' }}>
+                                <td className="col-fechamento-nome" style={{ padding: '0.75rem 1rem' }}>
                                   <strong title={paciente.nome} style={{ fontSize: '0.875rem' }}>{paciente.nome}</strong>
                                 </td>
-                                <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                                <td className="col-fechamento-antecipacao">
                                   {isClinica ? (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                       <span style={{ fontWeight: 600, color: '#1f2937' }}>{textoAntecipacaoAtual}</span>
@@ -5920,7 +6078,7 @@ const Pacientes = () => {
                                     formatarTelefone(paciente.telefone)
                                   )}
                                 </td>
-                                <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell'}}>
+                                <td className="col-fechamento-valor">
                                   {fechamentoPaciente?.valor_fechado ? (
                                     <div style={{ fontWeight: '700', color: '#059669', fontSize: '0.95rem' }}>
                                       {formatarMoeda(fechamentoPaciente.valor_fechado)}
@@ -5929,7 +6087,7 @@ const Pacientes = () => {
                                     <span style={{ color: '#9ca3af', fontSize: '0.875rem' }}>-</span>
                                   )}
                                 </td>
-                                <td>
+                                <td className="col-fechamento-status">
                                   <span 
                                     className="badge"
                                     style={{
@@ -5955,7 +6113,7 @@ const Pacientes = () => {
                                     {statusInfo.label}
                                   </span>
                                 </td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                              <td className="col-fechamento-documentacao">
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start', width: '100%' }}>
                                   <div style={{ 
                                     display: 'flex', 
@@ -6009,10 +6167,10 @@ const Pacientes = () => {
                                   </div>
                                 </div>
                               </td>
-                              <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
+                              <td className="col-fechamento-data">
                                 {fechamentoPaciente?.data_fechamento ? formatarData(fechamentoPaciente.data_fechamento) : formatarData(paciente.created_at)}
                               </td>
-                              <td>
+                              <td className="col-fechamento-acoes">
                                 <div style={{ 
                                   display: 'flex', 
                                   flexDirection: 'row', 
@@ -6202,6 +6360,176 @@ const Pacientes = () => {
                       </tbody>
                     </table>
                   </div>
+
+                  {/* Layout Mobile - Cards para Pacientes com Fechamento */}
+                  <div className="pacientes-fechamento-cards-mobile">
+                    {(() => {
+                      const clinicaId = user?.clinica_id || user?.id;
+                      const fechamentosClinica = fechamentos.filter(f => f.clinica_id === clinicaId);
+                      const pacientesIds = fechamentosClinica.map(f => f.paciente_id);
+                      
+                      return pacientes
+                        .filter(p => pacientesIds.includes(p.id) && p.status === 'fechado')
+                        .map(paciente => {
+                          const totalDocs = 4;
+                          const docsEnviados = [
+                            paciente.selfie_biometrica_url,
+                            paciente.documento_biometrica_url,
+                            paciente.comprovante_residencia_url,
+                            paciente.contrato_servico_url
+                          ].filter(Boolean).length;
+                          const fechamentoPaciente = fechamentosClinica.find(f => f.paciente_id === paciente.id);
+                          
+                          let statusFechamento = fechamentoPaciente?.aprovado || 'documentacao_pendente';
+                          if (docsEnviados === totalDocs && statusFechamento !== 'reprovado') {
+                            if (statusFechamento === 'aprovado') {
+                              statusFechamento = 'aprovado';
+                            } else {
+                              statusFechamento = 'assinatura_im';
+                            }
+                          } else if (docsEnviados < totalDocs && statusFechamento !== 'reprovado') {
+                            statusFechamento = 'documentacao_pendente';
+                          }
+                          
+                          const statusColors = {
+                            'aprovado': { color: '#10b981', label: 'Aprovado' },
+                            'reprovado': { color: '#ef4444', label: 'Reprovado' },
+                            'assinatura_im': { color: '#3b82f6', label: 'Assinatura IM' },
+                            'documentacao_pendente': { color: '#f59e0b', label: 'Doc. Pendente' },
+                            'pendente': { color: '#f59e0b', label: 'Pendente' }
+                          };
+                          const statusInfo = statusColors[statusFechamento] || statusColors['pendente'];
+                          const podeAntecipar = isClinica && fechamentoPaciente?.aprovado === 'aprovado';
+                          const selecionado = selectedPacientesAntecipacao.includes(paciente.id);
+                          
+                          return (
+                            <div key={paciente.id} className="paciente-fechamento-card">
+                              {isClinica && (
+                                <div className="paciente-fechamento-card-checkbox">
+                                  <input
+                                    type="checkbox"
+                                    checked={selecionado}
+                                    disabled={!podeAntecipar}
+                                    onChange={() => toggleSelecaoAntecipacao(paciente.id, fechamentoPaciente)}
+                                  />
+                                </div>
+                              )}
+                              <div className="paciente-fechamento-card-header">
+                                <div className="paciente-fechamento-card-nome">{paciente.nome}</div>
+                                <span 
+                                  className="badge"
+                                  style={{
+                                    backgroundColor: statusInfo.color + '20',
+                                    color: statusInfo.color,
+                                    fontWeight: '600',
+                                    border: `1px solid ${statusInfo.color}`,
+                                    padding: '0.25rem 0.5rem',
+                                    borderRadius: '4px',
+                                    fontSize: '0.75rem',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem'
+                                  }}
+                                >
+                                  {statusFechamento === 'assinatura_im' && (
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <circle cx="12" cy="12" r="10"></circle>
+                                      <polyline points="12 6 12 12 16 14"></polyline>
+                                    </svg>
+                                  )}
+                                  {statusInfo.label}
+                                </span>
+                              </div>
+                              <div className="paciente-fechamento-card-body">
+                                {isClinica && fechamentoPaciente && (
+                                  <div className="paciente-fechamento-card-row">
+                                    <span className="paciente-fechamento-card-label">Antecipação:</span>
+                                    <span className="paciente-fechamento-card-value">
+                                      {Number.isFinite(fechamentoPaciente?.antecipacao_meses) && fechamentoPaciente?.antecipacao_meses !== null && fechamentoPaciente.antecipacao_meses > 0
+                                        ? `${fechamentoPaciente.antecipacao_meses} ${fechamentoPaciente.antecipacao_meses === 1 ? 'parcela' : 'parcelas'}`
+                                        : 'Sem antecipação'}
+                                    </span>
+                                  </div>
+                                )}
+                                {fechamentoPaciente?.valor_fechado && (
+                                  <div className="paciente-fechamento-card-row">
+                                    <span className="paciente-fechamento-card-label">Valor:</span>
+                                    <span className="paciente-fechamento-card-value paciente-fechamento-card-valor">
+                                      {formatarMoeda(fechamentoPaciente.valor_fechado)}
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="paciente-fechamento-card-row">
+                                  <span className="paciente-fechamento-card-label">Documentação:</span>
+                                  <span className="paciente-fechamento-card-value">
+                                    {docsEnviados}/{totalDocs} {docsEnviados === totalDocs ? '✓' : ''}
+                                  </span>
+                                </div>
+                                {fechamentoPaciente?.data_fechamento && (
+                                  <div className="paciente-fechamento-card-row">
+                                    <span className="paciente-fechamento-card-label">Data:</span>
+                                    <span className="paciente-fechamento-card-value">
+                                      {formatarData(fechamentoPaciente.data_fechamento)}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="paciente-fechamento-card-actions">
+                                <button
+                                  className="btn-action"
+                                  onClick={() => handleView(paciente)}
+                                  title="Visualizar informações do paciente"
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                    <circle cx="12" cy="12" r="3" />
+                                  </svg>
+                                  Visualizar
+                                </button>
+                                <button
+                                  className="btn-action"
+                                  onClick={() => {
+                                    if (isClinica) {
+                                      navigate('/gestao-boletos', { state: { pacienteId: paciente.id } });
+                                    } else {
+                                      const clinicaIdAtual = user?.clinica_id || user?.id;
+                                      const fechamentoPacienteSelecionado = fechamentos.find(f => f.paciente_id === paciente.id && f.clinica_id === clinicaIdAtual);
+                                      if (fechamentoPacienteSelecionado) {
+                                        navigate('/fechamentos', { state: { pacienteId: paciente.id, expandirBoletos: true } });
+                                      }
+                                    }
+                                  }}
+                                  title="Ver boletos do paciente"
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <rect x="3" y="8" width="18" height="10" rx="1" />
+                                    <path d="M7 8V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2" />
+                                    <line x1="8" y1="12" x2="16" y2="12" />
+                                    <line x1="8" y1="15" x2="12" y2="15" />
+                                  </svg>
+                                  Ver Boletos
+                                </button>
+                                <button
+                                  className="btn-action"
+                                  onClick={() => handleGerarLoginRapido(paciente)}
+                                  title={paciente.tem_login && paciente.login_ativo ? "Gerar novo login" : "Gerar login para o paciente"}
+                                  disabled={gerandoLoginPacienteId === paciente.id}
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="8.5" cy="7" r="4"></circle>
+                                    <line x1="20" y1="8" x2="20" y2="14"></line>
+                                    <line x1="23" y1="11" x2="17" y2="11"></line>
+                                  </svg>
+                                  Gerar Login
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        });
+                    })()}
+                  </div>
+                  </>
                 )}
               </>
             )}
@@ -6215,9 +6543,6 @@ const Pacientes = () => {
                   <p style={{ margin: 0, color: '#6b7280', fontSize: '0.875rem' }}>
                     Acompanhe o status das solicitações enviadas para a IM
                   </p>
-                </div>
-                <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
-                  {solicitacoesAntecipacao.filter(s => s.status === 'pendente').length} pendente(s)
                 </div>
               </div>
               <div className="card-content">
@@ -7470,7 +7795,11 @@ const Pacientes = () => {
       {/* Modal de visualização com abas */}
       {showViewModal && viewPaciente && (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: '1000px', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="modal" style={{ 
+            maxWidth: window.innerWidth <= 768 ? 'none' : '1000px', 
+            maxHeight: window.innerWidth <= 768 ? 'none' : '90vh', 
+            overflowY: 'auto' 
+          }}>
             <div className="modal-header">
               <h2 className="modal-title">
                 {isIncorporadora ? 'Cliente' : 'Paciente'}: {viewPaciente.nome}
@@ -7505,7 +7834,7 @@ const Pacientes = () => {
                     whiteSpace: 'nowrap'
                   }}
                 >
-                  {isIncorporadora ? 'Informações do Cliente' : 'Informações do Paciente'}
+                  {isIncorporadora ? 'Informações' : 'Informações'}
                 </button>
                 
                 {isClinica && (
@@ -8597,16 +8926,6 @@ const Pacientes = () => {
                   )}
                 </div>
               )}
-              
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem' }}>
-                <button 
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={closeViewModal}
-                >
-                  Fechar
-                </button>
-              </div>
             </div>
           </div>
         </div>

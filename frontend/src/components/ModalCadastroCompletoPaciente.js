@@ -1300,7 +1300,7 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
           borderRadius: '16px',
           maxWidth: '600px',
           width: '100%',
-          maxHeight: '90vh',
+          maxHeight: '110vh',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',

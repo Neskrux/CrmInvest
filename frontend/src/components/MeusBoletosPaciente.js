@@ -128,7 +128,7 @@ const MeusBoletosPaciente = () => {
 
   return (
     <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', gap: '0.5rem' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: '700', color: '#1a1d23', margin: 0 }}>
           Meus Boletos
         </h1>
