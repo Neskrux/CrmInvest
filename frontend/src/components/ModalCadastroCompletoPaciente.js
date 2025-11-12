@@ -15,11 +15,12 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
   const [loading, setLoading] = useState(false);
   const [contratoUrl, setContratoUrl] = useState(null);
   const [passoInicializado, setPassoInicializado] = useState(false); // Flag para evitar resetar o passo
+  const [uploadEmProgresso, setUploadEmProgresso] = useState(false); // Flag para evitar verificação prematura durante upload
+  const pacienteInicialRef = useRef(null); // Ref para rastrear o paciente inicial e evitar reinicialização
   
   // Dados do formulário
   const [formData, setFormData] = useState({
     cpf: '',
-    data_nascimento: '',
     comprovante_residencia: null
   });
   
@@ -27,15 +28,33 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
   const isPacienteLogado = user?.tipo === 'paciente';
 
   useEffect(() => {
+    // Não atualizar formData se já estamos em um passo específico e o paciente mudou durante o fluxo
+    // Isso evita que atualizações do prop paciente reinicializem o formulário
+    if (passoInicializado && passoAtual > 1) {
+      console.log('⏸️ [ModalCadastro] Modal já em uso, ignorando atualização do prop paciente');
+      return;
+    }
+    
     if (paciente) {
+      // Armazenar referência do paciente inicial apenas na primeira vez
+      if (!pacienteInicialRef.current) {
+        pacienteInicialRef.current = paciente.id;
+      }
+      
+      // Se o paciente mudou mas não é o inicial, não atualizar (evita reinicialização)
+      if (pacienteInicialRef.current && paciente.id !== pacienteInicialRef.current && passoInicializado) {
+        console.log('⏸️ [ModalCadastro] Paciente mudou durante o fluxo, ignorando atualização');
+        return;
+      }
+      
       console.log('📋 [ModalCadastro] Dados do paciente recebidos:', {
         cpf: paciente.cpf ? '✓ Preenchido' : '✗ Vazio',
-        data_nascimento: paciente.data_nascimento ? '✓ Preenchido' : '✗ Vazio',
         comprovante_residencia_url: paciente.comprovante_residencia_url ? '✓ Preenchido' : '✗ Vazio',
         contrato_servico_url: paciente.contrato_servico_url ? '✓ Preenchido' : '✗ Vazio'
       });
       
       // Preservar valores existentes no formData se já estiverem preenchidos
+      // IMPORTANTE: NÃO sobrescrever valores que o usuário já digitou
       setFormData(prev => {
         // Formatar CPF se existir no paciente E não estiver preenchido no formData
         let cpfFormatado = prev.cpf;
@@ -48,28 +67,13 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
           }
         }
         
-        // Formatar data se existir no paciente E não estiver preenchida no formData
-        let dataFormatada = prev.data_nascimento;
-        if (!dataFormatada && paciente.data_nascimento) {
-          // Se está no formato YYYY-MM-DD, converter para DD/MM/YYYY
-          if (paciente.data_nascimento.includes('-')) {
-            const partes = paciente.data_nascimento.split('-');
-            if (partes.length === 3) {
-              dataFormatada = `${partes[2]}/${partes[1]}/${partes[0]}`;
-            }
-          } else {
-            dataFormatada = paciente.data_nascimento;
-          }
-        }
-        
         return {
           cpf: isPacienteLogado ? prev.cpf : cpfFormatado,
-          data_nascimento: dataFormatada,
           comprovante_residencia: prev.comprovante_residencia // Preservar comprovante se existir
         };
       });
     }
-  }, [paciente, isPacienteLogado]);
+  }, [paciente, isPacienteLogado, passoInicializado, passoAtual]);
   
   // Estados para upload
   const [uploadingComprovante, setUploadingComprovante] = useState(false);
@@ -137,11 +141,27 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
   // Determinar qual passo iniciar - SEMPRE começar do passo 1 apenas na primeira vez
   // O paciente DEVE passar por TODOS os passos sequencialmente para confirmar cada informação
   useEffect(() => {
+    // Não executar durante upload para evitar verificação prematura
+    if (uploadEmProgresso) {
+      console.log('⏸️ [ModalCadastro] Upload em progresso, pulando verificação inicial');
+      return;
+    }
+    
+    // Não reinicializar se já estamos em um passo específico (evita reset quando paciente muda)
+    if (passoInicializado && passoAtual > 1) {
+      console.log('⏸️ [ModalCadastro] Modal já em uso no passo', passoAtual, ', ignorando reinicialização');
+      return;
+    }
+    
     // Só executar na primeira vez que o componente é montado ou quando o paciente muda pela primeira vez
     if (paciente && !passoInicializado) {
+      // Armazenar referência do paciente inicial
+      if (!pacienteInicialRef.current) {
+        pacienteInicialRef.current = paciente.id;
+      }
+      
       console.log('🔍 [ModalCadastro] Determinando passo inicial:', {
         cpf: paciente.cpf ? `"${paciente.cpf}"` : 'NULL',
-        data_nascimento: paciente.data_nascimento ? `"${paciente.data_nascimento}"` : 'NULL',
         comprovante_residencia_url: paciente.comprovante_residencia_url ? 'EXISTE' : 'NULL',
         contrato_servico_url: paciente.contrato_servico_url ? 'EXISTE' : 'NULL'
       });
@@ -152,20 +172,8 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
       setPassoAtual(1);
       setPassoInicializado(true);
       
-      // Verificar se todos os passos estão completos (para fechar o modal se necessário)
-      const todosCompletos = 
-        paciente.cpf && paciente.cpf.trim() !== '' &&
-        paciente.data_nascimento && paciente.data_nascimento.trim() !== '' &&
-        paciente.comprovante_residencia_url && paciente.comprovante_residencia_url.trim() !== '' &&
-        paciente.contrato_servico_url && paciente.contrato_servico_url.trim() !== '';
-      
-      if (todosCompletos) {
-        console.log('✅ [ModalCadastro] Todos os passos completos! Fechando modal...');
-        // Pequeno delay para garantir que o modal foi renderizado antes de fechar
-        setTimeout(() => {
-          onComplete();
-        }, 100);
-      }
+      // NÃO verificar se todos os passos estão completos aqui - isso deve ser feito apenas no final do passo 4
+      // Removido para evitar fechamento prematuro do modal
     } else if (!paciente && !passoInicializado) {
       // Se não tem dados do paciente, começar do passo 1
       console.log('⚠️ [ModalCadastro] Paciente não fornecido, iniciando no Passo 1');
@@ -174,7 +182,7 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
     }
     // Não incluir 'paciente' nas dependências para evitar re-execução quando o paciente é atualizado
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [passoInicializado]);
+  }, [passoInicializado, uploadEmProgresso, passoAtual]);
   
   // Buscar contrato do fechamento
   useEffect(() => {
@@ -222,7 +230,7 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
       }
     };
     
-    if (passoAtual === 4) {
+    if (passoAtual === 3) {
       buscarContrato();
     }
   }, [passoAtual, paciente, makeRequest]);
@@ -231,7 +239,7 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
   useEffect(() => {
     const carregarPdfContrato = async () => {
       // Só carregar se estiver no passo 4 e ainda não tiver carregado
-      if (contratoUrl && passoAtual === 4 && !contratoPdfBytes) {
+      if (contratoUrl && passoAtual === 3 && !contratoPdfBytes) {
         try {
           console.log('📄 [ModalCadastro] Carregando PDF do contrato...');
           const response = await fetch(contratoUrl);
@@ -327,23 +335,42 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
   // Validar data de nascimento
   const validarDataNascimento = (data) => {
     const dataLimpa = data.replace(/\D/g, '');
-    if (dataLimpa.length !== 8) return false;
+    if (dataLimpa.length !== 8) {
+      console.log('❌ [ModalCadastro] Data inválida: comprimento incorreto', dataLimpa.length);
+      return false;
+    }
     
     const dia = parseInt(dataLimpa.substring(0, 2));
     const mes = parseInt(dataLimpa.substring(2, 4));
     const ano = parseInt(dataLimpa.substring(4, 8));
     
-    if (dia < 1 || dia > 31) return false;
-    if (mes < 1 || mes > 12) return false;
-    if (ano < 1900 || ano > new Date().getFullYear()) return false;
+    console.log('🔍 [ModalCadastro] Validando data:', { data, dia, mes, ano });
     
-    const dataObj = new Date(ano, mes - 1, dia);
-    if (dataObj.getDate() !== dia || dataObj.getMonth() !== mes - 1 || dataObj.getFullYear() !== ano) {
+    if (dia < 1 || dia > 31) {
+      console.log('❌ [ModalCadastro] Data inválida: dia fora do range', dia);
+      return false;
+    }
+    if (mes < 1 || mes > 12) {
+      console.log('❌ [ModalCadastro] Data inválida: mês fora do range', mes);
+      return false;
+    }
+    if (ano < 1900 || ano > new Date().getFullYear()) {
+      console.log('❌ [ModalCadastro] Data inválida: ano fora do range', ano);
       return false;
     }
     
-    if (dataObj > new Date()) return false;
+    const dataObj = new Date(ano, mes - 1, dia);
+    if (dataObj.getDate() !== dia || dataObj.getMonth() !== mes - 1 || dataObj.getFullYear() !== ano) {
+      console.log('❌ [ModalCadastro] Data inválida: data não existe', { dia, mes, ano, dataObj });
+      return false;
+    }
     
+    if (dataObj > new Date()) {
+      console.log('❌ [ModalCadastro] Data inválida: data futura', dataObj);
+      return false;
+    }
+    
+    console.log('✅ [ModalCadastro] Data válida:', data);
     return true;
   };
   
@@ -403,14 +430,7 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
           
           if (pacienteAtualizado.cpf === cpfLimpo) {
             showSuccessToast('CPF confirmado com sucesso!');
-            // Atualizar formData com a data formatada se existir
-            if (pacienteAtualizado.data_nascimento) {
-              const partes = pacienteAtualizado.data_nascimento.split('-');
-              if (partes.length === 3) {
-                setFormData(prev => ({ ...prev, data_nascimento: `${partes[2]}/${partes[1]}/${partes[0]}` }));
-              }
-            }
-            setPassoAtual(2);
+            setPassoAtual(2); // Ir direto para comprovante (passo 2)
           } else {
             console.error('❌ [ModalCadastro] CPF não foi salvo corretamente!');
             showErrorToast('Erro ao salvar CPF. Por favor, tente novamente.');
@@ -432,48 +452,7 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
     }
   };
   
-  // Passo 2: Data de nascimento
-  const handleSalvarDataNascimento = async () => {
-    if (!formData.data_nascimento || formData.data_nascimento.length !== 10) {
-      showErrorToast('Por favor, informe uma data de nascimento válida');
-      return;
-    }
-    
-    if (!validarDataNascimento(formData.data_nascimento)) {
-      showErrorToast('Data de nascimento inválida. Verifique a data informada.');
-      return;
-    }
-    
-    // Converter DD/MM/YYYY para YYYY-MM-DD
-    const partes = formData.data_nascimento.split('/');
-    const dataFormatada = `${partes[2]}-${partes[1]}-${partes[0]}`;
-    
-    setLoading(true);
-    try {
-      const response = await makeRequest(`/pacientes/${user?.paciente_id || user?.id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ data_nascimento: dataFormatada })
-      });
-      
-      if (response.ok) {
-        showSuccessToast('Data de nascimento salva com sucesso!');
-        // Preservar a data no formData após salvar (não resetar)
-        // A data já está no formato correto (DD/MM/YYYY) no formData
-        console.log('✅ [ModalCadastro] Data de nascimento salva, preservando no formData:', formData.data_nascimento);
-        setPassoAtual(3);
-      } else {
-        const data = await response.json();
-        showErrorToast(data.error || 'Erro ao salvar data de nascimento');
-      }
-    } catch (error) {
-      console.error('Erro ao salvar data de nascimento:', error);
-      showErrorToast('Erro ao conectar com o servidor');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  // Iniciar câmera para comprovante
+  // Passo 2: Comprovante de residência (anteriormente passo 3)
   const iniciarCameraComprovante = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -742,6 +721,7 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
     }
     
     setUploadingComprovante(true);
+    setUploadEmProgresso(true); // Marcar upload em progresso para evitar verificação prematura
     try {
       const formDataUpload = new FormData();
       formDataUpload.append('document', arquivoParaEnviar);
@@ -765,24 +745,29 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
       if (response.ok) {
         console.log('✅ [ModalCadastro] Comprovante enviado com sucesso!');
         showSuccessToast('Comprovante de residência enviado com sucesso!');
-        // Atualizar o paciente data para refletir a mudança
-        const pacienteResponse = await makeRequest(`/pacientes/${pacienteId}`);
-        if (pacienteResponse.ok) {
-          const pacienteAtualizado = await pacienteResponse.json();
-          setFormData(prev => ({ ...prev, comprovante_residencia: null }));
-          setComprovantePreview(null);
-          setModoComprovante(null);
-          setPassoAtual(4);
-        } else {
-          setPassoAtual(4);
-        }
+        
+        // Limpar estados do formulário
+        setFormData(prev => ({ ...prev, comprovante_residencia: null }));
+        setComprovantePreview(null);
+        setModoComprovante(null);
+        
+        // Avançar para o próximo passo SEM atualizar o prop paciente
+        // Isso evita que o useEffect seja disparado e cause refresh infinito
+        setPassoAtual(3); // Avançar para contrato (passo 3)
+        
+        // Aguardar um pouco antes de liberar a flag para garantir que o passo foi atualizado
+        setTimeout(() => {
+          setUploadEmProgresso(false);
+        }, 500);
       } else {
         console.error('❌ [ModalCadastro] Erro ao enviar comprovante:', data);
         showErrorToast(data.error || 'Erro ao enviar comprovante');
+        setUploadEmProgresso(false);
       }
     } catch (error) {
       console.error('❌ [ModalCadastro] Erro ao fazer upload:', error);
       showErrorToast('Erro ao conectar com o servidor');
+      setUploadEmProgresso(false);
     } finally {
       setUploadingComprovante(false);
     }
@@ -1195,11 +1180,6 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
         cpf_é_null: pacienteAtualizado?.cpf === null,
         cpf_é_undefined: pacienteAtualizado?.cpf === undefined,
         cpf_é_vazio: pacienteAtualizado?.cpf === '',
-        data_nascimento: pacienteAtualizado?.data_nascimento,
-        data_nascimento_tipo: typeof pacienteAtualizado?.data_nascimento,
-        data_nascimento_é_null: pacienteAtualizado?.data_nascimento === null,
-        data_nascimento_é_undefined: pacienteAtualizado?.data_nascimento === undefined,
-        data_nascimento_é_vazio: pacienteAtualizado?.data_nascimento === '',
         comprovante_residencia_url: pacienteAtualizado?.comprovante_residencia_url,
         comprovante_residencia_url_tipo: typeof pacienteAtualizado?.comprovante_residencia_url,
         comprovante_residencia_url_é_null: pacienteAtualizado?.comprovante_residencia_url === null,
@@ -1217,13 +1197,6 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
         pacienteAtualizado.cpf !== 'undefined'
       );
       
-      const dataValida = Boolean(
-        pacienteAtualizado?.data_nascimento && 
-        String(pacienteAtualizado.data_nascimento).trim() !== '' &&
-        pacienteAtualizado.data_nascimento !== 'null' &&
-        pacienteAtualizado.data_nascimento !== 'undefined'
-      );
-      
       const comprovanteValido = Boolean(
         pacienteAtualizado?.comprovante_residencia_url && 
         String(pacienteAtualizado.comprovante_residencia_url).trim() !== '' &&
@@ -1233,16 +1206,14 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
       
       console.log('🔍 [ModalCadastro] Resultado da validação:', {
         cpfValido,
-        dataValida,
         comprovanteValido,
         comprovante_valor: pacienteAtualizado?.comprovante_residencia_url,
         comprovante_apos_trim: pacienteAtualizado?.comprovante_residencia_url?.trim()
       });
       
-      if (!cpfValido || !dataValida || !comprovanteValido) {
+      if (!cpfValido || !comprovanteValido) {
         console.error('❌ [ModalCadastro] Campos obrigatórios não preenchidos:', {
           cpf: cpfValido ? '✓' : '✗',
-          data_nascimento: dataValida ? '✓' : '✗',
           comprovante_residencia_url: comprovanteValido ? '✓' : '✗'
         });
         
@@ -1252,12 +1223,9 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
         if (!cpfValido) {
           camposFaltando.push('CPF');
           passoParaVoltar = 1;
-        } else if (!dataValida) {
-          camposFaltando.push('Data de Nascimento');
-          passoParaVoltar = 2;
         } else if (!comprovanteValido) {
           camposFaltando.push('Comprovante de Residência');
-          passoParaVoltar = 3;
+          passoParaVoltar = 2;
         }
         
         setLoading(false);
@@ -1276,7 +1244,6 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
       console.log('✅ [ModalCadastro] Todos os campos validados. Finalizando cadastro...');
       console.log('📋 [ModalCadastro] Dados finais validados:', {
         cpf: cpfValido ? '✓' : '✗',
-        data_nascimento: dataValida ? '✓' : '✗',
         comprovante_residencia_url: comprovanteValido ? '✓' : '✗'
       });
       
@@ -1406,13 +1373,13 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
         {/* Indicador de progresso */}
         <div className="cadastro-stepper">
           {/* Linhas conectoras */}
-          {[1, 2, 3].map((index) => (
+          {[1, 2].map((index) => (
             <div
               key={`connector-${index}`}
               className="step-connector"
               style={{
-                left: `calc(${index * 25}% - 12.5%)`,
-                width: '25%',
+                left: `calc(${index * 33.33}% - 16.665%)`,
+                width: '33.33%',
                 backgroundColor: index < passoAtual ? '#059669' : '#e5e7eb'
               }}
             />
@@ -1421,9 +1388,8 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
           {/* Steps */}
           {[
             { num: 1, label: 'CPF' },
-            { num: 2, label: 'Nascimento' },
-            { num: 3, label: 'Residência' },
-            { num: 4, label: 'Contrato' }
+            { num: 2, label: 'Residência' },
+            { num: 3, label: 'Contrato' }
           ].map((step) => (
             <div key={step.num} className="cadastro-step">
               <div 
@@ -1501,70 +1467,8 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
             </div>
           )}
           
-          {/* Passo 2: Data de nascimento */}
+          {/* Passo 2: Comprovante de residência */}
           {passoAtual === 2 && (
-            <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.5rem', color: '#1e293b' }}>
-                Informe sua data de nascimento
-              </h2>
-              <p style={{ color: '#6b7280', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
-                Por favor, informe sua data de nascimento
-              </p>
-              
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{
-                  display: 'block',
-                  fontWeight: '600',
-                  marginBottom: '0.5rem',
-                  color: '#374151',
-                  fontSize: '0.875rem'
-                }}>
-                  Data de Nascimento *
-                </label>
-                <input
-                  type="text"
-                  value={formData.data_nascimento}
-                  onChange={(e) => {
-                    const valorFormatado = formatarData(e.target.value);
-                    setFormData(prev => ({ ...prev, data_nascimento: valorFormatado }));
-                  }}
-                  placeholder="DD/MM/AAAA"
-                  maxLength={10}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '2px solid #e2e8f0',
-                    borderRadius: '8px',
-                    fontSize: '1rem',
-                    outline: 'none',
-                    transition: 'all 0.2s'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = '#059669'}
-                  onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                />
-              </div>
-              
-              <div className="cadastro-form-actions">
-                <button
-                  className="btn-voltar"
-                  onClick={() => setPassoAtual(1)}
-                >
-                  Voltar
-                </button>
-                <button
-                  className="btn-proximo"
-                  onClick={handleSalvarDataNascimento}
-                  disabled={loading || !formData.data_nascimento}
-                  style={{ flex: 2 }}
-                >
-                  {loading ? 'Salvando...' : 'Continuar'}
-                </button>
-              </div>
-            </div>
-          )}
-          
-          {/* Passo 3: Comprovante de residência */}
-          {passoAtual === 3 && (
             <div>
               <h2 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.5rem', color: '#1e293b' }}>
                 Comprovante de residência
@@ -1799,8 +1703,8 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
             </div>
           )}
           
-          {/* Passo 4: Assinar contrato */}
-          {passoAtual === 4 && (
+          {/* Passo 3: Assinar contrato */}
+          {passoAtual === 3 && (
             <div>
               <h2 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.5rem', color: '#1e293b' }}>
                 Assinar contrato de serviço
@@ -2060,7 +1964,7 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
                   
                   <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                     <button
-                      onClick={() => setPassoAtual(3)}
+                      onClick={() => setPassoAtual(2)}
                       style={{
                         flex: 1,
                         minWidth: '100px',
@@ -2080,18 +1984,18 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
                     </button>
                     <button
                       onClick={handleFinalizarCadastro}
-                      disabled={loading || !paciente?.contrato_servico_url}
+                      disabled={loading || (!paciente?.contrato_servico_url && !assinaturaAplicada)}
                       style={{
                         flex: 2,
                         minWidth: '150px',
                         padding: '0.875rem',
-                        backgroundColor: (loading || !paciente?.contrato_servico_url) ? '#9ca3af' : '#059669',
+                        backgroundColor: (loading || (!paciente?.contrato_servico_url && !assinaturaAplicada)) ? '#9ca3af' : '#059669',
                         color: 'white',
                         border: 'none',
                         borderRadius: '8px',
                         fontSize: '0.95rem',
                         fontWeight: '600',
-                        cursor: (loading || !paciente?.contrato_servico_url) ? 'not-allowed' : 'pointer',
+                        cursor: (loading || (!paciente?.contrato_servico_url && !assinaturaAplicada)) ? 'not-allowed' : 'pointer',
                         touchAction: 'manipulation',
                         transition: 'all 0.2s'
                       }}

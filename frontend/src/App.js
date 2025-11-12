@@ -120,6 +120,7 @@ const AppContent = () => {
     if (path.includes('/whatsapp')) return 'whatsapp';
     if (path.includes('/simulador')) return 'simulador';
     if (path.includes('/meus-documentos')) return 'meus-documentos';
+    if (path.includes('/meus-boletos')) return 'meus-boletos';
     if (path.includes('/materiais')) return 'materiais';
     if (path.includes('/perfil')) return 'perfil';
     if (path.includes('/assinatura-digital')) return 'assinatura-digital';

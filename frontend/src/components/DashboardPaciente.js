@@ -15,27 +15,52 @@ const DashboardPaciente = () => {
   const [dados, setDados] = useState({
     proximosAgendamentos: [],
     documentosPendentes: 0,
+    boletosPagos: 0,
     boletosPendentes: 0,
-    totalBoletos: 0
+    boletosAtrasados: 0
   });
   const pacienteInfoRef = useRef(null);
 
   const fetchDashboardData = useCallback(async (pacienteInfo = null) => {
     try {
       setLoading(true);
+      let boletosPagos = 0;
       let boletosPendentes = 0;
-      let totalBoletos = 0;
+      let boletosAtrasados = 0;
 
       try {
         const boletosResponse = await makeRequest('/paciente/boletos', { method: 'GET' });
         if (boletosResponse.ok) {
           const boletosData = await boletosResponse.json();
           const lista = Array.isArray(boletosData?.boletos) ? boletosData.boletos : [];
-          totalBoletos = lista.length;
-          boletosPendentes = lista.filter((boleto) => {
+          
+          const hoje = new Date();
+          hoje.setHours(0, 0, 0, 0);
+          
+          lista.forEach((boleto) => {
             const status = (boleto.status || '').toLowerCase();
-            return status === 'pendente' || status === 'vencido';
-          }).length;
+            
+            // Verificar data de vencimento se disponível
+            let estaVencido = false;
+            if (boleto.data_vencimento) {
+              const dataVencimento = new Date(boleto.data_vencimento);
+              dataVencimento.setHours(0, 0, 0, 0);
+              estaVencido = dataVencimento < hoje;
+            }
+            
+            // Boletos Pagos (sempre contam como pagos, independente da data)
+            if (status === 'pago' || status === 'liquidado') {
+              boletosPagos++;
+            }
+            // Boletos Atrasados (vencidos ou status vencido)
+            else if (status === 'vencido' || estaVencido) {
+              boletosAtrasados++;
+            }
+            // Boletos Pendentes (não pagos e não vencidos)
+            else if (status === 'pendente' || !status) {
+              boletosPendentes++;
+            }
+          });
         } else {
           console.warn('⚠️ [DashboardPaciente] Falha ao carregar boletos:', boletosResponse.status);
         }
@@ -47,16 +72,16 @@ const DashboardPaciente = () => {
       let documentosPendentes = 0;
       if (pacienteReferencia) {
         const faltaCPF = !pacienteReferencia.cpf || pacienteReferencia.cpf.trim() === '';
-        const faltaDataNascimento = !pacienteReferencia.data_nascimento || pacienteReferencia.data_nascimento.trim() === '';
         const faltaComprovante = !pacienteReferencia.comprovante_residencia_url || pacienteReferencia.comprovante_residencia_url.trim() === '';
-        documentosPendentes = [faltaCPF, faltaDataNascimento, faltaComprovante].filter(Boolean).length;
+        documentosPendentes = [faltaCPF, faltaComprovante].filter(Boolean).length;
       }
 
       setDados({
         proximosAgendamentos: [],
         documentosPendentes,
+        boletosPagos,
         boletosPendentes,
-        totalBoletos
+        boletosAtrasados
       });
     } catch (error) {
       console.error('Erro ao buscar dados do dashboard:', error);
@@ -70,6 +95,12 @@ const DashboardPaciente = () => {
     // Se o cadastro já foi finalizado, não verificar novamente
     if (cadastroFinalizado) {
       console.log('✅ [DashboardPaciente] Cadastro já finalizado. Pulando verificação.');
+      return;
+    }
+    
+    // Se o modal já está aberto, não verificar novamente (evita reinicialização)
+    if (showModalCadastro) {
+      console.log('⏸️ [DashboardPaciente] Modal já aberto, pulando verificação para evitar reinicialização');
       return;
     }
     
@@ -91,12 +122,18 @@ const DashboardPaciente = () => {
       const response = await makeRequest(`/pacientes/${pacienteId}`);
       if (response.ok) {
         const paciente = await response.json();
-        setPacienteData(paciente);
-        pacienteInfoRef.current = paciente;
+        
+        // Só atualizar pacienteData se o modal não estiver aberto
+        if (!showModalCadastro) {
+          setPacienteData(paciente);
+          pacienteInfoRef.current = paciente;
+        } else {
+          // Se o modal está aberto, apenas atualizar a referência sem atualizar o estado
+          pacienteInfoRef.current = paciente;
+        }
         
         console.log('📋 [DashboardPaciente] Dados do paciente:', {
           cpf: paciente.cpf ? '✓' : '✗',
-          data_nascimento: paciente.data_nascimento ? '✓' : '✗',
           comprovante_residencia_url: paciente.comprovante_residencia_url ? '✓' : '✗',
           contrato_servico_url: paciente.contrato_servico_url ? '✓' : '✗'
         });
@@ -113,15 +150,16 @@ const DashboardPaciente = () => {
         // para confirmar cada informação
         // NOTA: O contrato não é obrigatório, pois pode não existir fechamento ainda
         const faltaCPF = !paciente.cpf || paciente.cpf.trim() === '';
-        const faltaDataNascimento = !paciente.data_nascimento || paciente.data_nascimento.trim() === '';
         const faltaComprovante = !paciente.comprovante_residencia_url || paciente.comprovante_residencia_url.trim() === '';
         
-        const cadastroIncompleto = faltaCPF || faltaDataNascimento || faltaComprovante;
+        const cadastroIncompleto = faltaCPF || faltaComprovante;
         
         if (cadastroIncompleto) {
           console.log('⚠️ [DashboardPaciente] Cadastro incompleto. Mostrando modal...');
           // Mostrar modal para completar cadastro
           setShowModalCadastro(true);
+          // Atualizar pacienteData apenas quando for abrir o modal
+          setPacienteData(paciente);
           setLoading(false);
           return;
         }
@@ -139,7 +177,7 @@ const DashboardPaciente = () => {
       // Em caso de erro, tentar carregar dashboard mesmo assim
       fetchDashboardData();
     }
-  }, [user, makeRequest, fetchDashboardData, cadastroFinalizado]);
+  }, [user, makeRequest, fetchDashboardData, cadastroFinalizado, showModalCadastro]);
 
   useEffect(() => {
     // Aguardar o user estar disponível antes de verificar
@@ -179,7 +217,7 @@ const DashboardPaciente = () => {
         gap: '1.5rem',
         marginBottom: '2rem'
       }}>
-        {/* Card de Próximos Agendamentos */}
+        {/* Card de Boletos Pagos */}
         <div style={{
           backgroundColor: 'white',
           borderRadius: '8px',
@@ -188,30 +226,14 @@ const DashboardPaciente = () => {
           border: '1px solid #e5e7eb'
         }}>
           <h3 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.5rem' }}>
-            Próximos Agendamentos
+            Boletos Pagos
           </h3>
-          <p style={{ fontSize: '2rem', fontWeight: '700', color: '#1a1d23', margin: 0 }}>
-            {dados.proximosAgendamentos.length}
+          <p style={{ fontSize: '2rem', fontWeight: '700', color: '#059669', margin: 0 }}>
+            {dados.boletosPagos}
           </p>
         </div>
 
-        {/* Card de Documentos */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          padding: '1.5rem',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          border: '1px solid #e5e7eb'
-        }}>
-          <h3 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.5rem' }}>
-            Documentos Pendentes
-          </h3>
-          <p style={{ fontSize: '2rem', fontWeight: '700', color: '#1a1d23', margin: 0 }}>
-            {dados.documentosPendentes}
-          </p>
-        </div>
-
-        {/* Card de Boletos */}
+        {/* Card de Boletos Pendentes */}
         <div style={{
           backgroundColor: 'white',
           borderRadius: '8px',
@@ -222,8 +244,24 @@ const DashboardPaciente = () => {
           <h3 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.5rem' }}>
             Boletos Pendentes
           </h3>
-          <p style={{ fontSize: '2rem', fontWeight: '700', color: '#1a1d23', margin: 0 }}>
+          <p style={{ fontSize: '2rem', fontWeight: '700', color: '#f59e0b', margin: 0 }}>
             {dados.boletosPendentes}
+          </p>
+        </div>
+
+        {/* Card de Boletos Atrasados */}
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          padding: '1.5rem',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          border: '1px solid #e5e7eb'
+        }}>
+          <h3 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.5rem' }}>
+            Boletos Atrasados
+          </h3>
+          <p style={{ fontSize: '2rem', fontWeight: '700', color: '#ef4444', margin: 0 }}>
+            {dados.boletosAtrasados}
           </p>
         </div>
       </div>

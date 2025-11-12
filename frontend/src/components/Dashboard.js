@@ -155,6 +155,7 @@ const Dashboard = () => {
   
   // Hook de autenticação - DEVE vir antes dos useEffect que dependem dele
   const { makeRequest, user, isAdmin, isConsultorInterno, podeVerTodosDados, isClinica, isFreelancer, isIncorporadora } = useAuth();
+  const mostrarKpisFinanceiros = isClinica || (isAdmin && user?.empresa_id === 3);
   
   // Hooks de notificações
   const { showFechamentoModal, FechamentoModal } = useFechamentoNotifications();
@@ -868,20 +869,22 @@ const Dashboard = () => {
           pacientes = pacientes.filter(paciente => pacientesIdsComRegiao.has(paciente.id));
         }
         
-        if (isClinica && user?.clinica_id) {
-          let boletosGestaoClinica = [];
+        if (mostrarKpisFinanceiros) {
+          let boletosFinanceiros = [];
           try {
             const paramsBoletos = new URLSearchParams();
             paramsBoletos.append('page', '1');
             paramsBoletos.append('limit', '500');
-            paramsBoletos.append('clinica_id', user.clinica_id);
+            if (isClinica && user?.clinica_id) {
+              paramsBoletos.append('clinica_id', user.clinica_id);
+            }
             const boletosResponse = await makeRequest(`/boletos-gestao?${paramsBoletos.toString()}`);
             if (boletosResponse.ok) {
               const boletosData = await boletosResponse.json();
               const lista = Array.isArray(boletosData?.boletos) ? boletosData.boletos : [];
-              boletosGestaoClinica = lista.filter(
-                (boleto) => String(boleto?.clinica_id) === String(user.clinica_id)
-              );
+              boletosFinanceiros = isClinica && user?.clinica_id
+                ? lista.filter((boleto) => String(boleto?.clinica_id) === String(user.clinica_id))
+                : lista;
             } else {
               const erroTexto = await boletosResponse.text();
               console.error('Erro ao carregar boletos da clínica:', erroTexto);
@@ -889,7 +892,7 @@ const Dashboard = () => {
           } catch (erroBoletosClinica) {
             console.error('Erro ao carregar boletos da clínica:', erroBoletosClinica);
           }
-          setKpisFinanceirosClinica(calcularIndicadoresFinanceirosClinica(boletosGestaoClinica));
+          setKpisFinanceirosClinica(calcularIndicadoresFinanceirosClinica(boletosFinanceiros));
         } else {
           setKpisFinanceirosClinica(createDefaultKpisFinanceiros());
         }
@@ -1870,6 +1873,86 @@ const Dashboard = () => {
     return `${numero.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
   };
 
+  const kpisFinanceirosGrid = (
+    <div className="grid grid-2">
+      <div className="stat-card" style={{ background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)', border: '1px solid #34d399' }}>
+        <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600', color: '#065f46' }}>
+          Valor Recebido
+        </div>
+        <div className="stat-value" style={{ fontSize: '2.5rem', color: '#065f46' }}>
+          {formatCurrency(kpisFinanceirosClinica.valorPago)}
+        </div>
+        <div className="stat-subtitle" style={{ color: '#047857', fontSize: '0.8rem', fontWeight: '500' }}>
+          Boletos pagos
+        </div>
+      </div>
+      <div className="stat-card" style={{ background: 'linear-gradient(135deg, #e0f2fe 0%, #bfdbfe 100%)', border: '1px solid #60a5fa' }}>
+        <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600', color: '#1d4ed8' }}>
+          A Receber
+        </div>
+        <div className="stat-value" style={{ fontSize: '2.5rem', color: '#1d4ed8' }}>
+          {formatCurrency(kpisFinanceirosClinica.valorPendente)}
+        </div>
+        <div className="stat-subtitle" style={{ color: '#1d4ed8', fontSize: '0.8rem', fontWeight: '500' }}>
+          Boletos pendentes
+        </div>
+      </div>
+      <div className="stat-card" style={{ background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)', border: '1px solid #f87171' }}>
+        <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600', color: '#b91c1c' }}>
+          Em Atraso
+        </div>
+        <div className="stat-value" style={{ fontSize: '2.5rem', color: '#b91c1c' }}>
+          {formatCurrency(kpisFinanceirosClinica.valorVencido)}
+        </div>
+        <div className="stat-subtitle" style={{ color: '#b91c1c', fontSize: '0.8rem', fontWeight: '500' }}>
+          Boletos vencidos
+        </div>
+        <div style={{
+          marginTop: '1rem',
+          padding: '0.75rem',
+          borderRadius: '10px',
+          background: 'rgba(248, 113, 113, 0.12)',
+          border: '1px solid rgba(248, 113, 113, 0.35)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.5rem'
+        }}>
+          {['faixa0a15', 'faixa30a60', 'faixa90mais'].map((faixaKey) => {
+            const faixa = kpisFinanceirosClinica.faixasAtraso?.[faixaKey];
+            if (!faixa) return null;
+            return (
+              <div key={faixaKey} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#7f1d1d' }}>
+                <span style={{ fontWeight: '600' }}>{faixa.label}</span>
+                <span style={{ fontWeight: '600' }}>
+                  {formatCurrency(faixa.valor)}{' '}
+                  <span style={{ fontWeight: '400', color: '#9f1239' }}>
+                    ({faixa.quantidade} {faixa.quantidade === 1 ? 'boleto' : 'boletos'})
+                  </span>
+                </span>
+              </div>
+            );
+          })}
+          {(kpisFinanceirosClinica.faixasAtraso?.faixaOutros?.valor || 0) > 0 && (
+            <div style={{ fontSize: '0.7rem', color: '#9f1239', lineHeight: 1.4 }}>
+              <strong>Observação:</strong> valores fora das faixas solicitadas (16-29 e 61-89 dias) totalizam {formatCurrency(kpisFinanceirosClinica.faixasAtraso.faixaOutros.valor)}.
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="stat-card" style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', border: '1px solid #fbbf24' }}>
+        <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600', color: '#92400e' }}>
+          Taxa de inadimplência
+        </div>
+        <div className="stat-value" style={{ fontSize: '2.5rem', color: '#b45309' }}>
+          {formatPercentagePlain(kpisFinanceirosClinica.inadimplencia)}
+        </div>
+        <div className="stat-subtitle" style={{ color: '#b45309', fontSize: '0.8rem', fontWeight: '500' }}>
+          Base: {formatCurrency(kpisFinanceirosClinica.totalEmitido)} · {kpisFinanceirosClinica.totalBoletos} boletos
+        </div>
+      </div>
+    </div>
+  );
+
   const formatarMesAno = (data) => {
     const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
                    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -2549,83 +2632,7 @@ const Dashboard = () => {
           Indicadores Principais
         </h3>
         {isClinica ? (
-          <div className="grid grid-2">
-            <div className="stat-card" style={{ background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)', border: '1px solid #34d399' }}>
-              <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600', color: '#065f46' }}>
-                Valor Recebido
-              </div>
-              <div className="stat-value" style={{ fontSize: '2.5rem', color: '#065f46' }}>
-                {formatCurrency(kpisFinanceirosClinica.valorPago)}
-              </div>
-              <div className="stat-subtitle" style={{ color: '#047857', fontSize: '0.8rem', fontWeight: '500' }}>
-                Boletos pagos
-              </div>
-            </div>
-            <div className="stat-card" style={{ background: 'linear-gradient(135deg, #e0f2fe 0%, #bfdbfe 100%)', border: '1px solid #60a5fa' }}>
-              <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600', color: '#1d4ed8' }}>
-                A Receber
-              </div>
-              <div className="stat-value" style={{ fontSize: '2.5rem', color: '#1d4ed8' }}>
-                {formatCurrency(kpisFinanceirosClinica.valorPendente)}
-              </div>
-              <div className="stat-subtitle" style={{ color: '#1d4ed8', fontSize: '0.8rem', fontWeight: '500' }}>
-                Boletos pendentes
-              </div>
-            </div>
-            <div className="stat-card" style={{ background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)', border: '1px solid #f87171' }}>
-              <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600', color: '#b91c1c' }}>
-                Em Atraso
-              </div>
-              <div className="stat-value" style={{ fontSize: '2.5rem', color: '#b91c1c' }}>
-                {formatCurrency(kpisFinanceirosClinica.valorVencido)}
-              </div>
-              <div className="stat-subtitle" style={{ color: '#b91c1c', fontSize: '0.8rem', fontWeight: '500' }}>
-                Boletos vencidos
-              </div>
-              <div style={{ 
-                marginTop: '1rem', 
-                padding: '0.75rem', 
-                borderRadius: '10px',
-                background: 'rgba(248, 113, 113, 0.12)',
-                border: '1px solid rgba(248, 113, 113, 0.35)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.5rem'
-              }}>
-                {['faixa0a15', 'faixa30a60', 'faixa90mais'].map((faixaKey) => {
-                  const faixa = kpisFinanceirosClinica.faixasAtraso?.[faixaKey];
-                  if (!faixa) return null;
-                  return (
-                    <div key={faixaKey} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#7f1d1d' }}>
-                      <span style={{ fontWeight: '600' }}>{faixa.label}</span>
-                      <span style={{ fontWeight: '600' }}>
-                        {formatCurrency(faixa.valor)}{' '}
-                        <span style={{ fontWeight: '400', color: '#9f1239' }}>
-                          ({faixa.quantidade} {faixa.quantidade === 1 ? 'boleto' : 'boletos'})
-                        </span>
-                      </span>
-                    </div>
-                  );
-                })}
-                {(kpisFinanceirosClinica.faixasAtraso?.faixaOutros?.valor || 0) > 0 && (
-                  <div style={{ fontSize: '0.7rem', color: '#9f1239', lineHeight: 1.4 }}>
-                    <strong>Observação:</strong> valores fora das faixas solicitadas (16-29 e 61-89 dias) totalizam {formatCurrency(kpisFinanceirosClinica.faixasAtraso.faixaOutros.valor)}.
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="stat-card" style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', border: '1px solid #fbbf24' }}>
-              <div className="stat-label" style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px', fontWeight: '600', color: '#92400e' }}>
-                Taxa de inadimplência
-              </div>
-              <div className="stat-value" style={{ fontSize: '2.5rem', color: '#b45309' }}>
-                {formatPercentagePlain(kpisFinanceirosClinica.inadimplencia)}
-              </div>
-              <div className="stat-subtitle" style={{ color: '#b45309', fontSize: '0.8rem', fontWeight: '500' }}>
-                Base: {formatCurrency(kpisFinanceirosClinica.totalEmitido)} · {kpisFinanceirosClinica.totalBoletos} boletos
-              </div>
-            </div>
-          </div>
+          kpisFinanceirosGrid
         ) : (
           <div className="grid grid-2">
             <div className="stat-card" style={{ background: 'white', border: '1px solid #e5e7eb' }}>
@@ -2672,6 +2679,23 @@ const Dashboard = () => {
           </div>
         )}
       </div>
+
+      {!isClinica && mostrarKpisFinanceiros && (
+        <div style={{ marginBottom: '2rem', padding: '2rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '16px' }}>
+          <h3 style={{
+            fontSize: '1.25rem',
+            fontWeight: '700',
+            color: '#1a1d23',
+            marginBottom: '1.5rem',
+            letterSpacing: '-0.025em',
+            borderBottom: '2px solid #e5e7eb',
+            paddingBottom: '0.75rem'
+          }}>
+            Indicadores Financeiros (Clínicas)
+          </h3>
+          {kpisFinanceirosGrid}
+        </div>
+      )}
 
       {/* Seção Exclusiva para Clínicas */}
       {isClinica && (

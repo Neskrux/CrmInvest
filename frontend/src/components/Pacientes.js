@@ -34,8 +34,17 @@ const Pacientes = () => {
   const [fechamentos, setFechamentos] = useState([]);
   const [boletosPorPaciente, setBoletosPorPaciente] = useState({});
   const [carregandoBoletosClinica, setCarregandoBoletosClinica] = useState(false);
-  const [antecipacaoEdicoes, setAntecipacaoEdicoes] = useState({});
-  const [antecipacaoSalvando, setAntecipacaoSalvando] = useState({});
+  const [selectedPacientesAntecipacao, setSelectedPacientesAntecipacao] = useState([]);
+  const [showAntecipacaoModal, setShowAntecipacaoModal] = useState(false);
+  const [antecipacaoModalPacientes, setAntecipacaoModalPacientes] = useState([]);
+  const [antecipacaoValoresSolicitados, setAntecipacaoValoresSolicitados] = useState({});
+  const [observacaoAntecipacao, setObservacaoAntecipacao] = useState('');
+  const [salvandoSolicitacaoAntecipacao, setSalvandoSolicitacaoAntecipacao] = useState(false);
+  const [solicitacoesAntecipacao, setSolicitacoesAntecipacao] = useState([]);
+  const [solicitacaoAntecipacaoSelecionada, setSolicitacaoAntecipacaoSelecionada] = useState(null);
+  const [showDetalhesAntecipacaoModal, setShowDetalhesAntecipacaoModal] = useState(false);
+  const [carregandoSolicitacoesAntecipacao, setCarregandoSolicitacoesAntecipacao] = useState(false);
+  const [observacaoAntecipacaoAdmin, setObservacaoAntecipacaoAdmin] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingPaciente, setEditingPaciente] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -753,6 +762,7 @@ const Pacientes = () => {
     // Buscar solicitações de carteira se for admin ou clínica
     if (isAdmin || isClinica) {
       fetchSolicitacoesCarteira();
+      fetchSolicitacoesAntecipacao();
     }
     
     // Buscar novos leads apenas se pode alterar status (não freelancer) ou é consultor interno
@@ -842,23 +852,6 @@ const Pacientes = () => {
       document.body.style.overflow = 'unset';
     };
   }, [showModal, showViewModal, showObservacoesModal, showAgendamentoModal, showPermissaoModal, showAtribuirConsultorModal, showEvidenciaModal, showCadastroCompletoModal]);
-
-  useEffect(() => {
-    if (!isClinica) return;
-    const clinicaId = user?.clinica_id || user?.id;
-    setAntecipacaoEdicoes(prev => {
-      const atualizados = { ...prev };
-      fechamentos.forEach(fechamento => {
-        if (fechamento.clinica_id === clinicaId) {
-          const valor = Number.isFinite(fechamento.antecipacao_meses) && fechamento.antecipacao_meses !== null
-            ? fechamento.antecipacao_meses
-            : 0;
-          atualizados[fechamento.paciente_id] = valor.toString();
-        }
-      });
-      return atualizados;
-    });
-  }, [isClinica, fechamentos, user?.clinica_id, user?.id]);
 
   //Sempre que FILTROS mudarem, voltar para a primeira página
   useEffect(() => {
@@ -2108,6 +2101,80 @@ const Pacientes = () => {
     
     return combinacoes;
   };
+  // Função específica para recalcular antecipação
+  // Mantém a estrutura de parcelas OPERAÇÃO/COLATERAL mas recalcula deságio
+  const recalcularAntecipacao = (parcelasDetalhadasOriginais) => {
+    const fatorAM = 0.33; // Fator de deságio fixo de 0.33% ao dia
+    const dataHoje = new Date();
+    dataHoje.setHours(0, 0, 0, 0);
+
+    const parcelasRecalculadas = parcelasDetalhadasOriginais.map(parcela => {
+      // Se for COLATERAL, manter sem deságio
+      if (parcela.tipo === 'COLATERAL' || parcela.categoria === 'COL') {
+        return {
+          ...parcela,
+          desagio: 0,
+          liquidez: parcela.valorFace || parcela.valor,
+          valorEntregue: parcela.valorFace || parcela.valor
+        };
+      }
+
+      // Se for OPERAÇÃO, recalcular deságio
+      try {
+        const dataVencimento = new Date(parcela.vencimento);
+        dataVencimento.setHours(0, 0, 0, 0);
+        
+        const diferencaMs = dataVencimento - dataHoje;
+        const dias = Math.max(0, Math.ceil(diferencaMs / (1000 * 60 * 60 * 24)));
+        
+        const valorParcela = parcela.valorFace || parcela.valor || 0;
+        const desagio = valorParcela * (fatorAM / 100) * dias;
+        const liquidez = Math.max(0, valorParcela - desagio);
+        
+        return {
+          ...parcela,
+          desagio: desagio,
+          liquidez: liquidez,
+          valorEntregue: liquidez
+        };
+      } catch (e) {
+        console.warn('Erro ao recalcular parcela:', e);
+        return parcela;
+      }
+    });
+
+    // Recalcular totais
+    const valorFaceTotal = parcelasRecalculadas.reduce((acc, p) => acc + (p.valorFace || p.valor || 0), 0);
+    const desagioTotal = parcelasRecalculadas
+      .filter(p => p.tipo === 'OPERAÇÃO' || p.categoria === 'OP')
+      .reduce((acc, p) => acc + (p.desagio || 0), 0);
+    const valorEntregueTotal = valorFaceTotal - desagioTotal;
+    
+    // Separar OPERAÇÃO e COLATERAL para calcular percentual
+    const valorOperacao = parcelasRecalculadas
+      .filter(p => p.tipo === 'OPERAÇÃO' || p.categoria === 'OP')
+      .reduce((acc, p) => acc + (p.valorFace || p.valor || 0), 0);
+    const valorColateral = parcelasRecalculadas
+      .filter(p => p.tipo === 'COLATERAL' || p.categoria === 'COL')
+      .reduce((acc, p) => acc + (p.valorFace || p.valor || 0), 0);
+    
+    const percentualFinal = valorOperacao > 0 ? (valorColateral / valorOperacao) * 100 : 0;
+
+    return {
+      parcelasDetalhadas: parcelasRecalculadas,
+      valorFaceTotal: valorFaceTotal,
+      valorEntregueTotal: valorEntregueTotal,
+      valorTotalOperacao: valorOperacao,
+      valorOperacaoEntregue: valorEntregueTotal,
+      valorColateral: valorColateral,
+      valorColateralEntregue: valorColateral,
+      desagioTotal: desagioTotal,
+      percentualFinal: percentualFinal,
+      percentualAlvo: 130,
+      slack: 0
+    };
+  };
+
   // Função para recalcular carteira com percentual específico (usado pelo admin)
   const calcularCarteiraComPercentual = (pacientes, percentualAlvo = 130) => {
     // Valores fixos conforme especificação
@@ -3021,76 +3088,198 @@ const Pacientes = () => {
     }).format(valor);
   };
 
-  const handleAntecipacaoChange = (pacienteId, valor) => {
+  const toggleSelecaoAntecipacao = (pacienteId, fechamento) => {
+    if (!isClinica) return;
+    if (!fechamento?.id) {
+      showErrorToast('Este paciente não possui um fechamento válido para antecipação.');
+      return;
+    }
+    if (fechamento.aprovado !== 'aprovado') {
+      showInfoToast('Somente fechamentos aprovados podem solicitar antecipação.');
+      return;
+    }
+
+    setSelectedPacientesAntecipacao(prev => {
+      if (prev.includes(pacienteId)) {
+        return prev.filter(id => id !== pacienteId);
+      }
+      return [...prev, pacienteId];
+    });
+  };
+
+  const abrirModalAntecipacao = () => {
+    if (!selectedPacientesAntecipacao.length) {
+      showInfoToast('Selecione pelo menos um paciente para solicitar antecipação.');
+      return;
+    }
+
+    const clinicaId = user?.clinica_id || user?.id;
+
+    const dadosPacientes = selectedPacientesAntecipacao
+      .map(pacienteId => {
+        const paciente = pacientes.find(p => p.id === pacienteId);
+        const fechamento = fechamentos.find(
+          f => f.paciente_id === pacienteId && f.clinica_id === clinicaId && f.aprovado === 'aprovado'
+        );
+        if (!paciente || !fechamento) {
+          return null;
+        }
+        return { paciente, fechamento };
+      })
+      .filter(Boolean);
+
+    if (!dadosPacientes.length) {
+      showErrorToast('Nenhum dos pacientes selecionados possui fechamento aprovado para antecipação.');
+      return;
+    }
+
+    const valoresIniciais = {};
+    dadosPacientes.forEach(({ paciente, fechamento }) => {
+      const valorAtual = Number.isFinite(fechamento.antecipacao_meses) && fechamento.antecipacao_meses !== null
+        ? fechamento.antecipacao_meses
+        : 0;
+      valoresIniciais[paciente.id] = valorAtual > 0 ? String(valorAtual) : '';
+    });
+
+    setAntecipacaoModalPacientes(dadosPacientes);
+    setAntecipacaoValoresSolicitados(valoresIniciais);
+    setObservacaoAntecipacao('');
+    setShowAntecipacaoModal(true);
+  };
+
+  const atualizarValorSolicitadoAntecipacao = (pacienteId, valor) => {
     const somenteNumeros = valor.replace(/\D/g, '');
-    setAntecipacaoEdicoes(prev => ({
+    setAntecipacaoValoresSolicitados(prev => ({
       ...prev,
       [pacienteId]: somenteNumeros
     }));
   };
 
-  const handleAntecipacaoSalvar = async (paciente, fechamento) => {
-    if (!fechamento?.id) {
-      showErrorToast('Fechamento não encontrado para este paciente.');
+  const limparSelecaoAntecipacao = () => {
+    setSelectedPacientesAntecipacao([]);
+    setAntecipacaoModalPacientes([]);
+    setAntecipacaoValoresSolicitados({});
+    setObservacaoAntecipacao('');
+  };
+
+  const enviarSolicitacaoAntecipacao = async () => {
+    if (!antecipacaoModalPacientes.length) {
+      showErrorToast('Nenhum paciente válido selecionado.');
       return;
     }
 
-    const valorEntrada = antecipacaoEdicoes.hasOwnProperty(paciente.id)
-      ? antecipacaoEdicoes[paciente.id]
-      : (Number.isFinite(fechamento.antecipacao_meses) && fechamento.antecipacao_meses !== null
-          ? fechamento.antecipacao_meses.toString()
-          : '0');
+    const solicitacoes = antecipacaoModalPacientes.map(({ paciente, fechamento }) => {
+      const bruto = antecipacaoValoresSolicitados[paciente.id] ?? '';
+      const valorNumero = bruto === '' ? 0 : parseInt(bruto, 10);
+      return {
+        paciente_id: paciente.id,
+        paciente_nome: paciente.nome,
+        fechamento_id: fechamento.id,
+        parcelas_solicitadas: valorNumero,
+        parcelas_atual: Number.isFinite(fechamento.antecipacao_meses) && fechamento.antecipacao_meses !== null
+          ? fechamento.antecipacao_meses
+          : 0
+      };
+    }).filter(item => item);
 
-    const valorNumero = valorEntrada === '' ? 0 : parseInt(valorEntrada, 10);
-
-    if (Number.isNaN(valorNumero) || valorNumero < 0) {
-      showErrorToast('Informe um valor de antecipação válido.');
+    if (!solicitacoes.length) {
+      showErrorToast('Informe a quantidade desejada para pelo menos um paciente.');
       return;
     }
 
-    const valorAtualFechamento = Number.isFinite(fechamento.antecipacao_meses) && fechamento.antecipacao_meses !== null
-      ? fechamento.antecipacao_meses
-      : 0;
-
-    if (valorNumero === valorAtualFechamento) {
-      if (showInfoToast) {
-        showInfoToast('O valor de antecipação já está atualizado.');
-      }
+    const possuiValorValido = solicitacoes.some(item => item.parcelas_solicitadas > 0);
+    if (!possuiValorValido) {
+      showErrorToast('Defina a quantidade de parcelas para antecipar em pelo menos um paciente.');
       return;
     }
-
-    setAntecipacaoSalvando(prev => ({ ...prev, [paciente.id]: true }));
 
     try {
-      const response = await makeRequest(`/fechamentos/${fechamento.id}/antecipacao`, {
-        method: 'PUT',
+      setSalvandoSolicitacaoAntecipacao(true);
+      const response = await makeRequest('/solicitacoes-carteira/antecipacao', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ antecipacao_meses: valorNumero })
+        body: JSON.stringify({
+          solicitacoes,
+          observacoes_clinica: observacaoAntecipacao
+        })
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.error || 'Erro ao atualizar antecipação');
+        throw new Error(data?.error || 'Erro ao registrar solicitação de antecipação');
       }
 
-      setFechamentos(prev =>
-        prev.map(f => (f.id === fechamento.id ? { ...f, antecipacao_meses: valorNumero } : f))
-      );
-
-      setAntecipacaoEdicoes(prev => ({
-        ...prev,
-        [paciente.id]: valorNumero.toString()
-      }));
-
-      showSuccessToast('Antecipação atualizada com sucesso!');
+      showSuccessToast('Solicitação de antecipação enviada para aprovação.');
+      setShowAntecipacaoModal(false);
+      limparSelecaoAntecipacao();
+      fetchSolicitacoesAntecipacao();
     } catch (error) {
-      console.error('Erro ao atualizar antecipação:', error);
-      showErrorToast(error.message || 'Erro ao atualizar antecipação');
+      console.error('Erro ao solicitar antecipação:', error);
+      showErrorToast(error.message || 'Erro ao solicitar antecipação');
     } finally {
-      setAntecipacaoSalvando(prev => ({ ...prev, [paciente.id]: false }));
+      setSalvandoSolicitacaoAntecipacao(false);
+    }
+  };
+
+  const fetchSolicitacoesAntecipacao = async () => {
+    try {
+      setCarregandoSolicitacoesAntecipacao(true);
+      const response = await makeRequest('/solicitacoes-carteira');
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Erro ao carregar solicitações de antecipação');
+      }
+      // Filtrar apenas solicitações de antecipação
+      const solicitacoesAntecipacao = Array.isArray(data) 
+        ? data.filter(s => s.tipo_solicitacao === 'antecipacao')
+        : [];
+      setSolicitacoesAntecipacao(solicitacoesAntecipacao);
+    } catch (error) {
+      console.error('Erro ao buscar solicitações de antecipação:', error);
+      showErrorToast(error.message || 'Erro ao buscar solicitações de antecipação');
+    } finally {
+      setCarregandoSolicitacoesAntecipacao(false);
+    }
+  };
+
+  const abrirDetalhesSolicitacaoAntecipacao = (solicitacao) => {
+    setSolicitacaoAntecipacaoSelecionada(solicitacao);
+    setObservacaoAntecipacaoAdmin(solicitacao?.observacoes_admin || '');
+    setShowDetalhesAntecipacaoModal(true);
+  };
+
+  const fecharDetalhesSolicitacaoAntecipacao = () => {
+    setSolicitacaoAntecipacaoSelecionada(null);
+    setShowDetalhesAntecipacaoModal(false);
+    setObservacaoAntecipacaoAdmin('');
+  };
+
+  const atualizarStatusSolicitacaoAntecipacao = async (solicitacaoId, status, observacoesAdmin = '') => {
+    try {
+      const response = await makeRequest(`/solicitacoes-carteira/${solicitacaoId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status, observacoes_admin: observacoesAdmin })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Erro ao atualizar solicitação de antecipação');
+      }
+
+      showSuccessToast(status === 'aprovado' ? 'Solicitação aprovada com sucesso!' : 'Solicitação reprovada.');
+      fecharDetalhesSolicitacaoAntecipacao();
+      fetchSolicitacoesAntecipacao();
+      fetchFechamentos();
+    } catch (error) {
+      console.error('Erro ao atualizar solicitação de antecipação:', error);
+      showErrorToast(error.message || 'Erro ao atualizar solicitação de antecipação');
     }
   };
 
@@ -4586,8 +4775,104 @@ const Pacientes = () => {
               </>
             )}
           </div>
+          <div className="card" style={{ marginTop: '1.5rem' }}>
+            <div className="card-header">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h2 className="card-title">Solicitações de Antecipação</h2>
+                  <p style={{ margin: 0, color: '#6b7280', fontSize: '0.875rem' }}>
+                    Aprove ou rejeite os pedidos enviados pelas clínicas
+                  </p>
+                </div>
+                <div style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', padding: '0.4rem 0.75rem', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem' }}>
+                  {solicitacoesAntecipacao.filter(s => s.status === 'pendente').length} pendente(s)
+                </div>
+              </div>
+            </div>
+            <div className="card-content">
+              {carregandoSolicitacoesAntecipacao ? (
+                <div className="loading">
+                  <div className="spinner"></div>
+                </div>
+              ) : solicitacoesAntecipacao.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+                  Nenhuma solicitação de antecipação encontrada.
+                </div>
+              ) : (
+                <div className="table-container" style={{ width: '100%' }}>
+                  <table className="table" style={{ width: '100%' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ width: '28%' }}>Clínica</th>
+                        <th style={{ width: '16%' }}>Data</th>
+                        <th style={{ width: '12%' }}>Pacientes</th>
+                        <th style={{ width: '14%' }}>Parcelas solicitadas</th>
+                        <th style={{ width: '12%' }}>Status</th>
+                        <th style={{ width: '18%' }}>Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {solicitacoesAntecipacao.map(solicitacao => {
+                        const totalPacientes = solicitacao.pacientes_carteira?.length || 0;
+                        const totalParcelas = (solicitacao.pacientes_carteira || []).reduce(
+                          (acc, item) => acc + (item.numeroParcelasAntecipar ?? 0),
+                          0
+                        );
+                        return (
+                          <tr key={solicitacao.id}>
+                            <td>{solicitacao.clinica_nome || 'Clínica'}</td>
+                            <td>{new Date(solicitacao.created_at).toLocaleString('pt-BR')}</td>
+                            <td>{totalPacientes}</td>
+                            <td>{totalParcelas}</td>
+                            <td>
+                              <span style={{
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '999px',
+                                fontSize: '0.75rem',
+                                fontWeight: '600',
+                                backgroundColor:
+                                  solicitacao.status === 'pendente' ? '#fef3c7' :
+                                  solicitacao.status === 'aprovado' ? '#dcfce7' :
+                                  solicitacao.status === 'reprovado' ? '#fee2e2' : '#f3f4f6',
+                                color:
+                                  solicitacao.status === 'pendente' ? '#b45309' :
+                                  solicitacao.status === 'aprovado' ? '#166534' :
+                                  solicitacao.status === 'reprovado' ? '#b91c1c' : '#6b7280'
+                              }}>
+                                {solicitacao.status === 'pendente' ? 'Pendente' :
+                                 solicitacao.status === 'aprovado' ? 'Aprovado' :
+                                 solicitacao.status === 'reprovado' ? 'Reprovado' : solicitacao.status}
+                              </span>
+                            </td>
+                            <td style={{ whiteSpace: 'nowrap' }}>
+                              <button
+                                onClick={() => abrirDetalhesSolicitacaoAntecipacao(solicitacao)}
+                                style={{
+                                  background: '#2563eb',
+                                  border: 'none',
+                                  color: 'white',
+                                  cursor: 'pointer',
+                                  padding: '6px 12px',
+                                  borderRadius: '4px',
+                                  fontSize: '14px',
+                                  marginRight: '8px'
+                                }}
+                              >
+                                Analisar
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
         </>
       )}
+
       {/* Conteúdo da aba Novos Leads */}
       {activeTab === 'novos-leads' && (
         <>
@@ -5447,6 +5732,54 @@ const Pacientes = () => {
               </div>
             </div>
 
+            {isClinica && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={abrirModalAntecipacao}
+                    disabled={selectedPacientesAntecipacao.length === 0}
+                    style={{
+                      backgroundColor: selectedPacientesAntecipacao.length === 0 ? '#d1d5db' : '#0ea5e9',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '0.6rem 1.2rem',
+                      fontWeight: 600,
+                      fontSize: '0.875rem',
+                      cursor: selectedPacientesAntecipacao.length === 0 ? 'not-allowed' : 'pointer',
+                      transition: 'background-color 0.2s ease'
+                    }}
+                  >
+                    Quero antecipar
+                  </button>
+                  {selectedPacientesAntecipacao.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={limparSelecaoAntecipacao}
+                      style={{
+                        backgroundColor: '#f3f4f6',
+                        color: '#1f2937',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        padding: '0.5rem 1rem',
+                        fontWeight: 500,
+                        fontSize: '0.8rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Limpar seleção
+                    </button>
+                  )}
+                </div>
+                <div style={{ fontSize: '0.85rem', color: '#4b5563', fontWeight: 500 }}>
+                  {selectedPacientesAntecipacao.length === 0
+                    ? 'Selecione os pacientes com fechamento aprovado para solicitar antecipação.'
+                    : `${selectedPacientesAntecipacao.length} paciente${selectedPacientesAntecipacao.length > 1 ? 's' : ''} selecionado${selectedPacientesAntecipacao.length > 1 ? 's' : ''}`}
+                </div>
+              </div>
+            )}
+
             {loading ? (
               <div className="loading">
                 <div className="spinner"></div>
@@ -5481,9 +5814,14 @@ const Pacientes = () => {
                     <table className="table">
                       <thead>
                         <tr>
+                          {isClinica && (
+                            <th style={{ width: '110px' }}>
+                              <span className="sr-only">Selecionar</span>
+                            </th>
+                          )}
                           <th style={{ minWidth: '180px', width: '20%' }}>Nome</th>
                           <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', minWidth: '120px' }}>
-                            {isClinica ? 'Antecipação (meses)' : 'Telefone'}
+                            {isClinica ? 'Antecipação atual' : 'Telefone'}
                           </th>
                           <th style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell', minWidth: '100px' }}>Valor</th>
                           <th style={{ minWidth: '120px' }}>Status</th>
@@ -5513,14 +5851,13 @@ const Pacientes = () => {
                               
                               // Determinar status do fechamento
                               let statusFechamento = fechamentoPaciente?.aprovado || 'documentacao_pendente';
-                              
-                              // Se todos os documentos foram enviados, marcar como "Assinatura IM" (pendente de assinatura da InvestMoney)
+                            
                               if (docsEnviados === totalDocs && statusFechamento !== 'reprovado') {
                                 // Se já foi aprovado, manter aprovado, senão mostrar como "Assinatura IM"
                                 if (statusFechamento === 'aprovado') {
                                   statusFechamento = 'aprovado';
                                 } else {
-                                  // Documentação completa mas pendente de assinatura da InvestMoney
+                                  // Documentação completa mas pendente de assinatura da IM
                                   statusFechamento = 'assinatura_im';
                                 }
                               } else if (docsEnviados < totalDocs && statusFechamento !== 'reprovado') {
@@ -5539,55 +5876,45 @@ const Pacientes = () => {
                                 'pendente': { color: '#f59e0b', label: 'Pendente' }
                               };
                               const statusInfo = statusColors[statusFechamento] || statusColors['pendente'];
-                              const valorAntecipacaoPadrao = Number.isFinite(fechamentoPaciente?.antecipacao_meses) && fechamentoPaciente?.antecipacao_meses !== null
+                              const valorAntecipacaoAtual = Number.isFinite(fechamentoPaciente?.antecipacao_meses) && fechamentoPaciente?.antecipacao_meses !== null
                                 ? fechamentoPaciente.antecipacao_meses
                                 : 0;
-                              const valorAntecipacaoInput = antecipacaoEdicoes.hasOwnProperty(paciente.id)
-                                ? antecipacaoEdicoes[paciente.id]
-                                : valorAntecipacaoPadrao.toString();
-                              const salvandoAntecipacao = Boolean(antecipacaoSalvando[paciente.id]);
+                              const podeAntecipar = isClinica && fechamentoPaciente?.aprovado === 'aprovado';
+                              const selecionado = selectedPacientesAntecipacao.includes(paciente.id);
+                              const textoAntecipacaoAtual = valorAntecipacaoAtual > 0
+                                ? `${valorAntecipacaoAtual} ${valorAntecipacaoAtual === 1 ? 'parcela' : 'parcelas'}`
+                                : 'Sem antecipação';
                               
                               return (
                             <tr key={paciente.id}>
+                                {isClinica && (
+                                  <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={selecionado}
+                                      disabled={!podeAntecipar}
+                                      onChange={() => toggleSelecaoAntecipacao(paciente.id, fechamentoPaciente)}
+                                      style={{ width: '16px', height: '16px', cursor: podeAntecipar ? 'pointer' : 'not-allowed' }}
+                                    />
+                                  </td>
+                                )}
                                 <td style={{ padding: '0.75rem 1rem' }}>
                                   <strong title={paciente.nome} style={{ fontSize: '0.875rem' }}>{paciente.nome}</strong>
                                 </td>
                                 <td style={{ display: window.innerWidth <= 768 ? 'none' : 'table-cell' }}>
                                   {isClinica ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', maxWidth: '50px' }}>
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        value={valorAntecipacaoInput}
-                                        onChange={(e) => handleAntecipacaoChange(paciente.id, e.target.value)}
-                                        style={{
-                                          width: '50px',
-                                          padding: '0.3rem 0.4rem',
-                                          border: '1px solid #d1d5db',
-                                          borderRadius: '6px',
-                                          fontSize: '0.875rem',
-                                          backgroundColor: '#ffffff',
-                                          color: '#1f2937'
-                                        }}
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => handleAntecipacaoSalvar(paciente, fechamentoPaciente)}
-                                        disabled={salvandoAntecipacao}
-                                        style={{
-                                          padding: '0.3rem 0.6rem',
-                                          borderRadius: '6px',
-                                          border: 'none',
-                                          backgroundColor: salvandoAntecipacao ? '#9ca3af' : '#059669',
-                                          color: '#ffffff',
-                                          fontSize: '0.75rem',
-                                          fontWeight: 600,
-                                          cursor: salvandoAntecipacao ? 'not-allowed' : 'pointer',
-                                          transition: 'background-color 0.2s ease'
-                                        }}
-                                      >
-                                        {salvandoAntecipacao ? 'Salvando...' : 'Salvar'}
-                                      </button>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                      <span style={{ fontWeight: 600, color: '#1f2937' }}>{textoAntecipacaoAtual}</span>
+                                      {!podeAntecipar && (
+                                        <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+                                          Fechamento pendente
+                                        </span>
+                                      )}
+                                      {podeAntecipar && (
+                                        <span style={{ fontSize: '0.75rem', color: selecionado ? '#059669' : '#6b7280' }}>
+                                          {selecionado ? 'Selecionado para solicitação' : 'Selecione para solicitar'}
+                                        </span>
+                                      )}
                                     </div>
                                   ) : (
                                     formatarTelefone(paciente.telefone)
@@ -5879,6 +6206,100 @@ const Pacientes = () => {
               </>
             )}
           </div>
+
+          {isClinica && (
+            <div className="card" style={{ marginTop: '1.5rem' }}>
+              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h2 className="card-title">Minhas solicitações de antecipação</h2>
+                  <p style={{ margin: 0, color: '#6b7280', fontSize: '0.875rem' }}>
+                    Acompanhe o status das solicitações enviadas para a IM
+                  </p>
+                </div>
+                <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                  {solicitacoesAntecipacao.filter(s => s.status === 'pendente').length} pendente(s)
+                </div>
+              </div>
+              <div className="card-content">
+                {carregandoSolicitacoesAntecipacao ? (
+                  <div className="loading">
+                    <div className="spinner"></div>
+                  </div>
+                ) : solicitacoesAntecipacao.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2.5rem', color: '#6b7280', fontSize: '0.95rem' }}>
+                    Nenhuma solicitação registrada ainda. Selecione pacientes e clique em &quot;Quero antecipar&quot; para enviar um pedido.
+                  </div>
+                ) : (
+                  <div className="table-container">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th style={{ width: '35%' }}>Data</th>
+                          <th style={{ width: '20%' }}>Pacientes</th>
+                          <th style={{ width: '20%' }}>Parcelas solicitadas</th>
+                          <th style={{ width: '15%' }}>Status</th>
+                          <th style={{ width: '10%' }}>Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {solicitacoesAntecipacao.map((solicitacao) => {
+                          const totalPacientes = solicitacao.pacientes_carteira?.length || 0;
+                          const totalParcelas = (solicitacao.pacientes_carteira || []).reduce(
+                            (acc, item) => acc + (item.numeroParcelasAntecipar ?? 0),
+                            0
+                          );
+                          return (
+                            <tr key={solicitacao.id}>
+                              <td>{new Date(solicitacao.created_at).toLocaleString('pt-BR')}</td>
+                              <td>{totalPacientes}</td>
+                              <td>{totalParcelas}</td>
+                              <td>
+                                <span style={{
+                                  padding: '0.25rem 0.5rem',
+                                  borderRadius: '999px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '600',
+                                  backgroundColor:
+                                    solicitacao.status === 'pendente' ? '#fef3c7' :
+                                    solicitacao.status === 'aprovado' ? '#dcfce7' :
+                                    solicitacao.status === 'reprovado' ? '#fee2e2' : '#f3f4f6',
+                                  color:
+                                    solicitacao.status === 'pendente' ? '#b45309' :
+                                    solicitacao.status === 'aprovado' ? '#166534' :
+                                    solicitacao.status === 'reprovado' ? '#b91c1c' : '#6b7280'
+                                }}>
+                                  {solicitacao.status === 'pendente' ? 'Pendente' :
+                                   solicitacao.status === 'aprovado' ? 'Aprovado' :
+                                   solicitacao.status === 'reprovado' ? 'Reprovado' : solicitacao.status}
+                                </span>
+                              </td>
+                              <td>
+                                <button
+                                  onClick={() => abrirDetalhesSolicitacaoAntecipacao(solicitacao)}
+                                  style={{
+                                    backgroundColor: '#3b82f6',
+                                    border: 'none',
+                                    color: 'white',
+                                    padding: '0.35rem 0.75rem',
+                                    borderRadius: '6px',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  Ver
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -6051,7 +6472,205 @@ const Pacientes = () => {
           </div>
         </>
       )}
-      
+
+      {showAntecipacaoModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '640px', width: '100%', display: 'flex', flexDirection: 'column', maxHeight: '80vh' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Solicitar antecipação</h2>
+              <button className="close-btn" onClick={() => setShowAntecipacaoModal(false)}>×</button>
+            </div>
+            <div className="modal-content" style={{ padding: '1.5rem', overflowY: 'auto' }}>
+              {antecipacaoModalPacientes.length === 0 ? (
+                <p style={{ color: '#6b7280', fontSize: '0.95rem' }}>
+                  Nenhum paciente selecionado com fechamento aprovado.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {antecipacaoModalPacientes.map(({ paciente, fechamento }) => {
+                    const valorAtual = Number.isFinite(fechamento?.antecipacao_meses) && fechamento?.antecipacao_meses !== null
+                      ? fechamento.antecipacao_meses
+                      : 0;
+                    const valorInput = antecipacaoValoresSolicitados[paciente.id] ?? '';
+                    return (
+                      <div key={paciente.id} style={{ border: '1px solid #e5e7eb', borderRadius: '12px', padding: '1rem 1.25rem', backgroundColor: '#f9fafb' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '1rem', color: '#1f2937' }}>{paciente.nome}</div>
+                            <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                              Antecipação atual: <strong>{valorAtual > 0 ? `${valorAtual} ${valorAtual === 1 ? 'parcela' : 'parcelas'}` : 'Sem antecipação'}</strong>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <label style={{ fontSize: '0.85rem', color: '#4b5563', fontWeight: 500 }}>
+                              Solicitar
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={valorInput}
+                              onChange={(e) => atualizarValorSolicitadoAntecipacao(paciente.id, e.target.value)}
+                              placeholder="0"
+                              style={{
+                                width: '80px',
+                                padding: '0.45rem 0.6rem',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '8px',
+                                fontSize: '0.9rem'
+                              }}
+                            />
+                            <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>parcelas</span>
+                          </div>
+                        </div>
+                        {Number.isFinite(fechamento?.numero_parcelas_aberto) && (
+                          <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                            Parcelas em aberto: <strong>{fechamento.numero_parcelas_aberto}</strong>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div style={{ marginTop: '1.5rem' }}>
+                <label style={{ display: 'block', fontWeight: 600, color: '#374151', marginBottom: '0.5rem' }}>
+                  Observações para o administrador (opcional)
+                </label>
+                <textarea
+                  value={observacaoAntecipacao}
+                  onChange={(e) => setObservacaoAntecipacao(e.target.value)}
+                  placeholder="Inclua informações adicionais sobre a necessidade da antecipação."
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    padding: '0.75rem',
+                    fontSize: '0.9rem',
+                    resize: 'none'
+                  }}
+                />
+              </div>
+            </div>
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', padding: '1.25rem', borderTop: '1px solid #e5e7eb' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowAntecipacaoModal(false)}
+                disabled={salvandoSolicitacaoAntecipacao}
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={enviarSolicitacaoAntecipacao}
+                disabled={salvandoSolicitacaoAntecipacao}
+              >
+                {salvandoSolicitacaoAntecipacao ? 'Enviando...' : 'Enviar solicitação'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDetalhesAntecipacaoModal && solicitacaoAntecipacaoSelecionada && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '720px', width: '100%', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Solicitação de antecipação</h2>
+              <button className="close-btn" onClick={fecharDetalhesSolicitacaoAntecipacao}>×</button>
+            </div>
+            <div className="modal-content" style={{ padding: '1.5rem', overflowY: 'auto' }}>
+              <div style={{ marginBottom: '1.25rem' }}>
+                <div style={{ fontWeight: 600, color: '#1f2937', fontSize: '1rem' }}>{solicitacaoAntecipacaoSelecionada.clinica_nome || 'Clínica'}</div>
+                <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                  Solicitado em {new Date(solicitacaoAntecipacaoSelecionada.created_at).toLocaleString('pt-BR')}
+                </div>
+                {solicitacaoAntecipacaoSelecionada.observacoes_clinica && (
+                  <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '0.9rem', color: '#374151' }}>
+                    <strong style={{ display: 'block', marginBottom: '0.25rem' }}>Observações da clínica:</strong>
+                    {solicitacaoAntecipacaoSelecionada.observacoes_clinica}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                  <thead>
+                    <tr style={{ background: '#f3f4f6', textAlign: 'left' }}>
+                      <th style={{ padding: '0.75rem 1rem' }}>Paciente</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Atual</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Solicitado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(solicitacaoAntecipacaoSelecionada.pacientes_carteira || []).map((item, index) => (
+                      <tr key={index} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#1f2937' }}>{item.nomeCompleto || item.paciente_nome}</td>
+                        <td style={{ padding: '0.75rem 1rem', color: '#6b7280' }}>
+                          {item.parcelasAtual ?? 0} {item.parcelasAtual === 1 ? 'parcela' : 'parcelas'}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', color: '#111827', fontWeight: 600 }}>
+                          {item.numeroParcelasAntecipar ?? 0} {item.numeroParcelasAntecipar === 1 ? 'parcela' : 'parcelas'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ marginTop: '1.5rem' }}>
+                <label style={{ display: 'block', fontWeight: 600, color: '#374151', marginBottom: '0.5rem' }}>
+                  Observações do administrador
+                </label>
+                <textarea
+                  value={observacaoAntecipacaoAdmin}
+                  onChange={(e) => setObservacaoAntecipacaoAdmin(e.target.value)}
+                  rows={3}
+                  placeholder="Adicione informações sobre a decisão da análise."
+                  style={{
+                    width: '100%',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    padding: '0.75rem',
+                    fontSize: '0.9rem',
+                    resize: 'none'
+                  }}
+                  disabled={solicitacaoAntecipacaoSelecionada.status !== 'pendente'}
+                />
+              </div>
+            </div>
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', padding: '1.25rem', borderTop: '1px solid #e5e7eb' }}>
+              <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                Status atual: <strong style={{ textTransform: 'capitalize' }}>{solicitacaoAntecipacaoSelecionada.status}</strong>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button
+                  className="btn btn-secondary"
+                  onClick={fecharDetalhesSolicitacaoAntecipacao}
+                >
+                  Fechar
+                </button>
+                <button
+                  className="btn btn-danger"
+                  onClick={() => atualizarStatusSolicitacaoAntecipacao(solicitacaoAntecipacaoSelecionada.id, 'reprovado', observacaoAntecipacaoAdmin)}
+                  disabled={solicitacaoAntecipacaoSelecionada.status !== 'pendente'}
+                >
+                  Reprovar
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => atualizarStatusSolicitacaoAntecipacao(solicitacaoAntecipacaoSelecionada.id, 'aprovado', observacaoAntecipacaoAdmin)}
+                  disabled={solicitacaoAntecipacaoSelecionada.status !== 'pendente'}
+                >
+                  Aprovar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ========== MODAIS DE CADASTRO ========== */}
       {/* PRIORIDADE 1: Modal Step-by-Step para Clínicas */}
       {(() => {
@@ -10590,7 +11209,9 @@ const Pacientes = () => {
                     fontWeight: '800',
                     color: solicitacaoSelecionada.calculos?.percentualFinal >= 130 ? '#166534' : '#dc2626'
                   }}>
-                    {solicitacaoSelecionada.calculos?.percentualFinal?.toFixed(2) || 0}%
+                    {isFinite(solicitacaoSelecionada.calculos?.percentualFinal) 
+                      ? solicitacaoSelecionada.calculos.percentualFinal.toFixed(2) 
+                      : '0.00'}%
                   </p>
                   <p style={{
                     fontSize: '0.875rem',
@@ -10865,28 +11486,39 @@ const Pacientes = () => {
                     <button
                       onClick={async () => {
                         try {
-                          // Recriar a carteira com o novo percentual
-                          const pacientesRecalculados = solicitacaoSelecionada.pacientes_carteira.map(paciente => ({
-                            id: paciente.id,
-                            cpf: paciente.cpf,
-                            nomeCompleto: paciente.nomeCompleto,
-                            valorParcela: paciente.valorParcela,
-                            numeroParcelasAberto: paciente.numeroParcelasAberto,
-                            primeiraVencimento: paciente.primeiraVencimento,
-                            numeroParcelasAntecipar: paciente.numeroParcelasAntecipar
-                          }));
-
-                          // Calcular com o novo percentual
-                          const calculosRecalculados = calcularCarteiraComPercentual(pacientesRecalculados, percentualAlvoCarteira);
+                          let calculosRecalculados;
+                          
+                          // Se for solicitação de antecipação, usar função específica
+                          if (solicitacaoSelecionada.tipo_solicitacao === 'antecipacao') {
+                            if (!solicitacaoSelecionada.calculos?.parcelasDetalhadas) {
+                              showErrorToast('Não foi possível recalcular: detalhamento de parcelas não encontrado');
+                              return;
+                            }
+                            calculosRecalculados = recalcularAntecipacao(solicitacaoSelecionada.calculos.parcelasDetalhadas);
+                          } else {
+                            // Para carteira existente normal, usar função de distribuição
+                            const pacientesRecalculados = solicitacaoSelecionada.pacientes_carteira.map(paciente => ({
+                              id: paciente.id,
+                              cpf: paciente.cpf,
+                              nomeCompleto: paciente.nomeCompleto,
+                              valorParcela: paciente.valorParcela,
+                              numeroParcelasAberto: paciente.numeroParcelasAberto,
+                              primeiraVencimento: paciente.primeiraVencimento,
+                              numeroParcelasAntecipar: paciente.numeroParcelasAntecipar
+                            }));
+                            calculosRecalculados = calcularCarteiraComPercentual(pacientesRecalculados, percentualAlvoCarteira);
+                          }
 
                           // Atualizar a solicitação selecionada com os novos cálculos
                           setSolicitacaoSelecionada({
                             ...solicitacaoSelecionada,
                             calculos: calculosRecalculados,
-                            percentual_alvo: percentualAlvoCarteira
+                            percentual_alvo: solicitacaoSelecionada.tipo_solicitacao === 'antecipacao' 
+                              ? calculosRecalculados.percentualAlvo 
+                              : percentualAlvoCarteira
                           });
 
-                          showSuccessToast(`Recálculo realizado com ${percentualAlvoCarteira}%`);
+                          showSuccessToast(`Recálculo realizado${solicitacaoSelecionada.tipo_solicitacao === 'antecipacao' ? '' : ` com ${percentualAlvoCarteira}%`}`);
                         } catch (error) {
                           console.error('Erro no recálculo:', error);
                           showErrorToast('Erro ao recalcular');
