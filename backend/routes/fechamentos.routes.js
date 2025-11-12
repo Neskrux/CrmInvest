@@ -45,6 +45,9 @@ router.get('/fechamentos/:id/boletos', authenticateToken, fechamentosController.
 // GET /api/fechamentos/:id/boletos/:boletoId/visualizar - Visualizar boleto como HTML
 router.get('/fechamentos/:id/boletos/:boletoId/visualizar', authenticateToken, fechamentosController.visualizarBoleto);
 
+// POST /api/fechamentos/:id/boletos/:boletoId/enviar-whatsapp - Enviar mensagem de boleto via WhatsApp
+router.post('/fechamentos/:id/boletos/:boletoId/enviar-whatsapp', authenticateToken, fechamentosController.enviarBoletoWhatsApp);
+
 // POST /api/fechamentos/:id/gerar-boletos - Gerar boletos manualmente para um fechamento
 router.post('/fechamentos/:id/gerar-boletos', authenticateToken, fechamentosController.gerarBoletosFechamento);
 

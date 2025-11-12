@@ -70,6 +70,7 @@ const Fechamentos = () => {
   const [boletosFechamento, setBoletosFechamento] = useState([]);
   const [carregandoBoletos, setCarregandoBoletos] = useState(false);
   const [gerandoBoletos, setGerandoBoletos] = useState(false);
+  const [enviandoWhatsApp, setEnviandoWhatsApp] = useState({}); // { boletoId: true/false }
   
   // Estados para aba de histórico
   const [movimentacoesPaciente, setMovimentacoesPaciente] = useState([]);
@@ -637,6 +638,41 @@ const Fechamentos = () => {
       } else {
         showErrorToast('Número de parcelas deve ser entre 1 e 100');
       }
+    }
+  };
+
+  // Função para enviar mensagem de boleto via WhatsApp
+  const enviarBoletoWhatsApp = async (boleto) => {
+    if (!boleto.fechamento_id || !boleto.id) {
+      showErrorToast('Dados do boleto incompletos');
+      return;
+    }
+
+    setEnviandoWhatsApp(prev => ({ ...prev, [boleto.id]: true }));
+
+    try {
+      const response = await makeRequest(`/fechamentos/${boleto.fechamento_id}/boletos/${boleto.id}/enviar-whatsapp`, {
+        method: 'POST'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao enviar mensagem');
+      }
+
+      const data = await response.json();
+      
+      if (data.warning) {
+        // Mostrar aviso se houver - mensagem aceita mas pode não ter sido entregue
+        showErrorToast(`⚠️ Mensagem aceita pela API, mas pode não ter sido entregue. Verifique se a instância Z-API está conectada ao WhatsApp no painel.`);
+      } else {
+        showSuccessToast(data.message || 'Mensagem enviada com sucesso para o WhatsApp do paciente!');
+      }
+    } catch (error) {
+      console.error('Erro ao enviar mensagem de boleto:', error);
+      showErrorToast(error.message || 'Erro ao enviar mensagem. Verifique se o paciente tem telefone cadastrado.');
+    } finally {
+      setEnviandoWhatsApp(prev => ({ ...prev, [boleto.id]: false }));
     }
   };
 
@@ -3881,6 +3917,55 @@ const Fechamentos = () => {
                                       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                                     </svg>
                                     Copiar Linha
+                                  </button>
+                                )}
+                                {boleto.fechamento_id && boleto.id && (
+                                  <button
+                                    onClick={() => enviarBoletoWhatsApp(boleto)}
+                                    disabled={enviandoWhatsApp[boleto.id]}
+                                    style={{
+                                      padding: '0.5rem 1rem',
+                                      backgroundColor: enviandoWhatsApp[boleto.id] ? '#9ca3af' : '#25D366',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontSize: '0.875rem',
+                                      fontWeight: '500',
+                                      cursor: enviandoWhatsApp[boleto.id] ? 'not-allowed' : 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '0.5rem',
+                                      transition: 'all 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      if (!enviandoWhatsApp[boleto.id]) {
+                                        e.target.style.backgroundColor = '#128C7E';
+                                      }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      if (!enviandoWhatsApp[boleto.id]) {
+                                        e.target.style.backgroundColor = '#25D366';
+                                      }
+                                    }}
+                                  >
+                                    {enviandoWhatsApp[boleto.id] ? (
+                                      <>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                                          <circle cx="12" cy="12" r="10"></circle>
+                                          <path d="M12 6v6l4 2"></path>
+                                        </svg>
+                                        Enviando...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                                          <line x1="9" y1="10" x2="15" y2="10"></line>
+                                          <line x1="12" y1="7" x2="12" y2="13"></line>
+                                        </svg>
+                                        Enviar
+                                      </>
+                                    )}
                                   </button>
                                 )}
                               </div>

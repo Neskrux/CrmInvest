@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt');
 const transporter = require('../config/email');
 const { criarMovimentacaoFechamentoCriado } = require('./movimentacoes.controller');
 const { criarBoletosCaixa } = require('../utils/caixa-boletos.helper');
+const zApiService = require('../services/z-api.service');
 
 // GET /api/fechamentos - Listar fechamentos
 const getAllFechamentos = async (req, res) => {
@@ -2905,6 +2906,119 @@ const getHashFechamentoPorPaciente = async (req, res) => {
   }
 };
 
+/**
+ * Enviar mensagem de boleto via WhatsApp (Z-API)
+ * POST /api/fechamentos/:id/boletos/:boletoId/enviar-whatsapp
+ */
+const enviarBoletoWhatsApp = async (req, res) => {
+  try {
+    const { id, boletoId } = req.params;
+    const fechamentoId = parseInt(id);
+    const boletoIdInt = parseInt(boletoId);
+
+    console.log('📱 [ENVIAR-WHATSAPP] Iniciando envio de mensagem de boleto:', { fechamentoId, boletoId: boletoIdInt });
+
+    // Buscar boleto
+    const { data: boleto, error: boletoError } = await supabaseAdmin
+      .from('boletos_caixa')
+      .select('*')
+      .eq('id', boletoIdInt)
+      .eq('fechamento_id', fechamentoId)
+      .single();
+
+    if (boletoError || !boleto) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Boleto não encontrado' 
+      });
+    }
+
+    // Verificar permissão: admin e clínica podem enviar
+    if (req.user.tipo === 'clinica') {
+      const clinicaId = req.user.clinica_id || req.user.id;
+      const { data: fechamentoCheck } = await supabaseAdmin
+        .from('fechamentos')
+        .select('clinica_id')
+        .eq('id', fechamentoId)
+        .single();
+      if (fechamentoCheck && fechamentoCheck.clinica_id !== clinicaId) {
+        return res.status(403).json({ 
+          success: false,
+          error: 'Você só pode enviar mensagens de boletos dos seus próprios fechamentos' 
+        });
+      }
+    } else if (req.user.tipo === 'paciente') {
+      return res.status(403).json({ 
+        success: false,
+        error: 'Pacientes não podem enviar mensagens de boletos' 
+      });
+    }
+
+    // Buscar dados do paciente
+    const { data: paciente, error: pacienteError } = await supabaseAdmin
+      .from('pacientes')
+      .select('nome, telefone, cpf')
+      .eq('id', boleto.paciente_id)
+      .single();
+
+    if (pacienteError || !paciente) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Paciente não encontrado' 
+      });
+    }
+
+    if (!paciente.telefone) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Telefone do paciente não cadastrado' 
+      });
+    }
+
+    // Verificar status da instância antes de enviar (opcional, pode comentar se não quiser)
+    // const statusInstancia = await zApiService.verificarStatusInstancia();
+    // console.log('📊 [ENVIAR-WHATSAPP] Status da instância:', statusInstancia);
+
+    // Enviar mensagem via Z-API
+    const resultado = await zApiService.enviarMensagemBoleto(boleto, paciente);
+
+    if (resultado.success) {
+      console.log('✅ [ENVIAR-WHATSAPP] Mensagem enviada com sucesso');
+      
+      // Se houver warning, incluir na resposta
+      const responseMessage = resultado.warning 
+        ? `${resultado.message}. ⚠️ ${resultado.warning}`
+        : resultado.message || 'Mensagem enviada com sucesso para o WhatsApp do paciente';
+      
+      return res.json({
+        success: true,
+        message: responseMessage,
+        data: resultado.data,
+        zaapId: resultado.zaapId,
+        messageId: resultado.messageId,
+        warning: resultado.warning
+      });
+    } else {
+      console.error('❌ [ENVIAR-WHATSAPP] Erro ao enviar mensagem:', resultado.error);
+      // Se o erro for relacionado à configuração do token (400), retornar 400
+      const statusCode = resultado.error?.toLowerCase().includes('client-token') || 
+                        resultado.error?.toLowerCase().includes('not configured') ? 400 : 500;
+      return res.status(statusCode).json({
+        success: false,
+        error: resultado.error || 'Erro ao enviar mensagem',
+        details: resultado.details
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ [ENVIAR-WHATSAPP] Erro ao enviar mensagem de boleto:', error);
+    return res.status(500).json({ 
+      success: false,
+      error: error.message || 'Erro ao enviar mensagem de boleto' 
+    });
+  }
+};
+
 module.exports = {
   getAllFechamentos,
   getDashboardFechamentos,
@@ -2921,5 +3035,6 @@ module.exports = {
   criarAcessoFreelancer,
   gerarBoletosFechamento,
   visualizarBoleto,
-  getHashFechamentoPorPaciente
+  getHashFechamentoPorPaciente,
+  enviarBoletoWhatsApp
 };
