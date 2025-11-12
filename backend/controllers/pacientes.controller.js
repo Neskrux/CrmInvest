@@ -1791,6 +1791,65 @@ const criarLoginPaciente = async (req, res) => {
 
     console.log(`🔍 Paciente encontrado: ${paciente.nome} (ID: ${id}), Clinica ID: ${paciente.clinica_id}`);
 
+    // Se o clinica_id do paciente estiver null, tentar buscar dos fechamentos ou agendamentos
+    if (!paciente.clinica_id) {
+      console.log(`⚠️ Paciente com clinica_id null. Buscando clinica_id dos fechamentos/agendamentos...`);
+      
+      // Primeiro, tentar buscar dos fechamentos
+      const { data: fechamento, error: fechError } = await supabaseAdmin
+        .from('fechamentos')
+        .select('clinica_id')
+        .eq('paciente_id', id)
+        .not('clinica_id', 'is', null)
+        .limit(1)
+        .maybeSingle();
+      
+      if (!fechError && fechamento && fechamento.clinica_id) {
+        console.log(`✅ Encontrado clinica_id ${fechamento.clinica_id} nos fechamentos. Atualizando paciente...`);
+        
+        // Atualizar o clinica_id do paciente
+        const { error: updateError } = await supabaseAdmin
+          .from('pacientes')
+          .update({ clinica_id: fechamento.clinica_id })
+          .eq('id', id);
+        
+        if (updateError) {
+          console.error('❌ Erro ao atualizar clinica_id do paciente:', updateError);
+        } else {
+          console.log(`✅ clinica_id atualizado com sucesso para ${fechamento.clinica_id}`);
+          paciente.clinica_id = fechamento.clinica_id;
+        }
+      } else {
+        // Se não encontrou nos fechamentos, tentar nos agendamentos
+        const { data: agendamento, error: agendError } = await supabaseAdmin
+          .from('agendamentos')
+          .select('clinica_id')
+          .eq('paciente_id', id)
+          .not('clinica_id', 'is', null)
+          .limit(1)
+          .maybeSingle();
+        
+        if (!agendError && agendamento && agendamento.clinica_id) {
+          console.log(`✅ Encontrado clinica_id ${agendamento.clinica_id} nos agendamentos. Atualizando paciente...`);
+          
+          // Atualizar o clinica_id do paciente
+          const { error: updateError } = await supabaseAdmin
+            .from('pacientes')
+            .update({ clinica_id: agendamento.clinica_id })
+            .eq('id', id);
+          
+          if (updateError) {
+            console.error('❌ Erro ao atualizar clinica_id do paciente:', updateError);
+          } else {
+            console.log(`✅ clinica_id atualizado com sucesso para ${agendamento.clinica_id}`);
+            paciente.clinica_id = agendamento.clinica_id;
+          }
+        } else {
+          console.warn(`⚠️ Não foi possível encontrar clinica_id nos fechamentos nem nos agendamentos para o paciente ${id}`);
+        }
+      }
+    }
+
     // Verificar se paciente pertence à clínica
     const clinicaId = req.user.clinica_id || req.user.id;
     console.log(`🔍 Clínica do usuário logado: ${clinicaId}, Tipo: ${req.user.tipo}`);
