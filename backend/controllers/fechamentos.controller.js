@@ -1706,6 +1706,7 @@ const getBoletosFechamento = async (req, res) => {
         codigo_barras: boleto.codigo_barras,
         linha_digitavel: boleto.linha_digitavel,
         url: boleto.url,
+        url_boleto: boleto.url, // boletos_caixa tem apenas 'url', mapear como url_boleto para compatibilidade
         qrcode: boleto.qrcode,
         url_qrcode: boleto.url_qrcode,
         parcela_numero: boleto.parcela_numero,

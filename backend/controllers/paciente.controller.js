@@ -58,6 +58,7 @@ const getBoletosPaciente = async (req, res) => {
         codigo_barras: boleto.codigo_barras,
         linha_digitavel: boleto.linha_digitavel,
         url: boleto.url,
+        url_boleto: boleto.url, // boletos_caixa tem apenas 'url', mapear como url_boleto para compatibilidade
         qrcode: boleto.qrcode,
         url_qrcode: boleto.url_qrcode,
         parcela_numero: boleto.parcela_numero,
@@ -117,6 +118,7 @@ const getBoletosPaciente = async (req, res) => {
 
         const numeroDocumento = bg.numero_documento || (bg.fechamento_id ? `FEC-${bg.fechamento_id}-PARC-${bg.numero_parcela || bg.parcela_numero || ''}` : `PARC-${bg.numero_parcela || bg.parcela_numero || bg.id}`);
 
+        const urlBoleto = bg.url_boleto || bg.url || null;
         return {
           id: `GESTAO-${bg.id}`,
           nosso_numero: bg.nosso_numero || null,
@@ -130,7 +132,8 @@ const getBoletosPaciente = async (req, res) => {
           status,
           codigo_barras: bg.codigo_barras || null,
           linha_digitavel: bg.linha_digitavel || null,
-          url: bg.url_boleto || bg.url || null,
+          url: urlBoleto,
+          url_boleto: urlBoleto, // Retornar também url_boleto para manter consistência
           qrcode: bg.qrcode || null,
           url_qrcode: bg.url_qrcode || null,
           parcela_numero: bg.numero_parcela || bg.parcela_numero || null,

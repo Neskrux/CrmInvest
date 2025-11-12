@@ -3840,11 +3840,40 @@ const Fechamentos = () => {
                               </div>
                               
                               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                {boleto.fechamento_id && boleto.id && (
+                                {(boleto.url_boleto || boleto.url) ? (
+                                  <button
+                                    onClick={() => {
+                                      // Abrir URL do boleto diretamente em nova aba
+                                      const urlBoleto = boleto.url_boleto || boleto.url;
+                                      window.open(urlBoleto, '_blank', 'noopener,noreferrer');
+                                    }}
+                                    style={{
+                                      padding: '0.5rem 1rem',
+                                      backgroundColor: '#3b82f6',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontSize: '0.875rem',
+                                      fontWeight: '500',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '0.5rem'
+                                    }}
+                                    onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
+                                    onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
+                                  >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                      <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                    Ver Boleto
+                                  </button>
+                                ) : boleto.fechamento_id && boleto.id ? (
                                   <button
                                     onClick={async () => {
                                       try {
-                                        // Fazer requisição autenticada para obter o HTML do boleto
+                                        // Fazer requisição autenticada para obter o HTML do boleto (fallback)
                                         const response = await makeRequest(`/fechamentos/${boleto.fechamento_id}/boletos/${boleto.id}/visualizar`, {
                                           method: 'GET'
                                         });
@@ -3889,7 +3918,7 @@ const Fechamentos = () => {
                                     </svg>
                                     Ver Boleto
                                   </button>
-                                )}
+                                ) : null}
                                 {boleto.linha_digitavel && (
                                   <button
                                     onClick={() => {
