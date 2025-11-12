@@ -1,0 +1,2858 @@
+<!doctype html>
+<html lang="pt-BR">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador Financeiro - Carteira de Boletos</title>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    body {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f2f0eb;
+      min-height: 100%;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #0B0F0E;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    /* Header */
+    .header {
+      background: white;
+      border-radius: 12px;
+      padding: 0;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      border: 1px solid #E5E7EB;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 64px;
+      overflow: hidden;
+    }
+
+    .header-left {
+      flex: 1;
+      min-width: 250px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 20px;
+    }
+
+    .header-left-content {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .header h1 {
+      margin: 0;
+      color: #111827;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+    }
+
+    .header-logo {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .header p {
+      margin: 0;
+      color: #6B7280;
+      font-size: 12px;
+      font-weight: 400;
+      line-height: 1.3;
+    }
+
+    .header-right {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 0 20px;
+      height: 100%;
+    }
+
+    /* Stepper */
+    .stepper {
+      background: white;
+      border-radius: 12px;
+      padding: 12px 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      border: 1px solid #E5E7EB;
+    }
+
+    .stepper-items {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      align-items: center;
+      position: relative;
+    }
+
+    .stepper-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .stepper-item:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      top: 16px;
+      left: calc(50% + 16px);
+      width: calc(100% + 12px);
+      height: 2px;
+      background: #E5E7EB;
+      z-index: -1;
+    }
+
+    .stepper-item.completed:not(:last-child)::after {
+      background: linear-gradient(to right, #f2c85c 0%, #f2c85c 100%);
+    }
+
+    .stepper-item.active:not(:last-child)::after {
+      background: linear-gradient(to right, #f2c85c 0%, #E5E7EB 50%);
+    }
+
+    .stepper-circle {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #F3F4F6;
+      color: #9CA3AF;
+      border: 2px solid #E5E7EB;
+      display: grid;
+      place-content: center;
+      font-weight: 600;
+      font-size: 13px;
+      margin-bottom: 8px;
+      transition: all 0.2s;
+    }
+
+    .stepper-item.active .stepper-circle {
+      background: #f2c85c;
+      color: #1a1a1a;
+      border-color: #f2c85c;
+      box-shadow: 0 0 0 4px rgba(242, 200, 92, 0.2);
+    }
+
+    .stepper-item.completed .stepper-circle {
+      background: white;
+      color: #f2c85c;
+      border: 2px solid #f2c85c;
+    }
+
+    .stepper-item.completed .stepper-circle::before {
+      content: '✓';
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .stepper-label {
+      font-size: 12px;
+      color: #6B7280;
+      text-align: center;
+      font-weight: 400;
+      line-height: 1.3;
+    }
+
+    .stepper-item.active .stepper-label {
+      color: #111827;
+      font-weight: 500;
+    }
+
+    .stepper-item.completed .stepper-label {
+      color: #d4a832;
+    }
+
+    /* Card */
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      border: 1px solid #E5E7EB;
+      margin-bottom: 16px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: start;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #F3F4F6;
+    }
+
+    .card-header-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: #fef9e7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .card-header-content {
+      flex: 1;
+    }
+
+    .card h2 {
+      color: #111827;
+      font-size: 16px;
+      margin: 0 0 4px 0;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      line-height: 1.3;
+    }
+
+    .card-subtitle {
+      color: #6B7280;
+      margin: 0;
+      font-size: 13px;
+      font-weight: 400;
+      line-height: 1.4;
+    }
+
+    /* Buttons */
+    .btn {
+      height: 40px;
+      padding: 0 16px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 120ms ease-out;
+      font-size: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: inherit;
+      line-height: 1;
+    }
+
+    .btn-primary {
+      background: #f2c85c;
+      color: #1a1a1a;
+      border-color: #f2c85c;
+    }
+
+    .btn-primary:hover {
+      background: #e6b840;
+      border-color: #e6b840;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(242, 200, 92, 0.3);
+    }
+
+    .btn-primary:focus {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(242, 200, 92, 0.3);
+    }
+
+    .btn-primary:disabled {
+      background: #E5E7EB;
+      color: #9CA3AF;
+      border-color: #E5E7EB;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-secondary {
+      background: white;
+      color: #111827;
+      border-color: #E5E7EB;
+    }
+
+    .btn-secondary:hover {
+      background: #F9FAFB;
+      border-color: #D1D5DB;
+    }
+
+    .btn-secondary:focus {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+    }
+
+    .btn-outline {
+      background: white;
+      color: #111827;
+      border-color: #E5E7EB;
+    }
+
+    .btn-outline:hover {
+      background: #fef9e7;
+      border-color: #f2c85c;
+      color: #d4a832;
+    }
+
+    .btn-outline:focus {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(242, 200, 92, 0.15);
+    }
+
+    .modalidade-btn.active {
+      background: #f2c85c;
+      border-color: #f2c85c;
+      color: #1a1a1a;
+      font-weight: 500;
+    }
+
+    .modalidade-btn.active svg {
+      stroke: #1a1a1a;
+    }
+
+    .modalidade-fields {
+      animation: fadeIn 300ms ease-out;
+    }
+
+    /* Form Elements */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+    }
+
+    .form-group label {
+      font-weight: 500;
+      color: #111827;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      line-height: 1.4;
+    }
+
+    .form-group input,
+    .form-group select {
+      height: 40px;
+      padding: 0 12px;
+      border: 1px solid #E5E7EB;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: all 120ms ease-out;
+      font-family: inherit;
+      background: white;
+      color: #0B0F0E;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #f2c85c;
+      box-shadow: 0 0 0 3px rgba(242, 200, 92, 0.15);
+    }
+
+    .form-group input:hover,
+    .form-group select:hover {
+      border-color: #D1D5DB;
+    }
+
+    .form-group input.error,
+    .form-group select.error {
+      border-color: #DC2626;
+    }
+
+    .form-group small {
+      color: #6B7280;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .error-message {
+      color: #DC2626;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+
+    /* Tooltip */
+    .tooltip-trigger {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.25rem;
+      height: 1.25rem;
+      border-radius: 50%;
+      background: #f3f4f6;
+      color: #6b7280;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: help;
+      position: relative;
+    }
+
+    .tooltip-trigger:hover {
+      background: #f2c85c;
+      color: #1a1a1a;
+    }
+
+    .tooltip-content {
+      position: absolute;
+      bottom: calc(100% + 0.5rem);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e293b;
+      color: white;
+      padding: 0.75rem 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.85rem;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      z-index: 1000;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      max-width: 300px;
+      white-space: normal;
+    }
+
+    .tooltip-trigger:hover .tooltip-content {
+      opacity: 1;
+    }
+
+    .tooltip-content::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: #1e293b;
+    }
+
+    /* Alert */
+    .alert {
+      padding: 16px 20px;
+      border-radius: 12px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: start;
+      gap: 12px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .alert-warning {
+      background: rgba(217, 119, 6, 0.08);
+      border-left: 3px solid #D97706;
+      color: #92400E;
+    }
+
+    .alert-info {
+      background: #fef9e7;
+      border: 1px solid #f2c85c;
+      border-radius: 12px;
+      border-left: 3px solid #f2c85c;
+      color: #0B0F0E;
+    }
+
+    .alert-success {
+      background: rgba(15, 138, 95, 0.08);
+      border-left: 3px solid #0F8A5F;
+      color: #065F46;
+    }
+
+    /* Navigation Buttons */
+    .nav-buttons {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: 2rem;
+      padding-top: 2rem;
+      border-top: 2px solid #e2e8f0;
+    }
+
+    /* Select Dropdown */
+    select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23334155' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.75rem center;
+      padding-right: 2.5rem;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: #1a1a1a;
+      color: white;
+      padding: 1rem 1.5rem;
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      opacity: 0;
+      transform: translateY(1rem);
+      transition: all 0.3s;
+      pointer-events: none;
+      z-index: 2000;
+      max-width: 400px;
+      font-weight: 400;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .toast.error {
+      background: #dc2626;
+    }
+
+    .toast.success {
+      background: #16a34a;
+    }
+
+    /* Modalidade Cards */
+    .modalidade-card {
+      position: relative;
+      border-radius: 12px;
+      padding: 28px;
+      background: white;
+      border: 2px solid #E5E7EB;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .modalidade-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 48px rgba(0, 0, 0, 0.12);
+      border-color: rgba(8, 72, 8, 0.3);
+    }
+
+    .modalidade-card.selected {
+      border-color: #084808;
+      box-shadow: 0 0 0 4px rgba(8, 72, 8, 0.1), 0 12px 48px rgba(8, 72, 8, 0.2);
+      background: rgba(8, 72, 8, 0.05);
+    }
+
+    /* Fade In Animation */
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .fade-in {
+      animation: fadeIn 120ms ease-out;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .container {
+        padding: 1rem;
+      }
+
+      .header {
+        flex-direction: column;
+        align-items: stretch;
+        height: auto;
+      }
+
+      .header-right {
+        justify-content: stretch;
+        padding: 12px 20px;
+      }
+
+      .header-right > * {
+        flex: 1;
+      }
+
+      .stepper-items {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+
+      .stepper-item::after {
+        display: none;
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .nav-buttons {
+        flex-direction: column;
+      }
+    }
+
+    /* Hide steps */
+    .step {
+      display: none;
+    }
+
+    .step.active {
+      display: block;
+    }
+
+    /* Slider */
+    .slider-container {
+      padding: 1rem;
+      background: #fafaf8;
+      border-radius: 0.75rem;
+    }
+
+    .slider {
+      width: 100%;
+      height: 0.5rem;
+      border-radius: 0.25rem;
+      background: #e5e7eb;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 1.5rem;
+      height: 1.5rem;
+      border-radius: 50%;
+      background: #f2c85c;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .slider::-moz-range-thumb {
+      width: 1.5rem;
+      height: 1.5rem;
+      border-radius: 50%;
+      background: #f2c85c;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    /* Estilo específico para o slider de antecipação */
+    #percentual-compra {
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    
+    #percentual-compra::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #f2c85c;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(242, 200, 92, 0.5), 0 0 0 4px rgba(242, 200, 92, 0.2);
+      transition: all 0.2s;
+    }
+    
+    #percentual-compra::-webkit-slider-thumb:hover {
+      background: #e6b840;
+      box-shadow: 0 4px 12px rgba(242, 200, 92, 0.6), 0 0 0 6px rgba(242, 200, 92, 0.3);
+      transform: scale(1.1);
+    }
+    
+    #percentual-compra::-moz-range-thumb {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #f2c85c;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 2px 8px rgba(242, 200, 92, 0.5), 0 0 0 4px rgba(242, 200, 92, 0.2);
+      transition: all 0.2s;
+    }
+    
+    #percentual-compra::-moz-range-thumb:hover {
+      background: #e6b840;
+      box-shadow: 0 4px 12px rgba(242, 200, 92, 0.6), 0 0 0 6px rgba(242, 200, 92, 0.3);
+      transform: scale(1.1);
+    }
+
+    .slider-value {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+      color: #6b7280;
+    }
+
+    .slider-current {
+      font-weight: 600;
+      color: #1a1a1a;
+      font-size: 1.25rem;
+    }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+  <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
+ </head>
+ <body>
+  <div class="container"><!-- Header -->
+   <header class="header">
+    <div class="header-left">
+     <svg class="header-logo" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 40px; height: 40px;"><circle cx="12" cy="12" r="10" stroke="#f2c85c" stroke-width="2" fill="none" /> <text x="12" y="17" text-anchor="middle" font-size="14" font-weight="bold" fill="#f2c85c" font-family="Arial, sans-serif">
+       $
+      </text>
+     </svg>
+     <div class="header-left-content">
+      <h1>IM GESTÃO</h1>
+      <p>Simulador de Carteira de Gestão de Cobrança e Taxas</p>
+     </div>
+    </div>
+    <div class="header-right">
+    </div>
+   </header><!-- Stepper -->
+   <div class="stepper">
+    <div class="stepper-items">
+     <div class="stepper-item active" data-step="1">
+      <div class="stepper-circle">
+       1
+      </div>
+      <div class="stepper-label">
+       Modalidade
+      </div>
+     </div>
+     <div class="stepper-item" data-step="2">
+      <div class="stepper-circle">
+       2
+      </div>
+      <div class="stepper-label">
+       Parâmetros
+      </div>
+     </div>
+     <div class="stepper-item" data-step="3">
+      <div class="stepper-circle">
+       3
+      </div>
+      <div class="stepper-label">
+       Revisão
+      </div>
+     </div>
+     <div class="stepper-item" data-step="4">
+      <div class="stepper-circle">
+       4
+      </div>
+      <div class="stepper-label">
+       Resultados
+      </div>
+     </div>
+    </div>
+   </div><!-- Step 1: Selecionar Modalidade -->
+   <div id="step-1" class="step active">
+    <div class="card">
+     <div class="card-header">
+      <div class="card-header-icon">
+       <svg width="20" height="20" viewbox="0 0 24 24" fill="none" stroke="#f2c85c" stroke-width="2"><path d="M9 11l3 3 8-8M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+       </svg>
+      </div>
+      <div class="card-header-content">
+       <h2>Selecionar Modalidade</h2>
+       <p class="card-subtitle">Escolha o tipo de carteira para iniciar a simulação</p>
+      </div>
+     </div>
+     <div class="alert alert-info">
+      <svg width="18" height="18" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="M12 16v-4M12 8h.01" />
+      </svg>
+      <div><strong>Vamos começar sua simulação! 🚀</strong> Escolha a modalidade que melhor se encaixa no seu negócio. Você vai precisar ter em mãos: o valor total da sua carteira de boletos, a quantidade de boletos e clientes, e o período que deseja simular. É rápido e fácil!
+      </div>
+     </div><!-- Modalidade Cards -->
+     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; max-width: 900px; margin: 40px auto;"><!-- Card: Gestão da Carteira -->
+      <div id="card-sem-antecipacao" class="modalidade-card" onclick="selecionarModalidade('SEM')">
+       <div style="display: flex; flex-direction: column; gap: 20px;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+         <div style="flex-shrink: 0; width: 56px; height: 56px; border-radius: 12px; background: #fef9e7; display: flex; align-items: center; justify-content: center;">
+          <svg width="28" height="28" viewbox="0 0 24 24" fill="none" stroke="#f2c85c" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" /> <path d="M9 11l3 3L22 4" />
+          </svg>
+         </div>
+         <div style="flex: 1;">
+          <h3 style="margin: 0 0 4px 0; font-size: 20px; font-weight: 600; color: #111827; font-family: 'Inter', sans-serif; letter-spacing: -0.01em;">Gestão da Carteira</h3>
+          <p style="margin: 0; font-size: 13px; color: #6B7280; font-family: 'Inter', sans-serif; line-height: 1.4;">Cobrança simples • 100% da carteira</p>
+         </div>
+        </div>
+        <div style="padding: 16px; background: #fafaf8; border-radius: 10px; border: 1px solid #f3f4f6;">
+         <div style="display: flex; align-items: baseline; gap: 8px;"><span style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #6B7280; font-family: 'Inter', sans-serif;">ADM</span> <span style="font-size: 32px; font-weight: 700; color: #d4a832; font-family: 'Inter', sans-serif; letter-spacing: -0.02em; line-height: 1;">4,99%</span>
+         </div>
+        </div><button type="button" class="btn-selecionar-modalidade" style="width: 100%; padding: 12px 20px; border-radius: 10px; border: 2px solid #084808; background: transparent; color: #084808; font-weight: 600; font-size: 15px; font-family: 'Inter', sans-serif; cursor: pointer; transition: all 0.2s ease; margin-top: 8px;" onmouseover="this.style.background='#084808'; this.style.color='white';" onmouseout="this.style.background='transparent'; this.style.color='#084808';"> Simular </button>
+       </div>
+      </div><!-- Card: Com Antecipação -->
+      <div id="card-com-antecipacao" class="modalidade-card" onclick="selecionarModalidade('DES')">
+       <div style="display: flex; flex-direction: column; gap: 20px;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+         <div style="flex-shrink: 0; width: 56px; height: 56px; border-radius: 12px; background: #fef9e7; display: flex; align-items: center; justify-content: center;">
+          <svg width="28" height="28" viewbox="0 0 24 24" fill="none" stroke="#f2c85c" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+         </div>
+         <div style="flex: 1;">
+          <h3 style="margin: 0 0 4px 0; font-size: 20px; font-weight: 600; color: #111827; font-family: 'Inter', sans-serif; letter-spacing: -0.01em;">Com Antecipação</h3>
+          <p style="margin: 0; font-size: 13px; color: #6B7280; font-family: 'Inter', sans-serif; line-height: 1.4;">Antecipação até 40% da carteira (α)</p>
+         </div>
+        </div>
+        <div style="padding: 16px; background: #fafaf8; border-radius: 10px; border: 1px solid #f3f4f6;">
+         <div style="display: flex; align-items: baseline; gap: 8px;"><span style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #6B7280; font-family: 'Inter', sans-serif;">ADM</span> <span style="font-size: 32px; font-weight: 700; color: #d4a832; font-family: 'Inter', sans-serif; letter-spacing: -0.02em; line-height: 1;">4,90%</span>
+         </div>
+        </div><button type="button" class="btn-selecionar-modalidade" style="width: 100%; padding: 12px 20px; border-radius: 10px; border: 2px solid #084808; background: transparent; color: #084808; font-weight: 600; font-size: 15px; font-family: 'Inter', sans-serif; cursor: pointer; transition: all 0.2s ease; margin-top: 8px;" onmouseover="this.style.background='#084808'; this.style.color='white';" onmouseout="this.style.background='transparent'; this.style.color='#084808';"> Simular </button>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div><!-- Step 2: Parâmetros do Plano -->
+   <div id="step-2" class="step">
+    <div class="card">
+     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid #F3F4F6;">
+      <div class="card-header" style="margin: 0; padding: 0; border: none;">
+       <div class="card-header-icon">
+        <svg width="20" height="20" viewbox="0 0 24 24" fill="none" stroke="#f2c85c" stroke-width="2"><circle cx="12" cy="12" r="3" /> <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m6.36 6.36l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m6.36-6.36l4.24-4.24" />
+        </svg>
+       </div>
+       <div class="card-header-content">
+        <h2>Parâmetros do Plano</h2>
+        <p class="card-subtitle">Configure os parâmetros do plano de pagamento</p>
+       </div>
+      </div><button type="button" class="btn btn-outline" onclick="trocarModalidade()" style="flex-shrink: 0;">
+       <svg width="16" height="16" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M3 21v-5h5" />
+       </svg> Trocar Modalidade </button>
+     </div><!-- Dados da Carteira -->
+     <div style="margin-bottom: 2rem;">
+      <h3 style="color: #d4a832; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;">
+       <svg width="20" height="20" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /> <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+       </svg> Dados da Carteira</h3>
+      <div class="form-grid">
+       <div class="form-group"><label for="valor-carteira">Valor Total da Carteira (R$)</label> <input type="text" id="valor-carteira" value="R$ 0,00" oninput="formatCurrencyInput(this)" onblur="validateValorCarteira()"> <small>Valor total mensal da carteira</small>
+        <div id="valor-carteira-error" class="error-message" style="display: none;">
+         <svg width="14" height="14" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="M12 8v4M12 16h.01" />
+         </svg> Insira um valor válido maior que zero
+        </div>
+       </div>
+       <div class="form-group"><label for="qtd-boletos">Quantidade de Boletos</label> <input type="number" id="qtd-boletos" value="0" min="1" oninput="validateQtdBoletos()"> <small>Número total de boletos na carteira</small>
+        <div id="qtd-boletos-error" class="error-message" style="display: none;">
+         <svg width="14" height="14" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="M12 8v4M12 16h.01" />
+         </svg> Insira uma quantidade válida maior que zero
+        </div>
+       </div>
+       <div class="form-group"><label for="total-clientes"> Total de Clientes Únicos <span class="tooltip-trigger"> ? <span class="tooltip-content"> Número total de clientes únicos em todas as carteiras selecionadas </span> </span> </label> <input type="number" id="total-clientes" value="0" min="1" oninput="validateTotalClientes()"> <small>Clientes únicos na carteira</small>
+        <div id="total-clientes-error" class="error-message" style="display: none;">
+         <svg width="14" height="14" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="M12 8v4M12 16h.01" />
+         </svg> Insira uma quantidade válida maior que zero
+        </div>
+       </div>
+      </div>
+     </div>
+     <div class="form-grid">
+      <div class="form-group"><label for="meses-plano">Duração do Plano (meses)</label> <select id="meses-plano" onchange="updateMesesPlano()"> <option value="3">3 meses</option> <option value="6" selected>6 meses</option> <option value="12">12 meses</option> <option value="24">24 meses</option> <option value="36">36 meses</option> <option value="custom">Personalizado</option> </select>
+       <div id="meses-sugerido-info" style="display: none; margin-top: 8px;"></div>
+      </div>
+      <div class="form-group" id="custom-meses-group" style="display: none;"><label for="meses-custom">Meses Personalizados</label> <input type="number" id="meses-custom" min="1" max="60" value="6" oninput="validateMesesCustom()">
+       <div id="meses-custom-error" class="error-message" style="display: none;">
+        <svg width="14" height="14" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="M12 8v4M12 16h.01" />
+        </svg> Insira um valor entre 1 e 60 meses
+       </div>
+      </div>
+      <div class="form-group"><label for="data-inicio">Vencimento do Primeiro Boleto</label> <input type="date" id="data-inicio" onchange="validateDataInicio()">
+       <div id="data-inicio-error" class="error-message" style="display: none;">
+        <svg width="14" height="14" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="M12 8v4M12 16h.01" />
+        </svg> Selecione uma data válida
+       </div>
+      </div>
+     </div>
+     <div id="percentual-compra-section" style="margin: 2rem 0; display: none;">
+      <h3 style="color: #d4a832; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px;">
+       <svg width="20" height="20" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+       </svg> Configuração de Antecipação</h3>
+      <div style="background: linear-gradient(135deg, #fef9e7 0%, #ffffff 100%); border-radius: 12px; padding: 24px; border: 2px solid #f2c85c;"><!-- Cabeçalho com valor atual -->
+       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div><label style="display: block; font-weight: 600; color: #111827; font-size: 15px; margin-bottom: 4px;"> Percentual de Antecipação (α) <span class="tooltip-trigger" style="cursor: help;"> ? <span class="tooltip-content"> Define quanto da carteira será antecipado. Máximo: 40% conforme regras de negócio. </span> </span> </label>
+         <p style="margin: 0; font-size: 13px; color: #6B7280;">Ajuste o percentual que deseja antecipar da carteira</p>
+        </div>
+        <div style="text-align: right;">
+         <div style="font-size: 36px; font-weight: 700; color: #d4a832; font-family: 'Inter', sans-serif; letter-spacing: -0.02em; line-height: 1;" id="percentual-display">
+          40%
+         </div>
+         <div style="font-size: 12px; color: #6B7280; margin-top: 4px;">
+          de antecipação
+         </div>
+        </div>
+       </div><!-- Slider com gradiente -->
+       <div style="position: relative; margin-bottom: 24px;"><input type="range" id="percentual-compra" min="0" max="40" value="40" step="1" oninput="updatePercentualDisplay()" style="width: 100%; height: 12px; border-radius: 6px; background: linear-gradient(to right, #084808 0%, #f2c85c 100%); outline: none; -webkit-appearance: none; cursor: pointer;">
+        <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: #6B7280; font-weight: 500;"><span>0%</span> <span>10%</span> <span>20%</span> <span>30%</span> <span style="color: #d4a832; font-weight: 700;">40% (máx)</span>
+        </div>
+       </div><!-- Cards de informação -->
+       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 16px;">
+        <div style="background: white; border-radius: 8px; padding: 14px; border: 1px solid #E5E7EB;">
+         <div style="font-size: 11px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+          Valor Antecipado
+         </div>
+         <div id="valor-antecipado" style="font-size: 20px; font-weight: 700; color: #111827; font-family: 'Courier New', monospace;">
+          R$ 0,00
+         </div>
+         <div style="font-size: 11px; color: #6B7280; margin-top: 2px;">
+          de <span id="valor-total-carteira">R$ 0,00</span>
+         </div>
+        </div>
+        <div style="background: white; border-radius: 8px; padding: 14px; border: 1px solid #E5E7EB;">
+         <div style="font-size: 11px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+          Taxa ADM Aplicada
+         </div>
+         <div style="font-size: 20px; font-weight: 700; color: #d4a832; font-family: 'Inter', sans-serif;">
+          4,90%
+         </div>
+         <div style="font-size: 11px; color: #6B7280; margin-top: 2px;">
+          sobre valor antecipado
+         </div>
+        </div>
+        <div style="background: white; border-radius: 8px; padding: 14px; border: 1px solid #E5E7EB;">
+         <div style="font-size: 11px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+          Custo ADM Mensal
+         </div>
+         <div id="custo-adm-mensal" style="font-size: 20px; font-weight: 700; color: #111827; font-family: 'Courier New', monospace;">
+          R$ 0,00
+         </div>
+         <div style="font-size: 11px; color: #6B7280; margin-top: 2px;">
+          por mês
+         </div>
+        </div>
+       </div><!-- Informação adicional -->
+       <div style="background: rgba(242, 200, 92, 0.1); border-left: 3px solid #f2c85c; border-radius: 6px; padding: 12px 16px;">
+        <div style="display: flex; align-items: start; gap: 10px;">
+         <svg width="18" height="18" viewbox="0 0 24 24" fill="none" stroke="#d4a832" stroke-width="2" style="flex-shrink: 0; margin-top: 2px;"><circle cx="12" cy="12" r="10" /> <path d="M12 16v-4M12 8h.01" />
+         </svg>
+         <div style="font-size: 13px; color: #374151; line-height: 1.5;"><strong style="color: #111827;">Como funciona:</strong> A taxa ADM de 4,90% é calculada apenas sobre o valor antecipado (<span id="alpha-info">40%</span> da carteira). As demais taxas (emissão, análise, etc.) continuam sendo calculadas sobre a carteira integral.
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+     <div style="margin: 2rem 0;">
+      <h3 style="color: #d4a832; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;">
+       <svg width="20" height="20" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" />
+       </svg> Configurações Globais</h3>
+      <div class="form-group" style="margin-top: 1.5rem;"><label for="perc-vencidos"> Percentual de Vencidos Estimado (% ao mês) <span class="tooltip-trigger"> ? <span class="tooltip-content"> Estimativa de inadimplência mensal para cálculo de taxas sobre valores vencidos </span> </span> </label> <input type="text" id="perc-vencidos" value="5,0%" oninput="formatPercentInput(this)" onblur="validatePercVencidos()"> <small>Estimativa de inadimplência mensal para cálculo de taxas sobre valores vencidos</small>
+       <div id="perc-vencidos-error" class="error-message" style="display: none;">
+        <svg width="14" height="14" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="M12 8v4M12 16h.01" />
+        </svg> Insira um percentual válido entre 0% e 100%
+       </div>
+      </div>
+     </div>
+     <div class="nav-buttons"><button class="btn btn-secondary" onclick="goToStep(1)">
+       <svg width="16" height="16" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7" />
+       </svg> Voltar </button> <button class="btn btn-primary" onclick="validateAndGoToStep3()"> Próximo: Serviços 
+       <svg width="16" height="16" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7" />
+       </svg></button>
+     </div>
+    </div>
+   </div><!-- Step 3: Confirmação (simplificada) -->
+   <div id="step-3" class="step">
+    <div class="card">
+     <div class="card-header">
+      <div class="card-header-icon">
+       <svg width="20" height="20" viewbox="0 0 24 24" fill="none" stroke="#f2c85c" stroke-width="2"><path d="M9 11l3 3L22 4" /> <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+       </svg>
+      </div>
+      <div class="card-header-content">
+       <h2>Revisão dos Dados</h2>
+       <p class="card-subtitle">Confirme os dados antes de calcular</p>
+      </div>
+     </div>
+     <div class="alert alert-info">
+      <svg width="18" height="18" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="M12 16v-4M12 8h.01" />
+      </svg>
+      <div><strong>Pronto para calcular:</strong> Revise os dados informados e clique em "Ver Resultados" para gerar o relatório da operação.
+      </div>
+     </div>
+     <div style="margin-top: 24px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px;">
+       <div style="padding: 20px; background: #fafaf8; border: 2px solid #E5E7EB; border-radius: 12px;">
+        <div style="font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+         Valor da Carteira
+        </div>
+        <div id="review-valor-carteira" style="font-size: 24px; font-weight: 700; color: #111827; font-family: 'Inter', sans-serif;">
+         R$ 0,00
+        </div>
+       </div>
+       <div style="padding: 20px; background: #fafaf8; border: 2px solid #E5E7EB; border-radius: 12px;">
+        <div style="font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+         Quantidade de Boletos
+        </div>
+        <div id="review-qtd-boletos" style="font-size: 24px; font-weight: 700; color: #111827; font-family: 'Inter', sans-serif;">
+         0
+        </div>
+       </div>
+       <div style="padding: 20px; background: #fafaf8; border: 2px solid #E5E7EB; border-radius: 12px;">
+        <div style="font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+         Total de Clientes
+        </div>
+        <div id="review-total-clientes" style="font-size: 24px; font-weight: 700; color: #111827; font-family: 'Inter', sans-serif;">
+         0
+        </div>
+       </div>
+       <div style="padding: 20px; background: #fafaf8; border: 2px solid #E5E7EB; border-radius: 12px;">
+        <div style="font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+         Duração do Plano
+        </div>
+        <div id="review-meses-plano" style="font-size: 24px; font-weight: 700; color: #111827; font-family: 'Inter', sans-serif;">
+         0 meses
+        </div>
+       </div>
+      </div>
+     </div>
+     <div class="nav-buttons"><button class="btn btn-secondary" onclick="goToStep(2)">
+       <svg width="16" height="16" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7" />
+       </svg> Voltar </button> <button class="btn btn-primary" onclick="calcularResultados()"> Ver Resultados 
+       <svg width="16" height="16" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7" />
+       </svg></button>
+     </div>
+    </div>
+   </div><!-- Step 4: Resultados -->
+   <div id="step-4" class="step">
+    <div class="card">
+     <div class="card-header">
+      <div class="card-header-icon">
+       <svg width="20" height="20" viewbox="0 0 24 24" fill="none" stroke="#f2c85c" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+       </svg>
+      </div>
+      <div class="card-header-content">
+       <h2>Resumo de Custos Mensais</h2>
+       <p class="card-subtitle">Análise detalhada dos custos operacionais mensais</p>
+      </div>
+     </div><!-- Resumo Principal -->
+     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-bottom: 32px;">
+      <div style="padding: 24px; background: linear-gradient(135deg, #f2c85c 0%, #e6b840 100%); border-radius: 12px; box-shadow: 0 4px 12px rgba(242, 200, 92, 0.3);">
+       <div style="font-size: 12px; font-weight: 600; color: rgba(26, 26, 26, 0.7); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+        Total Mensal
+       </div>
+       <div id="total-mensal-display" style="font-size: 32px; font-weight: 700; color: #1a1a1a; font-family: 'Inter', sans-serif; letter-spacing: -0.02em;">
+        R$ 0,00/mês
+       </div>
+      </div>
+      <div style="padding: 24px; background: #fafaf8; border: 2px solid #E5E7EB; border-radius: 12px;">
+       <div style="font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+        Valor da Carteira
+       </div>
+       <div id="valor-carteira-display" style="font-size: 28px; font-weight: 700; color: #111827; font-family: 'Inter', sans-serif;">
+        R$ 0,00
+       </div>
+      </div>
+      <div style="padding: 24px; background: #fafaf8; border: 2px solid #E5E7EB; border-radius: 12px;">
+       <div style="font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+        Duração do Plano
+       </div>
+       <div id="duracao-plano-display" style="font-size: 28px; font-weight: 700; color: #111827; font-family: 'Inter', sans-serif;">
+        0 meses
+       </div>
+      </div>
+     </div><!-- Taxas Obrigatórias -->
+     <div style="margin-bottom: 32px;">
+      <h3 style="color: #d4a832; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; font-size: 18px;">
+       <svg width="20" height="20" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" />
+       </svg> 1. Taxas Obrigatórias</h3>
+      <div style="background: #fafaf8; border-radius: 12px; padding: 20px; border: 1px solid #E5E7EB;">
+       <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #E5E7EB;"><span style="font-size: 14px; color: #374151; font-weight: 500;">Taxa PIX</span> <span id="taxa-pix-display" style="font-size: 16px; font-weight: 700; color: #111827; font-family: 'Courier New', monospace;">R$ 1,99/mês</span>
+       </div>
+       <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #E5E7EB;"><span id="emissao-label" style="font-size: 14px; color: #374151; font-weight: 500;">Emissão (R$ 9,98 por boleto)</span> <span id="emissao-mes-display" style="font-size: 16px; font-weight: 700; color: #111827; font-family: 'Courier New', monospace;">R$ 0,00/mês</span>
+       </div>
+       <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #E5E7EB;"><span id="diversos-label" style="font-size: 14px; color: #374151; font-weight: 500;">Diversos (R$ 0,99 por cliente)</span> <span id="diversos-mes-display" style="font-size: 16px; font-weight: 700; color: #111827; font-family: 'Courier New', monospace;">R$ 0,00/mês</span>
+       </div>
+       <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #E5E7EB;"><span id="whatsapp-label" style="font-size: 14px; color: #374151; font-weight: 500;">WhatsApp (R$ 1,47 por cliente)</span> <span id="whatsapp-mes-display" style="font-size: 16px; font-weight: 700; color: #111827; font-family: 'Courier New', monospace;">R$ 0,00/mês</span>
+       </div>
+       <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 0 0 0; margin-top: 8px;"><span style="font-size: 15px; color: #111827; font-weight: 600;">Subtotal Obrigatórias</span> <span id="total-obrigatorias-display" style="font-size: 18px; font-weight: 700; color: #d4a832; font-family: 'Courier New', monospace;">R$ 0,00/mês</span>
+       </div>
+      </div>
+     </div><!-- Taxa ADM -->
+     <div style="margin-bottom: 32px;">
+      <h3 style="color: #d4a832; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; font-size: 18px;">
+       <svg width="20" height="20" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+       </svg> 2. Taxa ADM</h3>
+      <div style="background: #fafaf8; border-radius: 12px; padding: 20px; border: 1px solid #E5E7EB;">
+       <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0;"><span id="adm-label-display" style="font-size: 14px; color: #374151; font-weight: 500;">Taxa ADM</span> <span id="adm-mes-display" style="font-size: 18px; font-weight: 700; color: #d4a832; font-family: 'Courier New', monospace;">R$ 0,00/mês</span>
+       </div>
+      </div>
+     </div><!-- Abas de Navegação -->
+     <div style="display: flex; gap: 8px; margin-bottom: 24px; border-bottom: 2px solid #E5E7EB;"><button id="tab-resumo" class="tab-button active" onclick="switchTab('resumo')" style="padding: 12px 24px; background: none; border: none; border-bottom: 3px solid #f2c85c; color: #111827; font-weight: 600; cursor: pointer; font-size: 14px; transition: all 0.2s;"> 📊 Resumo Mensal </button> <button id="tab-cronograma" class="tab-button" onclick="switchTab('cronograma')" style="padding: 12px 24px; background: none; border: none; border-bottom: 3px solid transparent; color: #6B7280; font-weight: 500; cursor: pointer; font-size: 14px; transition: all 0.2s;"> 📅 Cronograma Mensal </button>
+     </div><!-- Conteúdo da Aba Resumo -->
+     <div id="content-resumo" class="tab-content active"><!-- Conteúdo do resumo já está acima das abas -->
+     </div><!-- Conteúdo da Aba Cronograma -->
+     <div id="content-cronograma" class="tab-content" style="display: none;">
+      <div style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;">
+       <div>
+        <h3 style="color: #d4a832; margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px; font-size: 18px;">
+         <svg width="20" height="20" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /> <line x1="16" y1="2" x2="16" y2="6" /> <line x1="8" y1="2" x2="8" y2="6" /> <line x1="3" y1="10" x2="21" y2="10" />
+         </svg> Cronograma Detalhado por Mês</h3>
+        <p style="margin: 0; font-size: 13px; color: #6B7280;">Detalhamento de todas as taxas mês a mês durante o período do plano</p>
+       </div>
+       <div style="display: flex; gap: 8px;"><button class="btn btn-outline" onclick="exportarCronogramaCSV()" style="font-size: 13px; height: 36px; padding: 0 14px;">
+         <svg width="14" height="14" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+         </svg> CSV </button> <button class="btn btn-outline" onclick="exportarCronogramaPDF()" style="font-size: 13px; height: 36px; padding: 0 14px;">
+         <svg width="14" height="14" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /> <polyline points="14 2 14 8 20 8" /> <line x1="16" y1="13" x2="8" y2="13" /> <line x1="16" y1="17" x2="8" y2="17" /> <polyline points="10 9 9 9 8 9" />
+         </svg> PDF </button>
+       </div>
+      </div><!-- Tabela de Cronograma -->
+      <div style="background: white; border-radius: 12px; overflow: hidden; border: 1px solid #E5E7EB;">
+       <div style="overflow-x: auto;">
+        <table id="tabela-cronograma" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+         <thead>
+          <tr style="background: #fafaf8; border-bottom: 2px solid #E5E7EB;">
+           <th style="padding: 14px 12px; text-align: left; font-weight: 600; color: #111827; white-space: nowrap;">Mês</th>
+           <th style="padding: 14px 12px; text-align: right; font-weight: 600; color: #111827; white-space: nowrap;">PIX</th>
+           <th style="padding: 14px 12px; text-align: right; font-weight: 600; color: #111827; white-space: nowrap;">TAC</th>
+           <th style="padding: 14px 12px; text-align: right; font-weight: 600; color: #111827; white-space: nowrap;">Análise</th>
+           <th style="padding: 14px 12px; text-align: right; font-weight: 600; color: #111827; white-space: nowrap;">Assinatura</th>
+           <th style="padding: 14px 12px; text-align: right; font-weight: 600; color: #111827; white-space: nowrap;">Emissão</th>
+           <th style="padding: 14px 12px; text-align: right; font-weight: 600; color: #111827; white-space: nowrap;">Diversos</th>
+           <th style="padding: 14px 12px; text-align: right; font-weight: 600; color: #111827; white-space: nowrap;">WhatsApp</th>
+           <th style="padding: 14px 12px; text-align: right; font-weight: 600; color: #111827; white-space: nowrap;">ADM</th>
+           <th style="padding: 14px 12px; text-align: right; font-weight: 600; color: #d4a832; white-space: nowrap;">Total Mês</th>
+           <th style="padding: 14px 12px; text-align: center; font-weight: 600; color: #111827; width: 60px;">Detalhes</th>
+          </tr>
+         </thead>
+         <tbody id="cronograma-tbody"><!-- Preenchido dinamicamente -->
+         </tbody>
+         <tfoot>
+          <tr style="background: #fef9e7; border-top: 3px solid #f2c85c; font-weight: 700;">
+           <td style="padding: 16px 12px; color: #111827;">TOTAL DO PLANO</td>
+           <td id="total-pix" style="padding: 16px 12px; text-align: right; color: #111827; font-family: 'Courier New', monospace;">R$ 0,00</td>
+           <td id="total-tac" style="padding: 16px 12px; text-align: right; color: #111827; font-family: 'Courier New', monospace;">R$ 0,00</td>
+           <td id="total-analise" style="padding: 16px 12px; text-align: right; color: #111827; font-family: 'Courier New', monospace;">R$ 0,00</td>
+           <td id="total-assinatura" style="padding: 16px 12px; text-align: right; color: #111827; font-family: 'Courier New', monospace;">R$ 0,00</td>
+           <td id="total-emissao" style="padding: 16px 12px; text-align: right; color: #111827; font-family: 'Courier New', monospace;">R$ 0,00</td>
+           <td id="total-diversos" style="padding: 16px 12px; text-align: right; color: #111827; font-family: 'Courier New', monospace;">R$ 0,00</td>
+           <td id="total-whatsapp" style="padding: 16px 12px; text-align: right; color: #111827; font-family: 'Courier New', monospace;">R$ 0,00</td>
+           <td id="total-adm" style="padding: 16px 12px; text-align: right; color: #111827; font-family: 'Courier New', monospace;">R$ 0,00</td>
+           <td id="total-plano" style="padding: 16px 12px; text-align: right; color: #d4a832; font-family: 'Courier New', monospace; font-size: 16px;">R$ 0,00</td>
+           <td style="padding: 16px 12px;"></td>
+          </tr>
+         </tfoot>
+        </table>
+       </div>
+      </div>
+     </div>
+     <div class="nav-buttons"><button class="btn btn-secondary" onclick="goToStep(3)">
+       <svg width="16" height="16" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7" />
+       </svg> Voltar </button> <button class="btn btn-primary" onclick="goToGestaoCobranca()"> Gestão de Cobrança 
+       <svg width="16" height="16" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7" />
+       </svg></button>
+     </div>
+    </div>
+   </div>
+  </div><!-- Step 5: Gestão de Cobrança -->
+  <div id="step-5" class="step">
+   <div class="card">
+    <div class="card-header">
+     <div class="card-header-icon">
+      <svg width="20" height="20" viewbox="0 0 24 24" fill="none" stroke="#f2c85c" stroke-width="2"><path d="M9 11l3 3L22 4" /> <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+      </svg>
+     </div>
+     <div class="card-header-content">
+      <h2>Gestão de Cobrança</h2>
+      <p class="card-subtitle">Estimativa de custos com serviços de cobrança e negativação</p>
+     </div>
+    </div>
+    <div class="alert alert-info">
+     <svg width="18" height="18" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /> <path d="M12 16v-4M12 8h.01" />
+     </svg>
+     <div><strong>Serviços Opcionais:</strong> Estes serviços são cobrados apenas quando utilizados. Marque os que deseja incluir na estimativa de cobrança.
+     </div>
+    </div><!-- Serviços de Cobrança -->
+    <div style="margin-top: 32px;">
+     <h3 style="color: #d4a832; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; font-size: 18px;">
+      <svg width="20" height="20" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3" /> <circle cx="12" cy="12" r="10" />
+      </svg> Serviços de Cobrança Disponíveis</h3>
+     <div style="display: grid; gap: 16px; margin-bottom: 32px;"><!-- TAC -->
+      <div class="servico-card" id="card-tac" style="padding: 20px; background: white; border: 2px solid #E5E7EB; border-radius: 12px; transition: all 0.2s;">
+       <div style="display: flex; align-items: start; gap: 16px;"><input type="checkbox" id="servico-tac" onchange="toggleServicoCobranca('tac')" style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer; flex-shrink: 0;">
+        <div style="flex: 1;">
+         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+           <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #111827;">TAC</h3><span class="tooltip-trigger" style="cursor: help;"> ? <span class="tooltip-content" id="tooltip-tac">0,98% sobre valor total da operação (carteira × meses), cobrado no mês de uso</span> </span>
+          </div><span style="font-size: 14px; font-weight: 600; color: #6B7280;">0,98% da operação</span>
+         </div>
+         <p style="margin: 0; font-size: 14px; color: #6B7280; line-height: 1.5;">Taxa de Abertura de Crédito sobre o valor total da operação (cobrada no mês de uso)</p>
+        </div>
+       </div>
+      </div><!-- Análise -->
+      <div class="servico-card" id="card-analise" style="padding: 20px; background: white; border: 2px solid #E5E7EB; border-radius: 12px; transition: all 0.2s;">
+       <div style="display: flex; align-items: start; gap: 16px;"><input type="checkbox" id="servico-analise" onchange="toggleServicoCobranca('analise')" style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer; flex-shrink: 0;">
+        <div style="flex: 1;">
+         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+           <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #111827;">Análise</h3><span class="tooltip-trigger" style="cursor: help;"> ? <span class="tooltip-content" id="tooltip-analise">qtd_clientes × R$ 9,99</span> </span>
+          </div><span style="font-size: 14px; font-weight: 600; color: #6B7280;">R$ 9,99/cliente</span>
+         </div>
+         <p style="margin: 0 0 12px 0; font-size: 14px; color: #6B7280; line-height: 1.5;">Análise de crédito e cadastro de clientes</p>
+         <div id="qtd-analise-container" style="display: none;"><label style="font-size: 13px; color: #374151; font-weight: 500; display: block; margin-bottom: 6px;">Quantidade de Clientes</label> <input type="number" id="qtd-analise" min="0" value="0" disabled oninput="calcularCustosCobranca()" style="width: 100%; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 6px; font-size: 14px;">
+         </div>
+        </div>
+       </div>
+      </div><!-- Assinatura -->
+      <div class="servico-card" id="card-assinatura" style="padding: 20px; background: white; border: 2px solid #E5E7EB; border-radius: 12px; transition: all 0.2s;">
+       <div style="display: flex; align-items: start; gap: 16px;"><input type="checkbox" id="servico-assinatura" onchange="toggleServicoCobranca('assinatura')" style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer; flex-shrink: 0;">
+        <div style="flex: 1;">
+         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+           <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #111827;">Assinatura</h3><span class="tooltip-trigger" style="cursor: help;"> ? <span class="tooltip-content" id="tooltip-assinatura">qtd_assinaturas × R$ 10,00</span> </span>
+          </div><span style="font-size: 14px; font-weight: 600; color: #6B7280;">R$ 10,00/assinatura</span>
+         </div>
+         <p style="margin: 0 0 12px 0; font-size: 14px; color: #6B7280; line-height: 1.5;">Taxa de assinatura do sistema</p>
+         <div id="qtd-assinatura-container" style="display: none;"><label style="font-size: 13px; color: #374151; font-weight: 500; display: block; margin-bottom: 6px;">Quantidade de Assinaturas</label> <input type="number" id="qtd-assinatura" min="0" value="0" disabled oninput="calcularCustosCobranca()" style="width: 100%; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 6px; font-size: 14px;">
+         </div>
+        </div>
+       </div>
+      </div><!-- Negativação -->
+      <div class="servico-card" id="card-negativacao" style="padding: 20px; background: white; border: 2px solid #E5E7EB; border-radius: 12px; transition: all 0.2s;">
+       <div style="display: flex; align-items: start; gap: 16px;"><input type="checkbox" id="servico-negativacao" onchange="toggleServicoCobranca('negativacao')" style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer; flex-shrink: 0;">
+        <div style="flex: 1;">
+         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+           <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #111827;">Negativação</h3><span class="tooltip-trigger" style="cursor: help;"> ? <span class="tooltip-content" id="tooltip-negativacao">qtd_clientes × R$ 11,99</span> </span>
+          </div><span style="font-size: 14px; font-weight: 600; color: #6B7280;">R$ 11,99/cliente</span>
+         </div>
+         <p style="margin: 0 0 12px 0; font-size: 14px; color: #6B7280; line-height: 1.5;">Inclusão de devedores em órgãos de proteção ao crédito</p>
+         <div id="qtd-negativacao-container" style="display: none;"><label style="font-size: 13px; color: #374151; font-weight: 500; display: block; margin-bottom: 6px;">Quantidade de Clientes</label> <input type="number" id="qtd-negativacao" min="0" value="0" disabled oninput="calcularCustosCobranca()" style="width: 100%; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 6px; font-size: 14px;">
+         </div>
+        </div>
+       </div>
+      </div><!-- Exclusão de Negativação -->
+      <div class="servico-card" id="card-exclusaoNegativacao" style="padding: 20px; background: white; border: 2px solid #E5E7EB; border-radius: 12px; transition: all 0.2s;">
+       <div style="display: flex; align-items: start; gap: 16px;"><input type="checkbox" id="servico-exclusaoNegativacao" onchange="toggleServicoCobranca('exclusaoNegativacao')" style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer; flex-shrink: 0;">
+        <div style="flex: 1;">
+         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+           <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #111827;">Exclusão de Negativação</h3><span class="tooltip-trigger" style="cursor: help;"> ? <span class="tooltip-content" id="tooltip-exclusaoNegativacao">qtd_clientes × R$ 12,99</span> </span>
+          </div><span style="font-size: 14px; font-weight: 600; color: #6B7280;">R$ 12,99/cliente</span>
+         </div>
+         <p style="margin: 0 0 12px 0; font-size: 14px; color: #6B7280; line-height: 1.5;">Retirada de negativação após pagamento</p>
+         <div id="qtd-exclusaoNegativacao-container" style="display: none;"><label style="font-size: 13px; color: #374151; font-weight: 500; display: block; margin-bottom: 6px;">Quantidade de Clientes</label> <input type="number" id="qtd-exclusaoNegativacao" min="0" value="0" disabled oninput="calcularCustosCobranca()" style="width: 100%; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 6px; font-size: 14px;">
+         </div>
+        </div>
+       </div>
+      </div><!-- Manutenção de Vencidos -->
+      <div class="servico-card" id="card-manutencaoVencidos" style="padding: 20px; background: white; border: 2px solid #E5E7EB; border-radius: 12px; transition: all 0.2s;">
+       <div style="display: flex; align-items: start; gap: 16px;"><input type="checkbox" id="servico-manutencaoVencidos" onchange="toggleServicoCobranca('manutencaoVencidos')" style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer; flex-shrink: 0;">
+        <div style="flex: 1;">
+         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+           <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #111827;">Manutenção de Vencidos</h3><span class="tooltip-trigger" style="cursor: help;"> ? <span class="tooltip-content" id="tooltip-manutencaoVencidos">qtd_clientes × R$ 1,99</span> </span>
+          </div><span style="font-size: 14px; font-weight: 600; color: #6B7280;">R$ 1,99/cliente</span>
+         </div>
+         <p style="margin: 0 0 12px 0; font-size: 14px; color: #6B7280; line-height: 1.5;">Manutenção e gestão de títulos vencidos</p>
+         <div id="qtd-manutencaoVencidos-container" style="display: none;"><label style="font-size: 13px; color: #374151; font-weight: 500; display: block; margin-bottom: 6px;">Quantidade de Clientes</label> <input type="number" id="qtd-manutencaoVencidos" min="0" value="0" disabled oninput="calcularCustosCobranca()" style="width: 100%; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 6px; font-size: 14px;">
+         </div>
+        </div>
+       </div>
+      </div><!-- Carta de Cobrança -->
+      <div class="servico-card" id="card-carta" style="padding: 20px; background: white; border: 2px solid #E5E7EB; border-radius: 12px; transition: all 0.2s;">
+       <div style="display: flex; align-items: start; gap: 16px;"><input type="checkbox" id="servico-carta" onchange="toggleServicoCobranca('carta')" style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer; flex-shrink: 0;">
+        <div style="flex: 1;">
+         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+           <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #111827;">Carta de Cobrança</h3><span class="tooltip-trigger" style="cursor: help;"> ? <span class="tooltip-content" id="tooltip-carta">qtd_cartas × R$ 2,91</span> </span>
+          </div><span style="font-size: 14px; font-weight: 600; color: #6B7280;">R$ 2,91/carta</span>
+         </div>
+         <p style="margin: 0 0 12px 0; font-size: 14px; color: #6B7280; line-height: 1.5;">Envio de carta física de cobrança</p>
+         <div id="qtd-carta-container" style="display: none;"><label style="font-size: 13px; color: #374151; font-weight: 500; display: block; margin-bottom: 6px;">Quantidade de Cartas</label> <input type="number" id="qtd-carta" min="0" value="0" disabled oninput="calcularCustosCobranca()" style="width: 100%; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 6px; font-size: 14px;">
+         </div>
+        </div>
+       </div>
+      </div><!-- E-mail e SMS -->
+      <div class="servico-card" id="card-emailSms" style="padding: 20px; background: white; border: 2px solid #E5E7EB; border-radius: 12px; transition: all 0.2s;">
+       <div style="display: flex; align-items: start; gap: 16px;"><input type="checkbox" id="servico-emailSms" onchange="toggleServicoCobranca('emailSms')" style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer; flex-shrink: 0;">
+        <div style="flex: 1;">
+         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+           <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #111827;">E-mail e SMS</h3><span class="tooltip-trigger" style="cursor: help;"> ? <span class="tooltip-content" id="tooltip-emailSms">qtd_titulos × R$ 0,99</span> </span>
+          </div><span style="font-size: 14px; font-weight: 600; color: #6B7280;">R$ 0,99/título</span>
+         </div>
+         <p style="margin: 0 0 12px 0; font-size: 14px; color: #6B7280; line-height: 1.5;">Envio adicional de notificações por e-mail e SMS</p>
+         <div id="qtd-emailSms-container" style="display: none;"><label style="font-size: 13px; color: #374151; font-weight: 500; display: block; margin-bottom: 6px;">Quantidade de Títulos</label> <input type="number" id="qtd-emailSms" min="0" value="0" disabled oninput="calcularCustosCobranca()" style="width: 100%; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 6px; font-size: 14px;">
+         </div>
+        </div>
+       </div>
+      </div><!-- Taxa de Baixa -->
+      <div class="servico-card" id="card-taxaBaixa" style="padding: 20px; background: white; border: 2px solid #E5E7EB; border-radius: 12px; transition: all 0.2s;">
+       <div style="display: flex; align-items: start; gap: 16px;"><input type="checkbox" id="servico-taxaBaixa" onchange="toggleServicoCobranca('taxaBaixa')" style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer; flex-shrink: 0;">
+        <div style="flex: 1;">
+         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+           <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #111827;">Taxa de Baixa</h3><span class="tooltip-trigger" style="cursor: help;"> ? <span class="tooltip-content" id="tooltip-taxaBaixa">qtd_baixas × R$ 3,99</span> </span>
+          </div><span style="font-size: 14px; font-weight: 600; color: #6B7280;">R$ 3,99/título</span>
+         </div>
+         <p style="margin: 0 0 12px 0; font-size: 14px; color: #6B7280; line-height: 1.5;">Processamento de baixa de títulos pagos</p>
+         <div id="qtd-taxaBaixa-container" style="display: none;"><label style="font-size: 13px; color: #374151; font-weight: 500; display: block; margin-bottom: 6px;">Quantidade de Baixas</label> <input type="number" id="qtd-taxaBaixa" min="0" value="0" disabled oninput="calcularCustosCobranca()" style="width: 100%; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 6px; font-size: 14px;">
+         </div>
+        </div>
+       </div>
+      </div><!-- Taxa de Alteração -->
+      <div class="servico-card" id="card-taxaAlteracao" style="padding: 20px; background: white; border: 2px solid #E5E7EB; border-radius: 12px; transition: all 0.2s;">
+       <div style="display: flex; align-items: start; gap: 16px;"><input type="checkbox" id="servico-taxaAlteracao" onchange="toggleServicoCobranca('taxaAlteracao')" style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer; flex-shrink: 0;">
+        <div style="flex: 1;">
+         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+           <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #111827;">Taxa de Alteração</h3><span class="tooltip-trigger" style="cursor: help;"> ? <span class="tooltip-content" id="tooltip-taxaAlteracao">qtd_alteracoes × R$ 4,99</span> </span>
+          </div><span style="font-size: 14px; font-weight: 600; color: #6B7280;">R$ 4,99/título</span>
+         </div>
+         <p style="margin: 0 0 12px 0; font-size: 14px; color: #6B7280; line-height: 1.5;">Alteração de dados de títulos já emitidos</p>
+         <div id="qtd-taxaAlteracao-container" style="display: none;"><label style="font-size: 13px; color: #374151; font-weight: 500; display: block; margin-bottom: 6px;">Quantidade de Alterações</label> <input type="number" id="qtd-taxaAlteracao" min="0" value="0" disabled oninput="calcularCustosCobranca()" style="width: 100%; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 6px; font-size: 14px;">
+         </div>
+        </div>
+       </div>
+      </div><!-- Protesto -->
+      <div class="servico-card" id="card-protesto" style="padding: 20px; background: white; border: 2px solid #E5E7EB; border-radius: 12px; transition: all 0.2s;">
+       <div style="display: flex; align-items: start; gap: 16px;"><input type="checkbox" id="servico-protesto" onchange="toggleServicoCobranca('protesto')" style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer; flex-shrink: 0;">
+        <div style="flex: 1;">
+         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+           <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #111827;">Protesto</h3><span class="tooltip-trigger" style="cursor: help;"> ? <span class="tooltip-content" id="tooltip-protesto">qtd_protestos × R$ 9,90</span> </span>
+          </div><span style="font-size: 14px; font-weight: 600; color: #6B7280;">R$ 9,90/título</span>
+         </div>
+         <p style="margin: 0 0 12px 0; font-size: 14px; color: #6B7280; line-height: 1.5;">Protesto de título em cartório</p>
+         <div id="qtd-protesto-container" style="display: none;"><label style="font-size: 13px; color: #374151; font-weight: 500; display: block; margin-bottom: 6px;">Quantidade de Protestos</label> <input type="number" id="qtd-protesto" min="0" value="0" disabled oninput="calcularCustosCobranca()" style="width: 100%; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 6px; font-size: 14px;">
+         </div>
+        </div>
+       </div>
+      </div><!-- Anuência -->
+      <div class="servico-card" id="card-anuencia" style="padding: 20px; background: white; border: 2px solid #E5E7EB; border-radius: 12px; transition: all 0.2s;">
+       <div style="display: flex; align-items: start; gap: 16px;"><input type="checkbox" id="servico-anuencia" onchange="toggleServicoCobranca('anuencia')" style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer; flex-shrink: 0;">
+        <div style="flex: 1;">
+         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+           <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #111827;">Anuência</h3><span class="tooltip-trigger" style="cursor: help;"> ? <span class="tooltip-content" id="tooltip-anuencia">qtd_anuencias × R$ 9,90</span> </span>
+          </div><span style="font-size: 14px; font-weight: 600; color: #6B7280;">R$ 9,90/título</span>
+         </div>
+         <p style="margin: 0 0 12px 0; font-size: 14px; color: #6B7280; line-height: 1.5;">Anuência para cancelamento de protesto</p>
+         <div id="qtd-anuencia-container" style="display: none;"><label style="font-size: 13px; color: #374151; font-weight: 500; display: block; margin-bottom: 6px;">Quantidade de Anuências</label> <input type="number" id="qtd-anuencia" min="0" value="0" disabled oninput="calcularCustosCobranca()" style="width: 100%; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 6px; font-size: 14px;">
+         </div>
+        </div>
+       </div>
+      </div>
+     </div><!-- Resumo de Custos de Cobrança -->
+     <div id="resumo-cobranca" style="display: none;">
+      <h3 style="color: #d4a832; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; font-size: 18px;">
+       <svg width="20" height="20" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+       </svg> Estimativa de Custos Mensais</h3>
+      <div style="background: #fafaf8; border-radius: 12px; padding: 20px; border: 1px solid #E5E7EB; margin-bottom: 20px;">
+       <div id="servicos-cobranca-list"><!-- Preenchido dinamicamente -->
+       </div>
+       <div style="display: flex; justify-content: space-between; align-items: center; padding: 20px 0 0 0; margin-top: 16px; border-top: 2px solid #E5E7EB;"><span style="font-size: 18px; color: #111827; font-weight: 700;">Total Estimado (Cobrança)</span> <span id="total-cobranca-display" style="font-size: 28px; font-weight: 700; color: #d4a832; font-family: 'Courier New', monospace;">R$ 0,00/mês</span>
+       </div>
+      </div>
+     </div>
+    </div>
+    <div class="nav-buttons"><button class="btn btn-secondary" onclick="voltarParaOperacao()">
+      <svg width="16" height="16" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7" />
+      </svg> 📈 Voltar à Operação </button> <button class="btn btn-primary" onclick="exportarResultados()">
+      <svg width="16" height="16" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+      </svg> Exportar Resultados </button>
+    </div>
+   </div>
+  </div>
+  <div id="toast" class="toast"></div><!-- Easter Egg Footer -->
+  <footer style="text-align: center; padding: 2rem 1rem 1rem; margin-top: 3rem; border-top: 1px solid rgba(229, 231, 235, 0.3);">
+   <p style="margin: 0; font-size: 11px; color: rgba(107, 114, 128, 0.4); font-weight: 400; letter-spacing: 0.5px; font-family: 'Courier New', monospace;">Ketlyn Araujo ©</p>
+  </footer>
+  <script>
+    // ============================================================================
+    // ESTADO GLOBAL DA APLICAÇÃO
+    // ============================================================================
+    const appState = {
+      currentStep: 1,
+      carteiraData: null,
+      parametros: {},
+      servicosAtivos: [],
+      resultados: null,
+      scenarios: [],
+      mesesOverride: false,
+      modalidadeSelecionada: null
+    };
+
+    // ============================================================================
+    // FUNÇÕES DE NAVEGAÇÃO
+    // ============================================================================
+    
+    function goToStep(stepNumber) {
+      // Hide all steps
+      document.querySelectorAll('.step').forEach(step => {
+        step.classList.remove('active');
+      });
+      
+      // Show target step
+      document.getElementById(`step-${stepNumber}`).classList.add('active');
+      
+      // Update stepper
+      document.querySelectorAll('.stepper-item').forEach((item, index) => {
+        item.classList.remove('active', 'completed');
+        if (index + 1 < stepNumber) {
+          item.classList.add('completed');
+        } else if (index + 1 === stepNumber) {
+          item.classList.add('active');
+        }
+      });
+      
+      appState.currentStep = stepNumber;
+      
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ============================================================================
+    // SELEÇÃO DE MODALIDADE
+    // ============================================================================
+    
+    function selecionarModalidade(tipo) {
+      // Visual feedback
+      document.querySelectorAll('.modalidade-card').forEach(card => {
+        card.classList.remove('selected');
+      });
+      
+      if (tipo === 'SEM') {
+        document.getElementById('card-sem-antecipacao').classList.add('selected');
+      } else {
+        document.getElementById('card-com-antecipacao').classList.add('selected');
+      }
+
+      // Armazenar tipo selecionado e criar estrutura de dados
+      appState.modalidadeSelecionada = tipo;
+      
+      // Resetar override de meses ao trocar modalidade
+      appState.mesesOverride = false;
+      
+      // Inicializar estrutura de carteira baseada na modalidade
+      if (tipo === 'SEM') {
+        appState.carteiraData = {
+          sem_desembolso: 0,
+          desembolso: 0,
+          boletos_sem_desembolso: 0,
+          boletos_desembolso: 0,
+          total_clientes: 0,
+          modalidade: 'SEM'
+        };
+      } else {
+        appState.carteiraData = {
+          sem_desembolso: 0,
+          desembolso: 0,
+          boletos_sem_desembolso: 0,
+          boletos_desembolso: 0,
+          total_clientes: 0,
+          modalidade: 'DES'
+        };
+      }
+
+      showToast(`Modalidade ${tipo === 'SEM' ? 'Gestão da Carteira' : 'Com Antecipação'} selecionada`, 'success');
+      
+      // Ir direto para step 2 para preencher os dados
+      setTimeout(() => {
+        goToStep(2);
+        
+        // Mostrar/esconder seção de antecipação
+        const percentualSection = document.getElementById('percentual-compra-section');
+        if (tipo === 'DES') {
+          percentualSection.style.display = 'block';
+        } else {
+          percentualSection.style.display = 'none';
+        }
+      }, 500);
+    }
+
+    function trocarModalidade() {
+      // Resetar override ao trocar modalidade
+      appState.mesesOverride = false;
+      goToStep(1);
+      showToast('Selecione uma nova modalidade', 'info');
+    }
+
+    // ============================================================================
+    // VALIDAÇÃO E FORMATAÇÃO
+    // ============================================================================
+    
+    function formatCurrencyInput(input) {
+      let value = input.value.replace(/\D/g, '');
+      value = (parseInt(value) / 100).toFixed(2);
+      input.value = 'R$ ' + value.replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+
+    function formatPercentInput(input) {
+      let value = input.value.replace(/[^\d,]/g, '');
+      if (value.includes(',')) {
+        const parts = value.split(',');
+        value = parts[0] + ',' + parts[1].substring(0, 1);
+      }
+      input.value = value + '%';
+    }
+
+    function parseCurrency(value) {
+      return parseFloat(value.replace(/[^\d,]/g, '').replace(',', '.')) || 0;
+    }
+
+    function parsePercent(value) {
+      return parseFloat(value.replace(/[^\d,]/g, '').replace(',', '.')) || 0;
+    }
+
+    function formatCurrency(value) {
+      return 'R$ ' + value.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+
+    function formatMonthly(value) {
+      return formatCurrency(value) + '/mês';
+    }
+
+    // ============================================================================
+    // VALIDAÇÕES DOS CAMPOS
+    // ============================================================================
+    
+    function validateValorCarteira() {
+      const input = document.getElementById('valor-carteira');
+      const error = document.getElementById('valor-carteira-error');
+      const value = parseCurrency(input.value);
+      
+      if (value <= 0) {
+        input.classList.add('error');
+        error.style.display = 'flex';
+        return false;
+      }
+      
+      input.classList.remove('error');
+      error.style.display = 'none';
+      
+      // Atualizar carteiraData baseado na modalidade
+      if (appState.carteiraData) {
+        if (appState.modalidadeSelecionada === 'SEM') {
+          appState.carteiraData.sem_desembolso = value;
+        } else {
+          appState.carteiraData.desembolso = value;
+        }
+      }
+      
+      // Recomputar derivados
+      recomputaDerivados();
+      
+      // Atualizar display de antecipação se estiver na modalidade DES
+      if (appState.modalidadeSelecionada === 'DES') {
+        updatePercentualDisplay();
+      }
+      
+      return true;
+    }
+
+    function validateQtdBoletos() {
+      const input = document.getElementById('qtd-boletos');
+      const error = document.getElementById('qtd-boletos-error');
+      const value = parseInt(input.value) || 0;
+      
+      if (value <= 0) {
+        input.classList.add('error');
+        error.style.display = 'flex';
+        return false;
+      }
+      
+      input.classList.remove('error');
+      error.style.display = 'none';
+      
+      // Atualizar carteiraData baseado na modalidade
+      if (appState.carteiraData) {
+        if (appState.modalidadeSelecionada === 'SEM') {
+          appState.carteiraData.boletos_sem_desembolso = value;
+        } else {
+          appState.carteiraData.boletos_desembolso = value;
+        }
+      }
+      
+      // Calcular sugestão de meses
+      computeSuggestedMonths();
+      
+      // Recomputar derivados
+      recomputaDerivados();
+      
+      return true;
+    }
+
+    function validateTotalClientes() {
+      const input = document.getElementById('total-clientes');
+      const error = document.getElementById('total-clientes-error');
+      const value = parseInt(input.value) || 0;
+      
+      if (value <= 0) {
+        input.classList.add('error');
+        error.style.display = 'flex';
+        return false;
+      }
+      
+      input.classList.remove('error');
+      error.style.display = 'none';
+      
+      // Atualizar carteiraData
+      if (appState.carteiraData) {
+        appState.carteiraData.total_clientes = value;
+      }
+      
+      // Calcular sugestão de meses
+      computeSuggestedMonths();
+      
+      // Recomputar derivados
+      recomputaDerivados();
+      
+      return true;
+    }
+
+    function validateDataInicio() {
+      const input = document.getElementById('data-inicio');
+      const error = document.getElementById('data-inicio-error');
+      
+      if (!input.value) {
+        input.classList.add('error');
+        error.style.display = 'flex';
+        return false;
+      }
+      
+      input.classList.remove('error');
+      error.style.display = 'none';
+      return true;
+    }
+
+    function validateMesesCustom() {
+      const input = document.getElementById('meses-custom');
+      const error = document.getElementById('meses-custom-error');
+      const value = parseInt(input.value) || 0;
+      
+      if (value < 1 || value > 60) {
+        input.classList.add('error');
+        error.style.display = 'flex';
+        return false;
+      }
+      
+      input.classList.remove('error');
+      error.style.display = 'none';
+      return true;
+    }
+
+    function validatePercVencidos() {
+      const input = document.getElementById('perc-vencidos');
+      const error = document.getElementById('perc-vencidos-error');
+      const value = parsePercent(input.value);
+      
+      if (value < 0 || value > 100) {
+        input.classList.add('error');
+        error.style.display = 'flex';
+        return false;
+      }
+      
+      input.classList.remove('error');
+      error.style.display = 'none';
+      return true;
+    }
+
+    function validateAndGoToStep3() {
+      const isValid = validateValorCarteira() && 
+                     validateQtdBoletos() && 
+                     validateTotalClientes() && 
+                     validateDataInicio() &&
+                     validatePercVencidos();
+      
+      if (isValid) {
+        // Capturar e salvar todos os parâmetros no estado
+        capturarParametros();
+        // Recomputar derivados antes de ir para revisão
+        recomputaDerivados();
+        // Renderizar revisão
+        renderRevisao();
+        goToStep(3);
+      } else {
+        showToast('Por favor, preencha todos os campos corretamente', 'error');
+      }
+    }
+    
+    function capturarParametros() {
+      // Capturar todos os valores dos campos
+      const valorCarteira = parseCurrency(document.getElementById('valor-carteira').value);
+      const qtdBoletos = parseInt(document.getElementById('qtd-boletos').value) || 0;
+      const totalClientes = parseInt(document.getElementById('total-clientes').value) || 0;
+      const mesesPlano = getMesesPlano();
+      const dataInicio = document.getElementById('data-inicio').value;
+      const percVencidos = parsePercent(document.getElementById('perc-vencidos').value);
+      const modalidade = appState.modalidadeSelecionada;
+      
+      // Percentual de compra (apenas para DES)
+      let percentualCompra = 0;
+      if (modalidade === 'DES') {
+        percentualCompra = parseFloat(document.getElementById('percentual-compra')?.value || 40);
+      }
+      
+      // Salvar no estado global
+      appState.parametros = {
+        valorCarteira,
+        qtdBoletos,
+        totalClientes,
+        mesesPlano,
+        dataInicio,
+        percVencidos,
+        modalidade,
+        percentualCompra
+      };
+      
+      // Atualizar carteiraData
+      if (appState.carteiraData) {
+        appState.carteiraData.total_clientes = totalClientes;
+        if (modalidade === 'SEM') {
+          appState.carteiraData.sem_desembolso = valorCarteira;
+          appState.carteiraData.boletos_sem_desembolso = qtdBoletos;
+        } else {
+          appState.carteiraData.desembolso = valorCarteira;
+          appState.carteiraData.boletos_desembolso = qtdBoletos;
+        }
+      }
+      
+      console.log('Parâmetros capturados:', appState.parametros);
+    }
+
+    // ============================================================================
+    // FUNÇÕES DE ATUALIZAÇÃO
+    // ============================================================================
+    
+    function updateMesesPlano() {
+      const select = document.getElementById('meses-plano');
+      const customGroup = document.getElementById('custom-meses-group');
+      
+      if (select.value === 'custom') {
+        customGroup.style.display = 'block';
+      } else {
+        customGroup.style.display = 'none';
+      }
+      
+      // Marcar que o usuário alterou manualmente
+      appState.mesesOverride = true;
+      
+      // Recomputar derivados
+      recomputaDerivados();
+    }
+
+    function updatePercentualDisplay() {
+      const slider = document.getElementById('percentual-compra');
+      const percentual = parseFloat(slider.value);
+      
+      // Atualizar display do percentual
+      const display = document.getElementById('percentual-display');
+      display.textContent = percentual.toFixed(0) + '%';
+      
+      // Obter valor da carteira
+      const valorCarteira = parseCurrency(document.getElementById('valor-carteira').value);
+      
+      // Calcular valores
+      const valorAntecipado = valorCarteira * (percentual / 100);
+      const mesesPlano = getMesesPlano();
+      const vencimentoMensal = valorCarteira / mesesPlano;
+      const baseAdm = vencimentoMensal * (percentual / 100);
+      const custoAdmMensal = baseAdm * 0.049;
+      
+      // Atualizar cards de informação
+      document.getElementById('valor-antecipado').textContent = formatCurrency(valorAntecipado);
+      document.getElementById('valor-total-carteira').textContent = formatCurrency(valorCarteira);
+      document.getElementById('custo-adm-mensal').textContent = formatCurrency(custoAdmMensal);
+      document.getElementById('alpha-info').textContent = percentual.toFixed(0) + '%';
+      
+      // Recomputar derivados para atualizar cálculos
+      recomputaDerivados();
+    }
+
+    function computeSuggestedMonths() {
+      // Se o usuário já alterou manualmente, não sobrescrever
+      if (appState.mesesOverride) {
+        return;
+      }
+      
+      const qtdBoletos = parseInt(document.getElementById('qtd-boletos').value) || 0;
+      const totalClientes = parseInt(document.getElementById('total-clientes').value) || 0;
+      const suggestionInfo = document.getElementById('meses-sugerido-info');
+      
+      // Se algum campo estiver vazio ou zero, esconder sugestão
+      if (qtdBoletos <= 0 || totalClientes <= 0) {
+        suggestionInfo.style.display = 'none';
+        return;
+      }
+      
+      // Calcular meses sugeridos (arredondar para cima)
+      const mesesSugeridos = Math.ceil(qtdBoletos / totalClientes);
+      
+      // Exibir sugestão
+      suggestionInfo.innerHTML = `
+        <div style="padding: 12px 16px; background: #FAFAFA; border: 1px dashed #E5E7EB; border-radius: 8px; margin-top: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f2c85c" stroke-width="2">
+              <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span style="font-size: 13px; color: #374151;">
+              Sugerido: <strong>${qtdBoletos}</strong> ÷ <strong>${totalClientes}</strong> = <strong>${mesesSugeridos} meses</strong>
+            </span>
+          </div>
+        </div>
+      `;
+      suggestionInfo.style.display = 'block';
+      
+      // Aplicar sugestão automaticamente
+      const select = document.getElementById('meses-plano');
+      const customInput = document.getElementById('meses-custom');
+      
+      // Verificar se existe opção pré-definida com esse valor
+      const optionExists = Array.from(select.options).some(opt => parseInt(opt.value) === mesesSugeridos);
+      
+      if (optionExists) {
+        select.value = mesesSugeridos.toString();
+        document.getElementById('custom-meses-group').style.display = 'none';
+      } else {
+        // Usar campo personalizado
+        select.value = 'custom';
+        customInput.value = mesesSugeridos;
+        document.getElementById('custom-meses-group').style.display = 'block';
+      }
+    }
+
+    // ============================================================================
+    // TOAST NOTIFICATIONS
+    // ============================================================================
+    
+    function showToast(message, type = 'info') {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = 'toast show ' + type;
+      
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3000);
+    }
+
+
+    
+    // ============================================================================
+    // FUNÇÕES DE GESTÃO DE COBRANÇA
+    // ============================================================================
+    
+    function goToGestaoCobranca() {
+      // Esconder todas as steps
+      document.querySelectorAll('.step').forEach(step => {
+        step.classList.remove('active');
+      });
+      
+      // Mostrar step 5 (Gestão de Cobrança)
+      document.getElementById('step-5').classList.add('active');
+      
+      // Esconder stepper
+      document.querySelector('.stepper').style.display = 'none';
+      
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    
+    function voltarParaOperacao() {
+      // Esconder step 5
+      document.getElementById('step-5').classList.remove('active');
+      
+      // Mostrar step 4 (Resultados)
+      document.getElementById('step-4').classList.add('active');
+      
+      // Mostrar stepper novamente
+      document.querySelector('.stepper').style.display = 'block';
+      
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    
+    function toggleServicoCobranca(servicoKey) {
+      const checkbox = document.getElementById(`servico-${servicoKey}`);
+      const card = document.getElementById(`card-${servicoKey}`);
+      const container = document.getElementById(`qtd-${servicoKey}-container`);
+      const qtdInput = document.getElementById(`qtd-${servicoKey}`);
+      
+      if (checkbox.checked) {
+        card.style.borderColor = '#f2c85c';
+        card.style.background = '#fef9e7';
+        
+        // Mostrar campo de quantidade
+        if (container) {
+          container.style.display = 'block';
+        }
+        
+        // Habilitar campo de quantidade
+        if (qtdInput) {
+          qtdInput.disabled = false;
+        }
+        
+        showToast(`Serviço ${servicoKey} adicionado`, 'success');
+      } else {
+        card.style.borderColor = '#E5E7EB';
+        card.style.background = 'white';
+        
+        // Esconder campo de quantidade
+        if (container) {
+          container.style.display = 'none';
+        }
+        
+        // Desabilitar campo de quantidade
+        if (qtdInput) {
+          qtdInput.disabled = true;
+          qtdInput.value = 0;
+        }
+        
+        showToast(`Serviço ${servicoKey} removido`, 'info');
+      }
+      
+      // Recalcular custos de cobrança
+      calcularCustosCobranca();
+    }
+    
+
+    
+    function calcularCustosCobranca() {
+      if (!appState.resultados) return;
+      
+      const r = appState.resultados;
+      const carteiraMes = r.valorMes;
+      const vencidosMes = r.valorVencidos;
+      const clientesMes = r.totalClientes;
+      const titulosMes = r.boletosMes;
+      
+      const servicosAtivos = [];
+      let totalCobranca = 0;
+      
+      // TAC (0,98% da operação total, cobrado no mês de uso)
+      if (document.getElementById('servico-tac')?.checked) {
+        const valorTotal = r.valorOperacao * 0.0098;
+        totalCobranca += valorTotal;
+        servicosAtivos.push({
+          nome: 'TAC',
+          descricao: `0,98% de ${formatCurrency(r.valorOperacao)} (valor total da operação)`,
+          valor: valorTotal
+        });
+      }
+      
+      // Análise (R$ 9,99 por cliente, cobrado no mês de uso)
+      if (document.getElementById('servico-analise')?.checked) {
+        const qtd = parseInt(document.getElementById('qtd-analise').value) || 0;
+        const valorTotal = qtd * 9.99;
+        totalCobranca += valorTotal;
+        servicosAtivos.push({
+          nome: 'Análise',
+          descricao: `${qtd} clientes × R$ 9,99 (cobrado no mês de uso)`,
+          valor: valorTotal
+        });
+      }
+      
+      // Assinatura (R$ 10,00, cobrado no mês de uso)
+      if (document.getElementById('servico-assinatura')?.checked) {
+        const qtd = parseInt(document.getElementById('qtd-assinatura').value) || 0;
+        const valorTotal = qtd * 10.00;
+        totalCobranca += valorTotal;
+        servicosAtivos.push({
+          nome: 'Assinatura',
+          descricao: `${qtd} assinaturas × R$ 10,00 (cobrado no mês de uso)`,
+          valor: valorTotal
+        });
+      }
+      
+      // Negativação (R$ 11,99 por cliente)
+      if (document.getElementById('servico-negativacao')?.checked) {
+        const qtd = parseInt(document.getElementById('qtd-negativacao').value) || 0;
+        const valorMensal = qtd * 11.99;
+        totalCobranca += valorMensal;
+        servicosAtivos.push({
+          nome: 'Negativação',
+          descricao: `${qtd} clientes × R$ 11,99`,
+          valor: valorMensal
+        });
+      }
+      
+      // Exclusão de Negativação (R$ 12,99 por cliente)
+      if (document.getElementById('servico-exclusaoNegativacao')?.checked) {
+        const qtd = parseInt(document.getElementById('qtd-exclusaoNegativacao').value) || 0;
+        const valorMensal = qtd * 12.99;
+        totalCobranca += valorMensal;
+        servicosAtivos.push({
+          nome: 'Exclusão de Negativação',
+          descricao: `${qtd} clientes × R$ 12,99`,
+          valor: valorMensal
+        });
+      }
+      
+      // Manutenção de Vencidos (R$ 1,99 por cliente)
+      if (document.getElementById('servico-manutencaoVencidos')?.checked) {
+        const qtd = parseInt(document.getElementById('qtd-manutencaoVencidos').value) || 0;
+        const valorMensal = qtd * 1.99;
+        totalCobranca += valorMensal;
+        servicosAtivos.push({
+          nome: 'Manutenção de Vencidos',
+          descricao: `${qtd} clientes × R$ 1,99`,
+          valor: valorMensal
+        });
+      }
+      
+      // Carta de Cobrança (sempre por título)
+      if (document.getElementById('servico-carta')?.checked) {
+        const qtd = parseInt(document.getElementById('qtd-carta').value) || 0;
+        const valorMensal = qtd * 2.91;
+        const descricao = `${qtd} cartas × R$ 2,91`;
+        
+        totalCobranca += valorMensal;
+        servicosAtivos.push({
+          nome: 'Carta de Cobrança',
+          descricao: descricao,
+          valor: valorMensal
+        });
+      }
+      
+      // E-mail e SMS (sempre por título)
+      if (document.getElementById('servico-emailSms')?.checked) {
+        const qtd = parseInt(document.getElementById('qtd-emailSms').value) || 0;
+        const valorMensal = qtd * 0.99;
+        const descricao = `${qtd} títulos × R$ 0,99`;
+        
+        totalCobranca += valorMensal;
+        servicosAtivos.push({
+          nome: 'E-mail e SMS',
+          descricao: descricao,
+          valor: valorMensal
+        });
+      }
+      
+      // Taxa de Baixa (sempre por título)
+      if (document.getElementById('servico-taxaBaixa')?.checked) {
+        const qtd = parseInt(document.getElementById('qtd-taxaBaixa').value) || 0;
+        const valorMensal = qtd * 3.99;
+        const descricao = `${qtd} baixas × R$ 3,99`;
+        
+        totalCobranca += valorMensal;
+        servicosAtivos.push({
+          nome: 'Taxa de Baixa',
+          descricao: descricao,
+          valor: valorMensal
+        });
+      }
+      
+      // Taxa de Alteração (sempre por título)
+      if (document.getElementById('servico-taxaAlteracao')?.checked) {
+        const qtd = parseInt(document.getElementById('qtd-taxaAlteracao').value) || 0;
+        const valorMensal = qtd * 4.99;
+        const descricao = `${qtd} alterações × R$ 4,99`;
+        
+        totalCobranca += valorMensal;
+        servicosAtivos.push({
+          nome: 'Taxa de Alteração',
+          descricao: descricao,
+          valor: valorMensal
+        });
+      }
+      
+      // Protesto (sempre por título)
+      if (document.getElementById('servico-protesto')?.checked) {
+        const qtd = parseInt(document.getElementById('qtd-protesto').value) || 0;
+        const valorMensal = qtd * 9.90;
+        const descricao = `${qtd} protestos × R$ 9,90`;
+        
+        totalCobranca += valorMensal;
+        servicosAtivos.push({
+          nome: 'Protesto',
+          descricao: descricao,
+          valor: valorMensal
+        });
+      }
+      
+      // Anuência (sempre por título)
+      if (document.getElementById('servico-anuencia')?.checked) {
+        const qtd = parseInt(document.getElementById('qtd-anuencia').value) || 0;
+        const valorMensal = qtd * 9.90;
+        const descricao = `${qtd} anuências × R$ 9,90`;
+        
+        totalCobranca += valorMensal;
+        servicosAtivos.push({
+          nome: 'Anuência',
+          descricao: descricao,
+          valor: valorMensal
+        });
+      }
+      
+      // Armazenar no estado
+      appState.resultados.totalCobranca = totalCobranca;
+      appState.resultados.servicosCobranca = servicosAtivos;
+      
+      // Exibir resumo
+      const resumoCobranca = document.getElementById('resumo-cobranca');
+      const servicosCobrancaList = document.getElementById('servicos-cobranca-list');
+      
+      if (servicosAtivos.length > 0) {
+        resumoCobranca.style.display = 'block';
+        
+        let html = '';
+        servicosAtivos.forEach((servico, index) => {
+          const isLast = index === servicosAtivos.length - 1;
+          const borderClass = isLast ? '' : 'border-bottom: 1px solid #E5E7EB;';
+          
+          html += `
+            <div style="padding: 12px 0; ${borderClass}">
+              <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 4px;">
+                <span style="font-size: 15px; color: #111827; font-weight: 600;">${servico.nome}</span>
+                <span style="font-size: 16px; font-weight: 700; color: #111827; font-family: 'Courier New', monospace;">${formatCurrency(servico.valor)}/mês</span>
+              </div>
+              <div style="font-size: 13px; color: #6B7280;">${servico.descricao}</div>
+            </div>
+          `;
+        });
+        
+        servicosCobrancaList.innerHTML = html;
+        document.getElementById('total-cobranca-display').textContent = formatCurrency(totalCobranca) + '/mês';
+      } else {
+        resumoCobranca.style.display = 'none';
+      }
+    }
+
+    // ============================================================================
+    // CÁLCULO E EXIBIÇÃO DE RESULTADOS
+    // ============================================================================
+    
+    function calcularResultados() {
+      console.log('=== INICIANDO CÁLCULO DE RESULTADOS ===');
+      
+      // Garantir que parâmetros foram capturados
+      if (!appState.parametros) {
+        console.error('Parâmetros não capturados');
+        showToast('Erro: Parâmetros não encontrados', 'error');
+        return;
+      }
+      
+      console.log('Parâmetros disponíveis:', appState.parametros);
+      
+      // Garantir que derivados estão atualizados
+      recomputaDerivados();
+      
+      console.log('Derivados calculados:', appState.derivados);
+      
+      const resultados = calcularTaxasMensais();
+      
+      if (!resultados) {
+        console.error('Falha ao calcular taxas mensais');
+        showToast('Erro ao calcular resultados', 'error');
+        return;
+      }
+      
+      console.log('Resultados calculados:', resultados);
+      
+      // Armazenar resultados no estado
+      appState.resultados = resultados;
+      
+      // Exibir resultados
+      exibirResultados();
+      
+      // Ir para step 4
+      goToStep(4);
+      
+      console.log('=== CÁLCULO CONCLUÍDO ===');
+    }
+    
+    function exibirResultados() {
+      const r = appState.resultados;
+      
+      console.log('Exibindo resultados:', r);
+      
+      // Calcular total obrigatórias (sem opcionais)
+      const totalObrigatorias = r.taxaPix + r.emissaoMes + r.diversosMes + r.whatsappMes;
+      
+      // Atualizar TODOS os elementos de resumo (há duplicatas no HTML)
+      // Cards de topo principais
+      const totalMensalElements = document.querySelectorAll('#total-mensal-display');
+      totalMensalElements.forEach(el => {
+        el.textContent = formatCurrency(r.totalMensal) + '/mês';
+      });
+      
+      const valorCarteiraElements = document.querySelectorAll('#valor-carteira-display');
+      valorCarteiraElements.forEach(el => {
+        el.textContent = formatCurrency(r.valorMes);
+      });
+      
+      const duracaoPlanoElements = document.querySelectorAll('#duracao-plano-display');
+      duracaoPlanoElements.forEach(el => {
+        el.textContent = r.mesesPlano + ' meses';
+      });
+      
+      // Taxas obrigatórias
+      const taxaPixElements = document.querySelectorAll('#taxa-pix-display');
+      taxaPixElements.forEach(el => {
+        el.textContent = formatCurrency(r.taxaPix) + '/mês';
+      });
+      
+      const emissaoLabel = `Emissão ${Math.round(r.boletosMes)} boletos/mês × R$ 9,98`;
+      
+      const emissaoLabelElements = document.querySelectorAll('#emissao-label');
+      emissaoLabelElements.forEach(el => {
+        el.textContent = emissaoLabel;
+      });
+      
+      const emissaoMesElements = document.querySelectorAll('#emissao-mes-display');
+      emissaoMesElements.forEach(el => {
+        el.textContent = formatCurrency(r.emissaoMes) + '/mês';
+      });
+      
+      const diversosLabel = `Diversos ${r.totalClientes} clientes × R$ 0,99`;
+      
+      const diversosLabelElements = document.querySelectorAll('#diversos-label');
+      diversosLabelElements.forEach(el => {
+        el.textContent = diversosLabel;
+      });
+      
+      const diversosMesElements = document.querySelectorAll('#diversos-mes-display');
+      diversosMesElements.forEach(el => {
+        el.textContent = formatCurrency(r.diversosMes) + '/mês';
+      });
+      
+      const whatsappLabel = `WhatsApp ${r.totalClientes} clientes × R$ 1,47`;
+      
+      const whatsappLabelElements = document.querySelectorAll('#whatsapp-label');
+      whatsappLabelElements.forEach(el => {
+        el.textContent = whatsappLabel;
+      });
+      
+      const whatsappMesElements = document.querySelectorAll('#whatsapp-mes-display');
+      whatsappMesElements.forEach(el => {
+        el.textContent = formatCurrency(r.whatsappMes) + '/mês';
+      });
+      
+      // Subtotal obrigatórias
+      document.getElementById('total-obrigatorias-display').textContent = formatCurrency(totalObrigatorias) + '/mês';
+      
+      // Taxa ADM - ajustar label conforme modalidade
+      // Calcular vencimento mensal (valor que vence naquele mês)
+      const vencimentoMensal = r.valorMes / r.mesesPlano;
+      
+      let admLabel;
+      if (r.modalidade === 'SEM') {
+        admLabel = `Taxa ADM (4,99% sobre ${formatCurrency(vencimentoMensal)} vencimento mensal)`;
+      } else {
+        const baseAdm = vencimentoMensal * (r.alpha / 100);
+        admLabel = `Taxa ADM (4,90% sobre ${formatCurrency(baseAdm)} = vencimento mensal × ${r.alpha.toFixed(1)}%)`;
+      }
+      
+      const admLabelElements = document.querySelectorAll('#adm-label-display');
+      admLabelElements.forEach(el => {
+        el.textContent = admLabel;
+      });
+      
+      const admMesElements = document.querySelectorAll('#adm-mes-display');
+      admMesElements.forEach(el => {
+        el.textContent = formatCurrency(r.admMes) + '/mês';
+      });
+      
+      console.log('Resultados exibidos com sucesso em todos os elementos');
+    }
+    
+    // ============================================================================
+    // EXPORTAÇÃO DE RESULTADOS
+    // ============================================================================
+    
+    function exportarResultados() {
+      showToast('Exportação em desenvolvimento', 'info');
+    }
+    
+    // ============================================================================
+    // FUNÇÕES PLACEHOLDER
+    // ============================================================================
+    
+    function newScenario() {
+      showToast('Função em desenvolvimento', 'info');
+    }
+
+    // ============================================================================
+    // RECOMPUTAR DERIVADOS - Consolida estado antes de navegação
+    // ============================================================================
+    
+    function recomputaDerivados() {
+      // Usar parâmetros salvos se disponíveis, senão ler dos campos
+      let valorCarteira, totalBoletos, totalClientes, mesesPlano, modalidade, percentualCompra;
+      
+      if (appState.parametros) {
+        valorCarteira = appState.parametros.valorCarteira;
+        totalBoletos = appState.parametros.qtdBoletos;
+        totalClientes = appState.parametros.totalClientes;
+        mesesPlano = appState.parametros.mesesPlano;
+        modalidade = appState.parametros.modalidade;
+        percentualCompra = appState.parametros.percentualCompra || 0;
+      } else {
+        valorCarteira = parseCurrency(document.getElementById('valor-carteira').value);
+        totalBoletos = parseInt(document.getElementById('qtd-boletos').value) || 0;
+        totalClientes = parseInt(document.getElementById('total-clientes').value) || 0;
+        mesesPlano = getMesesPlano();
+        modalidade = appState.modalidadeSelecionada;
+        percentualCompra = parseFloat(document.getElementById('percentual-compra')?.value || 0);
+      }
+      
+      // Calcular meses e boletos mensais
+      const meses = totalClientes > 0 ? totalBoletos / totalClientes : 0;
+      const boletosMes = mesesPlano > 0 ? totalBoletos / mesesPlano : 0;
+      
+      // Calcular alpha (percentualCompra já vem de 0 a 40, converter para decimal 0.0 a 0.40)
+      const alpha = modalidade === 'DES' ? Math.min(percentualCompra / 100, 0.40) : 0;
+      
+      // Calcular valor total da operação para TAC
+      const valorTotalOperacao = valorCarteira * mesesPlano;
+      
+      // TAC: 0,98% do valor total da operação (cobrado no mês de uso, não diluído)
+      const tacTotal = valorTotalOperacao * 0.0098;
+      
+      // Taxas mensais obrigatórias
+      const emissaoMensal = boletosMes * 9.98;
+      const diversosMensal = totalClientes * 0.99;
+      const whatsappMensal = totalClientes * 1.47;
+      
+      // Taxas opcionais (cobradas no mês de uso, não diluídas)
+      const analiseTotal = totalClientes * 9.99;
+      const assinaturaTotal = 10.00;
+      
+      // Salvar no estado
+      appState.derivados = {
+        valorCarteira,
+        totalBoletos,
+        totalClientes,
+        mesesPlano,
+        meses,
+        boletosMes,
+        emissaoMensal,
+        diversosMensal,
+        whatsappMensal,
+        tacTotal,
+        analiseTotal,
+        assinaturaTotal,
+        alpha,
+        valorTotalOperacao,
+        modalidade
+      };
+      
+      console.log('Derivados calculados:', appState.derivados);
+    }
+    
+    // ============================================================================
+    // RENDER REVISÃO - Popula cards com valores corretos
+    // ============================================================================
+    
+    function renderRevisao() {
+      if (!appState.derivados) {
+        recomputaDerivados();
+      }
+      
+      const d = appState.derivados;
+      
+      document.getElementById('review-valor-carteira').textContent = formatCurrency(d.valorCarteira);
+      document.getElementById('review-qtd-boletos').textContent = d.totalBoletos.toLocaleString('pt-BR');
+      document.getElementById('review-total-clientes').textContent = d.totalClientes.toLocaleString('pt-BR');
+      document.getElementById('review-meses-plano').textContent = d.mesesPlano + ' meses';
+    }
+    
+    // ============================================================================
+    // MOTOR DE CÁLCULO - TAXAS MENSAIS
+    // ============================================================================
+    
+    function calcularTaxasMensais() {
+      // Garantir que derivados estão atualizados
+      if (!appState.derivados) {
+        recomputaDerivados();
+      }
+      
+      const d = appState.derivados;
+      
+      if (!d) {
+        console.error('Derivados não disponíveis');
+        return null;
+      }
+      
+      const modalidade = d.modalidade;
+      const valorMes = d.valorCarteira;
+      const boletosMes = d.boletosMes;
+      const totalClientes = d.totalClientes;
+      const mesesPlano = d.mesesPlano;
+      const alpha = d.alpha;
+      
+      // Valor total da operação (já calculado em derivados)
+      const valorOperacao = d.valorTotalOperacao;
+      
+      // 1. TAXAS FIXAS MENSAIS (obrigatórias)
+      const taxaPix = 1.99;
+      
+      // 2. TAXAS OPCIONAIS (cobradas no mês de uso, não diluídas)
+      // Estas taxas são zero por padrão e só aparecem quando o serviço é utilizado
+      const tacMes = 0; // Será calculado quando ativado
+      const analiseMes = 0; // Será calculado quando ativado
+      const assinaturaMes = 0; // Será calculado quando ativado
+      
+      // 3. TAXAS OBRIGATÓRIAS (por cliente/boleto)
+      const emissaoMes = parseFloat(d.emissaoMensal.toFixed(2));
+      const diversosMes = parseFloat(d.diversosMensal.toFixed(2));
+      const whatsappMes = parseFloat(d.whatsappMensal.toFixed(2));
+      
+      // 4. TAXA ADM
+      // IMPORTANTE: ADM é calculada sobre o VENCIMENTO MENSAL, não sobre o total da carteira
+      // Vencimento mensal = valorMes / mesesPlano (valor que vence naquele mês)
+      const vencimentoMensal = valorMes / mesesPlano;
+      
+      // Para SEM: 4,99% sobre vencimento mensal
+      // Para DES: 4,90% sobre (vencimento mensal × α)
+      let admMes;
+      if (modalidade === 'SEM') {
+        admMes = parseFloat((vencimentoMensal * 0.0499).toFixed(2));
+      } else {
+        // DES: 4,90% sobre (vencimento mensal × alpha)
+        // Alpha já vem como decimal (0.0 a 0.40)
+        const baseAdm = vencimentoMensal * alpha;
+        admMes = parseFloat((baseAdm * 0.0490).toFixed(2));
+      }
+      
+      // 5. TAXAS SOB DEMANDA (calculadas separadamente quando ativadas)
+      const percVencidos = appState.parametros?.percVencidos || 5;
+      const valorVencidos = valorMes * (percVencidos / 100);
+      
+      const taxasSobDemanda = {
+        negativacao: { valor: 11.99, base: valorVencidos * 0.20, ativa: false },
+        exclusaoNegativacao: { valor: 12.99, base: valorVencidos * 0.05, ativa: false },
+        carta: { valor: 5.99, base: totalClientes, ativa: false },
+        protesto: { valor: 15.99, base: valorVencidos * 0.10, ativa: false },
+        emailSms: { valor: 0.50, base: totalClientes, ativa: false }
+      };
+      
+      // RESUMO FINAL MENSAL (com precisão de 2 casas decimais)
+      // Total obrigatórias: PIX + Emissão + Diversos + WhatsApp
+      const totalObrigatorias = parseFloat((taxaPix + emissaoMes + diversosMes + whatsappMes).toFixed(2));
+      const totalADM = admMes;
+      const totalOpcionais = 0; // Calculado dinamicamente quando ativado
+      const totalSobDemanda = 0; // Calculado dinamicamente quando ativado (gestão de cobrança)
+      const totalMensal = parseFloat((totalObrigatorias + totalADM + totalOpcionais + totalSobDemanda).toFixed(2));
+      
+      console.log('Taxas calculadas:', {
+        taxaPix,
+        tacMes,
+        analiseMes,
+        assinaturaMes,
+        emissaoMes,
+        diversosMes,
+        whatsappMes,
+        admMes,
+        totalMensal
+      });
+      
+      return {
+        // Taxas Obrigatórias
+        taxaPix,
+        emissaoMes,
+        diversosMes,
+        whatsappMes,
+        totalObrigatorias,
+        
+        // Taxa ADM
+        admMes,
+        totalADM,
+        
+        // Taxas Opcionais (diluídas) - calculadas mas não incluídas no total inicial
+        tacMes,
+        analiseMes,
+        assinaturaMes,
+        totalOpcionais,
+        
+        // Taxas Sob Demanda (gestão de cobrança)
+        taxasSobDemanda,
+        totalSobDemanda,
+        
+        // Total Mensal
+        totalMensal,
+        
+        // Dados auxiliares
+        valorMes,
+        valorOperacao,
+        boletosMes,
+        totalClientes,
+        mesesPlano,
+        modalidade,
+        alpha: alpha * 100, // converter para percentual para exibição
+        valorVencidos
+      };
+    }
+    
+    function getMesesPlano() {
+      const select = document.getElementById('meses-plano');
+      if (select.value === 'custom') {
+        return parseInt(document.getElementById('meses-custom').value) || 6;
+      }
+      return parseInt(select.value) || 6;
+    }
+
+    // ============================================================================
+    // FUNÇÕES DE ABAS
+    // ============================================================================
+    
+    function switchTab(tabName) {
+      // Atualizar botões das abas
+      document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.borderBottomColor = 'transparent';
+        btn.style.color = '#6B7280';
+        btn.style.fontWeight = '500';
+      });
+      
+      const activeBtn = document.getElementById(`tab-${tabName}`);
+      activeBtn.classList.add('active');
+      activeBtn.style.borderBottomColor = '#f2c85c';
+      activeBtn.style.color = '#111827';
+      activeBtn.style.fontWeight = '600';
+      
+      // Atualizar conteúdo das abas
+      document.querySelectorAll('.tab-content').forEach(content => {
+        content.style.display = 'none';
+      });
+      
+      document.getElementById(`content-${tabName}`).style.display = 'block';
+      
+      // Se for aba de cronograma, gerar tabela
+      if (tabName === 'cronograma' && appState.resultados) {
+        gerarCronogramaMensal();
+      }
+    }
+    
+    // ============================================================================
+    // GERAÇÃO DE CRONOGRAMA MENSAL
+    // ============================================================================
+    
+    function gerarCronogramaMensal() {
+      if (!appState.resultados) {
+        console.error('Resultados não disponíveis para cronograma');
+        return;
+      }
+      
+      const r = appState.resultados;
+      const mesesPlano = r.mesesPlano;
+      
+      // Obter data de início dos parâmetros salvos
+      let dataInicio;
+      if (appState.parametros && appState.parametros.dataInicio) {
+        dataInicio = new Date(appState.parametros.dataInicio);
+      } else {
+        dataInicio = new Date();
+      }
+      
+      console.log('Gerando cronograma para', mesesPlano, 'meses a partir de', dataInicio);
+      
+      // Valores mensais fixos
+      const taxaPix = 1.99;
+      const emissaoMes = r.emissaoMes;
+      const diversosMes = r.diversosMes;
+      const whatsappMes = r.whatsappMes;
+      const admMes = r.admMes;
+      
+      // Valores opcionais (se ativados)
+      const tacMes = document.getElementById('servico-tac')?.checked ? r.tacMes : 0;
+      const analiseMes = document.getElementById('servico-analise')?.checked ? r.analiseMes : 0;
+      const assinaturaMes = document.getElementById('servico-assinatura')?.checked ? r.assinaturaMes : 0;
+      
+      // Determinar quais colunas mostrar (apenas as com valores > 0)
+      const colunas = [
+        { key: 'pix', label: 'PIX', valor: taxaPix, mostrar: taxaPix > 0 },
+        { key: 'tac', label: 'TAC', valor: tacMes, mostrar: tacMes > 0 },
+        { key: 'analise', label: 'Análise', valor: analiseMes, mostrar: analiseMes > 0 },
+        { key: 'assinatura', label: 'Assinatura', valor: assinaturaMes, mostrar: assinaturaMes > 0 },
+        { key: 'emissao', label: 'Emissão', valor: emissaoMes, mostrar: emissaoMes > 0 },
+        { key: 'diversos', label: 'Diversos', valor: diversosMes, mostrar: diversosMes > 0 },
+        { key: 'whatsapp', label: 'WhatsApp', valor: whatsappMes, mostrar: whatsappMes > 0 },
+        { key: 'adm', label: 'ADM', valor: admMes, mostrar: admMes > 0 }
+      ];
+      
+      const colunasVisiveis = colunas.filter(c => c.mostrar);
+      
+      // Totalizadores
+      const totais = {};
+      colunasVisiveis.forEach(col => {
+        totais[col.key] = 0;
+      });
+      let totalPlano = 0;
+      
+      // Atualizar cabeçalho da tabela
+      const thead = document.querySelector('#tabela-cronograma thead tr');
+      thead.innerHTML = '<th style="padding: 14px 12px; text-align: left; font-weight: 600; color: #111827; white-space: nowrap;">Mês</th>';
+      colunasVisiveis.forEach(col => {
+        thead.innerHTML += `<th style="padding: 14px 12px; text-align: right; font-weight: 600; color: #111827; white-space: nowrap;">${col.label}</th>`;
+      });
+      thead.innerHTML += `
+        <th style="padding: 14px 12px; text-align: right; font-weight: 600; color: #d4a832; white-space: nowrap;">Total Mês</th>
+        <th style="padding: 14px 12px; text-align: center; font-weight: 600; color: #111827; width: 60px;">Detalhes</th>
+      `;
+      
+      // Gerar linhas da tabela
+      const tbody = document.getElementById('cronograma-tbody');
+      tbody.innerHTML = '';
+      
+      for (let mes = 1; mes <= mesesPlano; mes++) {
+        const dataVencimento = new Date(dataInicio);
+        dataVencimento.setMonth(dataVencimento.getMonth() + (mes - 1));
+        const mesAno = dataVencimento.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+        
+        const totalMes = taxaPix + tacMes + analiseMes + assinaturaMes + emissaoMes + diversosMes + whatsappMes + admMes;
+        
+        // Acumular totais
+        colunasVisiveis.forEach(col => {
+          totais[col.key] += col.valor;
+        });
+        totalPlano += totalMes;
+        
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid #F3F4F6';
+        tr.style.transition = 'background 0.2s';
+        tr.onmouseover = function() { this.style.background = '#FAFAFA'; };
+        tr.onmouseout = function() { this.style.background = 'white'; };
+        
+        let rowHTML = `<td style="padding: 12px; font-weight: 600; color: #111827;">Mês ${mes}</td>`;
+        colunasVisiveis.forEach(col => {
+          rowHTML += `<td style="padding: 12px; text-align: right; font-family: 'Courier New', monospace; color: #374151;">${formatCurrency(col.valor)}</td>`;
+        });
+        rowHTML += `
+          <td style="padding: 12px; text-align: right; font-family: 'Courier New', monospace; font-weight: 700; color: #d4a832;">${formatCurrency(totalMes)}</td>
+          <td style="padding: 12px; text-align: center;">
+            <button onclick="toggleDetalhes(${mes})" class="btn-detalhes" style="background: none; border: 1px solid #E5E7EB; border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 12px; color: #6B7280; transition: all 0.2s;">
+              👁️
+            </button>
+          </td>
+        `;
+        
+        tr.innerHTML = rowHTML;
+        tbody.appendChild(tr);
+        
+        // Linha de detalhes (inicialmente oculta)
+        const trDetalhes = document.createElement('tr');
+        trDetalhes.id = `detalhes-${mes}`;
+        trDetalhes.style.display = 'none';
+        trDetalhes.style.background = '#fef9e7';
+        
+        let detalhesComposicao = '';
+        colunasVisiveis.forEach(col => {
+          detalhesComposicao += `<div>${col.label}: <strong>${formatCurrency(col.valor)}</strong></div>`;
+        });
+        
+        trDetalhes.innerHTML = `
+          <td colspan="${colunasVisiveis.length + 3}" style="padding: 20px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+              <div>
+                <div style="font-size: 11px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Vencimento</div>
+                <div style="font-size: 14px; font-weight: 600; color: #111827;">${mesAno}</div>
+              </div>
+              <div>
+                <div style="font-size: 11px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Boletos Emitidos</div>
+                <div style="font-size: 14px; font-weight: 600; color: #111827;">${Math.round(r.boletosMes)} boletos</div>
+              </div>
+              <div>
+                <div style="font-size: 11px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Clientes Ativos</div>
+                <div style="font-size: 14px; font-weight: 600; color: #111827;">${r.totalClientes} clientes</div>
+              </div>
+              <div>
+                <div style="font-size: 11px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Valor Vencendo</div>
+                <div style="font-size: 14px; font-weight: 600; color: #111827;">${formatCurrency(r.valorMes / mesesPlano)}</div>
+              </div>
+            </div>
+            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #E5E7EB;">
+              <div style="font-size: 11px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Composição do Total</div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; font-size: 13px;">
+                ${detalhesComposicao}
+              </div>
+            </div>
+          </td>
+        `;
+        
+        tbody.appendChild(trDetalhes);
+      }
+      
+      // Atualizar rodapé da tabela
+      const tfoot = document.querySelector('#tabela-cronograma tfoot tr');
+      tfoot.innerHTML = '<td style="padding: 16px 12px; color: #111827;">TOTAL DO PLANO</td>';
+      colunasVisiveis.forEach(col => {
+        tfoot.innerHTML += `<td id="total-${col.key}" style="padding: 16px 12px; text-align: right; color: #111827; font-family: 'Courier New', monospace;">${formatCurrency(totais[col.key])}</td>`;
+      });
+      tfoot.innerHTML += `
+        <td id="total-plano" style="padding: 16px 12px; text-align: right; color: #d4a832; font-family: 'Courier New', monospace; font-size: 16px;">${formatCurrency(totalPlano)}</td>
+        <td style="padding: 16px 12px;"></td>
+      `;
+    }
+    
+    function toggleDetalhes(mes) {
+      const detalhes = document.getElementById(`detalhes-${mes}`);
+      if (detalhes.style.display === 'none') {
+        detalhes.style.display = 'table-row';
+      } else {
+        detalhes.style.display = 'none';
+      }
+    }
+    
+    // ============================================================================
+    // EXPORTAÇÃO DE CRONOGRAMA
+    // ============================================================================
+    
+    function exportarCronogramaCSV() {
+      if (!appState.resultados) {
+        showToast('Nenhum resultado para exportar', 'error');
+        return;
+      }
+      
+      const r = appState.resultados;
+      const mesesPlano = r.mesesPlano;
+      
+      // Obter data de início
+      let dataInicio;
+      if (appState.parametros && appState.parametros.dataInicio) {
+        dataInicio = new Date(appState.parametros.dataInicio);
+      } else {
+        dataInicio = new Date();
+      }
+      
+      // Cabeçalho CSV
+      let csv = 'Mês,Data,PIX,TAC,Análise,Assinatura,Emissão,Diversos,WhatsApp,ADM,Total Mês\n';
+      
+      // Valores opcionais
+      const tacMes = document.getElementById('servico-tac')?.checked ? r.tacMes : 0;
+      const analiseMes = document.getElementById('servico-analise')?.checked ? r.analiseMes : 0;
+      const assinaturaMes = document.getElementById('servico-assinatura')?.checked ? r.assinaturaMes : 0;
+      
+      // Dados
+      for (let mes = 1; mes <= mesesPlano; mes++) {
+        const dataVencimento = new Date(dataInicio);
+        dataVencimento.setMonth(dataVencimento.getMonth() + (mes - 1));
+        const mesAno = dataVencimento.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+        
+        const totalMes = 1.99 + tacMes + analiseMes + assinaturaMes + r.emissaoMes + r.diversosMes + r.whatsappMes + r.admMes;
+        csv += `${mes},${mesAno},${1.99.toFixed(2)},${tacMes.toFixed(2)},${analiseMes.toFixed(2)},${assinaturaMes.toFixed(2)},${r.emissaoMes.toFixed(2)},${r.diversosMes.toFixed(2)},${r.whatsappMes.toFixed(2)},${r.admMes.toFixed(2)},${totalMes.toFixed(2)}\n`;
+      }
+      
+      // Download
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'cronograma_mensal.csv';
+      link.click();
+      
+      showToast('Cronograma exportado em CSV', 'success');
+    }
+    
+    function exportarCronogramaPDF() {
+      if (!appState.resultados) {
+        showToast('Nenhum resultado para exportar', 'error');
+        return;
+      }
+      
+      if (typeof jspdf === 'undefined' || !jspdf.jsPDF) {
+        showToast('Biblioteca PDF não carregada', 'error');
+        return;
+      }
+      
+      const { jsPDF } = jspdf;
+      const doc = new jsPDF();
+      
+      const r = appState.resultados;
+      const mesesPlano = r.mesesPlano;
+      
+      // Obter data de início
+      let dataInicio;
+      if (appState.parametros && appState.parametros.dataInicio) {
+        dataInicio = new Date(appState.parametros.dataInicio);
+      } else {
+        dataInicio = new Date();
+      }
+      
+      // Título
+      doc.setFontSize(18);
+      doc.setFont(undefined, 'bold');
+      doc.text('Cronograma Mensal - IM GESTÃO', 14, 20);
+      
+      doc.setFontSize(11);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Valor da Carteira: R$ ${r.valorMes.toFixed(2)}`, 14, 30);
+      doc.text(`Duração: ${mesesPlano} meses`, 14, 36);
+      doc.text(`Modalidade: ${r.modalidade === 'SEM' ? 'Gestão da Carteira' : 'Com Antecipação'}`, 14, 42);
+      
+      // Valores opcionais
+      const tacMes = document.getElementById('servico-tac')?.checked ? r.tacMes : 0;
+      const analiseMes = document.getElementById('servico-analise')?.checked ? r.analiseMes : 0;
+      const assinaturaMes = document.getElementById('servico-assinatura')?.checked ? r.assinaturaMes : 0;
+      
+      // Preparar dados da tabela
+      const tableData = [];
+      for (let mes = 1; mes <= mesesPlano; mes++) {
+        const dataVencimento = new Date(dataInicio);
+        dataVencimento.setMonth(dataVencimento.getMonth() + (mes - 1));
+        const mesAno = dataVencimento.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+        
+        const totalMes = 1.99 + tacMes + analiseMes + assinaturaMes + r.emissaoMes + r.diversosMes + r.whatsappMes + r.admMes;
+        tableData.push([
+          `Mês ${mes}`,
+          mesAno,
+          `R$ ${(1.99).toFixed(2)}`,
+          `R$ ${tacMes.toFixed(2)}`,
+          `R$ ${analiseMes.toFixed(2)}`,
+          `R$ ${assinaturaMes.toFixed(2)}`,
+          `R$ ${r.emissaoMes.toFixed(2)}`,
+          `R$ ${r.diversosMes.toFixed(2)}`,
+          `R$ ${r.whatsappMes.toFixed(2)}`,
+          `R$ ${r.admMes.toFixed(2)}`,
+          `R$ ${totalMes.toFixed(2)}`
+        ]);
+      }
+      
+      // Gerar tabela
+      doc.autoTable({
+        startY: 50,
+        head: [['Mês', 'Data', 'PIX', 'TAC', 'Análise', 'Assinatura', 'Emissão', 'Diversos', 'WhatsApp', 'ADM', 'Total']],
+        body: tableData,
+        theme: 'grid',
+        styles: { fontSize: 7, cellPadding: 1.5 },
+        headStyles: { fillColor: [242, 200, 92], textColor: [26, 26, 26], fontStyle: 'bold' }
+      });
+      
+      // Salvar
+      doc.save('cronograma_mensal.pdf');
+      
+      showToast('Cronograma exportado em PDF', 'success');
+    }
+    
+    // ============================================================================
+    // INICIALIZAÇÃO
+    // ============================================================================
+    
+    document.addEventListener('DOMContentLoaded', function() {
+      // Set default date to today
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('data-inicio').value = today;
+      
+      console.log('Simulador Financeiro inicializado');
+    });
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'99d7a65020f7568c',t:'MTc2Mjk2NzQ5OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

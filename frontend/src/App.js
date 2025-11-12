@@ -34,6 +34,7 @@ import ComoFazer from './components/ComoFazer';
 import MeusDocumentos from './components/MeusDocumentos';
 import Evidencias from './components/Evidencias';
 import Simulador from './components/Simulador';
+import SimuladorFinanceiro from './components/SimuladorFinanceiro';
 import DashboardPaciente from './components/DashboardPaciente';
 import AgendamentosPaciente from './components/AgendamentosPaciente';
 import MeusDocumentosPaciente from './components/MeusDocumentosPaciente';
@@ -313,6 +314,7 @@ const AppContent = () => {
         <Route path="/meta-ads" element={<MetaAds />} />
         {/* Rota WhatsApp temporariamente removida */}
         {/* <Route path="/whatsapp" element={<WhatsApp />} /> */}
+        <Route path="/simulador-financeiro" element={<SimuladorFinanceiro />} />
         <Route path="/materiais" element={<Materiais />} />
         <Route path="/como-fazer" element={<ComoFazer />} />
         <Route path="/idsf" element={<IDSFIntegration />} />
@@ -730,6 +732,24 @@ const AppContent = () => {
                   <path d="M14 3h7v7" />
                 </svg>
                 Movimentações
+              </Link>
+            </div>
+          )}
+
+          {/* Simulador Financeiro - Apenas para Admin e Consultores Invest Money (NÃO para clínicas) */}
+          {(user.tipo === 'admin' || (user.tipo === 'consultor' && user.pode_ver_todas_novas_clinicas && user.podealterarstatus)) && user.tipo !== 'clinica' && (
+            <div className="nav-item">
+              <Link
+                to="/simulador-financeiro"
+                className={`nav-link ${activeTab === 'simulador-financeiro' ? 'active' : ''}`}
+                onClick={handleMobileNavigation}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
+                  <circle cx="9.5" cy="8.5" r="1.5"/>
+                  <circle cx="14.5" cy="13.5" r="1.5"/>
+                </svg>
+                Simulador Financeiro
               </Link>
             </div>
           )}
