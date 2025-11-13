@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useState, useRef, useCallback } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { getSupabaseClient } from '../lib/supabaseClient';
-import { notificationQueue } from '../lib/notificationQueue';
+import { useAuth } from '../../contexts/AuthContext';
+import { getSupabaseClient } from '../../lib/supabase';
+import { notificationQueue } from '../../lib/notificationQueue';
 import { AlertCircle, Phone, MapPin, User, Clock } from 'lucide-react';
-import logoBrasao from '../images/logobrasaopreto.png';
+import logoBrasao from '../../assets/images/logobrasaopreto.png';
 
 const useIncorporadoraNotifications = () => {
   const { user, isIncorporadora } = useAuth();

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
-import { useToast } from './Toast';
+import { useToast } from '../contexts';
 import { useAuth } from '../contexts/AuthContext';
 import './GerenciarAssinaturaAdmin.css';
 

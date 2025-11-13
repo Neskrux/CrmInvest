@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import config from '../config';
+import { apiConfig } from '../config';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from '../components/Toast';
-import useBranding from '../hooks/useBranding';
+import { useToast } from '../contexts';
+import useBranding from '../hooks/common/useBranding';
 
 const PacientesFinanceiro = () => {
   const { user } = useAuth();
@@ -90,10 +90,10 @@ const PacientesFinanceiro = () => {
       // Buscar pacientes normais atrelados à clínica
       // O backend já filtra automaticamente por clinica_id quando o usuário é clínica
         token: user?.token ? 'Token presente' : 'Token ausente',
-        url: `${config.API_BASE_URL}/pacientes`
+        url: `${apiConfig.API_BASE_URL}/pacientes`
       });
       
-      const response = await axios.get(`${config.API_BASE_URL}/pacientes`, {
+      const response = await axios.get(`${apiConfig.API_BASE_URL}/pacientes`, {
         headers: {
           Authorization: `Bearer ${user.token}`
         }
@@ -117,7 +117,7 @@ const PacientesFinanceiro = () => {
   const fetchPacientes = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${config.API_BASE_URL}/pacientes-financeiro`, {
+      const response = await axios.get(`${apiConfig.API_BASE_URL}/pacientes-financeiro`, {
         headers: {
           Authorization: `Bearer ${user.token}`
         }
@@ -214,8 +214,8 @@ const PacientesFinanceiro = () => {
       });
       
       const url = editingPaciente 
-        ? `${config.API_BASE_URL}/pacientes-financeiro/${editingPaciente.id}`
-        : `${config.API_BASE_URL}/pacientes-financeiro`;
+        ? `${apiConfig.API_BASE_URL}/pacientes-financeiro/${editingPaciente.id}`
+        : `${apiConfig.API_BASE_URL}/pacientes-financeiro`;
         
       const method = editingPaciente ? 'put' : 'post';
       
@@ -293,7 +293,7 @@ const PacientesFinanceiro = () => {
     if (!window.confirm('Tem certeza que deseja excluir este paciente?')) return;
     
     try {
-      await axios.delete(`${config.API_BASE_URL}/pacientes-financeiro/${id}`, {
+      await axios.delete(`${apiConfig.API_BASE_URL}/pacientes-financeiro/${id}`, {
         headers: {
           Authorization: `Bearer ${user.token}`
         }

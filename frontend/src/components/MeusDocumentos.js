@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from './Toast';
+import { useToast } from '../contexts';
 import { Check, X, Clock, AlertCircle, FileText, Upload } from 'lucide-react';
-import config from '../config';
+import { apiConfig } from '../config';
 
 const MeusDocumentos = () => {
   const { makeRequest, user } = useAuth();
@@ -143,7 +143,7 @@ const MeusDocumentos = () => {
 
       // Para FormData, não usar makeRequest pois ele adiciona Content-Type automaticamente
       const token = localStorage.getItem('token');
-      const response = await fetch(`${config.API_BASE_URL}/clinicas/${user.clinica_id}/documentos`, {
+      const response = await fetch(`${apiConfig.API_BASE_URL}/clinicas/${user.clinica_id}/documentos`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`

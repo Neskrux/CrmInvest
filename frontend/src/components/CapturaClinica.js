@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Sparkles, Trophy, Gem, Lock, Check, Star, Building2, MapPin, Phone, Mail } from 'lucide-react';
-import logoBrasao from '../images/logobrasao-selo.png';
-import config from '../config';
+import logoBrasao from '../assets/images/logobrasao-selo.png';
+import { apiConfig } from '../config';
 import { META_PIXEL_ID_CAPTURA_CLINICA } from '../config/metaPixel';
 
 const CapturaClinica = () => {
@@ -330,7 +330,7 @@ const CapturaClinica = () => {
     };
 
     try {
-      const response = await fetch(`${config.API_BASE_URL}/clinicas/cadastro-publico`, {
+      const response = await fetch(`${apiConfig.API_BASE_URL}/clinicas/cadastro-publico`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

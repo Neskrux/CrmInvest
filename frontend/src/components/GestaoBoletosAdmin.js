@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from './Toast';
-import config from '../config';
+import { useToast } from '../contexts';
+import { apiConfig } from '../config';
 import './GestaoBoletosAdmin.css';
 
 const FILTROS_PADRAO = {
@@ -302,7 +302,7 @@ const GestaoBoletosAdmin = () => {
       formData.append('arquivo', importArquivoData.arquivo);
 
       const token = localStorage.getItem('token');
-      const response = await fetch(`${config.API_BASE_URL}/boletos-gestao/importar-arquivo`, {
+      const response = await fetch(`${apiConfig.API_BASE_URL}/boletos-gestao/importar-arquivo`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`

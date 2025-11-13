@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Sparkles, Trophy, Gem, Lock, Check, Star } from 'lucide-react';
-import logoBrasao from '../images/logobrasao-selo.png';
-import config from '../config';
+import logoBrasao from '../assets/images/logobrasao-selo.png';
+import { apiConfig } from '../config';
 
 const CapturaClientes = () => {
   const navigate = useNavigate();
@@ -416,7 +416,7 @@ const CapturaClientes = () => {
 
 
     try {
-      const response = await fetch(`${config.API_BASE_URL}/leads/cadastro`, {
+      const response = await fetch(`${apiConfig.API_BASE_URL}/leads/cadastro`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

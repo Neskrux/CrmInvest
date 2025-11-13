@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import { PDFDocument, rgb } from 'pdf-lib';
-import { useToast } from './Toast';
+import { useToast } from '../contexts';
 import './AssinaturaDigital.css';
 
 const AssinaturaDigital = () => {

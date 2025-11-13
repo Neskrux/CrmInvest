@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useToast } from './Toast';
-import logoBrasaoPreto from '../images/logohorizontalpreto.png';
+import { useToast } from '../contexts';
+import logoBrasaoPreto from '../assets/images/logohorizontalpreto.png';
 
 const ValidacaoBiometrica = () => {
   const navigate = useNavigate();

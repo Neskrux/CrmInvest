@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { getSupabaseClient } from '../lib/supabaseClient';
-import { notificationQueue } from '../lib/notificationQueue';
+import { useAuth } from '../../contexts/AuthContext';
+import { getSupabaseClient } from '../../lib/supabase';
+import { notificationQueue } from '../../lib/notificationQueue';
 import { CheckCircle, User, DollarSign, Calendar as CalendarIcon, Clock } from 'lucide-react';
-import logoBrasao from '../images/logobrasaopreto.png';
+import logoBrasao from '../../assets/images/logobrasaopreto.png';
 
 // Supabase client is now provided by a shared singleton in ../lib/supabaseClient
 

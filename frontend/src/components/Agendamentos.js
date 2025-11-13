@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import useBranding from '../hooks/useBranding';
-import { useToast } from '../components/Toast';
+import useBranding from '../hooks/common/useBranding';
+import { useToast } from '../contexts';
 import ModalEvidencia from './ModalEvidencia';
-import useSmartPolling from '../hooks/useSmartPolling';
+import useSmartPolling from '../hooks/common/useSmartPolling';
 import './Agendamentos.css';
 
 const Agendamentos = () => {

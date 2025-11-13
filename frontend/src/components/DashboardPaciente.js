@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from './Toast';
+import { useToast } from '../contexts';
 import ModalCadastroCompletoPaciente from './ModalCadastroCompletoPaciente';
 
 const DashboardPaciente = () => {

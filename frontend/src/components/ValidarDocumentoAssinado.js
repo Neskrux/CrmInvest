@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useToast } from './Toast';
+import { useToast } from '../contexts';
 import { useSearchParams } from 'react-router-dom';
 import './ValidarDocumentoAssinado.css';
 

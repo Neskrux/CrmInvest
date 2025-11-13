@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from '../components/Toast';
+import { useToast } from '../contexts';
 import ModalEvidencia from './ModalEvidencia';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import config from '../config';
+import { apiConfig } from '../config';
 
 const removerAcentos = (texto = '') =>
   texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '');

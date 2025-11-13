@@ -2,13 +2,13 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import useBranding from '../hooks/useBranding';
-import { useToast } from '../components/Toast';
+import useBranding from '../hooks/common/useBranding';
+import { useToast } from '../contexts';
 import ModalEvidencia from './ModalEvidencia';
 import ModalCriarLoginPaciente from './ModalCriarLoginPaciente';
 import ModalCadastroPacienteClinica from './ModalCadastroPacienteClinica';
 import * as XLSX from 'xlsx';
-import useSmartPolling from '../hooks/useSmartPolling';
+import useSmartPolling from '../hooks/common/useSmartPolling';
 import './Pacientes.css';
 
 const Pacientes = () => {

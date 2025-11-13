@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import logoBrasaoPreto from '../images/logobrasaopreto.png';
+import logoBrasaoPreto from '../assets/images/logobrasaopreto.png';
 
 const ResetPassword = () => {
   const navigate = useNavigate();

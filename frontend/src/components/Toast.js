@@ -1,100 +1,38 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 
-// Toast Context
-const ToastContext = createContext();
-
-// Toast Provider
-export const ToastProvider = ({ children }) => {
-  const [toasts, setToasts] = useState([]);
-
-  const addToast = (message, type = 'info', duration = 4000) => {
-    const id = Date.now() + Math.random();
-    const toast = { id, message, type, duration };
-
-    setToasts(prev => [...prev, toast]);
-
-    // Auto remove after duration
-    if (duration > 0) {
-      setTimeout(() => {
-        removeToast(id);
-      }, duration);
-    }
-
-    return id;
-  };
-
-  const removeToast = (id) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
-  };
-
-  const success = (message, duration) => addToast(message, 'success', duration);
-  const error = (message, duration) => addToast(message, 'error', duration);
-  const warning = (message, duration) => addToast(message, 'warning', duration);
-  const info = (message, duration) => addToast(message, 'info', duration);
-
-  // Override global alert
-  useEffect(() => {
-    window.originalAlert = window.alert;
-    window.alert = (message, type = 'info', duration = 4000) => {
-      return addToast(message, type, duration);
-    };
-
-    return () => {
-      window.alert = window.originalAlert;
-    };
-  }, []);
-
-  const value = {
-    toasts,
-    addToast,
-    removeToast,
-    success,
-    error,
-    warning,
-    info,
-    showSuccessToast: success,
-    showErrorToast: error,
-    showWarningToast: warning,
-    showInfoToast: info
-  };
-
-  return (
-    <ToastContext.Provider value={value}>
-      {children}
-      <ToastContainer toasts={toasts} removeToast={removeToast} />
-    </ToastContext.Provider>
-  );
-};
-
-// Hook to use toast
-export const useToast = () => {
-  const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error('useToast must be used within a ToastProvider');
-  }
-  return context;
-};
-
-// Individual Toast Component
 const Toast = ({ toast, onClose }) => {
   const [isExiting, setIsExiting] = useState(false);
 
   const handleClose = () => {
     setIsExiting(true);
     setTimeout(() => {
-      onClose(toast.id);
+      if (toast?.id) {
+        onClose(toast.id);
+      }
     }, 300);
   };
 
   useEffect(() => {
-    if (toast.duration > 0) {
+    if (toast && toast.duration && toast.duration > 0) {
       const timer = setTimeout(() => {
-        handleClose();
+        setIsExiting(true);
+        setTimeout(() => {
+          if (toast?.id) {
+            onClose(toast.id);
+          }
+        }, 300);
       }, toast.duration);
 
       return () => clearTimeout(timer);
     }
-  }, [toast.duration]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toast?.id, toast?.duration]);
+
+  // Verificação de segurança: se toast não existe, não renderiza nada
+  // Deve vir DEPOIS de todos os hooks
+  if (!toast) {
+    return null;
+  }
 
   const getToastStyles = () => {
     const baseStyles = {
@@ -147,9 +85,10 @@ const Toast = ({ toast, onClose }) => {
       }
     };
 
+    const toastType = toast?.type || 'info';
     return {
       ...baseStyles,
-      ...typeStyles[toast.type]
+      ...(typeStyles[toastType] || typeStyles.info)
     };
   };
 
@@ -161,7 +100,8 @@ const Toast = ({ toast, onClose }) => {
       opacity: 1
     };
 
-    switch (toast.type) {
+    const toastType = toast?.type || 'info';
+    switch (toastType) {
       case 'success':
         return (
           <svg style={iconStyles} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -203,7 +143,7 @@ const Toast = ({ toast, onClose }) => {
         fontWeight: '500',
         letterSpacing: '0.025em'
       }}>
-        {toast.message}
+        {toast?.message || ''}
       </div>
       <button
         onClick={handleClose}
@@ -244,9 +184,13 @@ const Toast = ({ toast, onClose }) => {
   );
 };
 
-// Toast Container Component
-const ToastContainer = ({ toasts, removeToast }) => {
-  if (toasts.length === 0) return null;
+export const ToastContainer = ({ toasts, removeToast }) => {
+  if (!toasts || toasts.length === 0) return null;
+
+  // Filtrar toasts inválidos antes de renderizar
+  const validToasts = toasts.filter(toast => toast && toast.id);
+
+  if (validToasts.length === 0) return null;
 
   return (
     <>
@@ -260,7 +204,7 @@ const ToastContainer = ({ toasts, removeToast }) => {
         flexDirection: 'column',
         alignItems: 'flex-end'
       }}>
-        {toasts.map(toast => (
+        {validToasts.map(toast => (
           <div
             key={toast.id}
             style={{
@@ -290,5 +234,4 @@ const ToastContainer = ({ toasts, removeToast }) => {
   );
 };
 
-export { ToastContext };
 export default Toast;

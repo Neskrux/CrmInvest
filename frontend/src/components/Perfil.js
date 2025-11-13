@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from '../components/Toast';
+import { useToast } from '../contexts';
 
 const Perfil = () => {
   const { user, makeRequest, login } = useAuth();

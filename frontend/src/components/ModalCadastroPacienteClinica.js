@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from './Toast';
-import useBranding from '../hooks/useBranding';
+import { useToast } from '../contexts';
+import useBranding from '../hooks/common/useBranding';
 import SignatureCanvas from 'react-signature-canvas';
 import { PDFDocument, rgb } from 'pdf-lib';
 import './ModalCadastroPacienteClinica.css';
-import logoBrasaoPreto from '../images/logohorizontalpreto.png';
+import logoBrasaoPreto from '../assets/images/logohorizontalpreto.png';
 
 const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
   console.log('🚀🚀🚀 [ModalCadastroPacienteClinica] COMPONENTE INICIADO!');

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import logoBrasaoPreto from '../images/logohorizontalpreto.png';
+import logoBrasaoPreto from '../assets/images/logohorizontalpreto.png';
 import { META_PIXEL_ID_CONSULTOR } from '../config/metaPixel';
 
 const CadastroConsultor = () => {

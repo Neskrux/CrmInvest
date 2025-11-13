@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import useBranding from '../hooks/useBranding';
+import useBranding from '../hooks/common/useBranding';
 
 const Movimentacoes = () => {
   const { t } = useBranding();

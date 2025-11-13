@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
-import config from '../config';
+import { apiConfig } from '../config';
 import { AuthContext } from '../contexts/AuthContext';
-import { useToast } from '../hooks/useToast';
+import { useToast } from '../contexts';
 import './Pacientes.css';
 
 const Pacientes = () => {

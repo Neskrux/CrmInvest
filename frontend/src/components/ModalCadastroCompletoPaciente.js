@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from './Toast';
+import { useToast } from '../contexts';
 import SignatureCanvas from 'react-signature-canvas';
 import { PDFDocument, rgb } from 'pdf-lib';
-import logoBrasaoPreto from '../images/logohorizontalpreto.png';
+import logoBrasaoPreto from '../assets/images/logohorizontalpreto.png';
 import './ModalCadastroCompletoPaciente.css';
 
 const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {

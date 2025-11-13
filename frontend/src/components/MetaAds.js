@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from '../components/Toast';
-import useSmartPolling from '../hooks/useSmartPolling';
+import { useToast } from '../contexts';
+import useSmartPolling from '../hooks/common/useSmartPolling';
 import '../App.css';
 
 function MetaAds() {

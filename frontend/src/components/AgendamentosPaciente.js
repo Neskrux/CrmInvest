@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from './Toast';
+import { useToast } from '../contexts';
 
 const AgendamentosPaciente = () => {
   const { user, makeRequest, pacienteId } = useAuth();

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from '../hooks/useToast';
+import { useToast } from '../contexts';
 
 const Materiais = () => {
   const { makeRequest, user, isAdmin } = useAuth();

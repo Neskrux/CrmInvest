@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { getBrandingByEmpresa } from '../config/branding';
+import { useAuth } from '../../contexts/AuthContext';
+import { getBrandingByEmpresa } from '../../config/branding';
 
 /**
  * Hook para obter textos dinâmicos baseados no empresa_id do usuário logado

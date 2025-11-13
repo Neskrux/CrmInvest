@@ -1,9 +1,12 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Link, useNavigate } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import './App.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { ToastProvider } from './components/Toast';
-import useBranding from './hooks/useBranding';
+import { ToastProvider } from './contexts';
+import { queryClient } from './lib/react-query';
+import useBranding from './hooks/common/useBranding';
 import { HelpCircle } from 'lucide-react';
 import CadastroConsultor from './components/CadastroConsultor';
 import CadastroSucesso from './components/CadastroSucesso';
@@ -42,9 +45,9 @@ import ValidacaoBiometrica from './components/ValidacaoBiometrica';
 import AssinaturaDigital from './components/AssinaturaDigital';
 import ValidarDocumentoAssinado from './components/ValidarDocumentoAssinado';
 // Removida importação de CadastroCompletoPaciente - agora usa ModalCadastroCompletoPaciente
-import logoBrasao from './images/logobrasao.png';
-import logoHorizontal from './images/logohorizontal.png';
-import logoHorizontalPreto from './images/logohorizontalpreto.png';
+import logoBrasao from './assets/images/logobrasao.png';
+import logoHorizontal from './assets/images/logohorizontal.png';
+import logoHorizontalPreto from './assets/images/logohorizontalpreto.png';
 
 // Importação lazy para evitar problemas de inicialização
 const GerenciarAssinaturaAdmin = React.lazy(() => import('./components/GerenciarAssinaturaAdmin'));
@@ -1392,29 +1395,32 @@ const AppContent = () => {
 
 function App() {
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <Router>
-            <Routes>
-              {/* Rotas públicas - Captura de leads */}
-              <Route path="/captura-lead" element={<CapturaLead />} />
-              <Route path="/captura-sucesso" element={<CapturaSucesso />} />
-              
-              {/* Rotas públicas - Captura de clínicas */}
-              <Route path="/captura-clinica" element={<CapturaClinica />} />
-              <Route path="/captura-clinica-sucesso" element={<CapturaClinicaSucesso />} />
-              
-              {/* Rotas públicas - Captura de clientes */}
-              <Route path="/captura-clientes" element={<CapturaClientes />} />
-              <Route path="/captura-sucesso-clientes" element={<CapturaSucessoClientes />} />
-              <Route path="/captura-indicador-cliente" element={<CapturaIndicadorClientes />} />
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <AuthProvider>
+          <Router>
+              <Routes>
+                {/* Rotas públicas - Captura de leads */}
+                <Route path="/captura-lead" element={<CapturaLead />} />
+                <Route path="/captura-sucesso" element={<CapturaSucesso />} />
+                
+                {/* Rotas públicas - Captura de clínicas */}
+                <Route path="/captura-clinica" element={<CapturaClinica />} />
+                <Route path="/captura-clinica-sucesso" element={<CapturaClinicaSucesso />} />
+                
+                {/* Rotas públicas - Captura de clientes */}
+                <Route path="/captura-clientes" element={<CapturaClientes />} />
+                <Route path="/captura-sucesso-clientes" element={<CapturaSucessoClientes />} />
+                <Route path="/captura-indicador-cliente" element={<CapturaIndicadorClientes />} />
 
-              {/* Rotas da aplicação principal */}
-              <Route path="/*" element={<AppContent />} />
-            </Routes>
-          </Router>
-      </AuthProvider>
-    </ToastProvider>
+                {/* Rotas da aplicação principal */}
+                <Route path="/*" element={<AppContent />} />
+              </Routes>
+            </Router>
+        </AuthProvider>
+      </ToastProvider>
+      {process.env.NODE_ENV === 'development' && <ReactQueryDevtools initialIsOpen={false} />}
+    </QueryClientProvider>
   );
 }
 

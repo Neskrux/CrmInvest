@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CheckCircle, ArrowRight, Clock, Gift, Star, MessageCircle, Users, DollarSign, Target } from 'lucide-react';
-import logoBrasao from '../images/logobrasao-selo.png';
+import logoBrasao from '../assets/images/logobrasao-selo.png';
 
 const CapturaSucesso = () => {
   const location = useLocation();

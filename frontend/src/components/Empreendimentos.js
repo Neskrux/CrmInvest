@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import useBranding from '../hooks/useBranding';
+import useBranding from '../hooks/common/useBranding';
 import { useAuth } from '../contexts/AuthContext';
-import { getSupabaseClient } from '../lib/supabaseClient';
+import { getSupabaseClient } from '../lib/supabase';
 import { Phone, Mail, Share2, X, Calculator, ArrowLeft, Home, Images, Globe, BookOpen, ChevronLeft, ChevronRight, Maximize2, Minimize2, Bed, BedDouble, Car, Clock, Bath, Droplets, Ruler, Edit, Copy, Upload, Info } from 'lucide-react';
 
 // ==== Helpers de imagem/URLs ====
@@ -83,8 +83,8 @@ const Empreendimentos = () => {
       setLoading(true);
       setError(null);
       
-      const config = await import('../config');
-      const response = await fetch(`${config.default.API_BASE_URL}/empreendimentos-public`);
+      const { apiConfig } = await import('../config');
+      const response = await fetch(`${apiConfig.API_BASE_URL}/empreendimentos-public`);
       
       if (!response.ok) {
         throw new Error('Erro ao carregar empreendimentos');

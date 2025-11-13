@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from './Toast';
+import { useToast } from '../contexts';
 
 const ModalCriarLoginPaciente = ({ paciente, onClose, onSuccess }) => {
   const { makeRequest } = useAuth();
