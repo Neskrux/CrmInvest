@@ -182,13 +182,7 @@ class CaixaBoletoService {
                   headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'apikey': apiKeyForToken,  // Formato correto conforme manual técnico MO 38.431 da Caixa
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36', // User-Agent de navegador real para evitar bloqueio
-                    'Accept': 'application/json, text/plain, */*',
-                    'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-                    'Accept-Encoding': 'gzip, deflate, br',
-                    'Origin': 'https://api.caixa.gov.br',
-                    'Referer': 'https://api.caixa.gov.br/',
-                    'Connection': 'keep-alive'
+                    'User-Agent': 'CrmInvest/1.0' // Evitar bloqueio anti-bot
                   },
               timeout: 30000,
               validateStatus: function (status) {
@@ -238,40 +232,14 @@ class CaixaBoletoService {
         throw new Error('Nenhuma resposta recebida da API após todas as tentativas');
       }
 
-      // Verificar se a resposta é HTML (bloqueio do Radware Bot Manager)
-      const responseData = response.data;
-      const isHtmlResponse = typeof responseData === 'string' && (
-        responseData.includes('<html') || 
-        responseData.includes('Radware Bot Manager') || 
-        responseData.includes('Bot Manager Block') ||
-        responseData.includes('comportamento malicioso')
-      );
-
-      if (isHtmlResponse) {
-        console.error('🚫 BLOQUEIO DETECTADO: Radware Bot Manager bloqueou a requisição');
-        console.error('   A API da Caixa está detectando o acesso como bot.');
-        console.error('   Possíveis causas:');
-        console.error('   1. Muitas requisições em pouco tempo (rate limiting)');
-        console.error('   2. IP bloqueado temporariamente');
-        console.error('   3. Headers insuficientes ou suspeitos');
-        console.error('   Solução: Aguardar alguns minutos antes de tentar novamente.');
-        
-        const error = new Error('API da Caixa bloqueou a requisição (Radware Bot Manager). Aguarde alguns minutos antes de tentar novamente.');
-        error.isBotBlocked = true;
-        error.response = response;
-        throw error;
-      }
-
-      // Log da resposta completa para debug (apenas se não for HTML)
-      if (!isHtmlResponse) {
-        console.log('📋 Resposta da API de token:', {
-          status: response?.status,
-          statusText: response?.statusText,
-          hasData: !!response?.data,
-          dataKeys: response?.data && typeof response.data === 'object' ? Object.keys(response.data) : [],
-          dataPreview: response?.data && typeof response.data === 'object' ? JSON.stringify(response.data).substring(0, 200) : 'sem dados'
-        });
-      }
+      // Log da resposta completa para debug
+      console.log('📋 Resposta da API de token:', {
+        status: response?.status,
+        statusText: response?.statusText,
+        hasData: !!response?.data,
+        dataKeys: response?.data ? Object.keys(response.data) : [],
+        dataPreview: response?.data ? JSON.stringify(response.data).substring(0, 200) : 'sem dados'
+      });
 
       if (response && response.data && response.data.access_token) {
         this.accessToken = response.data.access_token;
@@ -284,88 +252,49 @@ class CaixaBoletoService {
         
         return this.accessToken;
       } else {
-        // Verificar se é HTML (bloqueio) antes de logar
-        const responseDataStr = typeof response?.data === 'string' ? response?.data : JSON.stringify(response?.data || {});
-        const isHtml = responseDataStr.includes('<html') || responseDataStr.includes('Radware');
-        
-        // Log detalhado do que foi retornado (sem mostrar HTML completo)
+        // Log detalhado do que foi retornado
         const errorDetails = {
           responseExists: !!response,
           dataExists: !!response?.data,
+          responseData: response?.data,
           responseStatus: response?.status,
           responseStatusText: response?.statusText,
-          isHtmlResponse: isHtml,
-          dataPreview: isHtml 
-            ? 'HTML (bloqueio detectado)' 
-            : (typeof response?.data === 'object' ? JSON.stringify(response?.data).substring(0, 200) : responseDataStr.substring(0, 200))
+          responseHeaders: response?.headers
         };
         
         console.error('❌ Resposta da API não contém access_token:', errorDetails);
         
         // Criar erro mais informativo
-        let errorMessage;
-        if (isHtml) {
-          errorMessage = 'API bloqueou a requisição (Radware Bot Manager)';
-        } else if (response?.data?.error_description) {
-          errorMessage = response.data.error_description;
-        } else if (response?.data?.error) {
-          errorMessage = response.data.error;
-        } else if (response?.data?.message) {
-          errorMessage = response.data.message;
-        } else if (typeof response?.data === 'object') {
-          errorMessage = JSON.stringify(response.data).substring(0, 200);
-        } else {
-          errorMessage = 'Token não retornado na resposta';
-        }
+        const errorMessage = response?.data?.error_description || 
+                            response?.data?.error || 
+                            response?.data?.message ||
+                            JSON.stringify(response?.data) ||
+                            'Token não retornado na resposta';
         
         const error = new Error(`Erro ao obter token: ${errorMessage}`);
         // Adicionar dados da resposta ao erro para facilitar debug
         error.response = response;
-        if (isHtml) {
-          error.isBotBlocked = true;
-        }
         throw error;
       }
     } catch (error) {
       // Garantir que apiKeyForToken está definida para uso no catch (caso o erro ocorra antes da linha 142)
       const apiKeyForToken = this.CAIXA_API_KEY ? this.CAIXA_API_KEY.trim() : null;
       
-      // Verificar se é bloqueio HTML antes de logar
-      const errorData = error.response?.data;
-      const isHtmlError = typeof errorData === 'string' && (
-        errorData.includes('<html') || 
-        errorData.includes('Radware Bot Manager') || 
-        errorData.includes('Bot Manager Block')
-      );
-      
-      // Log detalhado do erro (sem mostrar HTML completo)
-      const logData = {
+      // Log detalhado do erro
+      console.error('❌ Erro ao obter token da Caixa:', {
         status: error.response?.status,
         statusText: error.response?.statusText,
+        data: error.response?.data,
         message: error.message,
         'API Key usada (primeiros 10 chars)': apiKeyForToken ? apiKeyForToken.substring(0, 10) : 'NÃO DISPONÍVEL',
         'Token URL': this.CAIXA_TOKEN_URL,
         'Client ID': this.CAIXA_CLIENT_ID
-      };
-      
-      if (isHtmlError) {
-        logData.data = 'HTML (Radware Bot Manager Block detectado)';
-        logData.isBotBlocked = true;
-      } else if (errorData) {
-        // Mostrar apenas preview se não for HTML
-        if (typeof errorData === 'object') {
-          logData.data = JSON.stringify(errorData).substring(0, 200);
-        } else {
-          logData.data = errorData.substring(0, 200);
-        }
-      }
-      
-      console.error('❌ Erro ao obter token da Caixa:', logData);
+      });
       
       // Tratar erros específicos da API Key
       if (error.response?.status === 400 || error.response?.status === 401) {
-        const errorDataForKey = error.response?.data;
-        const errorMessage = typeof errorDataForKey === 'string' ? errorDataForKey : errorDataForKey?.error_description || errorDataForKey?.mensagem || errorDataForKey?.error;
+        const errorData = error.response?.data;
+        const errorMessage = typeof errorData === 'string' ? errorData : errorData?.error_description || errorData?.mensagem || errorData?.error;
         
         if (errorMessage && (
           errorMessage.toLowerCase().includes('api key') ||
@@ -390,15 +319,6 @@ class CaixaBoletoService {
           
           throw new Error(`API Key inválida ou não reconhecida pela Caixa. Verifique: 1) Se a API Key está correta no .env (deve começar com "l"), 2) Se está vinculada ao Client ID ${this.CAIXA_CLIENT_ID}, 3) Se está ativa no ambiente ${this.CAIXA_TOKEN_URL.includes('logindes') ? 'SANDBOX' : 'PRODUÇÃO'}. Erro da Caixa: ${errorMessage}`);
         }
-      }
-      
-      // Tratar bloqueio do Radware Bot Manager
-      if (error.isBotBlocked || 
-          (error.response?.data && typeof error.response.data === 'string' && 
-           (error.response.data.includes('Radware Bot Manager') || 
-            error.response.data.includes('Bot Manager Block') ||
-            error.response.data.includes('comportamento malicioso')))) {
-        throw new Error('API da Caixa bloqueou a requisição (Radware Bot Manager). O IP pode estar temporariamente bloqueado. Aguarde 10-15 minutos antes de tentar novamente. Se o problema persistir, entre em contato com o suporte da Caixa.');
       }
       
       if (error.response?.status === 429) {
@@ -432,22 +352,15 @@ class CaixaBoletoService {
       
       const token = await this.getAccessToken();
       
-      // Preparar headers base - apenas o essencial para evitar "Policy Falsified"
-      const headers = {
-        'Authorization': `Bearer ${token}`,
-        'apikey': apiKeyToSend,  // Formato correto conforme manual técnico MO 38.431 da Caixa
-        'Accept': 'application/json'
-      };
-      
-      // Adicionar Content-Type apenas para requisições que enviam dados (POST, PUT, PATCH)
-      if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
-        headers['Content-Type'] = 'application/json';
-      }
-      
       const config = {
         method,
         url: `${this.CAIXA_API_BASE_URL}${endpoint}`,
-        headers,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'apikey': apiKeyToSend,  // Formato correto conforme manual técnico MO 38.431 da Caixa
+          'User-Agent': 'CrmInvest/1.0' // Evitar bloqueio anti-bot (valores genéricos como "curl" são bloqueados)
+        },
         timeout: 30000
       };
       
@@ -456,7 +369,7 @@ class CaixaBoletoService {
       
       console.log(`📤 Headers da requisição:`, {
         'Authorization': `Bearer ${token.substring(0, 20)}...`,
-        'Content-Type': config.headers['Content-Type'] || 'não enviado (GET)',
+        'Content-Type': config.headers['Content-Type'],
         'apikey (primeiros 15 chars)': apiKeyToSend ? apiKeyToSend.substring(0, 15) : 'NÃO DISPONÍVEL',
         'apikey (últimos 5 chars)': apiKeyToSend ? apiKeyToSend.substring(apiKeyToSend.length - 5) : 'NÃO DISPONÍVEL',
         'API Key length': apiKeyToSend ? apiKeyToSend.length : 0,
@@ -500,67 +413,33 @@ class CaixaBoletoService {
         }
       }
     } catch (error) {
-      // Verificar se é erro XML/SOAP (Policy Falsified)
-      const errorData = error.response?.data;
-      const isXmlError = typeof errorData === 'string' && (
-        errorData.includes('<?xml') || 
-        errorData.includes('<soapenv:') ||
-        errorData.includes('Policy Falsified') ||
-        errorData.includes('Assertion Falsified')
-      );
-      
-      // Log detalhado do erro (sem mostrar XML completo)
-      const logData = {
+      // Log detalhado do erro
+      console.error('❌ Erro na requisição para API Caixa:', {
         endpoint,
         method,
         status: error.response?.status,
         statusText: error.response?.statusText,
+        data: error.response?.data,
         message: error.message,
         'URL completa': `${this.CAIXA_API_BASE_URL}${endpoint}`,
         'API Key (primeiros 10 chars)': apiKeyToSend ? apiKeyToSend.substring(0, 10) : 'NÃO DISPONÍVEL',
         'Ambiente': this.CAIXA_API_BASE_URL.includes('/sandbox/') ? 'SANDBOX' : 'PRODUÇÃO'
-      };
-      
-      if (isXmlError) {
-        logData.data = 'XML/SOAP (Policy Falsified detectado)';
-        logData.isPolicyError = true;
-      } else if (errorData) {
-        if (typeof errorData === 'object') {
-          logData.data = JSON.stringify(errorData).substring(0, 200);
-        } else {
-          logData.data = errorData.substring(0, 200);
-        }
-      }
-      
-      console.error('❌ Erro na requisição para API Caixa:', logData);
-      
-      // Tratar erro "Policy Falsified" (erro 500 com XML/SOAP)
-      if (error.response?.status === 500 && isXmlError) {
-        console.error('🔴 ERRO: Policy Falsified (Layer7 API Gateway)');
-        console.error('   O gateway da Caixa rejeitou a requisição por violação de política.');
-        console.error('   Possíveis causas:');
-        console.error('   1. Headers incorretos ou faltando');
-        console.error('   2. Content-Type enviado em requisição GET');
-        console.error('   3. Accept-Encoding não suportado');
-        console.error('   4. Token expirado ou inválido');
-        console.error('   Solução: Verificar se os headers estão corretos conforme documentação da API.');
-        throw new Error('Erro Policy Falsified: O gateway da Caixa rejeitou a requisição. Verifique se os headers estão corretos. Se o problema persistir, pode ser necessário aguardar alguns minutos ou verificar com o suporte da Caixa.');
-      }
+      });
       
       // Tratar erros específicos da API Key
       if (error.response?.status === 400) {
-        const errorDataFor400 = error.response?.data;
+        const errorData = error.response?.data;
         
         // Verificar se é erro BK076 (formatação JSON) ou erro de API Key
-        if (errorDataFor400?.integracao?.codigo === 'BK076') {
+        if (errorData?.integracao?.codigo === 'BK076') {
           console.error('🔴 ERRO BK076: Formatação da mensagem inválida');
           console.error('   Verifique: 1) Formato JSON do payload, 2) Tipos de dados (CPF/CNPJ/CEP como integer), 3) Estrutura do payload');
-          throw new Error(`Erro BK076: Formatação da mensagem inválida. ${errorDataFor400?.integracao?.mensagem || ''}`);
+          throw new Error(`Erro BK076: Formatação da mensagem inválida. ${errorData?.integracao?.mensagem || ''}`);
         }
         
         // Tratar erros negociais (ex: código de juros inválido)
-        if (errorDataFor400?.negocial && Array.isArray(errorDataFor400.negocial) && errorDataFor400.negocial.length > 0) {
-          const erroNegocial = errorDataFor400.negocial[0];
+        if (errorData?.negocial && Array.isArray(errorData.negocial) && errorData.negocial.length > 0) {
+          const erroNegocial = errorData.negocial[0];
           const codigoRetorno = erroNegocial.codigo_retorno;
           const mensagemRetorno = erroNegocial.mensagem_retorno;
           
@@ -580,11 +459,11 @@ class CaixaBoletoService {
         }
         
         // Verificar se a mensagem indica problema com API Key
-        const errorMessage = typeof errorDataFor400 === 'string' ? errorDataFor400 : 
-          errorDataFor400?.integracao?.mensagem || 
-          errorDataFor400?.mensagem || 
-          errorDataFor400?.error_description || 
-          errorDataFor400?.error || '';
+        const errorMessage = typeof errorData === 'string' ? errorData : 
+          errorData?.integracao?.mensagem || 
+          errorData?.mensagem || 
+          errorData?.error_description || 
+          errorData?.error || '';
         
         if (errorMessage && (
           errorMessage.toLowerCase().includes('api key') ||
@@ -759,29 +638,8 @@ class CaixaBoletoService {
       // A resposta vem dentro de dados_complementares conforme Swagger
       const dadosComplementares = response.dados_complementares || response;
 
-      // Extrair nosso_numero da URL se disponível (mais confiável que o retornado pela API)
-      // A API da Caixa às vezes retorna nosso_numero duplicado ou incorreto, mas a URL sempre contém o correto
-      let nossoNumero = dadosComplementares.nosso_numero;
-      if (dadosComplementares.url) {
-        // A URL tem formato: https://boletoonline.caixa.gov.br/ecobranca/SIGCB/imprimir/1242669/14000000173871621
-        // O nosso_numero está no final da URL, após a última barra
-        const urlParts = dadosComplementares.url.split('/');
-        const nossoNumeroDaUrl = urlParts[urlParts.length - 1];
-        
-        // Se conseguir extrair da URL e for um número válido, usar o da URL (mais confiável)
-        if (nossoNumeroDaUrl && /^\d+$/.test(nossoNumeroDaUrl)) {
-          const nossoNumeroUrlParsed = parseInt(nossoNumeroDaUrl, 10);
-          
-          // Se o nosso_numero da URL for diferente do retornado pela API, usar o da URL
-          if (nossoNumeroUrlParsed !== nossoNumero) {
-            console.log(`⚠️ Inconsistência detectada: API retornou nosso_numero ${nossoNumero}, mas URL contém ${nossoNumeroUrlParsed}. Usando o da URL (mais confiável).`);
-            nossoNumero = nossoNumeroUrlParsed;
-          }
-        }
-      }
-
       return {
-        nosso_numero: nossoNumero,
+        nosso_numero: dadosComplementares.nosso_numero,
         codigo_barras: dadosComplementares.codigo_barras,
         linha_digitavel: dadosComplementares.linha_digitavel,
         url: dadosComplementares.url,

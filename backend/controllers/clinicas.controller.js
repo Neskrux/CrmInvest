@@ -893,7 +893,8 @@ const cadastroPublico = async (req, res) => {
       nicho, 
       responsavel, 
       observacoes, 
-      ref_consultor 
+      ref_consultor,
+      empresa_id
     } = req.body;
     
     // Normalizar email
@@ -1049,7 +1050,8 @@ const cadastroPublico = async (req, res) => {
       criado_por_consultor_id: consultorId,
       tipo_origem: 'aprovada',
       latitude,
-      longitude
+      longitude,
+      empresa_id: empresa_id || 3  // Usa empresa_id do request ou padrão 3
     };
 
     // Inserir na tabela novas_clinicas
