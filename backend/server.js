@@ -14,6 +14,7 @@ const { supabase, supabaseAdmin } = require('./config/database');
 
 // Importar rotas refatoradas
 const routes = require('./routes');
+const solicitacoesCobrancaRoutes = require('./routes/solicitacoes-cobranca.routes');
 
 // Importar middlewares e controllers para rotas de upload de galeria e unidades
 const { authenticateUpload, authenticateToken } = require('./middleware/auth');
@@ -317,6 +318,7 @@ app.put('/api/empreendimentos/:id', authenticateToken, updateEmpreendimento);
 
 // Usar rotas refatoradas
 app.use('/api', routes);
+app.use('/api', solicitacoesCobrancaRoutes);
 
 // Configurar Socket.IO apenas se não estiver no Vercel
 let io = null;

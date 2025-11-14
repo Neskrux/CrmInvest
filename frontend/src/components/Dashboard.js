@@ -8,6 +8,7 @@ import useDocumentacaoPendente from '../hooks/useDocumentacaoPendente';
 import { useToast } from '../components/Toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, Area, ReferenceLine, ComposedChart } from 'recharts';
 import { TrendingUp, Calendar, BarChart3, CheckCircle, XCircle, RotateCcw, UserPlus } from 'lucide-react';
+import DashboardClinicaBoletos from './DashboardClinicaBoletos';
 import './Dashboard.css';
 
 const createDefaultKpisFinanceiros = () => ({
@@ -2018,6 +2019,20 @@ const Dashboard = () => {
       <div className="loading">
         <div className="spinner"></div>
       </div>
+    );
+  }
+
+  // Renderizar dashboard específico para clínicas da empresa_id 3
+  if (isClinica && user?.empresa_id === 3) {
+    return (
+      <>
+        <DashboardClinicaBoletos 
+          kpisFinanceirosClinica={kpisFinanceirosClinica}
+        />
+        {FechamentoModal}
+        {AgendamentoModal}
+        {NewLeadModal}
+      </>
     );
   }
 
