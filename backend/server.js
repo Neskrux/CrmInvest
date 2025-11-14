@@ -495,11 +495,12 @@ server.listen(PORT, async () => {
   // Inicializar job de envio de notificações automáticas de boletos
   try {
     const enviadorNotificacoes = require('./jobs/enviar-notificacoes-boletos');
-    // Executar a cada 6 horas (pode ser ajustado conforme necessidade)
-    enviadorNotificacoes.iniciarScheduler(6);
-    console.log('✅ Job de notificações automáticas de boletos iniciado');
+    // Executar a cada 3 horas
+    enviadorNotificacoes.iniciarScheduler(3);
+    console.log('✅ Job de notificações automáticas de boletos iniciado (intervalo: 3 horas)');
   } catch (error) {
     console.error('⚠️  Erro ao iniciar job de notificações:', error.message);
+    console.error('⚠️  Stack trace:', error.stack);
   }
 
   // Inicializar job de atualização de status de boletos

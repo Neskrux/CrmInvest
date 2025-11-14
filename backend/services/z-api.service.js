@@ -175,6 +175,8 @@ class ZApiService {
       ? new Date(boleto.data_vencimento).toLocaleDateString('pt-BR')
       : 'Não informado';
 
+    const urlBoleto = boleto.url_boleto || 'N/A';
+
     const mensagem = `*Boleto Pendente de Pagamento*
 
 Olá, ${paciente?.nome || 'Cliente do Grupo IM'}!
@@ -186,7 +188,7 @@ Você possui um boleto pendente de pagamento:
 • Vencimento: ${dataVencimento}
 
 *Acesse seu boleto:*
-${boleto.url_boleto}
+${urlBoleto}
 
 ⚠️ *Importante:* Por favor, efetue o pagamento até a data de vencimento para evitar juros e multa.
 

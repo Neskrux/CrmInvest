@@ -4,6 +4,35 @@ const { STORAGE_BUCKET_DOCUMENTOS } = require('../config/constants');
 const { uploadToSupabase } = require('../middleware/upload');
 const caixaBoletoService = require('../services/caixa-boleto.service');
 
+/**
+ * Valida se uma string é um UUID válido
+ * @param {string} str - String a ser validada
+ * @returns {boolean} True se for UUID válido
+ */
+const isValidUUID = (str) => {
+  if (!str) return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(String(str));
+};
+
+/**
+ * Obtém o importado_por validado (UUID ou null)
+ * @param {any} userId - ID do usuário
+ * @returns {string|null} UUID válido ou null
+ */
+const getImportadoPor = (userId) => {
+  return userId && isValidUUID(userId) ? userId : null;
+};
+
+/**
+ * Obtém o atualizado_por validado (UUID ou null)
+ * @param {any} userId - ID do usuário
+ * @returns {string|null} UUID válido ou null
+ */
+const getAtualizadoPor = (userId) => {
+  return userId && isValidUUID(userId) ? userId : null;
+};
+
 // GET /api/boletos-gestao - Listar boletos com filtros
 const listarBoletos = async (req, res) => {
   try {
@@ -241,23 +270,32 @@ const importarBoletos = async (req, res) => {
       });
     }
 
+    // Validar importado_por (deve ser UUID)
+    const importadoPor = getImportadoPor(req.user?.id);
+
     let boletosParaCriar = [];
 
     if (parcelas && Array.isArray(parcelas)) {
       // Usar parcelas customizadas fornecidas
-      boletosParaCriar = parcelas.map((p, index) => ({
-        fechamento_id,
-        paciente_id: fechamento.paciente_id,
-        clinica_id: fechamento.clinica_id,
-        empresa_id: fechamento.empresa_id,
-        numero_parcela: p.numero_parcela || (index + 1),
-        valor: p.valor || fechamento.valor_parcela,
-        data_vencimento: p.data_vencimento,
-        gerar_boleto: p.gerar_boleto !== undefined ? p.gerar_boleto : gerar_automatico,
-        dias_antes_vencimento: p.dias_antes_vencimento || dias_antes_vencimento,
-        importado_por: req.user.id,
-        status: 'pendente'
-      }));
+      boletosParaCriar = parcelas.map((p, index) => {
+        const boleto = {
+          fechamento_id,
+          paciente_id: fechamento.paciente_id,
+          clinica_id: fechamento.clinica_id,
+          empresa_id: fechamento.empresa_id,
+          numero_parcela: p.numero_parcela || (index + 1),
+          valor: p.valor || fechamento.valor_parcela,
+          data_vencimento: p.data_vencimento,
+          gerar_boleto: p.gerar_boleto !== undefined ? p.gerar_boleto : gerar_automatico,
+          dias_antes_vencimento: p.dias_antes_vencimento || dias_antes_vencimento,
+          status: 'pendente'
+        };
+        // Adicionar importado_por apenas se for UUID válido
+        if (importadoPor) {
+          boleto.importado_por = importadoPor;
+        }
+        return boleto;
+      });
     } else {
       // Criar parcelas baseadas no fechamento
       const dataVencimentoInicial = fechamento.vencimento || new Date();
@@ -266,7 +304,7 @@ const importarBoletos = async (req, res) => {
         const dataVencimento = new Date(dataVencimentoInicial);
         dataVencimento.setMonth(dataVencimento.getMonth() + i);
         
-        boletosParaCriar.push({
+        const boleto = {
           fechamento_id,
           paciente_id: fechamento.paciente_id,
           clinica_id: fechamento.clinica_id,
@@ -276,9 +314,13 @@ const importarBoletos = async (req, res) => {
           data_vencimento: dataVencimento.toISOString().split('T')[0],
           gerar_boleto: gerar_automatico,
           dias_antes_vencimento,
-          importado_por: req.user.id,
           status: 'pendente'
-        });
+        };
+        // Adicionar importado_por apenas se for UUID válido
+        if (importadoPor) {
+          boleto.importado_por = importadoPor;
+        }
+        boletosParaCriar.push(boleto);
       }
     }
 
@@ -321,10 +363,17 @@ const atualizarBoleto = async (req, res) => {
       observacoes
     } = req.body;
 
+    // Validar atualizado_por (deve ser UUID)
+    const atualizadoPor = getAtualizadoPor(req.user?.id);
+    
     const updateData = {
-      atualizado_por: req.user.id,
       atualizado_em: new Date().toISOString()
     };
+    
+    // Adicionar atualizado_por apenas se for UUID válido
+    if (atualizadoPor) {
+      updateData.atualizado_por = atualizadoPor;
+    }
 
     // Adicionar campos se fornecidos
     if (status !== undefined) updateData.status = status;
@@ -601,84 +650,43 @@ const importarBoletoArquivo = async (req, res) => {
 
     const urlBoleto = urlData.publicUrl;
 
-    // Buscar id_beneficiario da empresa (necessário para boletos_caixa)
-    const { data: empresaData } = await supabaseAdmin
-      .from('empresas')
-      .select('id')
-      .eq('id', 3) // Caixa (padrão)
-      .single();
-    
-    // Obter ID do beneficiário da variável de ambiente
-    const idBeneficiarioRaw = process.env.CAIXA_ID_BENEFICIARIO;
-    let idBeneficiario = null;
-    
-    if (idBeneficiarioRaw) {
-      // Normalizar ID do beneficiário (pode vir como "0374/1242669" ou apenas "1242669")
-      if (idBeneficiarioRaw.includes('/')) {
-        idBeneficiario = idBeneficiarioRaw.split('/')[1].trim();
-      } else {
-        idBeneficiario = idBeneficiarioRaw.trim();
-      }
-    }
-
-    // Criar registro em boletos_caixa (para aparecer para paciente e clínica)
+    // Boletos importados não são criados em boletos_caixa, apenas em boletos_gestao
     const numeroDocumento = `MANUAL-${Date.now()}`;
-    
-    const { data: boletoCaixa, error: boletoCaixaError } = await supabaseAdmin
-      .from('boletos_caixa')
-      .insert([{
-        paciente_id: parseInt(paciente_id),
-        fechamento_id: fechamentoIdParaVincular, // Vincular ao fechamento se existir
-        id_beneficiario: idBeneficiario, // ID do beneficiário da Caixa
-        nosso_numero: null, // Boleto manual não tem nosso número da Caixa
-        numero_documento: numeroDocumento,
-        codigo_barras: null,
-        linha_digitavel: null,
-        url: urlBoleto,
-        qrcode: null,
-        url_qrcode: null,
-        valor: parseFloat(valor),
-        data_vencimento: data_vencimento,
-        data_emissao: new Date().toISOString().split('T')[0],
-        situacao: 'EM ABERTO',
-        status: 'pendente',
-        empresa_id: 3, // Caixa (padrão)
-        parcela_numero: 1,
-        sincronizado_em: new Date().toISOString()
-      }])
-      .select()
-      .single();
 
-    if (boletoCaixaError) {
-      console.error('Erro ao criar boleto em boletos_caixa:', boletoCaixaError);
-      throw boletoCaixaError;
+    // Validar importado_por (deve ser UUID)
+    const importadoPor = getImportadoPor(req.user?.id);
+
+    // Criar registro em boletos_gestao (para gestão)
+    const dadosBoleto = {
+      fechamento_id: fechamentoIdParaVincular, // Vincular ao fechamento se existir
+      paciente_id: parseInt(paciente_id),
+      clinica_id: clinicaId,
+      empresa_id: 3, // Caixa (padrão)
+      numero_parcela: 1,
+      valor: parseFloat(valor),
+      data_vencimento: data_vencimento,
+      status: 'pendente',
+      boleto_gerado: true, // Já foi "gerado" (importado)
+      data_geracao_boleto: new Date().toISOString(),
+      gerar_boleto: false, // Não precisa gerar novamente
+      dias_antes_vencimento: 20,
+      boleto_caixa_id: null, // Boletos importados não têm vínculo com boletos_caixa
+      nosso_numero: null,
+      numero_documento: numeroDocumento,
+      linha_digitavel: null,
+      codigo_barras: null,
+      url_boleto: urlBoleto,
+      observacoes: `Boleto importado manualmente em ${new Date().toISOString()}`
+    };
+
+    // Adicionar importado_por apenas se for UUID válido
+    if (importadoPor) {
+      dadosBoleto.importado_por = importadoPor;
     }
 
-    // Criar registro em boletos_gestao (para gestão) - AGORA É OBRIGATÓRIO
     const { data: boletoGestao, error: boletoGestaoError } = await supabaseAdmin
       .from('boletos_gestao')
-      .insert([{
-        fechamento_id: fechamentoIdParaVincular, // Vincular ao fechamento se existir
-        paciente_id: parseInt(paciente_id),
-        clinica_id: clinicaId,
-        empresa_id: 3, // Caixa (padrão)
-        numero_parcela: 1,
-        valor: parseFloat(valor),
-        data_vencimento: data_vencimento,
-        status: 'pendente',
-        boleto_gerado: true, // Já foi "gerado" (importado)
-        data_geracao_boleto: new Date().toISOString(),
-        gerar_boleto: false, // Não precisa gerar novamente
-        dias_antes_vencimento: 20,
-        boleto_caixa_id: boletoCaixa.id,
-        nosso_numero: null,
-        numero_documento: numeroDocumento,
-        linha_digitavel: null,
-        codigo_barras: null,
-        url_boleto: urlBoleto,
-        observacoes: `Boleto importado manualmente em ${new Date().toISOString()}`
-        // Removido importado_por pois pode causar erro se req.user.id não for UUID
-      }])
+      .insert([dadosBoleto])
       .select()
       .single();
 
@@ -697,7 +705,7 @@ const importarBoletoArquivo = async (req, res) => {
       success: true,
       message: 'Boleto importado com sucesso',
       boleto: {
-        id: boletoCaixa.id,
+        id: boletoGestao.id,
         paciente_id: parseInt(paciente_id),
         paciente_nome: paciente.nome,
         valor: parseFloat(valor),
@@ -796,6 +804,9 @@ const importarBoletosCaixa = async (req, res) => {
 
     console.log(`📋 [IMPORTAR CAIXA] ${boletosParaImportar.length} boletos para importar`);
 
+    // Validar importado_por (deve ser UUID)
+    const importadoPor = getImportadoPor(req.user?.id);
+
     // Criar registros em boletos_gestao
     const boletosParaCriar = boletosParaImportar.map(boletoCaixa => {
       const fechamento = fechamentosMap[boletoCaixa.fechamento_id];
@@ -826,7 +837,7 @@ const importarBoletosCaixa = async (req, res) => {
         }
       }
 
-      return {
+      const boleto = {
         fechamento_id: boletoCaixa.fechamento_id,
         paciente_id: boletoCaixa.paciente_id,
         clinica_id: fechamento.clinica_id,
@@ -847,9 +858,15 @@ const importarBoletosCaixa = async (req, res) => {
         linha_digitavel: boletoCaixa.linha_digitavel,
         codigo_barras: boletoCaixa.codigo_barras,
         url_boleto: boletoCaixa.url,
-        importado_por: req.user.id,
         observacoes: `Importado de boletos_caixa em ${new Date().toISOString()}`
       };
+
+      // Adicionar importado_por apenas se for UUID válido
+      if (importadoPor) {
+        boleto.importado_por = importadoPor;
+      }
+
+      return boleto;
     }).filter(b => b !== null); // Remover nulos
 
     if (boletosParaCriar.length === 0) {
@@ -1311,6 +1328,38 @@ const sincronizarTodosBoletos = async (req, res) => {
   }
 };
 
+// POST /api/boletos-gestao/atualizar-status-vencidos - Executar job de atualização de status para vencidos
+const atualizarStatusVencidos = async (req, res) => {
+  try {
+    // Verificar se é admin ou consultor interno
+    if (req.user.tipo !== 'admin' && req.user.tipo !== 'consultor_interno') {
+      return res.status(403).json({ error: 'Acesso negado. Apenas administradores podem executar esta ação.' });
+    }
+
+    // Importar e executar o job de atualização de status
+    const atualizadorStatus = require('../jobs/atualizar-status-boletos');
+    
+    console.log('🔄 [ATUALIZAR STATUS VENCIDOS] Executando job de atualização de status...');
+    const resultado = await atualizadorStatus.executar();
+
+    res.json({
+      success: true,
+      message: 'Status de boletos vencidos atualizado com sucesso',
+      resultado: {
+        duracao: resultado.duracao,
+        boletos_gestao: resultado.resultados.boletos_gestao,
+        boletos_caixa: resultado.resultados.boletos_caixa
+      }
+    });
+  } catch (error) {
+    console.error('❌ [ATUALIZAR STATUS VENCIDOS] Erro:', error);
+    res.status(500).json({ 
+      error: 'Erro ao atualizar status de boletos vencidos',
+      message: error.message 
+    });
+  }
+};
+
 module.exports = {
   listarBoletos,
   importarBoletos,
@@ -1321,6 +1370,7 @@ module.exports = {
   gerarBoletosPendentes,
   excluirBoleto,
   sincronizarBoleto,
-  sincronizarTodosBoletos
+  sincronizarTodosBoletos,
+  atualizarStatusVencidos
 };
 

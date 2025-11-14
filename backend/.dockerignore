@@ -13,6 +13,7 @@
 !middleware/
 !services/
 !utils/
+!jobs/
 !database.sqlite
 
 # Exclude all node_modules
