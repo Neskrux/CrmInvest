@@ -275,6 +275,29 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contratoUrl, passoAtual]); // Verificação interna evita loops
   
+  // Desabilitar scroll do body quando modal estiver aberto
+  useEffect(() => {
+    // Salvar o estado original do overflow
+    const originalOverflow = document.body.style.overflow;
+    const originalPosition = document.body.style.position;
+    const originalWidth = document.body.style.width;
+    const originalHeight = document.body.style.height;
+    
+    // Desabilitar scroll do body
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    document.body.style.height = '100%';
+    
+    // Cleanup: restaurar scroll quando modal fechar
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.position = originalPosition;
+      document.body.style.width = originalWidth;
+      document.body.style.height = originalHeight;
+    };
+  }, []);
+
   // Fechar modal ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -783,6 +806,73 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
     return hashHex;
   };
   
+  // Função para detectar bounding box da assinatura (remover espaços vazios)
+  const obterBoundingBoxAssinatura = (imageDataUrl) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        
+        let minX = canvas.width;
+        let minY = canvas.height;
+        let maxX = 0;
+        let maxY = 0;
+        
+        // Encontrar os limites da assinatura (pixels não transparentes)
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < canvas.width; x++) {
+            const index = (y * canvas.width + x) * 4;
+            const alpha = data[index + 3];
+            
+            if (alpha > 0) { // Pixel não transparente
+              minX = Math.min(minX, x);
+              minY = Math.min(minY, y);
+              maxX = Math.max(maxX, x);
+              maxY = Math.max(maxY, y);
+            }
+          }
+        }
+        
+        // Se não encontrou nada, retornar dimensões padrão
+        if (minX >= maxX || minY >= maxY) {
+          resolve({
+            x: 0,
+            y: 0,
+            width: canvas.width,
+            height: canvas.height,
+            originalWidth: canvas.width,
+            originalHeight: canvas.height
+          });
+          return;
+        }
+        
+        // Adicionar padding de 5px ao redor
+        const padding = 5;
+        minX = Math.max(0, minX - padding);
+        minY = Math.max(0, minY - padding);
+        maxX = Math.min(canvas.width, maxX + padding);
+        maxY = Math.min(canvas.height, maxY + padding);
+        
+        resolve({
+          x: minX,
+          y: minY,
+          width: maxX - minX,
+          height: maxY - minY,
+          originalWidth: canvas.width,
+          originalHeight: canvas.height
+        });
+      };
+      img.src = imageDataUrl;
+    });
+  };
+
   // Limpar assinatura
   const limparAssinaturaContrato = () => {
     if (assinaturaRef) {
@@ -827,9 +917,33 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
       const pages = pdfDoc.getPages();
       console.log('📄 [ModalCadastro] PDF carregado, número de páginas:', pages.length);
       
+      // Obter bounding box da assinatura para remover espaços vazios
+      const boundingBox = await obterBoundingBoxAssinatura(assinaturaBase64);
+      console.log('📦 [ModalCadastro] Bounding box da assinatura:', boundingBox);
+      
+      // Criar nova imagem apenas com a área da assinatura (sem espaços vazios)
+      const img = new Image();
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.src = assinaturaBase64;
+      });
+      
+      const canvasCrop = document.createElement('canvas');
+      const ctxCrop = canvasCrop.getContext('2d');
+      canvasCrop.width = boundingBox.width;
+      canvasCrop.height = boundingBox.height;
+      ctxCrop.drawImage(
+        img,
+        boundingBox.x, boundingBox.y, boundingBox.width, boundingBox.height,
+        0, 0, boundingBox.width, boundingBox.height
+      );
+      
+      const assinaturaCortadaBase64 = canvasCrop.toDataURL('image/png');
+      
       // Converter assinatura base64 para imagem
-      const signatureImage = await pdfDoc.embedPng(assinaturaBase64);
-      console.log('✅ [ModalCadastro] Assinatura convertida para imagem');
+      const signatureImage = await pdfDoc.embedPng(assinaturaCortadaBase64);
+      const signatureDims = signatureImage.scale(1);
+      console.log('✅ [ModalCadastro] Assinatura convertida para imagem (cortada)');
       
       // Adicionar rodapé estruturado apenas na última página
       const ultimaPagina = pages[pages.length - 1];
@@ -841,15 +955,15 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
         altura: alturaPagina
       });
       
-      // Configurações do rodapé estruturado - mesmo layout da clínica
-      const alturaRodape = 140;
+      // Configurações do rodapé estruturado - melhor espaçamento
+      const alturaRodape = 180; // Altura total do rodapé (aumentada significativamente)
       const margemInferior = 20;
       const yBaseRodape = margemInferior;
       const margemLateral = 50;
       const espacoEntreColunas = 20;
       
       // Desenhar área do rodapé
-      // Linha superior do rodapé
+      // Linha superior do rodapé (mais grossa e escura)
       ultimaPagina.drawLine({
         start: { x: margemLateral, y: yBaseRodape + alturaRodape },
         end: { x: larguraPagina - margemLateral, y: yBaseRodape + alturaRodape },
@@ -857,36 +971,59 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
         color: rgb(0.2, 0.2, 0.2),
       });
       
-      // Calcular posições das 3 áreas de assinatura
+      // Calcular posições das 3 áreas de assinatura com melhor distribuição
       const larguraTotal = larguraPagina - (2 * margemLateral);
       const larguraArea = (larguraTotal - (2 * espacoEntreColunas)) / 3;
-      const yLinhaAssinatura = yBaseRodape + 90;
-      const alturaAssinatura = 35;
+      const alturaAssinatura = 70; // Aumentada significativamente para acomodar melhor a assinatura
+      const yLinhaAssinatura = yBaseRodape + 50; // Linha de assinatura mais abaixo, dando mais espaço acima
+      
+      // Posições Y para textos
+      const yTitulo = yBaseRodape + alturaRodape - 15; // Texto "ASSINATURA CLÍNICA" mais para cima
+      const yAssinatura = yBaseRodape + alturaRodape - 45;
+      // Dados (nome e CNPJ) ficam ABAIXO da linha de assinatura
+      const yDadosAbaixoLinha = yLinhaAssinatura - 12; // CNPJ abaixo da linha
+      const yNomeAbaixoLinha = yLinhaAssinatura - 24; // Nome abaixo da linha (acima do CNPJ)
       
       // Área 1: ASSINATURA CLÍNICA (já deve estar preenchida)
       const x1 = margemLateral;
+      const fontBold = await pdfDoc.embedFont('Helvetica-Bold');
       ultimaPagina.drawLine({
         start: { x: x1, y: yLinhaAssinatura },
         end: { x: x1 + larguraArea, y: yLinhaAssinatura },
         thickness: 0.5,
         color: rgb(0.4, 0.4, 0.4),
       });
-      ultimaPagina.drawText('ASSINATURA CLÍNICA', {
-        x: x1 + (larguraArea - 'ASSINATURA CLÍNICA'.length * 4.5) / 2,
-        y: yLinhaAssinatura - 12,
-        size: 7,
-        color: rgb(0.3, 0.3, 0.3),
+      const textoClinica = 'ASSINATURA CLÍNICA';
+      const larguraTextoClinica = fontBold.widthOfTextAtSize(textoClinica, 9);
+      ultimaPagina.drawText(textoClinica, {
+        x: x1 + (larguraArea - larguraTextoClinica) / 2,
+        y: yTitulo,
+        size: 9,
+        color: rgb(0.2, 0.2, 0.2),
+        font: fontBold,
       });
       
       // Área 2: ASSINATURA PACIENTE - AQUI VAI A ASSINATURA DO PACIENTE
       const x2 = x1 + larguraArea + espacoEntreColunas;
       
-      // Desenhar assinatura do paciente (acima da linha)
+      // Calcular dimensões da assinatura mantendo proporção
+      const larguraMaxima = larguraArea - 20; // Margem de 10px de cada lado
+      const alturaMaxima = alturaAssinatura;
+      const proporcao = Math.min(
+        larguraMaxima / signatureDims.width,
+        alturaMaxima / signatureDims.height
+      );
+      const larguraAssinatura = signatureDims.width * proporcao;
+      const alturaAssinaturaFinal = signatureDims.height * proporcao;
+      
+      // Desenhar assinatura do paciente (acima da linha, centralizada)
+      // A assinatura será posicionada acima da linha, com espaço adequado
+      const yAssinaturaPaciente = yLinhaAssinatura + alturaAssinatura - alturaAssinaturaFinal - 5; // 5px acima da linha
       ultimaPagina.drawImage(signatureImage, {
-        x: x2 + (larguraArea - 100) / 2, // Centralizar assinatura
-        y: yLinhaAssinatura + 8,
-        width: 100,
-        height: alturaAssinatura,
+        x: x2 + (larguraArea - larguraAssinatura) / 2, // Centralizar assinatura
+        y: yAssinaturaPaciente, // Posicionar acima da linha com espaço adequado
+        width: larguraAssinatura,
+        height: alturaAssinaturaFinal,
       });
       console.log('✅ [ModalCadastro] Assinatura do paciente desenhada');
       
@@ -898,36 +1035,55 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
         color: rgb(0.4, 0.4, 0.4),
       });
       
-      // Texto centralizado abaixo da linha
+      // Texto centralizado acima da linha
       const textoPaciente = 'ASSINATURA PACIENTE';
-      const larguraTextoPaciente = textoPaciente.length * 4.5;
+      const fontBoldPaciente = await pdfDoc.embedFont('Helvetica-Bold');
+      const larguraTextoPaciente = fontBoldPaciente.widthOfTextAtSize(textoPaciente, 9);
       ultimaPagina.drawText(textoPaciente, {
         x: x2 + (larguraArea - larguraTextoPaciente) / 2,
-        y: yLinhaAssinatura - 12,
-        size: 7,
-        color: rgb(0.3, 0.3, 0.3),
+        y: yTitulo,
+        size: 9,
+        color: rgb(0.2, 0.2, 0.2),
+        font: fontBoldPaciente,
       });
       
       const nomePaciente = paciente.nome || '';
       const cpfPaciente = formData.cpf || paciente.cpf?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') || '';
       
+      // Nome do paciente (truncar baseado na largura disponível) - ABAIXO da linha
       if (nomePaciente) {
-        const larguraNomePaciente = nomePaciente.length * 3.5;
-        ultimaPagina.drawText(nomePaciente, {
+        const tamanhoFonteNomePaciente = 6.5; // Fonte menor
+        const fontNormalPaciente = await pdfDoc.embedFont('Helvetica'); // Fonte normal para nomes
+        const larguraDisponivelNomePaciente = larguraArea - 10; // Margem de 5px de cada lado
+        let nomeExibidoPaciente = nomePaciente;
+        let larguraNomePaciente = fontNormalPaciente.widthOfTextAtSize(nomeExibidoPaciente, tamanhoFonteNomePaciente);
+        
+        // Truncar se necessário
+        if (larguraNomePaciente > larguraDisponivelNomePaciente) {
+          let textoTruncado = nomeExibidoPaciente;
+          while (fontNormalPaciente.widthOfTextAtSize(textoTruncado + '...', tamanhoFonteNomePaciente) > larguraDisponivelNomePaciente && textoTruncado.length > 0) {
+            textoTruncado = textoTruncado.substring(0, textoTruncado.length - 1);
+          }
+          nomeExibidoPaciente = textoTruncado + '...';
+          larguraNomePaciente = fontNormalPaciente.widthOfTextAtSize(nomeExibidoPaciente, tamanhoFonteNomePaciente);
+        }
+        
+        ultimaPagina.drawText(nomeExibidoPaciente, {
           x: x2 + (larguraArea - larguraNomePaciente) / 2,
-          y: yLinhaAssinatura - 22,
-          size: 6,
-          color: rgb(0.5, 0.5, 0.5),
+          y: yNomeAbaixoLinha, // Nome abaixo da linha
+          size: tamanhoFonteNomePaciente,
+          color: rgb(0.3, 0.3, 0.3),
+          font: fontNormalPaciente,
         });
       }
       if (cpfPaciente) {
         const textoCpfPaciente = `CPF: ${cpfPaciente}`;
-        const larguraCpfPaciente = textoCpfPaciente.length * 3.5;
+        const larguraCpfPaciente = textoCpfPaciente.length * 3.0;
         ultimaPagina.drawText(textoCpfPaciente, {
           x: x2 + (larguraArea - larguraCpfPaciente) / 2,
-          y: yLinhaAssinatura - 32,
-          size: 6,
-          color: rgb(0.5, 0.5, 0.5),
+          y: yDadosAbaixoLinha, // CPF abaixo da linha
+          size: 7,
+          color: rgb(0.4, 0.4, 0.4),
         });
       }
       
@@ -940,24 +1096,48 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
         color: rgb(0.4, 0.4, 0.4),
       });
       const textoGrupoIM = 'ASSINATURA GRUPO IM';
-      const larguraTextoGrupoIM = textoGrupoIM.length * 4.5;
+      const fontBoldGrupoIM = await pdfDoc.embedFont('Helvetica-Bold');
+      const larguraTextoGrupoIM = fontBoldGrupoIM.widthOfTextAtSize(textoGrupoIM, 9);
       ultimaPagina.drawText(textoGrupoIM, {
         x: x3 + (larguraArea - larguraTextoGrupoIM) / 2,
-        y: yLinhaAssinatura - 12,
-        size: 7,
+        y: yTitulo,
+        size: 9,
+        color: rgb(0.2, 0.2, 0.2),
+        font: fontBoldGrupoIM,
+      });
+      
+      const nomeGrupoIM = 'INVESTMONEY S.A.';
+      const fontNormalGrupoIM = await pdfDoc.embedFont('Helvetica');
+      const tamanhoFonteNomeGrupoIM = 6.5;
+      const larguraDisponivelNomeGrupoIM = larguraArea - 10;
+      let nomeExibidoGrupoIM = nomeGrupoIM;
+      let larguraNomeGrupoIM = fontNormalGrupoIM.widthOfTextAtSize(nomeExibidoGrupoIM, tamanhoFonteNomeGrupoIM);
+      
+      // Truncar se necessário
+      if (larguraNomeGrupoIM > larguraDisponivelNomeGrupoIM) {
+        let textoTruncado = nomeExibidoGrupoIM;
+        while (fontNormalGrupoIM.widthOfTextAtSize(textoTruncado + '...', tamanhoFonteNomeGrupoIM) > larguraDisponivelNomeGrupoIM && textoTruncado.length > 0) {
+          textoTruncado = textoTruncado.substring(0, textoTruncado.length - 1);
+        }
+        nomeExibidoGrupoIM = textoTruncado + '...';
+        larguraNomeGrupoIM = fontNormalGrupoIM.widthOfTextAtSize(nomeExibidoGrupoIM, tamanhoFonteNomeGrupoIM);
+      }
+      
+      ultimaPagina.drawText(nomeExibidoGrupoIM, {
+        x: x3 + (larguraArea - larguraNomeGrupoIM) / 2,
+        y: yNomeAbaixoLinha, // Nome abaixo da linha
+        size: tamanhoFonteNomeGrupoIM,
         color: rgb(0.3, 0.3, 0.3),
+        font: fontNormalGrupoIM,
       });
-      ultimaPagina.drawText('INVESTMONEY S.A.', {
-        x: x3 + (larguraArea - 'INVESTMONEY S.A.'.length * 3.5) / 2,
-        y: yLinhaAssinatura - 22,
-        size: 6,
-        color: rgb(0.5, 0.5, 0.5),
-      });
-      ultimaPagina.drawText('CNPJ: 41.267.440/0001-97', {
-        x: x3 + (larguraArea - 'CNPJ: 41.267.440/0001-97'.length * 3.5) / 2,
-        y: yLinhaAssinatura - 32,
-        size: 6,
-        color: rgb(0.5, 0.5, 0.5),
+      
+      const cnpjGrupoIM = 'CNPJ: 41.267.440/0001-97';
+      const larguraCnpjGrupoIM = cnpjGrupoIM.length * 3.0;
+      ultimaPagina.drawText(cnpjGrupoIM, {
+        x: x3 + (larguraArea - larguraCnpjGrupoIM) / 2,
+        y: yDadosAbaixoLinha, // CNPJ abaixo da linha
+        size: 7,
+        color: rgb(0.4, 0.4, 0.4),
       });
       
       // Linha separadora antes do hash e data
@@ -1279,41 +1459,50 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
   };
   
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.7)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 10000,
-      padding: '1rem',
-      backdropFilter: 'blur(4px)'
-    }}>
+    <div 
+      className="modal-overlay-cadastro-completo"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: isMobile ? '0' : '1rem',
+        backdropFilter: 'blur(4px)',
+        overflow: 'hidden',
+        touchAction: 'none'
+      }}
+    >
       <div 
         ref={modalRef}
+        className="modal-cadastro-completo"
         style={{
           backgroundColor: 'white',
-          borderRadius: '16px',
+          borderRadius: isMobile ? '0' : '16px',
           maxWidth: '600px',
           width: '100%',
-          maxHeight: '110vh',
+          height: isMobile ? '100vh' : 'auto',
+          maxHeight: isMobile ? '100vh' : '90vh',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)'
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
+          position: 'relative'
         }}
       >
         {/* Header */}
         <div style={{
           background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-          padding: '2rem',
+          padding: isMobile ? '1.5rem' : '2rem',
           textAlign: 'center',
           color: 'white',
-          position: 'relative'
+          position: 'relative',
+          flexShrink: 0
         }}>
           {/* Botão de Logout */}
           <button
@@ -1371,7 +1560,12 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
         </div>
         
         {/* Indicador de progresso */}
-        <div className="cadastro-stepper">
+        <div 
+          className="cadastro-stepper"
+          style={{
+            flexShrink: 0
+          }}
+        >
           {/* Linhas conectoras */}
           {[1, 2].map((index) => (
             <div
@@ -1413,7 +1607,19 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
         </div>
         
         {/* Conteúdo */}
-        <div className="cadastro-form-content">
+        <div 
+          className="cadastro-form-content"
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            WebkitOverflowScrolling: 'touch',
+            overscrollBehavior: 'contain',
+            scrollBehavior: 'smooth',
+            padding: isMobile ? '1.5rem' : '2rem',
+            touchAction: 'pan-y'
+          }}
+        >
           {/* Passo 1: CPF */}
           {passoAtual === 1 && (
             <div>
@@ -1771,7 +1977,11 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
                         position: 'relative',
                         width: '100%',
                         height: `${assinaturaCanvasSize.height}px`,
-                        touchAction: 'none'
+                        touchAction: 'none',
+                        WebkitTouchCallout: 'none',
+                        WebkitUserSelect: 'none',
+                        userSelect: 'none',
+                        padding: '0.5rem'
                       }}>
                         <SignatureCanvas
                           ref={(ref) => {
@@ -1786,12 +1996,18 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
                             style: {
                               width: '100%',
                               height: '100%',
-                              touchAction: 'none'
+                              touchAction: 'none',
+                              WebkitTouchCallout: 'none',
+                              WebkitUserSelect: 'none',
+                              userSelect: 'none',
+                              display: 'block'
                             }
                           }}
                           onEnd={() => setHasAssinatura(true)}
                           backgroundColor="white"
-                          penColor="#000000"
+                          penColor="black"
+                          throttle={0}
+                          velocityFilterWeight={0.7}
                         />
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>

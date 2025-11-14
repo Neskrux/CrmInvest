@@ -235,6 +235,37 @@
   touch-action: none;
   cursor: crosshair;
   width: 100%;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.signature-canvas {
+  touch-action: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  cursor: crosshair !important;
+}
+
+/* Melhorar suporte touch no mobile */
+@media (max-width: 768px) {
+  .signature-canvas {
+    touch-action: none !important;
+    -ms-touch-action: none !important;
+  }
+  
+  .signature-clinica-canvas {
+    position: relative;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .signature-clinica-canvas canvas {
+    touch-action: none !important;
+    -ms-touch-action: none !important;
+  }
 }
 
 .assinatura-clinica-controls {

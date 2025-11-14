@@ -4,6 +4,7 @@ import './App.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './components/Toast';
 import useBranding from './hooks/useBranding';
+import useDocumentacaoPendente from './hooks/useDocumentacaoPendente';
 import { HelpCircle } from 'lucide-react';
 import CadastroConsultor from './components/CadastroConsultor';
 import CadastroSucesso from './components/CadastroSucesso';
@@ -68,6 +69,58 @@ const ProtectedRoute = ({ children }) => {
   }
   
   return children;
+};
+
+// Componente para indicador de documentação pendente na sidebar
+const DocumentacaoPendenteIndicator = ({ children }) => {
+  const { isClinica } = useAuth();
+  const { temDocumentacaoPendente } = useDocumentacaoPendente();
+  
+  if (!isClinica || !temDocumentacaoPendente) {
+    return children;
+  }
+  
+  return (
+    <>
+      {React.cloneElement(children, {
+        children: (
+          <>
+            {children.props.children}
+            <span
+              style={{
+                position: 'absolute',
+                top: '10px',
+                right: '12px',
+                width: '18px',
+                height: '18px',
+                backgroundColor: '#ef4444',
+                color: 'white',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                boxShadow: '0 0 0 2px #ef4444',
+                animation: 'pulse 2s infinite',
+                zIndex: 10,
+                pointerEvents: 'none'
+              }}
+              title="Documentação pendente"
+            >
+              !
+            </span>
+          </>
+        )
+      })}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.8; transform: scale(1.1); }
+        }
+      `}</style>
+    </>
+  );
 };
 
 // Componente interno principal
@@ -883,21 +936,23 @@ const AppContent = () => {
 
           {/* Meus Documentos - Apenas para clínicas */}
           {user.tipo === 'clinica' && (
-            <div className="nav-item">
-              <Link
-                to="/meus-documentos"
-                className={`nav-link ${activeTab === 'meus-documentos' ? 'active' : ''}`}
-                onClick={handleMobileNavigation}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14,2 14,8 20,8"/>
-                  <line x1="12" y1="18" x2="12" y2="12"/>
-                  <line x1="9" y1="15" x2="15" y2="15"/>
-                </svg>
-                Meus Documentos
-              </Link>
-            </div>
+            <DocumentacaoPendenteIndicator>
+              <div className="nav-item" style={{ position: 'relative' }}>
+                <Link
+                  to="/meus-documentos"
+                  className={`nav-link ${activeTab === 'meus-documentos' ? 'active' : ''}`}
+                  onClick={handleMobileNavigation}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14,2 14,8 20,8"/>
+                    <line x1="12" y1="18" x2="12" y2="12"/>
+                    <line x1="9" y1="15" x2="15" y2="15"/>
+                  </svg>
+                  Meus Documentos
+                </Link>
+              </div>
+            </DocumentacaoPendenteIndicator>
           )}
 
           {/* Materiais de Apoio - Não mostrar para clínicas, pacientes e incorporadora */}
@@ -1132,7 +1187,7 @@ const AppContent = () => {
 
       <main className="main-content">
         <header className="main-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '7.5rem' : '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '14.5rem' : '1.5rem' }}>
             {isMobile && (
               <button
                 onClick={() => setShowMobileSidebar(!showMobileSidebar)}

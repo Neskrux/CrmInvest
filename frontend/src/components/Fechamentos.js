@@ -634,6 +634,34 @@ const Fechamentos = () => {
     if (fechamentoParaGerar) {
       const valorValidado = parseInt(numeroParcelasInput) || fechamentoParaGerar.numero_parcelas || 1;
       if (valorValidado >= 1 && valorValidado <= 100) {
+        // Validar que a data de vencimento seja pelo menos 20 dias no futuro
+        if (!fechamentoParaGerar.vencimento) {
+          showErrorToast('O fechamento precisa ter uma data de vencimento cadastrada para gerar boletos.');
+          return;
+        }
+        
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        
+        // Criar data de vencimento a partir da string (formato YYYY-MM-DD)
+        // Usar construtor local para evitar problemas de timezone
+        const [anoVenc, mesVenc, diaVenc] = fechamentoParaGerar.vencimento.split('-').map(Number);
+        const dataVencimento = new Date(anoVenc, mesVenc - 1, diaVenc, 0, 0, 0, 0);
+        
+        // Calcular data mínima (hoje + 20 dias)
+        const dataMinima = new Date(hoje);
+        dataMinima.setDate(dataMinima.getDate() + 20);
+        dataMinima.setHours(0, 0, 0, 0);
+        
+        // Comparar apenas as datas (sem horas) - aceitar data mínima exata ou posterior
+        // A data mínima deve ser aceita (>=), então rejeitamos apenas se for menor
+        const diffDias = Math.floor((dataVencimento.getTime() - dataMinima.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDias < 0) {
+          const dataMinimaFormatada = dataMinima.toLocaleDateString('pt-BR');
+          showErrorToast(`A data de vencimento deve ser pelo menos 20 dias no futuro. Data mínima: ${dataMinimaFormatada}`);
+          return;
+        }
+        
         gerarBoletosFechamento(fechamentoParaGerar.id, valorValidado);
       } else {
         showErrorToast('Número de parcelas deve ser entre 1 e 100');
@@ -3830,12 +3858,6 @@ const Fechamentos = () => {
                                     const match = boleto.erro_criacao.match(/NOSSO_NUMERO_DUPLICADO_DA_API: (\d+)/);
                                     if (match) nossoNumero = match[1];
                                   }
-                                  
-                                  return nossoNumero ? (
-                                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
-                                      Nosso Número: {nossoNumero}
-                                    </div>
-                                  ) : null;
                                 })()}
                               </div>
                               

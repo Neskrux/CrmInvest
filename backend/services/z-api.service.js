@@ -175,29 +175,182 @@ class ZApiService {
       ? new Date(boleto.data_vencimento).toLocaleDateString('pt-BR')
       : 'Não informado';
 
-    const nossoNumero = boleto.nosso_numero || 'N/A';
-    const linhaDigitavel = boleto.linha_digitavel || 'N/A';
+    const mensagem = `*Boleto Pendente de Pagamento*
 
-    const mensagem = `🔔 *Lembrete de Pagamento*
-
-Olá, ${paciente?.nome || 'Cliente'}!
+Olá, ${paciente?.nome || 'Cliente do Grupo IM'}!
 
 Você possui um boleto pendente de pagamento:
 
-📋 *Detalhes do Boleto:*
+*Detalhes do Boleto:*
 • Valor: ${valorFormatado}
 • Vencimento: ${dataVencimento}
-• Nosso Número: ${nossoNumero}
 
-💳 *Linha Digitável:*
-${linhaDigitavel}
+*Acesse seu boleto:*
+${boleto.url_boleto}
 
 ⚠️ *Importante:* Por favor, efetue o pagamento até a data de vencimento para evitar juros e multa.
 
 Em caso de dúvidas, entre em contato conosco.
 
 Atenciosamente,
-Equipe InvestMoney`;
+Grupo IM`;
+
+    return mensagem;
+  }
+
+  /**
+   * Formatar mensagem de boleto para 3 dias antes do vencimento
+   * @param {Object} boleto - Dados do boleto
+   * @param {Object} paciente - Dados do paciente
+   * @returns {string} Mensagem formatada
+   */
+  formatarMensagem3DiasAntes(boleto, paciente) {
+    const valorFormatado = new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(boleto.valor || 0);
+
+    // Formatar data corretamente (evitar problema de timezone)
+    let dataVencimento = 'Não informado';
+    if (boleto.data_vencimento) {
+      if (typeof boleto.data_vencimento === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(boleto.data_vencimento)) {
+        const [ano, mes, dia] = boleto.data_vencimento.split('-').map(Number);
+        const dataLocal = new Date(ano, mes - 1, dia);
+        dataVencimento = dataLocal.toLocaleDateString('pt-BR');
+      } else {
+        dataVencimento = new Date(boleto.data_vencimento).toLocaleDateString('pt-BR');
+      }
+    }
+
+    const urlBoleto = boleto.url_boleto || 'N/A';
+
+    const mensagem = `*Boleto Pendente de Pagamento - 3 Dias*
+
+Olá, ${paciente?.nome || 'Cliente do Grupo IM'}!
+
+Lembramos que você possui um boleto com vencimento em 3 dias:
+
+*Detalhes do Boleto:*
+• Valor: ${valorFormatado}
+• Vencimento: ${dataVencimento}
+
+*Acesse seu boleto:*
+${urlBoleto}
+
+⚠️ *Importante:* Efetue o pagamento até a data de vencimento para evitar juros e multa.
+
+Em caso de dúvidas, entre em contato conosco.
+
+Atenciosamente,
+Grupo IM`;
+
+    return mensagem;
+  }
+
+  /**
+   * Formatar mensagem de boleto para o dia do vencimento
+   * @param {Object} boleto - Dados do boleto
+   * @param {Object} paciente - Dados do paciente
+   * @returns {string} Mensagem formatada
+   */
+  formatarMensagemNoDia(boleto, paciente) {
+    const valorFormatado = new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(boleto.valor || 0);
+
+    // Formatar data corretamente (evitar problema de timezone)
+    let dataVencimento = 'Não informado';
+    if (boleto.data_vencimento) {
+      if (typeof boleto.data_vencimento === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(boleto.data_vencimento)) {
+        const [ano, mes, dia] = boleto.data_vencimento.split('-').map(Number);
+        const dataLocal = new Date(ano, mes - 1, dia);
+        dataVencimento = dataLocal.toLocaleDateString('pt-BR');
+      } else {
+        dataVencimento = new Date(boleto.data_vencimento).toLocaleDateString('pt-BR');
+      }
+    }
+
+    const urlBoleto = boleto.url_boleto || 'N/A';
+
+    const mensagem = `*Boleto Pendente de Pagamento - Vencimento Hoje*
+
+Olá, ${paciente?.nome || 'Cliente do Grupo IM'}!
+
+*Atenção:* Seu boleto vence HOJE!
+
+*Detalhes do Boleto:*
+• Valor: ${valorFormatado}
+• Vencimento: ${dataVencimento}
+
+*Acesse seu boleto:*
+${urlBoleto}
+
+⚠️ *Importante:* Efetue o pagamento hoje para evitar juros e multa.
+
+Em caso de dúvidas, entre em contato conosco.
+
+Atenciosamente,
+Grupo IM`;
+
+    return mensagem;
+  }
+
+  /**
+   * Formatar mensagem de boleto vencido
+   * @param {Object} boleto - Dados do boleto
+   * @param {Object} paciente - Dados do paciente
+   * @returns {string} Mensagem formatada
+   */
+  formatarMensagemVencido(boleto, paciente) {
+    const valorFormatado = new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(boleto.valor || 0);
+
+    // Formatar data corretamente (evitar problema de timezone)
+    let dataVencimento = 'Não informado';
+    let diasAtraso = 0;
+    
+    if (boleto.data_vencimento) {
+      // Calcular dias de atraso usando timezone local
+      const hoje = new Date();
+      const hojeLocal = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+      
+      let vencimentoLocal;
+      if (typeof boleto.data_vencimento === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(boleto.data_vencimento)) {
+        const [ano, mes, dia] = boleto.data_vencimento.split('-').map(Number);
+        vencimentoLocal = new Date(ano, mes - 1, dia);
+        dataVencimento = vencimentoLocal.toLocaleDateString('pt-BR');
+      } else {
+        const vencimento = new Date(boleto.data_vencimento);
+        vencimentoLocal = new Date(vencimento.getFullYear(), vencimento.getMonth(), vencimento.getDate());
+        dataVencimento = vencimentoLocal.toLocaleDateString('pt-BR');
+      }
+      
+      diasAtraso = Math.floor((hojeLocal - vencimentoLocal) / (1000 * 60 * 60 * 24));
+    }
+    const urlBoleto = boleto.url_boleto || 'N/A';
+
+    const mensagem = `*Boleto Vencido - Ação Necessária*
+
+Olá, ${paciente?.nome || 'Cliente do Grupo IM'}!
+
+*Atenção:* Seu boleto está VENCIDO há ${diasAtraso} ${diasAtraso === 1 ? 'dia' : 'dias'}!
+
+*Detalhes do Boleto:*
+• Valor: ${valorFormatado}
+• Vencimento: ${dataVencimento}
+
+*Acesse seu boleto:*
+${urlBoleto}
+
+⚠️ *Importante:* Efetue o pagamento o quanto antes para evitar maiores juros e multa.
+
+Em caso de dúvidas, entre em contato conosco.
+
+Atenciosamente,
+Grupo IM`;
 
     return mensagem;
   }

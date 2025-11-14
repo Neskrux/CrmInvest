@@ -848,22 +848,6 @@
   color: #1a1d23;
 }
 
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 2rem;
-  color: #6b7280;
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  transition: all 0.2s;
-}
-
 .close-btn:hover {
   background-color: #f3f4f6;
   color: #1a1d23;

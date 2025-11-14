@@ -5889,7 +5889,7 @@ const Pacientes = () => {
             </div>
 
             {isClinica && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem', padding: '1rem 1.5rem' }}>
                 <div style={{ fontSize: '0.85rem', color: '#4b5563', fontWeight: 500 }}>
                   {selectedPacientesAntecipacao.length === 0
                     ? 'Selecione os pacientes com fechamento aprovado para solicitar antecipação.'
@@ -5979,7 +5979,7 @@ const Pacientes = () => {
                             )}
                             <th className="col-fechamento-nome" style={{ minWidth: '180px', width: '20%' }}>Nome</th>
                             <th className="col-fechamento-antecipacao" style={{ minWidth: '120px' }}>
-                              {isClinica ? 'Antecipação atual' : 'Telefone'}
+                              {isClinica ? 'Antecipação' : 'Telefone'}
                             </th>
                             <th className="col-fechamento-valor" style={{ minWidth: '100px' }}>Valor</th>
                             <th className="col-fechamento-status" style={{ minWidth: '120px' }}>Status</th>

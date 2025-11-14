@@ -2512,7 +2512,7 @@ const visualizarBoleto = async (req, res) => {
       const elemento = document.querySelector('.boleto-wrapper');
       const opt = {
         margin: 0,
-        filename: 'boleto_${boleto.nosso_numero || boleto.numero_documento || 'download'}.pdf',
+        filename: 'boleto_${boleto.numero_documento || boleto.nosso_numero || 'download'}.pdf',
         image: { type: 'jpeg', quality: 1 },
         html2canvas: { scale: 4, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }

@@ -40,6 +40,8 @@ const GestaoBoletosAdmin = () => {
   const [loading, setLoading] = useState(false);
   const [filtros, setFiltros] = useState(FILTROS_PADRAO);
   const [filtrosIniciaisAplicados, setFiltrosIniciaisAplicados] = useState(false);
+  const [sincronizandoTodos, setSincronizandoTodos] = useState(false);
+  const [sincronizandoBoletoId, setSincronizandoBoletoId] = useState(null);
   
   const [showImportArquivoModal, setShowImportArquivoModal] = useState(false);
   const [pacientes, setPacientes] = useState([]);
@@ -283,6 +285,29 @@ const GestaoBoletosAdmin = () => {
       return;
     }
 
+    // Validar que a data de vencimento seja pelo menos 20 dias no futuro
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    
+    // Criar data de vencimento a partir da string (formato YYYY-MM-DD)
+    // Usar construtor local para evitar problemas de timezone
+    const [anoVenc, mesVenc, diaVenc] = importArquivoData.data_vencimento.split('-').map(Number);
+    const dataVencimento = new Date(anoVenc, mesVenc - 1, diaVenc, 0, 0, 0, 0);
+    
+    // Calcular data mínima (hoje + 20 dias)
+    const dataMinima = new Date(hoje);
+    dataMinima.setDate(dataMinima.getDate() + 20);
+    dataMinima.setHours(0, 0, 0, 0);
+    
+    // Comparar apenas as datas (sem horas) - aceitar data mínima exata ou posterior
+    // A data mínima deve ser aceita (>=), então rejeitamos apenas se for menor
+    const diffDias = Math.floor((dataVencimento.getTime() - dataMinima.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDias < 0) {
+      const dataMinimaFormatada = dataMinima.toLocaleDateString('pt-BR');
+      showErrorToast(`A data de vencimento deve ser pelo menos 20 dias no futuro. Data mínima: ${dataMinimaFormatada}`);
+      return;
+    }
+
     if (!importArquivoData.valor) {
       showErrorToast('Informe o valor do boleto');
       return;
@@ -334,6 +359,71 @@ const GestaoBoletosAdmin = () => {
     }
   };
 
+
+  // Sincronizar status de um boleto específico
+  const sincronizarBoleto = async (boletoId) => {
+    try {
+      setSincronizandoBoletoId(boletoId);
+      // Usar endpoint específico para admin - usa o ID do boleto_gestao
+      const response = await makeRequest(`/boletos-gestao/${boletoId}/sincronizar`, {
+        method: 'GET'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || errorData.message || 'Erro ao sincronizar boleto');
+      }
+
+      showSuccessToast('Status atualizado com sucesso!');
+      // Recarregar lista de boletos
+      await buscarBoletos();
+    } catch (error) {
+      console.error('Erro ao sincronizar boleto:', error);
+      showErrorToast(error.message || 'Erro ao atualizar status');
+    } finally {
+      setSincronizandoBoletoId(null);
+    }
+  };
+
+  // Sincronizar todos os boletos pendentes/vencidos
+  const sincronizarTodos = async () => {
+    // Filtrar apenas boletos que podem ser sincronizados (têm boleto_caixa_id e estão pendentes/vencidos)
+    const boletosParaSincronizar = boletos.filter(b => 
+      b.boleto_caixa_id && 
+      (b.status === 'pendente' || b.status === 'vencido')
+    );
+
+    if (boletosParaSincronizar.length === 0) {
+      showErrorToast('Nenhum boleto disponível para sincronização');
+      return;
+    }
+
+    try {
+      setSincronizandoTodos(true);
+      
+      // Usar endpoint específico para admin que sincroniza todos de uma vez
+      const response = await makeRequest('/boletos-gestao/sincronizar-todos', {
+        method: 'POST'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || errorData.message || 'Erro ao sincronizar boletos');
+      }
+
+      const data = await response.json();
+      
+      // Recarregar lista de boletos
+      await buscarBoletos();
+
+      showSuccessToast(data.message || `${data.sincronizados || 0} boleto(s) sincronizado(s) com sucesso!`);
+    } catch (error) {
+      console.error('Erro ao sincronizar boletos:', error);
+      showErrorToast(error.message || 'Erro ao sincronizar boletos');
+    } finally {
+      setSincronizandoTodos(false);
+    }
+  };
 
   // Atualizar status do boleto
   const handleAtualizarStatus = async (boletoId, novoStatus) => {
@@ -431,7 +521,30 @@ const GestaoBoletosAdmin = () => {
       <div className="header">
         <h1>Gestão de Boletos</h1>
         {podeGerenciar && (
-          <div className="header-actions">
+          <div className="header-actions" style={{ display: 'flex', gap: '0.5rem' }}>
+            {boletos.length > 0 && boletos.some(b => b.boleto_caixa_id && (b.status === 'pendente' || b.status === 'vencido')) && (
+              <button
+                onClick={sincronizarTodos}
+                disabled={sincronizandoTodos}
+                className="btn btn-secondary"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                {sincronizandoTodos ? (
+                  <>
+                    <div className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }}></div>
+                    Sincronizando...
+                  </>
+                ) : (
+                  <>
+                    🔄 Atualizar Status
+                  </>
+                )}
+              </button>
+            )}
             <button 
               className="btn btn-primary"
               onClick={() => setShowImportArquivoModal(true)}
@@ -701,6 +814,30 @@ const GestaoBoletosAdmin = () => {
                             Ver
                           </a>
                         )}
+                        {boleto.boleto_caixa_id && (boleto.status === 'pendente' || boleto.status === 'vencido') && (
+                          <button
+                            onClick={() => sincronizarBoleto(boleto.id)}
+                            disabled={sincronizandoBoletoId === boleto.id || sincronizandoTodos}
+                            className="btn btn-sm"
+                            style={{
+                              backgroundColor: sincronizandoBoletoId === boleto.id ? '#9ca3af' : '#3b82f6',
+                              color: 'white',
+                              border: 'none',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem'
+                            }}
+                          >
+                            {sincronizandoBoletoId === boleto.id ? (
+                              <>
+                                <div className="spinner" style={{ width: '12px', height: '12px', borderWidth: '2px' }}></div>
+                                Atualizando...
+                              </>
+                            ) : (
+                              <>🔄 Atualizar</>
+                            )}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -790,6 +927,30 @@ const GestaoBoletosAdmin = () => {
                       >
                         Ver Boleto
                       </a>
+                    )}
+                    {boleto.boleto_caixa_id && (boleto.status === 'pendente' || boleto.status === 'vencido') && (
+                      <button
+                        onClick={() => sincronizarBoleto(boleto.id)}
+                        disabled={sincronizandoBoletoId === boleto.id || sincronizandoTodos}
+                        className="btn btn-sm"
+                        style={{
+                          backgroundColor: sincronizandoBoletoId === boleto.id ? '#9ca3af' : '#3b82f6',
+                          color: 'white',
+                          border: 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem'
+                        }}
+                      >
+                        {sincronizandoBoletoId === boleto.id ? (
+                          <>
+                            <div className="spinner" style={{ width: '12px', height: '12px', borderWidth: '2px' }}></div>
+                            Atualizando...
+                          </>
+                        ) : (
+                          <>🔄 Atualizar</>
+                        )}
+                      </button>
                     )}
                   </div>
                 </div>

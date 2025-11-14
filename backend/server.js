@@ -491,6 +491,26 @@ server.listen(PORT, async () => {
   } catch (error) {
     console.log('⚠️  Erro ao conectar com Supabase:', error.message);
   }
+
+  // Inicializar job de envio de notificações automáticas de boletos
+  try {
+    const enviadorNotificacoes = require('./jobs/enviar-notificacoes-boletos');
+    // Executar a cada 6 horas (pode ser ajustado conforme necessidade)
+    enviadorNotificacoes.iniciarScheduler(6);
+    console.log('✅ Job de notificações automáticas de boletos iniciado');
+  } catch (error) {
+    console.error('⚠️  Erro ao iniciar job de notificações:', error.message);
+  }
+
+  // Inicializar job de atualização de status de boletos
+  try {
+    const atualizadorStatus = require('./jobs/atualizar-status-boletos');
+    // Executar a cada 6 horas (mesmo intervalo das notificações)
+    atualizadorStatus.iniciarScheduler(6);
+    console.log('✅ Job de atualização de status de boletos iniciado');
+  } catch (error) {
+    console.error('⚠️  Erro ao iniciar job de atualização de status:', error.message);
+  }
 }); 
 
 module.exports = { app, server, io };

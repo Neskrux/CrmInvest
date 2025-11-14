@@ -7,8 +7,6 @@ const MeusBoletosPaciente = () => {
   const { success: showSuccessToast, error: showErrorToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [boletos, setBoletos] = useState([]);
-  const [sincronizando, setSincronizando] = useState(false);
-  const [sincronizandoTodos, setSincronizandoTodos] = useState(false);
 
   useEffect(() => {
     fetchBoletos();
@@ -35,52 +33,6 @@ const MeusBoletosPaciente = () => {
     }
   };
 
-  const sincronizarBoleto = async (boletoId) => {
-    try {
-      setSincronizando(true);
-      const response = await makeRequest(`/paciente/boletos/sincronizar/${boletoId}`, {
-        method: 'GET'
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Erro ao sincronizar boleto');
-      }
-
-      showSuccessToast('Status atualizado com sucesso!');
-      // Recarregar lista de boletos
-      await fetchBoletos();
-    } catch (error) {
-      console.error('Erro ao sincronizar boleto:', error);
-      showErrorToast(error.message || 'Erro ao atualizar status');
-    } finally {
-      setSincronizando(false);
-    }
-  };
-
-  const sincronizarTodos = async () => {
-    try {
-      setSincronizandoTodos(true);
-      const response = await makeRequest('/paciente/boletos/sincronizar-todos', {
-        method: 'POST'
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Erro ao sincronizar boletos');
-      }
-
-      const data = await response.json();
-      showSuccessToast(data.message || 'Boletos sincronizados com sucesso!');
-      // Recarregar lista de boletos
-      await fetchBoletos();
-    } catch (error) {
-      console.error('Erro ao sincronizar todos os boletos:', error);
-      showErrorToast(error.message || 'Erro ao sincronizar boletos');
-    } finally {
-      setSincronizandoTodos(false);
-    }
-  };
 
   const formatarData = (data) => {
     if (!data) return '-';
@@ -128,35 +80,10 @@ const MeusBoletosPaciente = () => {
 
   return (
     <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', gap: '0.5rem' }}>
+      <div style={{ marginBottom: '2rem' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: '700', color: '#1a1d23', margin: 0 }}>
           Meus Boletos
         </h1>
-        {boletos.length > 0 && boletos.some(b => b.nosso_numero && (b.status === 'pendente' || b.status === 'vencido')) && (
-          <button
-            onClick={sincronizarTodos}
-            disabled={sincronizandoTodos}
-            style={{
-              padding: '0.5rem 1rem',
-              backgroundColor: sincronizandoTodos ? '#9ca3af' : '#1a1d23',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              cursor: sincronizandoTodos ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              if (!sincronizandoTodos) e.target.style.backgroundColor = '#374151';
-            }}
-            onMouseLeave={(e) => {
-              if (!sincronizandoTodos) e.target.style.backgroundColor = '#1a1d23';
-            }}
-          >
-            {sincronizandoTodos ? 'Sincronizando...' : '🔄 Atualizar Status'}
-          </button>
-        )}
       </div>
 
       {/* Resumo de boletos */}
@@ -265,7 +192,7 @@ const MeusBoletosPaciente = () => {
                 }}>
                   <div>
                     <h3 style={{ fontSize: '1.125rem', fontWeight: '700', color: '#1a1d23', margin: 0 }}>
-                      {boleto.nosso_numero ? `Boleto #${boleto.nosso_numero}` : `Boleto ${boleto.numero_documento}`}
+                      Boleto {boleto.numero_documento || boleto.id}
                     </h3>
                     <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>
                       Vencimento: {formatarData(boleto.data_vencimento)}
@@ -412,31 +339,6 @@ const MeusBoletosPaciente = () => {
                         }}
                       >
                         Copiar Linha Digitável
-                      </button>
-                    )}
-                    {boleto.nosso_numero && (boleto.status === 'pendente' || boleto.status === 'vencido') && (
-                      <button
-                        onClick={() => sincronizarBoleto(boleto.id)}
-                        disabled={sincronizando}
-                        style={{
-                          padding: '0.5rem 1rem',
-                          backgroundColor: sincronizando ? '#9ca3af' : '#3b82f6',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '6px',
-                          fontSize: '0.875rem',
-                          fontWeight: '600',
-                          cursor: sincronizando ? 'not-allowed' : 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!sincronizando) e.target.style.backgroundColor = '#2563eb';
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!sincronizando) e.target.style.backgroundColor = '#3b82f6';
-                        }}
-                      >
-                        {sincronizando ? '⏳' : '🔄'} Atualizar
                       </button>
                     )}
                   </div>
