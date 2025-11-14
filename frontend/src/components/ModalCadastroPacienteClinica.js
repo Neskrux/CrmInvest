@@ -32,6 +32,8 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
   const [pdfKey, setPdfKey] = useState(0); // Para forçar re-render do iframe
   const [hashExistente, setHashExistente] = useState(null); // Hash do fechamento existente
   const [dadosClinica, setDadosClinica] = useState(null); // Dados completos da clínica
+  const assinaturaCanvasContainerRef = useRef(null);
+  const [assinaturaCanvasSize, setAssinaturaCanvasSize] = useState({ width: 400, height: 150 });
   
   // Log quando componente é montado
   useEffect(() => {
@@ -151,14 +153,41 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
     'PA': ['Belém', 'Ananindeua', 'Santarém', 'Marabá', 'Parauapebas', 'Castanhal', 'Abaetetuba']
   };
   
+  // Ajustar dimensões do canvas de assinatura dinamicamente
+  const ajustarDimensoesCanvasAssinatura = () => {
+    if (!assinaturaCanvasContainerRef.current) return;
+    const { width } = assinaturaCanvasContainerRef.current.getBoundingClientRect();
+    if (!width) return;
+
+    const novoWidth = Math.round(width);
+    const novoHeight = Math.round(Math.max(120, Math.min(220, width * 0.4))); // Mantém proporção aproximada
+
+    setAssinaturaCanvasSize(prev => {
+      if (prev.width === novoWidth && prev.height === novoHeight) return prev;
+      return { width: novoWidth, height: novoHeight };
+    });
+  };
+
   // Detectar mudanças no tamanho da tela
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      ajustarDimensoesCanvasAssinatura();
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Ajustar dimensões quando o canvas for exibido
+  useEffect(() => {
+    if (mostrarCanvasAssinatura) {
+      // Ajustar dimensões ao abrir o canvas
+      setTimeout(() => {
+        ajustarDimensoesCanvasAssinatura();
+      }, 0);
+    }
+  }, [mostrarCanvasAssinatura]);
   
   // Formatar telefone (mesma lógica do modal antigo)
   const formatarTelefone = (valor) => {
@@ -1929,24 +1958,31 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
                           <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#1e293b' }}>
                             Desenhe sua assinatura:
                           </label>
-                          <div 
+                          <div
+                            ref={assinaturaCanvasContainerRef}
                             style={{
-                              border: '2px solid #d1d5db',
+                              border: '2px solid #e2e8f0',
                               borderRadius: '8px',
-                              backgroundColor: 'white',
-                              padding: '0.5rem',
+                              backgroundColor: '#fff',
+                              position: 'relative',
+                              width: '100%',
+                              height: `${assinaturaCanvasSize.height}px`,
                               touchAction: 'none',
                               WebkitTouchCallout: 'none',
                               WebkitUserSelect: 'none',
                               userSelect: 'none',
-                              position: 'relative'
+                              padding: '0.5rem'
                             }}
                           >
                             <SignatureCanvas
-                              ref={(ref) => setAssinaturaRef(ref)}
+                              ref={(ref) => {
+                                if (ref) {
+                                  setAssinaturaRef(ref);
+                                }
+                              }}
                               canvasProps={{
-                                width: 400,
-                                height: 150,
+                                width: assinaturaCanvasSize.width,
+                                height: assinaturaCanvasSize.height,
                                 className: 'signature-canvas',
                                 style: {
                                   width: '100%',
