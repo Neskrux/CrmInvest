@@ -2,6 +2,7 @@ const { supabaseAdmin } = require('../config/database');
 const { criarBoletosCaixa } = require('../utils/caixa-boletos.helper');
 const { STORAGE_BUCKET_DOCUMENTOS } = require('../config/constants');
 const { uploadToSupabase } = require('../middleware/upload');
+const caixaBoletoService = require('../services/caixa-boleto.service');
 
 // GET /api/boletos-gestao - Listar boletos com filtros
 const listarBoletos = async (req, res) => {
@@ -923,6 +924,393 @@ const excluirBoleto = async (req, res) => {
   }
 };
 
+// GET /api/boletos-gestao/:id/sincronizar - Sincronizar status de um boleto específico (admin)
+const sincronizarBoleto = async (req, res) => {
+  try {
+    // Verificar se é admin ou consultor interno
+    if (req.user.tipo !== 'admin' && req.user.tipo !== 'consultor_interno') {
+      return res.status(403).json({ error: 'Acesso negado. Apenas administradores podem sincronizar boletos.' });
+    }
+
+    const { id } = req.params;
+    const boletoGestaoId = parseInt(id);
+
+    // Buscar boleto na tabela boletos_gestao
+    const { data: boletoGestao, error: boletoGestaoError } = await supabaseAdmin
+      .from('boletos_gestao')
+      .select('*')
+      .eq('id', boletoGestaoId)
+      .single();
+
+    if (boletoGestaoError || !boletoGestao) {
+      return res.status(404).json({ error: 'Boleto não encontrado' });
+    }
+
+    // Verificar se tem boleto_caixa_id
+    if (!boletoGestao.boleto_caixa_id) {
+      return res.status(400).json({ 
+        error: 'Este boleto não foi gerado na Caixa ainda. Não é possível sincronizar.' 
+      });
+    }
+
+    // Buscar boleto na tabela boletos_caixa
+    const { data: boletoCaixa, error: boletoCaixaError } = await supabaseAdmin
+      .from('boletos_caixa')
+      .select('*')
+      .eq('id', boletoGestao.boleto_caixa_id)
+      .single();
+
+    if (boletoCaixaError || !boletoCaixa) {
+      return res.status(404).json({ error: 'Boleto da Caixa não encontrado' });
+    }
+
+    // Validar se o boleto foi gerado na Caixa (precisa ter nosso_numero para consultar na API)
+    if (!boletoCaixa.nosso_numero || !boletoCaixa.id_beneficiario) {
+      return res.status(400).json({ 
+        error: 'Este boleto ainda não foi gerado na Caixa. O nosso número é necessário para sincronização.' 
+      });
+    }
+
+    // Consultar status na API Caixa
+    try {
+      const dadosBoleto = await caixaBoletoService.consultarBoleto(
+        boletoCaixa.id_beneficiario,
+        boletoCaixa.nosso_numero
+      );
+
+      // Determinar status baseado na situação retornada pela Caixa
+      let status = 'pendente';
+      const situacaoUpper = (dadosBoleto.situacao || '').toUpperCase();
+      if (situacaoUpper === 'PAGO' || 
+          situacaoUpper === 'LIQUIDADO' || 
+          situacaoUpper.includes('PAGO') || 
+          situacaoUpper === 'TITULO JA PAGO NO DIA') {
+        status = 'pago';
+      } else if (situacaoUpper === 'BAIXADO' || situacaoUpper === 'CANCELADO') {
+        status = 'cancelado';
+      } else {
+        // Verificar se está vencido baseado na data
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        const vencimento = dadosBoleto.data_vencimento ? new Date(dadosBoleto.data_vencimento) : null;
+        if (vencimento) {
+          vencimento.setHours(0, 0, 0, 0);
+          if (vencimento < hoje) {
+            status = 'vencido';
+          } else {
+            status = 'pendente';
+          }
+        }
+      }
+
+      // Converter formato da data da Caixa para timestamp válido do PostgreSQL
+      let dataHoraPagamentoFormatada = null;
+      if (dadosBoleto.data_hora_pagamento) {
+        const dataHoraCaixa = dadosBoleto.data_hora_pagamento;
+        if (dataHoraCaixa.includes('-') && dataHoraCaixa.includes('.')) {
+          const partes = dataHoraCaixa.split('-');
+          if (partes.length >= 4) {
+            const data = `${partes[0]}-${partes[1]}-${partes[2]}`;
+            const hora = partes[3].replace(/\./g, ':');
+            dataHoraPagamentoFormatada = `${data} ${hora}`;
+          }
+        } else {
+          dataHoraPagamentoFormatada = dataHoraCaixa;
+        }
+      }
+
+      // Atualizar boleto_caixa no banco
+      const updateDataCaixa = {
+        situacao: dadosBoleto.situacao || boletoCaixa.situacao,
+        status: status,
+        valor_pago: dadosBoleto.valor_pago || boletoCaixa.valor_pago,
+        data_hora_pagamento: dataHoraPagamentoFormatada || boletoCaixa.data_hora_pagamento,
+        sincronizado_em: new Date().toISOString()
+      };
+
+      // Atualizar campos se retornados pela API
+      if (dadosBoleto.codigo_barras) updateDataCaixa.codigo_barras = dadosBoleto.codigo_barras;
+      if (dadosBoleto.linha_digitavel) updateDataCaixa.linha_digitavel = dadosBoleto.linha_digitavel;
+      if (dadosBoleto.url) updateDataCaixa.url = dadosBoleto.url;
+      if (dadosBoleto.qrcode) updateDataCaixa.qrcode = dadosBoleto.qrcode;
+      if (dadosBoleto.url_qrcode) updateDataCaixa.url_qrcode = dadosBoleto.url_qrcode;
+
+      const { data: boletoCaixaAtualizado, error: updateCaixaError } = await supabaseAdmin
+        .from('boletos_caixa')
+        .update(updateDataCaixa)
+        .eq('id', boletoCaixa.id)
+        .select()
+        .single();
+
+      if (updateCaixaError) throw updateCaixaError;
+
+      // Atualizar também boletos_gestao
+      let dataPagamento = null;
+      if (boletoCaixaAtualizado.data_hora_pagamento) {
+        const dataHoraPagamento = boletoCaixaAtualizado.data_hora_pagamento;
+        if (dataHoraPagamento.length >= 10) {
+          dataPagamento = dataHoraPagamento.substring(0, 10);
+        }
+      }
+
+      const updateDataGestao = {
+        status: status,
+        valor_pago: boletoCaixaAtualizado.valor_pago,
+        data_pagamento: dataPagamento,
+        atualizado_em: new Date().toISOString()
+      };
+
+      const { error: updateGestaoError } = await supabaseAdmin
+        .from('boletos_gestao')
+        .update(updateDataGestao)
+        .eq('id', boletoGestaoId);
+
+      if (updateGestaoError) {
+        console.error(`⚠️ Erro ao atualizar boletos_gestao ${boletoGestaoId}:`, updateGestaoError);
+      }
+
+      res.json({
+        success: true,
+        message: 'Status sincronizado com sucesso',
+        boleto: {
+          id: boletoCaixaAtualizado.id,
+          nosso_numero: boletoCaixaAtualizado.nosso_numero,
+          situacao: boletoCaixaAtualizado.situacao,
+          status: boletoCaixaAtualizado.status,
+          valor_pago: boletoCaixaAtualizado.valor_pago,
+          data_hora_pagamento: boletoCaixaAtualizado.data_hora_pagamento
+        }
+      });
+
+    } catch (apiError) {
+      console.error('Erro ao consultar boleto na Caixa:', apiError);
+      
+      // Atualizar tentativa de sincronização
+      await supabaseAdmin
+        .from('boletos_caixa')
+        .update({
+          sincronizado_em: new Date().toISOString(),
+          erro_criacao: apiError.response?.data?.mensagem || apiError.message
+        })
+        .eq('id', boletoCaixa.id);
+
+      return res.status(500).json({
+        error: 'Erro ao sincronizar com API Caixa',
+        message: apiError.response?.data?.mensagem || apiError.message
+      });
+    }
+
+  } catch (error) {
+    console.error('Erro ao sincronizar status do boleto:', error);
+    res.status(500).json({ error: error.message || 'Erro interno do servidor' });
+  }
+};
+
+// POST /api/boletos-gestao/sincronizar-todos - Sincronizar todos os boletos pendentes/vencidos (admin)
+const sincronizarTodosBoletos = async (req, res) => {
+  try {
+    // Verificar se é admin ou consultor interno
+    if (req.user.tipo !== 'admin' && req.user.tipo !== 'consultor_interno') {
+      return res.status(403).json({ error: 'Acesso negado. Apenas administradores podem sincronizar boletos.' });
+    }
+
+    // Buscar todos os boletos_gestao que têm boleto_caixa_id e estão pendentes/vencidos
+    const { data: boletosGestao, error: boletosGestaoError } = await supabaseAdmin
+      .from('boletos_gestao')
+      .select('*')
+      .not('boleto_caixa_id', 'is', null)
+      .in('status', ['pendente', 'vencido']);
+
+    if (boletosGestaoError) throw boletosGestaoError;
+
+    if (!boletosGestao || boletosGestao.length === 0) {
+      return res.json({
+        success: true,
+        message: 'Nenhum boleto para sincronizar',
+        sincronizados: 0,
+        total: 0
+      });
+    }
+
+    // Buscar dados dos boletos_caixa relacionados
+    const boletoCaixaIds = boletosGestao.map(bg => bg.boleto_caixa_id).filter(Boolean);
+    
+    const { data: boletosCaixa, error: boletosCaixaError } = await supabaseAdmin
+      .from('boletos_caixa')
+      .select('id, nosso_numero, id_beneficiario, paciente_id')
+      .in('id', boletoCaixaIds);
+
+    if (boletosCaixaError) throw boletosCaixaError;
+
+    // Criar mapa de boleto_caixa_id -> boleto_caixa
+    const boletosCaixaMap = new Map();
+    (boletosCaixa || []).forEach(bc => {
+      boletosCaixaMap.set(bc.id, bc);
+    });
+
+    // Filtrar apenas os que têm nosso_numero e id_beneficiario
+    const boletosParaSincronizar = boletosGestao
+      .map(bg => {
+        const boletoCaixa = boletosCaixaMap.get(bg.boleto_caixa_id);
+        return { ...bg, boletoCaixa };
+      })
+      .filter(bg => bg.boletoCaixa && bg.boletoCaixa.nosso_numero && bg.boletoCaixa.id_beneficiario);
+
+    if (boletosParaSincronizar.length === 0) {
+      return res.json({
+        success: true,
+        message: 'Nenhum boleto válido para sincronizar',
+        sincronizados: 0,
+        total: 0
+      });
+    }
+
+    const resultados = {
+      sincronizados: 0,
+      erros: 0,
+      atualizados: []
+    };
+
+    // Sincronizar cada boleto (com delay para respeitar rate limit)
+    for (let i = 0; i < boletosParaSincronizar.length; i++) {
+      const boletoGestao = boletosParaSincronizar[i];
+      const boletoCaixa = boletoGestao.boletoCaixa;
+
+      try {
+        // Consultar status na API Caixa
+        const dadosBoleto = await caixaBoletoService.consultarBoleto(
+          boletoCaixa.id_beneficiario,
+          boletoCaixa.nosso_numero
+        );
+
+        // Determinar status baseado na situação retornada pela Caixa
+        let status = 'pendente';
+        const situacaoUpper = (dadosBoleto.situacao || '').toUpperCase();
+        if (situacaoUpper === 'PAGO' || 
+            situacaoUpper === 'LIQUIDADO' || 
+            situacaoUpper.includes('PAGO') || 
+            situacaoUpper === 'TITULO JA PAGO NO DIA') {
+          status = 'pago';
+        } else if (situacaoUpper === 'BAIXADO' || situacaoUpper === 'CANCELADO') {
+          status = 'cancelado';
+        } else {
+          const hoje = new Date();
+          hoje.setHours(0, 0, 0, 0);
+          const vencimento = dadosBoleto.data_vencimento ? new Date(dadosBoleto.data_vencimento) : null;
+          if (vencimento) {
+            vencimento.setHours(0, 0, 0, 0);
+            if (vencimento < hoje) {
+              status = 'vencido';
+            } else {
+              status = 'pendente';
+            }
+          }
+        }
+
+        // Converter formato da data da Caixa
+        let dataHoraPagamentoFormatada = null;
+        if (dadosBoleto.data_hora_pagamento) {
+          const dataHoraCaixa = dadosBoleto.data_hora_pagamento;
+          if (dataHoraCaixa.includes('-') && dataHoraCaixa.includes('.')) {
+            const partes = dataHoraCaixa.split('-');
+            if (partes.length >= 4) {
+              const data = `${partes[0]}-${partes[1]}-${partes[2]}`;
+              const hora = partes[3].replace(/\./g, ':');
+              dataHoraPagamentoFormatada = `${data} ${hora}`;
+            }
+          } else {
+            dataHoraPagamentoFormatada = dataHoraCaixa;
+          }
+        }
+
+        // Atualizar boleto_caixa
+        const updateDataCaixa = {
+          situacao: dadosBoleto.situacao || boletoCaixa.situacao,
+          status: status,
+          valor_pago: dadosBoleto.valor_pago || boletoCaixa.valor_pago,
+          data_hora_pagamento: dataHoraPagamentoFormatada || boletoCaixa.data_hora_pagamento,
+          sincronizado_em: new Date().toISOString()
+        };
+
+        if (dadosBoleto.codigo_barras) updateDataCaixa.codigo_barras = dadosBoleto.codigo_barras;
+        if (dadosBoleto.linha_digitavel) updateDataCaixa.linha_digitavel = dadosBoleto.linha_digitavel;
+        if (dadosBoleto.url) updateDataCaixa.url = dadosBoleto.url;
+        if (dadosBoleto.qrcode) updateDataCaixa.qrcode = dadosBoleto.qrcode;
+        if (dadosBoleto.url_qrcode) updateDataCaixa.url_qrcode = dadosBoleto.url_qrcode;
+
+        const { error: updateCaixaError } = await supabaseAdmin
+          .from('boletos_caixa')
+          .update(updateDataCaixa)
+          .eq('id', boletoCaixa.id);
+
+        if (updateCaixaError) throw updateCaixaError;
+
+        // Atualizar boletos_gestao
+        let dataPagamento = null;
+        if (dataHoraPagamentoFormatada && dataHoraPagamentoFormatada.length >= 10) {
+          dataPagamento = dataHoraPagamentoFormatada.substring(0, 10);
+        }
+
+        const updateDataGestao = {
+          status: status,
+          valor_pago: dadosBoleto.valor_pago,
+          data_pagamento: dataPagamento,
+          atualizado_em: new Date().toISOString()
+        };
+
+        const { error: updateGestaoError } = await supabaseAdmin
+          .from('boletos_gestao')
+          .update(updateDataGestao)
+          .eq('id', boletoGestao.id);
+
+        if (updateGestaoError) {
+          console.error(`⚠️ Erro ao atualizar boletos_gestao ${boletoGestao.id}:`, updateGestaoError);
+        }
+
+        resultados.sincronizados++;
+        resultados.atualizados.push({
+          id: boletoGestao.id,
+          nosso_numero: boletoCaixa.nosso_numero,
+          status_anterior: boletoGestao.status,
+          status_novo: status,
+          situacao: dadosBoleto.situacao
+        });
+
+        // Delay entre requisições (rate limit: 5 calls/segundo)
+        if (i < boletosParaSincronizar.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 250)); // 250ms = 4 calls/segundo
+        }
+
+      } catch (apiError) {
+        console.error(`Erro ao sincronizar boleto ${boletoGestao.id}:`, apiError);
+        resultados.erros++;
+        
+        // Atualizar tentativa de sincronização
+        await supabaseAdmin
+          .from('boletos_caixa')
+          .update({
+            sincronizado_em: new Date().toISOString(),
+            erro_criacao: apiError.response?.data?.mensagem || apiError.message
+          })
+          .eq('id', boletoCaixa.id);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `${resultados.sincronizados} boleto(s) sincronizado(s) com sucesso${resultados.erros > 0 ? `, ${resultados.erros} erro(s)` : ''}`,
+      sincronizados: resultados.sincronizados,
+      erros: resultados.erros,
+      total: boletosParaSincronizar.length,
+      atualizados: resultados.atualizados
+    });
+
+  } catch (error) {
+    console.error('Erro ao sincronizar todos os boletos:', error);
+    res.status(500).json({ error: error.message || 'Erro interno do servidor' });
+  }
+};
+
 module.exports = {
   listarBoletos,
   importarBoletos,
@@ -931,6 +1319,8 @@ module.exports = {
   atualizarBoleto,
   atualizarStatusLote,
   gerarBoletosPendentes,
-  excluirBoleto
+  excluirBoleto,
+  sincronizarBoleto,
+  sincronizarTodosBoletos
 };
 

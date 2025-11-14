@@ -119,6 +119,12 @@ router.post('/boletos-gestao/gerar-pendentes', authenticateToken, requireAdmin, 
 // DELETE /api/boletos-gestao/:id - Excluir boleto
 router.delete('/boletos-gestao/:id', authenticateToken, requireAdmin, boletosGestaoController.excluirBoleto);
 
+// GET /api/boletos-gestao/:id/sincronizar - Sincronizar status de um boleto específico (admin)
+router.get('/boletos-gestao/:id/sincronizar', authenticateToken, boletosGestaoController.sincronizarBoleto);
+
+// POST /api/boletos-gestao/sincronizar-todos - Sincronizar todos os boletos pendentes/vencidos (admin)
+router.post('/boletos-gestao/sincronizar-todos', authenticateToken, boletosGestaoController.sincronizarTodosBoletos);
+
 console.log('✅ [ROUTES] boletos-gestao.routes.js carregado completamente');
 console.log('✅ [ROUTES] Rotas registradas:', router.stack.map(layer => layer.route?.path || 'middleware').filter(Boolean));
 

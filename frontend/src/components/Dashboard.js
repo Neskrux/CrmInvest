@@ -4,6 +4,7 @@ import useBranding from '../hooks/useBranding';
 import useFechamentoNotifications from '../hooks/useFechamentoNotifications';
 import useAgendamentoNotifications from '../hooks/useAgendamentoNotifications';
 import useIncorporadoraNotifications from '../hooks/useIncorporadoraNotifications';
+import useDocumentacaoPendente from '../hooks/useDocumentacaoPendente';
 import { useToast } from '../components/Toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, Area, ReferenceLine, ComposedChart } from 'recharts';
 import { TrendingUp, Calendar, BarChart3, CheckCircle, XCircle, RotateCcw, UserPlus } from 'lucide-react';
@@ -161,6 +162,7 @@ const Dashboard = () => {
   const { showFechamentoModal, FechamentoModal } = useFechamentoNotifications();
   const { showAgendamentoModal, AgendamentoModal } = useAgendamentoNotifications();
   const { showNewLeadModal, NewLeadModal } = useIncorporadoraNotifications();
+  const { temDocumentacaoPendente } = useDocumentacaoPendente();
   
   // Hook de toast
   const { showSuccessToast, showErrorToast } = useToast();
@@ -2028,6 +2030,61 @@ const Dashboard = () => {
             <h1 className="page-title">Dashboard</h1>
             <p className="page-subtitle">
               Bem-vindo, {user?.nome}
+              {isClinica && temDocumentacaoPendente && (
+                <div style={{
+                  marginTop: '1rem',
+                  padding: '1rem 1.5rem',
+                  backgroundColor: '#fef3c7',
+                  border: '2px solid #f59e0b',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '1rem',
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                }}>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    backgroundColor: '#f59e0b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    color: 'white',
+                    fontSize: '20px',
+                    fontWeight: 'bold'
+                  }}>
+                    !
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: '700', color: '#92400e', fontSize: '1rem', marginBottom: '0.25rem' }}>
+                      Documentação Pendente
+                    </div>
+                    <div style={{ color: '#78350f', fontSize: '0.875rem' }}>
+                      Você possui documentos pendentes ou reprovados. Acesse "Meus Documentos" para enviar ou corrigir.
+                    </div>
+                  </div>
+                  <a
+                    href="/meus-documentos"
+                    style={{
+                      padding: '0.5rem 1rem',
+                      backgroundColor: '#f59e0b',
+                      color: 'white',
+                      borderRadius: '8px',
+                      textDecoration: 'none',
+                      fontWeight: '600',
+                      fontSize: '0.875rem',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#d97706'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#f59e0b'}
+                  >
+                    Ver Documentos
+                  </a>
+                </div>
+              )}
               {(filtroRegiao.cidade || filtroRegiao.estado) && (
                 <span style={{ 
                   marginLeft: '1rem',

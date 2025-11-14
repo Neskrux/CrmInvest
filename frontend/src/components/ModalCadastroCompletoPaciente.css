@@ -11,6 +11,13 @@
   display: flex;
   flex-direction: column;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  position: relative;
+}
+
+/* Overlay do modal */
+.modal-overlay-cadastro-completo {
+  touch-action: none;
+  overscroll-behavior: none;
 }
 
 /* Mobile: Tela cheia */
@@ -22,12 +29,13 @@
     max-height: 100vh;
     border-radius: 0;
     margin: 0;
-    padding: 15px;
+    padding: 0;
   }
   
-  .modal-overlay {
+  .modal-overlay-cadastro-completo {
     align-items: flex-start;
     padding: 0;
+    touch-action: none;
   }
 }
 
@@ -39,6 +47,7 @@
   margin-bottom: 20px;
   flex-wrap: wrap;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .modal-cadastro-header h2 {
@@ -75,6 +84,7 @@
   border-bottom: 1px solid #e2e8f0;
   position: relative;
   overflow: visible;
+  flex-shrink: 0;
 }
 
 .cadastro-step {
@@ -150,7 +160,22 @@
 .cadastro-form-content {
   padding: 2rem;
   overflow-y: auto;
+  overflow-x: hidden;
   flex: 1;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+}
+
+/* Mobile: Melhorar scroll no conteúdo */
+@media (max-width: 768px) {
+  .cadastro-form-content {
+    padding: 1.5rem;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    /* Garantir que o scroll funcione bem no mobile */
+    touch-action: pan-y;
+  }
 }
 
 .form-group {
@@ -350,6 +375,37 @@
   display: block;
   touch-action: none;
   cursor: crosshair;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.signature-canvas {
+  touch-action: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  cursor: crosshair !important;
+}
+
+/* Melhorar suporte touch no mobile */
+@media (max-width: 768px) {
+  .signature-canvas {
+    touch-action: none !important;
+    -ms-touch-action: none !important;
+  }
+  
+  .signature-canvas-wrapper {
+    position: relative;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .signature-canvas-wrapper canvas {
+    touch-action: none !important;
+    -ms-touch-action: none !important;
+  }
 }
 
 .assinatura-controls {

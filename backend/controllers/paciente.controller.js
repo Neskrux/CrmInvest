@@ -182,8 +182,11 @@ const sincronizarStatusBoleto = async (req, res) => {
       return res.status(404).json({ error: 'Boleto não encontrado' });
     }
 
+    // Validar se o boleto foi gerado na Caixa (precisa ter nosso_numero para consultar na API)
     if (!boleto.nosso_numero || !boleto.id_beneficiario) {
-      return res.status(400).json({ error: 'Boleto não possui dados suficientes para sincronização' });
+      return res.status(400).json({ 
+        error: 'Este boleto ainda não foi gerado na Caixa. O nosso número é necessário para sincronização.' 
+      });
     }
 
     // Consultar status na API Caixa

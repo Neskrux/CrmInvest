@@ -15,7 +15,9 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
   const modalRef = useRef(null);
   
   const [passoAtual, setPassoAtual] = useState(1);
+  const [passoMaximoVisitado, setPassoMaximoVisitado] = useState(1); // Rastrear o passo mais avançado visitado
   const [loading, setLoading] = useState(false);
+  const [buscandoCEP, setBuscandoCEP] = useState(false);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [cidadeCustomizada, setCidadeCustomizada] = useState(false);
   
@@ -207,6 +209,55 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
     }
     return valor;
   };
+
+  // Buscar endereço por CEP usando ViaCEP
+  const buscarEnderecoPorCEP = async (cep) => {
+    const cepLimpo = cep.replace(/\D/g, '');
+    
+    if (cepLimpo.length !== 8) {
+      return;
+    }
+    
+    setBuscandoCEP(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
+      const data = await response.json();
+      
+      if (data.erro) {
+        showErrorToast('CEP não encontrado. Por favor, verifique o CEP informado.');
+        return;
+      }
+      
+      // Preencher campos automaticamente
+      // Se cidade/estado já foram preenchidos no passo 2, manter se forem compatíveis
+      // Caso contrário, usar os dados do CEP
+      setFormData(prev => {
+        const estadoAtual = prev.estado?.toUpperCase();
+        const cidadeAtual = prev.cidade;
+        const estadoCEP = data.uf?.toUpperCase();
+        const cidadeCEP = data.localidade;
+        
+        // Se estado/cidade já preenchidos são diferentes do CEP, usar os do CEP (mais confiável)
+        return {
+          ...prev,
+          endereco: data.logradouro || '',
+          bairro: data.bairro || '',
+          cidade: cidadeCEP || cidadeAtual || '',
+          estado: estadoCEP || estadoAtual || '',
+          cep: formatarCEP(cepLimpo)
+        };
+      });
+      
+      if (data.logradouro || data.bairro || data.localidade) {
+        showSuccessToast('Endereço encontrado! Verifique e complete os dados se necessário.');
+      }
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+      showErrorToast('Erro ao buscar CEP. Tente novamente.');
+    } finally {
+      setBuscandoCEP(false);
+    }
+  };
   
   // Formatar valores monetários
   const formatarValorInput = (valor) => {
@@ -266,6 +317,19 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
       valorFormatado = formatarData(value);
     } else if (name === 'cep') {
       valorFormatado = formatarCEP(value);
+      // Buscar endereço quando CEP estiver completo (8 dígitos)
+      const cepLimpo = valorFormatado.replace(/\D/g, '');
+      if (cepLimpo.length === 8) {
+        buscarEnderecoPorCEP(cepLimpo);
+      } else {
+        // Limpar apenas endereço e bairro se CEP for removido ou incompleto
+        // Manter cidade e estado caso já tenham sido preenchidos no passo 2
+        setFormData(prev => ({
+          ...prev,
+          endereco: '',
+          bairro: ''
+        }));
+      }
     } else if (name === 'estado') {
       valorFormatado = value.toUpperCase().slice(0, 2);
       // Limpar cidade quando estado muda
@@ -354,6 +418,73 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
     }
   };
   
+  // Função para detectar bounding box da assinatura (remover espaços vazios)
+  const obterBoundingBoxAssinatura = (imageDataUrl) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        
+        let minX = canvas.width;
+        let minY = canvas.height;
+        let maxX = 0;
+        let maxY = 0;
+        
+        // Encontrar os limites da assinatura (pixels não transparentes)
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < canvas.width; x++) {
+            const index = (y * canvas.width + x) * 4;
+            const alpha = data[index + 3];
+            
+            if (alpha > 0) { // Pixel não transparente
+              minX = Math.min(minX, x);
+              minY = Math.min(minY, y);
+              maxX = Math.max(maxX, x);
+              maxY = Math.max(maxY, y);
+            }
+          }
+        }
+        
+        // Se não encontrou nada, retornar dimensões padrão
+        if (minX >= maxX || minY >= maxY) {
+          resolve({
+            x: 0,
+            y: 0,
+            width: canvas.width,
+            height: canvas.height,
+            originalWidth: canvas.width,
+            originalHeight: canvas.height
+          });
+          return;
+        }
+        
+        // Adicionar padding de 5px ao redor
+        const padding = 5;
+        minX = Math.max(0, minX - padding);
+        minY = Math.max(0, minY - padding);
+        maxX = Math.min(canvas.width, maxX + padding);
+        maxY = Math.min(canvas.height, maxY + padding);
+        
+        resolve({
+          x: minX,
+          y: minY,
+          width: maxX - minX,
+          height: maxY - minY,
+          originalWidth: canvas.width,
+          originalHeight: canvas.height
+        });
+      };
+      img.src = imageDataUrl;
+    });
+  };
+
   // Salvar assinatura temporariamente
   const salvarAssinaturaTemporaria = () => {
     if (!hasAssinatura || !assinaturaRef) {
@@ -384,9 +515,33 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
       const pages = pdfDoc.getPages();
       console.log('📄 [ModalCadastroClinica] PDF carregado, número de páginas:', pages.length);
       
+      // Obter bounding box da assinatura para remover espaços vazios
+      const boundingBox = await obterBoundingBoxAssinatura(assinaturaBase64);
+      console.log('📦 [ModalCadastroClinica] Bounding box da assinatura:', boundingBox);
+      
+      // Criar nova imagem apenas com a área da assinatura (sem espaços vazios)
+      const img = new Image();
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.src = assinaturaBase64;
+      });
+      
+      const canvasCrop = document.createElement('canvas');
+      const ctxCrop = canvasCrop.getContext('2d');
+      canvasCrop.width = boundingBox.width;
+      canvasCrop.height = boundingBox.height;
+      ctxCrop.drawImage(
+        img,
+        boundingBox.x, boundingBox.y, boundingBox.width, boundingBox.height,
+        0, 0, boundingBox.width, boundingBox.height
+      );
+      
+      const assinaturaCortadaBase64 = canvasCrop.toDataURL('image/png');
+      
       // Converter assinatura base64 para imagem
-      const signatureImage = await pdfDoc.embedPng(assinaturaBase64);
-      console.log('✅ [ModalCadastroClinica] Assinatura convertida para imagem');
+      const signatureImage = await pdfDoc.embedPng(assinaturaCortadaBase64);
+      const signatureDims = signatureImage.scale(1);
+      console.log('✅ [ModalCadastroClinica] Assinatura convertida para imagem (cortada)');
       
       // Adicionar rodapé estruturado apenas na última página
       const ultimaPagina = pages[pages.length - 1];
@@ -399,7 +554,7 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
       });
       
       // Configurações do rodapé estruturado - melhor espaçamento
-      const alturaRodape = 140; // Altura total do rodapé (aumentada)
+      const alturaRodape = 180; // Altura total do rodapé (aumentada significativamente)
       const margemInferior = 20;
       const yBaseRodape = margemInferior;
       const margemLateral = 50;
@@ -417,23 +572,37 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
       // Calcular posições das 3 áreas de assinatura com melhor distribuição
       const larguraTotal = larguraPagina - (2 * margemLateral);
       const larguraArea = (larguraTotal - (2 * espacoEntreColunas)) / 3;
-      const yLinhaAssinatura = yBaseRodape + 90; // Linha de assinatura mais abaixo
-      const alturaAssinatura = 35;
+      const alturaAssinatura = 70; // Aumentada significativamente para acomodar melhor a assinatura
+      const yLinhaAssinatura = yBaseRodape + 50; // Linha de assinatura mais abaixo, dando mais espaço acima
       
       // Posições Y para textos
-      const yTitulo = yBaseRodape + alturaRodape - 20;
-      const yAssinatura = yBaseRodape + alturaRodape - 50;
-      const yDados = yBaseRodape + alturaRodape - 80;
+      const yTitulo = yBaseRodape + alturaRodape - 15; // Texto "ASSINATURA CLÍNICA" mais para cima
+      const yAssinatura = yBaseRodape + alturaRodape - 45;
+      // Dados (nome e CNPJ) ficam ABAIXO da linha de assinatura
+      const yDadosAbaixoLinha = yLinhaAssinatura - 12; // CNPJ abaixo da linha
+      const yNomeAbaixoLinha = yLinhaAssinatura - 24; // Nome abaixo da linha (acima do CNPJ)
       
       // Área 1: ASSINATURA CLÍNICA
       const x1 = margemLateral;
       
-      // Desenhar assinatura da clínica primeiro (acima da linha)
+      // Calcular dimensões da assinatura mantendo proporção
+      const larguraMaxima = larguraArea - 20; // Margem de 10px de cada lado
+      const alturaMaxima = alturaAssinatura;
+      const proporcao = Math.min(
+        larguraMaxima / signatureDims.width,
+        alturaMaxima / signatureDims.height
+      );
+      const larguraAssinatura = signatureDims.width * proporcao;
+      const alturaAssinaturaFinal = signatureDims.height * proporcao;
+      
+      // Desenhar assinatura da clínica primeiro (acima da linha, centralizada)
+      // A assinatura será posicionada acima da linha, com espaço adequado
+      const yAssinaturaClinica = yLinhaAssinatura + alturaAssinatura - alturaAssinaturaFinal - 5; // 5px acima da linha
       ultimaPagina.drawImage(signatureImage, {
-        x: x1 + (larguraArea - 100) / 2, // Centralizar assinatura
-        y: yLinhaAssinatura + 8,
-        width: 100,
-        height: alturaAssinatura,
+        x: x1 + (larguraArea - larguraAssinatura) / 2, // Centralizar assinatura
+        y: yAssinaturaClinica, // Posicionar acima da linha com espaço adequado
+        width: larguraAssinatura,
+        height: alturaAssinaturaFinal,
       });
       console.log('✅ [ModalCadastroClinica] Assinatura da clínica desenhada');
       
@@ -470,23 +639,38 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
         font: fontBold,
       });
       
-      // Nome da clínica (truncar se muito longo)
-      const nomeExibido = nomeClinica.length > 40 ? nomeClinica.substring(0, 37) + '...' : nomeClinica;
-      const larguraNomeClinica = nomeExibido.length * 3.2;
+      // Nome da clínica (truncar baseado na largura disponível) - ABAIXO da linha
+      const tamanhoFonteNome = 6.5; // Fonte menor
+      const fontNormal = await pdfDoc.embedFont('Helvetica'); // Fonte normal para nomes
+      const larguraDisponivelNome = larguraArea - 10; // Margem de 5px de cada lado
+      let nomeExibido = nomeClinica;
+      let larguraNomeClinica = fontNormal.widthOfTextAtSize(nomeExibido, tamanhoFonteNome);
+      
+      // Truncar se necessário
+      if (larguraNomeClinica > larguraDisponivelNome) {
+        let textoTruncado = nomeExibido;
+        while (fontNormal.widthOfTextAtSize(textoTruncado + '...', tamanhoFonteNome) > larguraDisponivelNome && textoTruncado.length > 0) {
+          textoTruncado = textoTruncado.substring(0, textoTruncado.length - 1);
+        }
+        nomeExibido = textoTruncado + '...';
+        larguraNomeClinica = fontNormal.widthOfTextAtSize(nomeExibido, tamanhoFonteNome);
+      }
+      
       ultimaPagina.drawText(nomeExibido, {
         x: x1 + (larguraArea - larguraNomeClinica) / 2,
-        y: yDados,
-        size: 8,
+        y: yNomeAbaixoLinha, // Nome abaixo da linha
+        size: tamanhoFonteNome,
         color: rgb(0.3, 0.3, 0.3),
+        font: fontNormal,
       });
       
-      // CNPJ formatado
+      // CNPJ formatado - ABAIXO da linha
       if (cnpjFormatado || cnpjClinica) {
         const textoCnpj = `CNPJ: ${cnpjFormatado || cnpjClinica}`;
         const larguraCnpj = textoCnpj.length * 3.0;
         ultimaPagina.drawText(textoCnpj, {
           x: x1 + (larguraArea - larguraCnpj) / 2,
-          y: yDados - 12,
+          y: yDadosAbaixoLinha, // CNPJ abaixo da linha
           size: 7,
           color: rgb(0.4, 0.4, 0.4),
         });
@@ -519,13 +703,29 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
       const cpfPaciente = formData.cpf?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') || '';
       
       if (nomePaciente) {
-        const nomeExibidoPaciente = nomePaciente.length > 40 ? nomePaciente.substring(0, 37) + '...' : nomePaciente;
-        const larguraNomePaciente = nomeExibidoPaciente.length * 3.2;
+        // Calcular tamanho máximo baseado na largura disponível
+        const tamanhoFonteNomePaciente = 6.5; // Fonte menor
+        const fontNormalPaciente = await pdfDoc.embedFont('Helvetica'); // Fonte normal para nomes
+        const larguraDisponivelNomePaciente = larguraArea - 10; // Margem de 5px de cada lado
+        let nomeExibidoPaciente = nomePaciente;
+        let larguraNomePaciente = fontNormalPaciente.widthOfTextAtSize(nomeExibidoPaciente, tamanhoFonteNomePaciente);
+        
+        // Truncar se necessário
+        if (larguraNomePaciente > larguraDisponivelNomePaciente) {
+          let textoTruncado = nomeExibidoPaciente;
+          while (fontNormalPaciente.widthOfTextAtSize(textoTruncado + '...', tamanhoFonteNomePaciente) > larguraDisponivelNomePaciente && textoTruncado.length > 0) {
+            textoTruncado = textoTruncado.substring(0, textoTruncado.length - 1);
+          }
+          nomeExibidoPaciente = textoTruncado + '...';
+          larguraNomePaciente = fontNormalPaciente.widthOfTextAtSize(nomeExibidoPaciente, tamanhoFonteNomePaciente);
+        }
+        
         ultimaPagina.drawText(nomeExibidoPaciente, {
           x: x2 + (larguraArea - larguraNomePaciente) / 2,
-          y: yDados,
-          size: 8,
+          y: yNomeAbaixoLinha, // Nome abaixo da linha
+          size: tamanhoFonteNomePaciente,
           color: rgb(0.3, 0.3, 0.3),
+          font: fontNormalPaciente,
         });
       }
       if (cpfPaciente) {
@@ -533,7 +733,7 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
         const larguraCpfPaciente = textoCpfPaciente.length * 3.0;
         ultimaPagina.drawText(textoCpfPaciente, {
           x: x2 + (larguraArea - larguraCpfPaciente) / 2,
-          y: yDados - 12,
+          y: yDadosAbaixoLinha, // CPF abaixo da linha
           size: 7,
           color: rgb(0.4, 0.4, 0.4),
         });
@@ -566,7 +766,7 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
       const larguraNomeGrupoIM = nomeGrupoIM.length * 3.2;
       ultimaPagina.drawText(nomeGrupoIM, {
         x: x3 + (larguraArea - larguraNomeGrupoIM) / 2,
-        y: yDados,
+        y: yNomeAbaixoLinha, // Nome abaixo da linha
         size: 8,
         color: rgb(0.3, 0.3, 0.3),
       });
@@ -575,7 +775,7 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
       const larguraCnpjGrupoIM = cnpjGrupoIM.length * 3.0;
       ultimaPagina.drawText(cnpjGrupoIM, {
         x: x3 + (larguraArea - larguraCnpjGrupoIM) / 2,
-        y: yDados - 12,
+        y: yDadosAbaixoLinha, // CNPJ abaixo da linha
         size: 7,
         color: rgb(0.4, 0.4, 0.4),
       });
@@ -727,7 +927,22 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
   
   // Validar passo 3
   const validarPasso3 = () => {
-    // Passo 3 é opcional, pode avançar sem preencher
+    if (!formData.cep || formData.cep.replace(/\D/g, '').length !== 8) {
+      showErrorToast('Por favor, informe um CEP válido!');
+      return false;
+    }
+    if (!formData.endereco || formData.endereco.trim() === '') {
+      showErrorToast('Por favor, informe o endereço (rua)!');
+      return false;
+    }
+    if (!formData.bairro || formData.bairro.trim() === '') {
+      showErrorToast('Por favor, informe o bairro!');
+      return false;
+    }
+    if (!formData.numero || formData.numero.trim() === '') {
+      showErrorToast('Por favor, informe o número do endereço!');
+      return false;
+    }
     return true;
   };
   
@@ -774,7 +989,12 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
     if (passoAtual === 5 && !validarPasso5()) return;
     
     if (passoAtual < 6) {
-      setPassoAtual(passoAtual + 1);
+      const novoPasso = passoAtual + 1;
+      setPassoAtual(novoPasso);
+      // Atualizar o passo máximo visitado
+      if (novoPasso > passoMaximoVisitado) {
+        setPassoMaximoVisitado(novoPasso);
+      }
     }
   };
   
@@ -785,11 +1005,36 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
     }
   };
   
+  // Navegar para um passo específico
+  const irParaPasso = (passo) => {
+    // Só permitir ir para passos já visitados ou o próximo passo válido
+    if (passo <= passoMaximoVisitado || passo === passoAtual + 1) {
+      // Se for avançar para o próximo, validar o passo atual primeiro
+      if (passo === passoAtual + 1) {
+        if (passoAtual === 1 && !validarPasso1()) return;
+        if (passoAtual === 2 && !validarPasso2()) return;
+        if (passoAtual === 3 && !validarPasso3()) return;
+        if (passoAtual === 4 && !validarPasso4()) return;
+        if (passoAtual === 5 && !validarPasso5()) return;
+        
+        // Atualizar passo máximo visitado
+        if (passo > passoMaximoVisitado) {
+          setPassoMaximoVisitado(passo);
+        }
+      }
+      setPassoAtual(passo);
+    }
+  };
+  
   // Finalizar cadastro
   const handleFinalizarCadastro = async () => {
     // Validar todos os passos obrigatórios
     if (!validarPasso1()) {
       setPassoAtual(1);
+      return;
+    }
+    if (!validarPasso3()) {
+      setPassoAtual(3);
       return;
     }
     if (!validarPasso4()) {
@@ -916,7 +1161,7 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 99999,
+      zIndex: 1000,
       padding: isMobile ? '1rem' : '2rem'
     }}
     onClick={(e) => {
@@ -985,34 +1230,60 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
             justifyContent: 'space-between',
             marginBottom: '0.75rem'
           }}>
-            {[1, 2, 3, 4, 5, 6].map((passo) => (
-              <React.Fragment key={passo}>
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  backgroundColor: passoAtual >= passo ? '#059669' : '#e2e8f0',
-                  color: passoAtual >= passo ? 'white' : '#6b7280',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: '600',
-                  fontSize: '0.875rem',
-                  transition: 'all 0.3s'
-                }}>
-                  {passoAtual > passo ? '✓' : passo}
-                </div>
-                {passo < totalPassos && (
-                  <div style={{
-                    flex: 1,
-                    height: '3px',
-                    backgroundColor: passoAtual > passo ? '#059669' : '#e2e8f0',
-                    margin: '0 0.5rem',
-                    transition: 'all 0.3s'
-                  }} />
-                )}
-              </React.Fragment>
-            ))}
+            {[1, 2, 3, 4, 5, 6].map((passo) => {
+              const podeClicar = passo <= passoMaximoVisitado || passo === passoAtual + 1;
+              const estaAtivo = passoAtual === passo;
+              const estaCompleto = passoAtual > passo;
+              
+              return (
+                <React.Fragment key={passo}>
+                  <div 
+                    onClick={() => podeClicar && irParaPasso(passo)}
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '50%',
+                      backgroundColor: estaAtivo || estaCompleto ? '#059669' : '#e2e8f0',
+                      color: estaAtivo || estaCompleto ? 'white' : '#6b7280',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: '600',
+                      fontSize: '0.875rem',
+                      transition: 'all 0.3s',
+                      cursor: podeClicar ? 'pointer' : 'not-allowed',
+                      opacity: podeClicar ? 1 : 0.6,
+                      position: 'relative',
+                      zIndex: 1
+                    }}
+                    onMouseEnter={(e) => {
+                      if (podeClicar) {
+                        e.target.style.transform = 'scale(1.1)';
+                        e.target.style.boxShadow = '0 2px 8px rgba(5, 150, 105, 0.3)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (podeClicar) {
+                        e.target.style.transform = 'scale(1)';
+                        e.target.style.boxShadow = 'none';
+                      }
+                    }}
+                    title={podeClicar ? `Ir para passo ${passo}` : 'Complete os passos anteriores primeiro'}
+                  >
+                    {estaCompleto ? '✓' : passo}
+                  </div>
+                  {passo < totalPassos && (
+                    <div style={{
+                      flex: 1,
+                      height: '3px',
+                      backgroundColor: estaCompleto ? '#059669' : '#e2e8f0',
+                      margin: '0 0.5rem',
+                      transition: 'all 0.3s'
+                    }} />
+                  )}
+                </React.Fragment>
+              );
+            })}
           </div>
           <div style={{
             display: 'flex',
@@ -1056,7 +1327,6 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
                     name="nome"
                     value={formData.nome}
                     onChange={handleInputChange}
-                    onBlur={handleNomeBlur}
                     placeholder="Digite o nome completo"
                     style={{
                       width: '100%',
@@ -1135,7 +1405,7 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
                 Informações Adicionais
               </h2>
               <p style={{ color: '#6b7280', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
-                Complete as informações do paciente (opcional)
+                Complete as informações do paciente
               </p>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -1315,87 +1585,15 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
                 Endereço
               </h2>
               <p style={{ color: '#6b7280', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
-                Informe o endereço do paciente (opcional)
+                Informe o endereço completo do paciente. O endereço será preenchido automaticamente ao informar o CEP.
               </p>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#1e293b' }}>
-                    Rua
+                    CEP *
                   </label>
-                  <input
-                    type="text"
-                    name="endereco"
-                    value={formData.endereco}
-                    onChange={handleInputChange}
-                    placeholder="Digite o nome da rua"
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem',
-                      border: '2px solid #e2e8f0',
-                      borderRadius: '8px',
-                      fontSize: '1rem',
-                      outline: 'none',
-                      transition: 'all 0.2s'
-                    }}
-                    onFocus={(e) => e.target.style.borderColor = '#059669'}
-                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                  />
-                </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr 1fr', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#1e293b' }}>
-                      Bairro
-                    </label>
-                    <input
-                      type="text"
-                      name="bairro"
-                      value={formData.bairro}
-                      onChange={handleInputChange}
-                      placeholder="Digite o bairro"
-                      style={{
-                        width: '100%',
-                        padding: '0.875rem',
-                        border: '2px solid #e2e8f0',
-                        borderRadius: '8px',
-                        fontSize: '1rem',
-                        outline: 'none',
-                        transition: 'all 0.2s'
-                      }}
-                      onFocus={(e) => e.target.style.borderColor = '#059669'}
-                      onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#1e293b' }}>
-                      Número
-                    </label>
-                    <input
-                      type="text"
-                      name="numero"
-                      value={formData.numero}
-                      onChange={handleInputChange}
-                      placeholder="Nº"
-                      style={{
-                        width: '100%',
-                        padding: '0.875rem',
-                        border: '2px solid #e2e8f0',
-                        borderRadius: '8px',
-                        fontSize: '1rem',
-                        outline: 'none',
-                        transition: 'all 0.2s'
-                      }}
-                      onFocus={(e) => e.target.style.borderColor = '#059669'}
-                      onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#1e293b' }}>
-                      CEP
-                    </label>
+                  <div style={{ position: 'relative' }}>
                     <input
                       type="text"
                       name="cep"
@@ -1403,6 +1601,116 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
                       onChange={handleInputChange}
                       placeholder="00000-000"
                       maxLength={9}
+                      required
+                      disabled={buscandoCEP}
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        paddingRight: buscandoCEP ? '3rem' : '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        transition: 'all 0.2s',
+                        backgroundColor: buscandoCEP ? '#f9fafb' : 'white'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#059669'}
+                      onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                    />
+                    {buscandoCEP && (
+                      <div style={{
+                        position: 'absolute',
+                        right: '0.875rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}>
+                        <div className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }}></div>
+                      </div>
+                    )}
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem', marginBottom: 0 }}>
+                    Digite o CEP para buscar o endereço automaticamente
+                  </p>
+                </div>
+                
+                <div>
+                  <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#1e293b' }}>
+                    Rua/Logradouro *
+                  </label>
+                  <input
+                    type="text"
+                    name="endereco"
+                    value={formData.endereco}
+                    onChange={handleInputChange}
+                    placeholder="Digite o nome da rua"
+                    required
+                    disabled={!formData.cep || formData.cep.replace(/\D/g, '').length !== 8}
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontSize: '1rem',
+                      outline: 'none',
+                      transition: 'all 0.2s',
+                      backgroundColor: (!formData.cep || formData.cep.replace(/\D/g, '').length !== 8) ? '#f9fafb' : 'white',
+                      cursor: (!formData.cep || formData.cep.replace(/\D/g, '').length !== 8) ? 'not-allowed' : 'text'
+                    }}
+                    onFocus={(e) => {
+                      if (formData.cep && formData.cep.replace(/\D/g, '').length === 8) {
+                        e.target.style.borderColor = '#059669';
+                      }
+                    }}
+                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                  />
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#1e293b' }}>
+                      Bairro *
+                    </label>
+                    <input
+                      type="text"
+                      name="bairro"
+                      value={formData.bairro}
+                      onChange={handleInputChange}
+                      placeholder="Digite o bairro"
+                      required
+                      disabled={!formData.cep || formData.cep.replace(/\D/g, '').length !== 8}
+                      style={{
+                        width: '100%',
+                        padding: '0.875rem',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        transition: 'all 0.2s',
+                        backgroundColor: (!formData.cep || formData.cep.replace(/\D/g, '').length !== 8) ? '#f9fafb' : 'white',
+                        cursor: (!formData.cep || formData.cep.replace(/\D/g, '').length !== 8) ? 'not-allowed' : 'text'
+                      }}
+                      onFocus={(e) => {
+                        if (formData.cep && formData.cep.replace(/\D/g, '').length === 8) {
+                          e.target.style.borderColor = '#059669';
+                        }
+                      }}
+                      onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#1e293b' }}>
+                      Número *
+                    </label>
+                    <input
+                      type="text"
+                      name="numero"
+                      value={formData.numero}
+                      onChange={handleInputChange}
+                      placeholder="Nº"
+                      required
                       style={{
                         width: '100%',
                         padding: '0.875rem',
@@ -1621,12 +1929,19 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
                           <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#1e293b' }}>
                             Desenhe sua assinatura:
                           </label>
-                          <div style={{
-                            border: '2px solid #d1d5db',
-                            borderRadius: '8px',
-                            backgroundColor: 'white',
-                            padding: '0.5rem'
-                          }}>
+                          <div 
+                            style={{
+                              border: '2px solid #d1d5db',
+                              borderRadius: '8px',
+                              backgroundColor: 'white',
+                              padding: '0.5rem',
+                              touchAction: 'none',
+                              WebkitTouchCallout: 'none',
+                              WebkitUserSelect: 'none',
+                              userSelect: 'none',
+                              position: 'relative'
+                            }}
+                          >
                             <SignatureCanvas
                               ref={(ref) => setAssinaturaRef(ref)}
                               canvasProps={{
@@ -1636,11 +1951,18 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
                                 style: {
                                   width: '100%',
                                   height: '100%',
-                                  touchAction: 'none'
+                                  touchAction: 'none',
+                                  WebkitTouchCallout: 'none',
+                                  WebkitUserSelect: 'none',
+                                  userSelect: 'none',
+                                  display: 'block'
                                 }
                               }}
                               onEnd={() => setHasAssinatura(true)}
                               backgroundColor="white"
+                              penColor="black"
+                              throttle={0}
+                              velocityFilterWeight={0.7}
                             />
                           </div>
                         </div>
