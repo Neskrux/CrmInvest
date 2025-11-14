@@ -437,16 +437,36 @@ class EnviadorNotificacoesBoletos {
   /**
    * Executa o job periodicamente
    */
-  iniciarScheduler(intervaloHoras = 6) {
+  iniciarScheduler(intervaloHoras = 2) {
     console.log(`🕐 [JOB NOTIFICAÇÕES] Scheduler iniciado - Executando a cada ${intervaloHoras} horas`);
+    console.log(`🕐 [JOB NOTIFICAÇÕES] Intervalo em milissegundos: ${intervaloHoras * 60 * 60 * 1000}ms`);
     
-    // Executar imediatamente
-    this.executar().catch(console.error);
+    // Executar imediatamente após um pequeno delay para garantir que o servidor está pronto
+    setTimeout(() => {
+      console.log(`🚀 [JOB NOTIFICAÇÕES] Executando primeira execução imediata...`);
+      this.executar()
+        .then(() => {
+          console.log(`✅ [JOB NOTIFICAÇÕES] Primeira execução concluída com sucesso`);
+        })
+        .catch((error) => {
+          console.error(`❌ [JOB NOTIFICAÇÕES] Erro na primeira execução:`, error);
+        });
+    }, 5000); // Aguardar 5 segundos após o servidor iniciar
     
     // Executar periodicamente
+    const intervaloMs = intervaloHoras * 60 * 60 * 1000;
     setInterval(() => {
-      this.executar().catch(console.error);
-    }, intervaloHoras * 60 * 60 * 1000);
+      console.log(`⏰ [JOB NOTIFICAÇÕES] Executando job agendado (intervalo de ${intervaloHoras}h)...`);
+      this.executar()
+        .then(() => {
+          console.log(`✅ [JOB NOTIFICAÇÕES] Execução agendada concluída com sucesso`);
+        })
+        .catch((error) => {
+          console.error(`❌ [JOB NOTIFICAÇÕES] Erro na execução agendada:`, error);
+        });
+    }, intervaloMs);
+    
+    console.log(`✅ [JOB NOTIFICAÇÕES] Scheduler configurado com sucesso`);
   }
 }
 

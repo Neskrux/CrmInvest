@@ -387,20 +387,37 @@ const GestaoBoletosAdmin = () => {
 
   // Sincronizar todos os boletos pendentes/vencidos
   const sincronizarTodos = async () => {
-    // Filtrar apenas boletos que podem ser sincronizados (têm boleto_caixa_id e estão pendentes/vencidos)
-    const boletosParaSincronizar = boletos.filter(b => 
-      b.boleto_caixa_id && 
-      (b.status === 'pendente' || b.status === 'vencido')
-    );
-
-    if (boletosParaSincronizar.length === 0) {
-      showErrorToast('Nenhum boleto disponível para sincronização');
-      return;
-    }
-
     try {
       setSincronizandoTodos(true);
       
+      // 1. Primeiro, atualizar status de boletos vencidos (mesmo job que roda no servidor)
+      try {
+        const responseStatus = await makeRequest('/boletos-gestao/atualizar-status-vencidos', {
+          method: 'POST'
+        });
+
+        if (responseStatus.ok) {
+          const dataStatus = await responseStatus.json();
+          console.log('✅ Status de vencidos atualizado:', dataStatus);
+        }
+      } catch (error) {
+        console.warn('⚠️ Erro ao atualizar status vencidos (continuando...):', error);
+      }
+
+      // 2. Depois, sincronizar com a API da Caixa (para boletos que têm boleto_caixa_id)
+      // Filtrar apenas boletos que podem ser sincronizados (têm boleto_caixa_id e estão pendentes/vencidos)
+      const boletosParaSincronizar = boletos.filter(b => 
+        b.boleto_caixa_id && 
+        (b.status === 'pendente' || b.status === 'vencido')
+      );
+
+      if (boletosParaSincronizar.length === 0) {
+        // Recarregar lista mesmo se não houver boletos para sincronizar com Caixa
+        await buscarBoletos();
+        showSuccessToast('Status atualizado com sucesso!');
+        return;
+      }
+
       // Usar endpoint específico para admin que sincroniza todos de uma vez
       const response = await makeRequest('/boletos-gestao/sincronizar-todos', {
         method: 'POST'
@@ -500,7 +517,21 @@ const GestaoBoletosAdmin = () => {
   // Formatar data
   const formatarData = (data) => {
     if (!data) return '-';
-    return new Date(data).toLocaleDateString('pt-BR');
+    // Se a data vier no formato YYYY-MM-DD (sem hora), criar no timezone local
+    // para evitar problemas de conversão UTC que mudam o dia
+    if (typeof data === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data)) {
+      const [ano, mes, dia] = data.split('-').map(Number);
+      const dataLocal = new Date(ano, mes - 1, dia);
+      return dataLocal.toLocaleDateString('pt-BR');
+    }
+    // Para outros formatos, usar a conversão padrão
+    const dataObj = new Date(data);
+    // Se a data for uma string ISO com hora, ajustar para timezone local
+    if (dataObj.getUTCHours() === 0 && dataObj.getUTCMinutes() === 0) {
+      // Data sem hora específica, usar componentes locais
+      return dataObj.toLocaleDateString('pt-BR');
+    }
+    return dataObj.toLocaleDateString('pt-BR');
   };
 
   // Formatar valor
@@ -813,30 +844,6 @@ const GestaoBoletosAdmin = () => {
                           >
                             Ver
                           </a>
-                        )}
-                        {boleto.boleto_caixa_id && (boleto.status === 'pendente' || boleto.status === 'vencido') && (
-                          <button
-                            onClick={() => sincronizarBoleto(boleto.id)}
-                            disabled={sincronizandoBoletoId === boleto.id || sincronizandoTodos}
-                            className="btn btn-sm"
-                            style={{
-                              backgroundColor: sincronizandoBoletoId === boleto.id ? '#9ca3af' : '#3b82f6',
-                              color: 'white',
-                              border: 'none',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.25rem'
-                            }}
-                          >
-                            {sincronizandoBoletoId === boleto.id ? (
-                              <>
-                                <div className="spinner" style={{ width: '12px', height: '12px', borderWidth: '2px' }}></div>
-                                Atualizando...
-                              </>
-                            ) : (
-                              <>🔄 Atualizar</>
-                            )}
-                          </button>
                         )}
                       </div>
                     </td>

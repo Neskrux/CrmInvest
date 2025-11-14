@@ -125,6 +125,9 @@ router.get('/boletos-gestao/:id/sincronizar', authenticateToken, boletosGestaoCo
 // POST /api/boletos-gestao/sincronizar-todos - Sincronizar todos os boletos pendentes/vencidos (admin)
 router.post('/boletos-gestao/sincronizar-todos', authenticateToken, boletosGestaoController.sincronizarTodosBoletos);
 
+// POST /api/boletos-gestao/atualizar-status-vencidos - Executar job de atualização de status para vencidos
+router.post('/boletos-gestao/atualizar-status-vencidos', authenticateToken, boletosGestaoController.atualizarStatusVencidos);
+
 console.log('✅ [ROUTES] boletos-gestao.routes.js carregado completamente');
 console.log('✅ [ROUTES] Rotas registradas:', router.stack.map(layer => layer.route?.path || 'middleware').filter(Boolean));
 
