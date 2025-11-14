@@ -2603,6 +2603,80 @@ const visualizarBoleto = async (req, res) => {
   }
 };
 
+// GET /api/fechamentos/gamificacao - Dados agregados por corretor para gamificação
+const getGamificacao = async (req, res) => {
+  try {
+    const empresaId = req.user.empresa_id;
+    
+    // Verificar se é incorporadora (empresa_id = 5)
+    if (empresaId !== 5) {
+      return res.status(403).json({ error: 'Acesso negado. Apenas para incorporadora.' });
+    }
+    
+    const hoje = new Date();
+    const mesAtual = hoje.getMonth() + 1;
+    const anoAtual = hoje.getFullYear();
+    
+    // Buscar todos os corretores internos da incorporadora
+    const { data: corretores, error: corretoresError } = await supabaseAdmin
+      .from('consultores')
+      .select('id, nome, foto_url, empresa_id')
+      .eq('empresa_id', 5)
+      .eq('pode_ver_todas_novas_clinicas', true)
+      .eq('podealterarstatus', true)
+      .neq('tipo_consultor', 'sdr')
+      .eq('is_freelancer', false)
+      .eq('ativo', true);
+    
+    if (corretoresError) throw corretoresError;
+    
+    // Buscar fechamentos aprovados do mês
+    const { data: fechamentos, error: fechError } = await supabaseAdmin
+      .from('fechamentos')
+      .select('consultor_interno_id, valor_fechado, entrada_total, entrada_paga, data_fechamento')
+      .eq('empresa_id', 5)
+      .eq('aprovado', 'aprovado');
+    
+    if (fechError) throw fechError;
+    
+    // Filtrar fechamentos do mês atual
+    const fechamentosMes = fechamentos?.filter(f => {
+      if (!f.data_fechamento) return false;
+      const [ano, mes, dia] = f.data_fechamento.split('-');
+      const data = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+      return data.getMonth() + 1 === mesAtual && data.getFullYear() === anoAtual;
+    }) || [];
+    
+    // Agregar dados por corretor
+    const dadosCorretores = corretores.map(corretor => {
+      const fechamentosCorretor = fechamentosMes.filter(f => f.consultor_interno_id === corretor.id);
+      
+      const vgvTotal = fechamentosCorretor.reduce((acc, f) => acc + parseFloat(f.valor_fechado || 0), 0);
+      const entradaTotal = fechamentosCorretor.reduce((acc, f) => acc + parseFloat(f.entrada_total || 0), 0);
+      const entradaPaga = fechamentosCorretor.reduce((acc, f) => acc + parseFloat(f.entrada_paga || 0), 0);
+      const numeroFechamentos = fechamentosCorretor.length;
+      
+      return {
+        corretor_id: corretor.id,
+        nome: corretor.nome,
+        foto_url: corretor.foto_url,
+        vgv_mes: vgvTotal,
+        entrada_total_mes: entradaTotal,
+        entrada_paga_mes: entradaPaga,
+        numero_fechamentos: numeroFechamentos
+      };
+    });
+    
+    // Ordenar por VGV do mês (maior primeiro)
+    dadosCorretores.sort((a, b) => b.vgv_mes - a.vgv_mes);
+    
+    res.json(dadosCorretores);
+  } catch (error) {
+    console.error('Erro ao buscar dados de gamificação:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getAllFechamentos,
   getDashboardFechamentos,
@@ -2617,5 +2691,6 @@ module.exports = {
   reprovarFechamento,
   criarAcessoFreelancer,
   gerarBoletosFechamento,
-  visualizarBoleto
+  visualizarBoleto,
+  getGamificacao
 };

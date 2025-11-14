@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Link, useNavigate } from 'react-router-dom';
 import './App.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 import { ToastProvider } from './components/Toast';
 import useBranding from './hooks/useBranding';
 import { HelpCircle } from 'lucide-react';
@@ -67,6 +68,7 @@ const ProtectedRoute = ({ children }) => {
 // Componente interno principal
 const AppContent = () => {
   const { user, logout, loading, isAdmin, isParceiro, isIncorporadora }	 = useAuth();
+  const { sidebarCollapsed, setSidebarCollapsed } = useSidebar(); // Usar contexto
   const { t } = useBranding();
   const location = useLocation();
   const navigate = useNavigate();
@@ -576,7 +578,10 @@ const AppContent = () => {
           transition: 'transform 0.3s ease-in-out',
           position: 'fixed',
           zIndex: 999
-        } : {}}
+        } : {
+          transform: sidebarCollapsed ? 'translateX(-100%)' : 'translateX(0)',
+          transition: 'transform 0.3s ease-in-out'
+        }}
       >
         <div className="sidebar-header">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
@@ -1020,6 +1025,60 @@ const AppContent = () => {
                    'Consultor'}</p>
             </div>
           </div>
+          
+          {/* Botão discreto para fechar/abrir sidebar - Apenas desktop */}
+          {!isMobile && (
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              style={{
+                width: '32px',
+                height: '32px',
+                padding: '0',
+                marginBottom: '0.75rem',
+                marginLeft: '0',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '6px',
+                transition: 'all 0.2s ease',
+                color: 'rgba(255, 255, 255, 0.5)',
+                opacity: 0.6
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
+                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.8)';
+                e.currentTarget.style.opacity = '1';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.5)';
+                e.currentTarget.style.opacity = '0.6';
+              }}
+              title={sidebarCollapsed ? 'Abrir painel lateral' : 'Fechar painel lateral'}
+              aria-label={sidebarCollapsed ? 'Abrir painel lateral' : 'Fechar painel lateral'}
+            >
+              <svg 
+                width="18" 
+                height="18" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                {sidebarCollapsed ? (
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                ) : (
+                  <polyline points="15 18 9 12 15 6"></polyline>
+                )}
+              </svg>
+            </button>
+          )}
+          
           <Link
             to="/perfil"
             className={`nav-link-profile ${activeTab === 'perfil' ? 'active' : ''}`}
@@ -1046,9 +1105,9 @@ const AppContent = () => {
         </div>
       </aside>
 
-      <main className="main-content">
+      <main className="main-content" style={{ marginLeft: (!isMobile && sidebarCollapsed) ? '0' : '260px', transition: 'margin-left 0.3s ease-in-out' }}>
         <header className="main-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '7.5rem' : '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '1rem' : '1rem' }}>
             {isMobile && (
               <button
                 onClick={() => setShowMobileSidebar(!showMobileSidebar)}
@@ -1062,12 +1121,10 @@ const AppContent = () => {
                   justifyContent: 'center',
                   borderRadius: '0.5rem',
                   transition: 'background-color 0.2s',
-                  ':hover': {
-                    backgroundColor: '#f3f4f6'
-                  }
                 }}
                 onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
                 onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                aria-label="Abrir menu"
               >
                 <svg 
                   width="24" 
@@ -1242,7 +1299,7 @@ const AppContent = () => {
           </div>
         </header>
 
-        <div className="page-content">
+        <div id="dashboard-scroll" className="page-content">
           {RenderContent()}
         </div>
       </main>
@@ -1321,7 +1378,8 @@ function App() {
   return (
     <ToastProvider>
       <AuthProvider>
-        <Router>
+        <SidebarProvider>
+          <Router>
             <Routes>
               {/* Rotas públicas - Captura de leads */}
               <Route path="/captura-lead" element={<CapturaLead />} />
@@ -1340,6 +1398,7 @@ function App() {
               <Route path="/*" element={<AppContent />} />
             </Routes>
           </Router>
+        </SidebarProvider>
       </AuthProvider>
     </ToastProvider>
   );

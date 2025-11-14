@@ -21,6 +21,7 @@ const fechamentosRoutes = require('./fechamentos.routes');
 const dashboardRoutes = require('./dashboard.routes');
 const materiaisRoutes = require('./materiais.routes');
 const metasRoutes = require('./metas.routes');
+const metasCorretoresRoutes = require('./metas-corretores.routes');
 const novasClinicasRoutes = require('./novas-clinicas.routes');
 const pacientesFinanceiroRoutes = require('./pacientes-financeiro.routes');
 const metaAdsRoutes = require('./meta-ads.routes');
@@ -63,6 +64,7 @@ router.use('/', fechamentosRoutes); // /api/fechamentos/*
 router.use('/', dashboardRoutes); // /api/dashboard/*
 router.use('/', materiaisRoutes); // /api/materiais/*
 router.use('/', metasRoutes); // /api/metas/*
+router.use('/metas-corretores', metasCorretoresRoutes); // /api/metas-corretores/*
 router.use('/', novasClinicasRoutes); // /api/novas-clinicas/*
 router.use('/', pacientesFinanceiroRoutes); // /api/pacientes-financeiro/*
 router.use('/', metaAdsRoutes); // /api/meta-ads/*

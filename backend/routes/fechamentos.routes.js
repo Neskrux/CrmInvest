@@ -54,5 +54,8 @@ router.put('/fechamentos/:id/reprovar', authenticateToken, requireAdmin, fechame
 // POST /api/fechamentos/:id/criar-acesso-freelancer - Criar acesso freelancer para paciente fechado
 router.post('/fechamentos/:id/criar-acesso-freelancer', authenticateToken, fechamentosController.criarAcessoFreelancer);
 
+// GET /api/fechamentos/gamificacao - Dados agregados por corretor para gamificação (apenas incorporadora)
+router.get('/fechamentos/gamificacao', authenticateToken, fechamentosController.getGamificacao);
+
 module.exports = router;
 

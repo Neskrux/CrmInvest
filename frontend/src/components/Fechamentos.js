@@ -76,6 +76,10 @@ const Fechamentos = () => {
   const [fechamentoParaGerar, setFechamentoParaGerar] = useState(null);
   const [numeroParcelasSelecionado, setNumeroParcelasSelecionado] = useState(1);
   const [numeroParcelasInput, setNumeroParcelasInput] = useState('1');
+  
+  // Estados para gamificação (incorporadora)
+  const [gamificacao, setGamificacao] = useState([]);
+  const [carregandoGamificacao, setCarregandoGamificacao] = useState(false);
 
 
   // Estado para modal de explicação de permissões
@@ -155,15 +159,29 @@ const Fechamentos = () => {
   const carregarDados = async () => {
     setCarregando(true);
     try {
-      const [fechamentosRes, pacientesRes, consultoresRes] = await Promise.all([
+      const requests = [
         makeRequest('/fechamentos'),
         makeRequest('/pacientes'),
         makeRequest('/consultores')
-      ]);
+      ];
+      
+      // Se for incorporadora, buscar dados de gamificação
+      if (isIncorporadora) {
+        requests.push(makeRequest('/fechamentos/gamificacao'));
+      }
+      
+      const results = await Promise.all(requests);
+      const [fechamentosRes, pacientesRes, consultoresRes, gamificacaoRes] = results;
 
       const fechamentosJson = await fechamentosRes.json();
       const pacientesJson = await pacientesRes.json();
       const consultoresJson = await consultoresRes.json();
+      
+      // Se for incorporadora, processar dados de gamificação
+      if (isIncorporadora && gamificacaoRes && gamificacaoRes.ok) {
+        const gamificacaoJson = await gamificacaoRes.json();
+        setGamificacao(gamificacaoJson || []);
+      }
 
       if (fechamentosRes.ok) {
         const isUserAdmin = Boolean(isAdmin);
@@ -1245,6 +1263,89 @@ const Fechamentos = () => {
           </div>
         </div>
       </div>
+
+      {/* Gamificação - Incorporadora */}
+      {isIncorporadora && gamificacao.length > 0 && (
+        <div style={{ 
+          marginBottom: '2rem', 
+          padding: '1.5rem', 
+          backgroundColor: '#ffffff', 
+          borderRadius: '12px', 
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)' 
+        }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b', marginBottom: '1rem' }}>
+            Desempenho dos Corretores - Mês Atual
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+            {gamificacao.map((corretor, index) => (
+              <div 
+                key={corretor.corretor_id}
+                style={{ 
+                  padding: '1rem', 
+                  backgroundColor: '#f9fafb', 
+                  borderRadius: '8px', 
+                  border: index < 3 ? `3px solid ${index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : '#CD7F32'}` : '1px solid #e5e7eb',
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                  {corretor.foto_url && (
+                    <img 
+                      src={corretor.foto_url} 
+                      alt={corretor.nome} 
+                      style={{ 
+                        width: '50px', 
+                        height: '50px', 
+                        borderRadius: '50%', 
+                        objectFit: 'cover',
+                        border: '2px solid #e5e7eb'
+                      }} 
+                    />
+                  )}
+                  <div>
+                    <div style={{ fontWeight: '600', color: '#1e293b', fontSize: '0.875rem' }}>
+                      {corretor.nome}
+                    </div>
+                    {index < 3 && (
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                        #{index + 1} no ranking
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div style={{ padding: '0.5rem', backgroundColor: '#dbeafe', borderRadius: '6px' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#1e40af', fontWeight: '600' }}>VGV</div>
+                    <div style={{ fontSize: '1rem', fontWeight: '700', color: '#1e40af' }}>
+                      {formatarMoeda(corretor.vgv_mes || 0)}
+                    </div>
+                  </div>
+                  <div style={{ padding: '0.5rem', backgroundColor: '#dcfce7', borderRadius: '6px' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#059669', fontWeight: '600' }}>Entrada</div>
+                    <div style={{ fontSize: '1rem', fontWeight: '700', color: '#059669' }}>
+                      {formatarMoeda(corretor.entrada_paga_mes || 0)}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ marginTop: '0.75rem', padding: '0.5rem', backgroundColor: '#f3f4f6', borderRadius: '6px' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                    {corretor.numero_fechamentos || 0} fechamentos
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="stats-grid" style={{ marginBottom: '2rem' }}>

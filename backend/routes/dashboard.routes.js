@@ -29,5 +29,20 @@ router.get('/dashboard/ranking/internos', authenticateToken, dashboardController
 // GET /api/dashboard/ranking/freelancers - Ranking de freelancers
 router.get('/dashboard/ranking/freelancers', authenticateToken, dashboardController.getRankingFreelancers);
 
+// GET /api/dashboard/incorporadora/corretor - KPIs do primeiro quadro (foco corretor)
+router.get('/dashboard/incorporadora/corretor', authenticateToken, dashboardController.getDashboardIncorporadoraCorretor);
+
+// GET /api/dashboard/incorporadora/geral - Dados gerais (negócios ganhos/perdidos/em andamento)
+router.get('/dashboard/incorporadora/geral', authenticateToken, dashboardController.getDashboardIncorporadoraGeral);
+
+// GET /api/dashboard/incorporadora/funil - Dados do funil visual
+router.get('/dashboard/incorporadora/funil', authenticateToken, dashboardController.getDashboardIncorporadoraFunil);
+
+// GET /api/dashboard/incorporadora/sdr/:sdr_id/funil - Mini-funil individual de um SDR
+router.get('/dashboard/incorporadora/sdr/:sdr_id/funil', authenticateToken, dashboardController.getDashboardIncorporadoraSDRFunil);
+
+// GET /api/dashboard/incorporadora/corretores/individuais - Dados de VGV e Entrada por corretor com metas
+router.get('/dashboard/incorporadora/corretores/individuais', authenticateToken, dashboardController.getDashboardIncorporadoraCorretoresIndividuais);
+
 module.exports = router;
 

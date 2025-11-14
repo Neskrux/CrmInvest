@@ -1,12 +1,19 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useSidebar } from '../contexts/SidebarContext';
 import useBranding from '../hooks/useBranding';
 import useFechamentoNotifications from '../hooks/useFechamentoNotifications';
 import useAgendamentoNotifications from '../hooks/useAgendamentoNotifications';
 import useIncorporadoraNotifications from '../hooks/useIncorporadoraNotifications';
+import useScrollRestoration from '../hooks/useScrollRestoration';
 import { useToast } from '../components/Toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, Area, ReferenceLine, ComposedChart } from 'recharts';
 import { TrendingUp, Calendar, BarChart3, CheckCircle, XCircle, RotateCcw, UserPlus } from 'lucide-react';
+import MiniFunilSDR from './MiniFunilSDR';
+import SDRRankingCard from './SDRRankingCard';
+import FunnelTotals from './FunnelTotals';
+import BrokerPerformance from './BrokerPerformance';
+import CoordinatorPlaceholder from './CoordinatorPlaceholder';
 
 const Dashboard = () => {
   // Hook para textos dinâmicos baseados no empresa_id
@@ -14,6 +21,9 @@ const Dashboard = () => {
   
   // Hook de autenticação - DEVE vir antes dos useEffect que dependem dele
   const { makeRequest, user, isAdmin, isConsultorInterno, podeVerTodosDados, isClinica, isFreelancer, isIncorporadora } = useAuth();
+  
+  // Hook para estado da sidebar
+  const { sidebarCollapsed, setSidebarCollapsed } = useSidebar();
   
   // Hooks de notificações
   const { showFechamentoModal, FechamentoModal } = useFechamentoNotifications();
@@ -23,54 +33,11 @@ const Dashboard = () => {
   // Hook de toast
   const { showSuccessToast, showErrorToast } = useToast();
   
+  // Hook para preservar posição de scroll
+  const { runWithPreservedScroll } = useScrollRestoration('dashboard', {
+    selector: '#dashboard-scroll',
+  });
   
-  
-  // Ref para controlar debounce de refresh quando notificação chega
-  const lastRefreshTimeRef = useRef(0);
-  const SAFETY_NET_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutos - refresh de segurança caso sockets morram
-  
-  // Refresh periódico como "safety net" - apenas quando não há notificações ativas
-  useEffect(() => {
-    if (user?.tipo === 'admin' && user?.empresa_id === 5) {
-      const safetyNetInterval = setInterval(() => {
-        // Verificar se há notificações ativas
-        const hasActiveNotification = showFechamentoModal || showAgendamentoModal || showNewLeadModal;
-        
-        if (!hasActiveNotification) {
-          // Verificar se não fizemos refresh recente (evitar refresh logo após notificação)
-          const timeSinceLastRefresh = Date.now() - lastRefreshTimeRef.current;
-          const lastNotificationRefresh = localStorage.getItem('last_notification_refresh');
-          const timeSinceNotificationRefresh = lastNotificationRefresh 
-            ? Date.now() - parseInt(lastNotificationRefresh) 
-            : Infinity;
-          
-          // Só fazer refresh se:
-          // 1. Passou pelo menos 30s desde último refresh programático
-          // 2. Passou pelo menos 2 minutos desde último refresh por notificação (evitar conflito)
-          if (timeSinceLastRefresh > 30000 && timeSinceNotificationRefresh > 120000) {
-            console.log('🔄 [DASHBOARD] Refresh periódico de segurança (safety net)');
-            // Limpar last_notification_refresh se já passou tempo suficiente
-            if (timeSinceNotificationRefresh > 180000) { // 3 minutos
-              localStorage.removeItem('last_notification_refresh');
-            }
-            lastRefreshTimeRef.current = Date.now();
-            window.location.reload();
-          } else {
-            console.log('⏸️ [DASHBOARD] Refresh de segurança adiado - muito recente:', {
-              timeSinceLastRefresh: Math.round(timeSinceLastRefresh / 1000) + 's',
-              timeSinceNotificationRefresh: Math.round(timeSinceNotificationRefresh / 1000) + 's'
-            });
-          }
-        } else {
-          console.log('⏸️ [DASHBOARD] Refresh de segurança cancelado - notificação ativa');
-        }
-      }, SAFETY_NET_REFRESH_INTERVAL);
-
-      return () => {
-        clearInterval(safetyNetInterval);
-      };
-    }
-  }, [user?.tipo, user?.empresa_id, showFechamentoModal, showAgendamentoModal, showNewLeadModal]);
   
   // Estado separado para KPIs principais (dados filtrados)
   const [kpisPrincipais, setKpisPrincipais] = useState({
@@ -163,6 +130,341 @@ const Dashboard = () => {
   
   // Estado para limite da clínica
   const [clinicaLimite, setClinicaLimite] = useState(null);
+  
+  // Estados para dashboard incorporadora
+  const [dashboardCorretor, setDashboardCorretor] = useState({
+    vgv_ganho_total: 0,
+    taxa_conversao: 0,
+    ticket_medio: 0,
+    entrada_ganha_atualmente: 0,
+    meta_maxima_entrada: 0,
+    numero_fechamentos: 0,
+    numero_leads: 0
+  });
+  const [dashboardGeral, setDashboardGeral] = useState({
+    negocios_ganhos_mes: 0,
+    negocios_perdidos_mes: 0,
+    em_andamento: 0
+  });
+  const [dashboardFunil, setDashboardFunil] = useState({
+    leads_entram: 0,
+    em_andamento: 0,
+    agendamento: 0,
+    comparecimento: 0,
+    fechamento: 0,
+    pagamento_entrada: 0,
+    taxas: {
+      leads_para_agendamento: 0,
+      agendamento_para_comparecimento: 0,
+      comparecimento_para_fechamento: 0,
+      fechamento_para_pagamento: 0
+    }
+  });
+  const [metasTime, setMetasTime] = useState({
+    meta_maxima_vgv: 0,
+    meta_maxima_entrada: 0,
+    vgv_atual: 0,
+    entrada_atual: 0
+  });
+  const [statusNegativos, setStatusNegativos] = useState([]);
+  const [loadingIncorporadora, setLoadingIncorporadora] = useState(false);
+  const [sdrsFunil, setSdrsFunil] = useState({}); // { sdr_id: { leads, em_andamento, agendamento, fechamento, taxas } }
+  const [corretoresIndividuais, setCorretoresIndividuais] = useState([]); // Array de corretores com VGV e Entrada
+  
+  // ============================================================================
+  // FUNÇÕES DE FETCH - DEVEM SER DEFINIDAS ANTES DE QUALQUER CÓDIGO QUE AS USE
+  // ============================================================================
+  
+  // Buscar rankings diferenciados (apenas para incorporadora)
+  const fetchRankings = useCallback(async () => {
+    if (!isIncorporadora) return null;
+    
+    try {
+      const [sdrsRes, internosRes, freelancersRes] = await Promise.all([
+        makeRequest('/dashboard/ranking/sdrs'),
+        makeRequest('/dashboard/ranking/internos'),
+        makeRequest('/dashboard/ranking/freelancers')
+      ]);
+
+      let sdrsData = null;
+      if (sdrsRes.ok) {
+        sdrsData = await sdrsRes.json();
+        setRankingSDRs(sdrsData);
+      }
+
+      if (internosRes.ok) {
+        const internosData = await internosRes.json();
+        setRankingInternosNovos(internosData);
+      }
+
+      if (freelancersRes.ok) {
+        const freelancersData = await freelancersRes.json();
+        setRankingFreelancersNovos(freelancersData);
+      }
+
+      // Retornar dados dos SDRs para uso imediato no refetch
+      return sdrsData;
+    } catch (error) {
+      console.error('Erro ao buscar rankings:', error);
+      return null;
+    }
+  }, [isIncorporadora, makeRequest]);
+
+  // Buscar dados do dashboard incorporadora
+  const fetchDashboardIncorporadora = useCallback(async () => {
+    if (!isIncorporadora) return;
+    
+    setLoadingIncorporadora(true);
+    try {
+      // Se for corretor interno, buscar dados do corretor
+      if (isConsultorInterno) {
+        const corretorRes = await makeRequest('/dashboard/incorporadora/corretor');
+        if (corretorRes.ok) {
+          const corretorData = await corretorRes.json();
+          setDashboardCorretor(corretorData);
+        }
+      }
+      
+      // Buscar dados gerais (para admin e consultor interno)
+      const [geralRes, funilRes, metasRes] = await Promise.all([
+        makeRequest('/dashboard/incorporadora/geral'),
+        makeRequest('/dashboard/incorporadora/funil'),
+        makeRequest('/metas-corretores')
+      ]);
+      
+      if (geralRes.ok) {
+        const geralData = await geralRes.json();
+        setDashboardGeral(geralData);
+      } else {
+        const errorText = await geralRes.text();
+        console.error('❌ Erro ao buscar dados gerais:', errorText);
+      }
+      
+      if (funilRes.ok) {
+        const funilData = await funilRes.json();
+        setDashboardFunil(funilData);
+      } else {
+        const errorText = await funilRes.text();
+        console.error('❌ Erro ao buscar dados funil:', errorText);
+      }
+      
+      // Guardar valores das metas em variáveis locais para usar depois
+      let metaMaximaVGV = 0;
+      let metaMaximaEntrada = 0;
+      
+      if (metasRes.ok) {
+        const metasData = await metasRes.json();
+        metaMaximaVGV = metasData.meta_maxima_vgv || 0;
+        metaMaximaEntrada = metasData.meta_maxima_entrada || 0;
+        setMetasTime({
+          meta_maxima_vgv: metaMaximaVGV,
+          meta_maxima_entrada: metaMaximaEntrada,
+          vgv_atual: 0, // Será calculado abaixo
+          entrada_atual: 0 // Será calculado abaixo
+        });
+      } else {
+        const errorText = await metasRes.text();
+        console.error('❌ Erro ao buscar metas:', errorText);
+      }
+      // Buscar fechamentos para calcular VGV e Entrada atual do time
+      // IMPORTANTE: Filtrar apenas pelos corretores que atendem ao filtro da seção 1
+      // Filtro: empresa_id=5, is_freelancer=false, tipo_consultor='corretor'
+      
+      // Primeiro, buscar os IDs dos corretores que atendem ao filtro
+      const consultoresRes = await makeRequest('/consultores');
+      
+      if (consultoresRes.ok) {
+        const consultores = await consultoresRes.json();
+        
+        const corretoresFiltrados = consultores.filter(c => 
+          c.empresa_id === 5 && 
+          c.is_freelancer === false && 
+          c.tipo_consultor === 'corretor'
+        );
+        const corretoresIds = corretoresFiltrados.map(c => c.id);
+        
+        if (corretoresIds.length === 0) {
+          // Mesmo sem corretores, definir valores zerados para evitar erros
+          setMetasTime(prev => ({
+            ...prev,
+            vgv_atual: 0,
+            entrada_atual: 0
+          }));
+        } else {
+          // Buscar fechamentos apenas se houver corretores
+          const fechamentosRes = await makeRequest('/dashboard/gerais/fechamentos');
+          
+          if (fechamentosRes.ok) {
+            const fechamentos = await fechamentosRes.json();
+            
+            const hoje = new Date();
+            const mesAtual = hoje.getMonth() + 1;
+            const anoAtual = hoje.getFullYear();
+            
+            // Filtrar fechamentos: apenas dos corretores filtrados, do mês atual e aprovados
+            const fechamentosMes = fechamentos.filter(f => {
+              if (!f.data_fechamento) return false;
+              if (f.aprovado !== 'aprovado') return false;
+              // Verificar se consultor_interno_id está na lista de corretores filtrados
+              if (!f.consultor_interno_id || !corretoresIds.includes(f.consultor_interno_id)) return false;
+              
+              const [ano, mes, dia] = f.data_fechamento.split('-');
+              const data = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+              return data.getMonth() + 1 === mesAtual && data.getFullYear() === anoAtual;
+            });
+            
+            const vgvAtual = fechamentosMes.reduce((acc, f) => acc + parseFloat(f.valor_fechado || 0), 0);
+            const entradaAtual = fechamentosMes.reduce((acc, f) => acc + parseFloat(f.entrada_paga || 0), 0);
+            
+            setMetasTime(prev => ({
+              ...prev,
+              vgv_atual: vgvAtual,
+              entrada_atual: entradaAtual
+            }));
+          }
+        }
+      } else {
+        const errorText = await consultoresRes.text();
+        console.error('❌ Erro ao buscar consultores:', errorText);
+        
+        // Mesmo com erro, definir valores zerados
+        setMetasTime(prev => ({
+          ...prev,
+          vgv_atual: 0,
+          entrada_atual: 0
+        }));
+      }
+      
+      // Buscar status negativos
+      const pacientesRes = await makeRequest('/dashboard/gerais/pacientes');
+      if (pacientesRes.ok) {
+        const pacientes = await pacientesRes.json();
+        const STATUS_NEGATIVOS = ['nao_existe', 'nao_tem_interesse', 'nao_reconhece', 'nao_responde', 'sem_clinica', 'nao_passou_cpf', 'nao_tem_outro_cpf', 'cpf_reprovado'];
+        
+        const pacientesNegativos = pacientes.filter(p => STATUS_NEGATIVOS.includes(p.status));
+        const statusAgrupados = {};
+        
+        pacientesNegativos.forEach(p => {
+          if (!statusAgrupados[p.status]) {
+            statusAgrupados[p.status] = 0;
+          }
+          statusAgrupados[p.status]++;
+        });
+        
+        const statusLista = Object.entries(statusAgrupados).map(([status, count]) => ({
+          status,
+          count
+        }));
+        
+        setStatusNegativos(statusLista);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar dashboard incorporadora:', error);
+    } finally {
+      setLoadingIncorporadora(false);
+    }
+  }, [isIncorporadora, isConsultorInterno, makeRequest]);
+
+  // Buscar corretores individuais
+  const fetchCorretoresIndividuais = useCallback(async () => {
+    if (!isIncorporadora) return;
+    
+    try {
+      const res = await makeRequest('/dashboard/incorporadora/corretores/individuais');
+      if (res.ok) {
+        const data = await res.json();
+        setCorretoresIndividuais(data);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar corretores individuais:', error);
+    }
+  }, [isIncorporadora, makeRequest]);
+
+  // Buscar mini-funis dos SDRs top 3
+  const fetchSDRsFunil = useCallback(async (sdrsData = null) => {
+    // Usar dados passados como parâmetro ou do state
+    const sdrsToUse = sdrsData || rankingSDRs;
+    
+    if (!isIncorporadora || !sdrsToUse || sdrsToUse.length === 0) return;
+    
+    try {
+      const top3SDRs = sdrsToUse.slice(0, 3);
+      const funisPromises = top3SDRs.map(async (sdr) => {
+        try {
+          const res = await makeRequest(`/dashboard/incorporadora/sdr/${sdr.id}/funil`);
+          if (res.ok) {
+            const data = await res.json();
+            return { sdrId: sdr.id, data };
+          }
+          return { sdrId: sdr.id, data: null };
+        } catch (error) {
+          console.error(`Erro ao buscar funil do SDR ${sdr.id}:`, error);
+          return { sdrId: sdr.id, data: null };
+        }
+      });
+      
+      const funis = await Promise.all(funisPromises);
+      const funisMap = {};
+      funis.forEach(({ sdrId, data }) => {
+        if (data) funisMap[sdrId] = data;
+      });
+      setSdrsFunil(funisMap);
+    } catch (error) {
+      console.error('Erro ao buscar funis dos SDRs:', error);
+    }
+  }, [isIncorporadora, rankingSDRs, makeRequest]);
+
+  // Função centralizada para refazer todos os fetches (no lugar do window.location.reload)
+  const refetchAllData = useCallback(async () => {
+    try {
+      if (isIncorporadora) {
+        // 1. Buscar rankings primeiro (retorna dados dos SDRs diretamente)
+        const sdrsData = await fetchRankings();
+        
+        // 2. Buscar dados gerais e corretores em paralelo
+        await Promise.all([
+          fetchDashboardIncorporadora(),
+          fetchCorretoresIndividuais(),
+        ]);
+        
+        // 3. Buscar funis dos SDRs usando os dados retornados diretamente
+        // (não depende do state atualizado, usa os dados frescos)
+        if (sdrsData && sdrsData.length > 0) {
+          await fetchSDRsFunil(sdrsData);
+        }
+      } else {
+        // aqui vão os fetches para outros tipos de usuário, se tiver
+        // ex: await fetchStats(); await fetchMetas();
+      }
+    } catch (err) {
+      console.error('❌ [DASHBOARD] Erro no refetchAllData', err);
+    }
+  }, [
+    isIncorporadora,
+    fetchRankings,
+    fetchDashboardIncorporadora,
+    fetchCorretoresIndividuais,
+    fetchSDRsFunil,
+  ]);
+
+  // Auto-refresh a cada 10 minutos (apenas para incorporadora)
+  useEffect(() => {
+    if (!isIncorporadora) return;
+
+    const TEN_MIN = 10 * 60 * 1000;
+
+    const intervalId = setInterval(() => {
+
+      // aqui é onde a mágica acontece: preserva scroll automaticamente
+      runWithPreservedScroll(refetchAllData);
+    }, TEN_MIN);
+
+    return () => clearInterval(intervalId);
+  }, [isIncorporadora, runWithPreservedScroll, refetchAllData]);
+  
+  // ============================================================================
+  // FIM DAS FUNÇÕES DE FETCH E REFETCH
+  // ============================================================================
   
   // Buscar metas (apenas admin)
   const fetchMetas = async (mes = null, ano = null) => {
@@ -1606,42 +1908,22 @@ const Dashboard = () => {
     }
   };
 
-  // Buscar rankings diferenciados (apenas para incorporadora)
-  const fetchRankings = async () => {
-    if (!isIncorporadora) return;
-    
-    try {
-      const [sdrsRes, internosRes, freelancersRes] = await Promise.all([
-        makeRequest('/dashboard/ranking/sdrs'),
-        makeRequest('/dashboard/ranking/internos'),
-        makeRequest('/dashboard/ranking/freelancers')
-      ]);
-
-      if (sdrsRes.ok) {
-        const sdrsData = await sdrsRes.json();
-        setRankingSDRs(sdrsData);
-      }
-
-      if (internosRes.ok) {
-        const internosData = await internosRes.json();
-        setRankingInternosNovos(internosData);
-      }
-
-      if (freelancersRes.ok) {
-        const freelancersData = await freelancersRes.json();
-        setRankingFreelancersNovos(freelancersData);
-      }
-    } catch (error) {
-      console.error('Erro ao buscar rankings:', error);
-    }
-  };
-
   // Buscar rankings quando incorporadora acessar o dashboard
   useEffect(() => {
     if (isIncorporadora) {
       fetchRankings();
+      fetchDashboardIncorporadora();
+      fetchCorretoresIndividuais();
     }
-  }, [isIncorporadora]);
+  }, [isIncorporadora, isConsultorInterno]);
+
+
+  // Buscar funis dos SDRs quando rankingSDRs mudar
+  useEffect(() => {
+    if (isIncorporadora && rankingSDRs && rankingSDRs.length > 0) {
+      fetchSDRsFunil();
+    }
+  }, [isIncorporadora, rankingSDRs, fetchSDRsFunil]);
 
   // Se for freelancer, mudar tab automaticamente para freelancers
   useEffect(() => {
@@ -1766,6 +2048,8 @@ const Dashboard = () => {
   return (
     <>
     <div>
+      {/* Page Header - Apenas para não-incorporadora */}
+      {!isIncorporadora && (
       <div className="page-header" style={{padding: '1.5rem'}}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
@@ -1787,28 +2071,27 @@ const Dashboard = () => {
               )}
             </p>
           </div>
-          
-          
         </div>
       </div>
+      )}
 
-      {/* Rankings por Categoria - Primeiro depois do título */}
+      {/* Rankings por Categoria - Apenas para não-incorporadora */}
       {isIncorporadora && (
-        <div style={{ marginBottom: '3rem', padding: '1.5rem', backgroundColor: '#ffffff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1e293b', marginBottom: '1.5rem' }}>
+        <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b', marginBottom: '1rem' }}>
             {isFreelancer ? 'Ranking dos Freelancers' : 'Rankings por Categoria'}
           </h2>
 
           {!isFreelancer && (
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '2px solid #e5e7eb' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', borderBottom: '2px solid #e5e7eb' }}>
               <button
                 onClick={() => setRankingTab('sdrs')}
                 style={{
-                  padding: '0.75rem 1.5rem',
+                  padding: '0.625rem 1.25rem',
                   border: 'none',
                   backgroundColor: 'transparent',
                   color: rankingTab === 'sdrs' ? '#1e293b' : '#6b7280',
-                  fontSize: '1rem',
+                  fontSize: '0.875rem',
                   fontWeight: rankingTab === 'sdrs' ? '600' : '400',
                   cursor: 'pointer',
                   borderBottom: rankingTab === 'sdrs' ? '3px solid #1e293b' : '3px solid transparent',
@@ -1820,11 +2103,11 @@ const Dashboard = () => {
               <button
                 onClick={() => setRankingTab('internos')}
                 style={{
-                  padding: '0.75rem 1.5rem',
+                  padding: '0.625rem 1.25rem',
                   border: 'none',
                   backgroundColor: 'transparent',
                   color: rankingTab === 'internos' ? '#1e293b' : '#6b7280',
-                  fontSize: '1rem',
+                  fontSize: '0.875rem',
                   fontWeight: rankingTab === 'internos' ? '600' : '400',
                   cursor: 'pointer',
                   borderBottom: rankingTab === 'internos' ? '3px solid #1e293b' : '3px solid transparent',
@@ -1836,11 +2119,11 @@ const Dashboard = () => {
               <button
                 onClick={() => setRankingTab('freelancers')}
                 style={{
-                  padding: '0.75rem 1.5rem',
+                  padding: '0.625rem 1.25rem',
                   border: 'none',
                   backgroundColor: 'transparent',
                   color: rankingTab === 'freelancers' ? '#1e293b' : '#6b7280',
-                  fontSize: '1rem',
+                  fontSize: '0.875rem',
                   fontWeight: rankingTab === 'freelancers' ? '600' : '400',
                   cursor: 'pointer',
                   borderBottom: rankingTab === 'freelancers' ? '3px solid #1e293b' : '3px solid transparent',
@@ -2027,7 +2310,93 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Filtro de Período */}
+      {/* Dashboard Incorporadora - Layout Responsivo */}
+      {isIncorporadora && (
+        <div style={{ 
+          height: sidebarCollapsed ? 'calc(100vh - 64px)' : 'calc(100vh - 64px + 6.5cm)', // Altura total menos o header (64px) + 6.5cm extra quando aberto
+          backgroundColor: '#f9fafb', // Background padrão do projeto
+          padding: sidebarCollapsed ? '8px' : '12px',
+          paddingBottom: sidebarCollapsed ? '8px' : 'calc(12px + 6.5cm)', // Adiciona 6.5cm no padding inferior quando aberto
+          display: 'grid',
+          gridTemplateColumns: '40% 1fr', // Sempre mantém layout de 2 colunas: 40% SDRs + resto
+          gap: sidebarCollapsed ? '8px' : '16px',
+          overflow: 'hidden',
+          position: 'relative'
+        }}>
+          {/* COLUNA ESQUERDA (40%) - Ranking SDRs Top 3 */}
+          <div style={{ 
+            height: '100%', // Usa 100% da altura do container pai
+            overflow: 'hidden', // Sem scroll - tudo deve caber na tela
+            display: 'grid',
+            gridTemplateRows: 'repeat(3, 1fr)', // 3 linhas com altura igual
+            rowGap: sidebarCollapsed ? '8px' : '12px',
+            paddingRight: '4px'
+          }}>
+            {rankingSDRs.slice(0, 3).map((sdr, index) => {
+              const funilData = sdrsFunil[sdr.id] || { 
+                leads: 0, 
+                em_andamento: 0, 
+                agendamento: 0, 
+                fechamento: 0, 
+                taxas: {} 
+              };
+              
+              return (
+                <SDRRankingCard
+                  key={sdr.id}
+                  sdr={sdr}
+                  funnel={funilData}
+                  rank={index}
+                  compact={!sidebarCollapsed}
+                />
+              );
+            })}
+          </div>
+
+              {/* COLUNA DIREITA (60%) */}
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '12px',
+                overflow: 'hidden', // Sem scroll - tudo deve caber na tela
+                paddingRight: '4px'
+              }}>
+                  {/* BLOCO SUPERIOR - Totais do Funil */}
+                  <FunnelTotals 
+                    data={{
+                      leads: dashboardFunil.leads_entram || 0,
+                      em_andamento: dashboardFunil.em_andamento || 0,
+                      agendamento: dashboardFunil.agendamento || 0,
+                      fechamento: dashboardFunil.fechamento || 0
+                    }}
+                  />
+
+                  {/* BLOCO MEIO - Corretores */}
+                  <BrokerPerformance
+                    general={{
+                      nome: 'GERAL',
+                      vgv_atual: metasTime.vgv_atual || 0,
+                      entrada_atual: metasTime.entrada_atual || 0,
+                      meta_vgv: metasTime.meta_maxima_vgv || 0,
+                      meta_entrada: metasTime.meta_maxima_entrada || 0
+                    }}
+                    brokers={corretoresIndividuais.map(c => ({
+                      nome: c.nome || '',
+                      vgv_atual: c.vgv_atual || 0,
+                      entrada_atual: c.entrada_atual || 0,
+                      meta_vgv: c.meta_vgv || 0,
+                      meta_entrada: c.meta_entrada || 0
+                    }))}
+                  />
+
+                  {/* BLOCO INFERIOR - Coordenadoras */}
+                  <CoordinatorPlaceholder />
+              </div>
+        </div>
+      )}
+
+      {/* Filtro de Período - Apenas para não-incorporadora */}
+      {!isIncorporadora && (
       <div style={{ 
         marginBottom: '2rem',
         padding: '1rem',
@@ -2233,9 +2602,10 @@ const Dashboard = () => {
           </div>
         )}
       </div>
+      )}
 
       {/* Estatísticas detalhadas por dia (apenas no modo semanal) */}
-      {periodo === 'semanal' && !subPeriodo && Object.keys(stats.estatisticasPorDia).length > 0 && (
+      {!isIncorporadora && periodo === 'semanal' && !subPeriodo && Object.keys(stats.estatisticasPorDia).length > 0 && (
         <div style={{ marginBottom: '2rem' }}>
           <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1a1d23', marginBottom: '1rem' }}>
             Detalhamento por Dia da Semana
@@ -4220,6 +4590,129 @@ const Dashboard = () => {
       )}
 
     </div>
+    
+    {/* Modal expandido de Status Negativos */}
+    {isIncorporadora && statusNegativos.length > 0 && (
+      <div 
+        id="status-negativos-expanded"
+        style={{
+          display: 'none',
+          position: 'fixed',
+          bottom: '2rem',
+          right: '2rem',
+          zIndex: 1000,
+          maxWidth: '300px',
+          maxHeight: '400px',
+          overflowY: 'auto',
+          backgroundColor: '#ffffff',
+          borderRadius: '12px',
+          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+          border: '2px solid #ef4444',
+          padding: '1rem'
+        }}
+      >
+        <div style={{ 
+          fontSize: '0.875rem', 
+          fontWeight: '600', 
+          color: '#dc2626',
+          marginBottom: '0.75rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <span>Status Negativos</span>
+          <button
+            onClick={() => {
+              const expanded = document.getElementById('status-negativos-expanded');
+              if (expanded) {
+                expanded.style.display = 'none';
+              }
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#dc2626',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              fontWeight: 'bold'
+            }}
+          >
+            ×
+          </button>
+        </div>
+        {statusNegativos.map((item, index) => (
+          <div 
+            key={index}
+            style={{
+              padding: '0.75rem',
+              marginBottom: '0.5rem',
+              backgroundColor: '#f9fafb',
+              borderRadius: '6px',
+              border: '1px solid #e5e7eb'
+            }}
+          >
+            <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#374151', marginBottom: '0.25rem' }}>
+              {item.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+              {item.count} {item.count === 1 ? 'registro' : 'registros'}
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+    
+    {/* Botão fixo para toggle da sidebar - Canto inferior esquerdo - Apenas quando sidebar fechada */}
+    {sidebarCollapsed && (
+      <button
+        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+        style={{
+          position: 'fixed',
+          bottom: '20px',
+          left: '20px',
+          width: '32px',
+          height: '32px',
+          padding: '0',
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: '6px',
+          transition: 'all 0.3s ease',
+          color: 'rgba(0, 0, 0, 0.4)',
+          opacity: 0.6,
+          zIndex: 1000,
+          pointerEvents: 'auto'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+          e.currentTarget.style.color = 'rgba(0, 0, 0, 0.7)';
+          e.currentTarget.style.opacity = '1';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+          e.currentTarget.style.color = 'rgba(0, 0, 0, 0.4)';
+          e.currentTarget.style.opacity = '0.6';
+        }}
+        title="Abrir painel lateral"
+        aria-label="Abrir painel lateral"
+      >
+        <svg 
+          width="18" 
+          height="18" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="currentColor" 
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </button>
+    )}
     
     {/* Modais de Notificações - os componentes já verificam internamente se devem ser exibidos */}
     <FechamentoModal />
