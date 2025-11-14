@@ -1187,7 +1187,7 @@ const AppContent = () => {
 
       <main className="main-content">
         <header className="main-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '14.5rem' : '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '13rem' : '1.5rem' }}>
             {isMobile && (
               <button
                 onClick={() => setShowMobileSidebar(!showMobileSidebar)}

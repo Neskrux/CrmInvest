@@ -275,7 +275,7 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contratoUrl, passoAtual]); // Verificação interna evita loops
   
-  // Desabilitar scroll do body quando modal estiver aberto
+  // Desabilitar scroll do body quando modal estiver aberto e prevenir zoom automático
   useEffect(() => {
     // Salvar o estado original do overflow
     const originalOverflow = document.body.style.overflow;
@@ -289,6 +289,9 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
     document.body.style.width = '100%';
     document.body.style.height = '100%';
     
+    // Não modificar o viewport - o fontSize de 16px já previne o zoom automático
+    // Isso permite que o usuário continue usando zoom manual (pinch to zoom) normalmente
+    
     // Cleanup: restaurar scroll quando modal fechar
     return () => {
       document.body.style.overflow = originalOverflow;
@@ -296,7 +299,7 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
       document.body.style.width = originalWidth;
       document.body.style.height = originalHeight;
     };
-  }, []);
+  }, [isMobile]);
 
   // Fechar modal ao clicar fora
   useEffect(() => {
@@ -1642,6 +1645,7 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
                 </label>
                 <input
                   type="text"
+                  inputMode="numeric"
                   value={formData.cpf}
                   onChange={(e) => {
                     const valorFormatado = formatarCPF(e.target.value);
@@ -1654,12 +1658,22 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
                     padding: '0.75rem',
                     border: '2px solid #e2e8f0',
                     borderRadius: '8px',
-                    fontSize: '1rem',
+                    fontSize: isMobile ? '16px' : '1rem',
                     outline: 'none',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.2s',
+                    WebkitAppearance: 'none',
+                    appearance: 'none'
                   }}
-                  onFocus={(e) => e.target.style.borderColor = '#059669'}
-                  onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#059669';
+                    // Prevenir zoom no iOS
+                    if (isMobile) {
+                      e.target.style.fontSize = '16px';
+                    }
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e2e8f0';
+                  }}
                 />
               </div>
               
