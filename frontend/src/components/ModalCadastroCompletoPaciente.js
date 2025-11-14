@@ -100,6 +100,8 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
   const [hashExistente, setHashExistente] = useState(null); // Hash do fechamento existente
   const assinaturaCanvasContainerRef = useRef(null);
   const [assinaturaCanvasSize, setAssinaturaCanvasSize] = useState({ width: 400, height: 150 });
+  const [modoAssinatura, setModoAssinatura] = useState(null); // 'texto' ou 'desenhar'
+  const [textoAssinatura, setTextoAssinatura] = useState('');
   
   // Detectar mudanças no tamanho da tela (apenas para layout, não para assinatura)
   const ajustarDimensoesCanvasAssinatura = () => {
@@ -885,17 +887,54 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
     }
   };
   
+  // Converter texto em imagem de assinatura
+  const converterTextoEmImagem = (texto) => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Configurar canvas com tamanho adequado
+      canvas.width = 400;
+      canvas.height = 150;
+      
+      // Estilo da assinatura em texto
+      ctx.font = 'bold 48px "Brush Script MT", "Lucida Handwriting", cursive, sans-serif';
+      ctx.fillStyle = '#000000';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      // Desenhar texto centralizado
+      ctx.fillText(texto, canvas.width / 2, canvas.height / 2);
+      
+      // Converter para base64
+      const base64 = canvas.toDataURL('image/png');
+      resolve(base64);
+    });
+  };
+
   // Salvar assinatura temporariamente
-  const salvarAssinaturaTemporaria = () => {
-    if (!hasAssinatura || !assinaturaRef) {
-      showErrorToast('Por favor, desenhe sua assinatura primeiro.');
-      return;
+  const salvarAssinaturaTemporaria = async () => {
+    if (modoAssinatura === 'texto') {
+      if (!textoAssinatura.trim()) {
+        showErrorToast('Por favor, digite sua assinatura primeiro.');
+        return;
+      }
+      
+      const assinaturaBase64Temp = await converterTextoEmImagem(textoAssinatura.trim());
+      setAssinaturaBase64(assinaturaBase64Temp);
+      setModoAssinatura(null);
+      showSuccessToast('Assinatura criada! Clique em "Aplicar Assinatura" para assinar o contrato.');
+    } else {
+      if (!hasAssinatura || !assinaturaRef) {
+        showErrorToast('Por favor, desenhe sua assinatura primeiro.');
+        return;
+      }
+      
+      const assinaturaBase64Temp = assinaturaRef.toDataURL('image/png');
+      setAssinaturaBase64(assinaturaBase64Temp);
+      setMostrarCanvasAssinatura(false);
+      showSuccessToast('Assinatura criada! Clique em "Aplicar Assinatura" para assinar o contrato.');
     }
-    
-    const assinaturaBase64Temp = assinaturaRef.toDataURL('image/png');
-    setAssinaturaBase64(assinaturaBase64Temp);
-    setMostrarCanvasAssinatura(false);
-    showSuccessToast('Assinatura criada! Clique em "Aplicar Assinatura" para assinar o contrato.');
   };
   
   // Aplicar assinatura ao contrato PDF - automaticamente na área do paciente
@@ -1970,8 +2009,8 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
                     )}
                   </div>
                   
-                  {/* Canvas para criar assinatura */}
-                  {mostrarCanvasAssinatura && (
+                  {/* Canvas para criar assinatura (apenas desktop) */}
+                  {modoAssinatura === 'desenhar' && mostrarCanvasAssinatura && (
                     <div style={{
                       border: '2px solid #e2e8f0',
                       borderRadius: '8px',
@@ -2067,34 +2106,162 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
                   )}
                   
                   {/* Botões de ação */}
-                  {!mostrarCanvasAssinatura && !assinaturaBase64 && !assinaturaAplicada && (
+                  {!mostrarCanvasAssinatura && !assinaturaBase64 && !assinaturaAplicada && !modoAssinatura && (
                     <div style={{ marginBottom: '1rem' }}>
-                      <button
-                        onClick={() => setMostrarCanvasAssinatura(true)}
+                      {/* Mobile: apenas texto */}
+                      {isMobile ? (
+                        <button
+                          onClick={() => setModoAssinatura('texto')}
+                          style={{
+                            width: '100%',
+                            padding: '1rem',
+                            backgroundColor: '#059669',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '1rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            touchAction: 'manipulation',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.5rem'
+                          }}
+                        >
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                          </svg>
+                          Digitar Assinatura
+                        </button>
+                      ) : (
+                        /* Desktop: opção de texto ou desenhar */
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => setModoAssinatura('texto')}
+                            style={{
+                              flex: 1,
+                              padding: '1rem',
+                              backgroundColor: '#059669',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              fontSize: '1rem',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              touchAction: 'manipulation',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.5rem'
+                            }}
+                          >
+                            Digitar Assinatura
+                          </button>
+                          <button
+                            onClick={() => {
+                              setModoAssinatura('desenhar');
+                              setMostrarCanvasAssinatura(true);
+                            }}
+                            style={{
+                              flex: 1,
+                              padding: '1rem',
+                              backgroundColor: '#3b82f6',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              fontSize: '1rem',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              touchAction: 'manipulation',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.5rem'
+                            }}
+                          >
+                            Desenhar Assinatura
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Campo de texto para assinatura (mobile e desktop) */}
+                  {modoAssinatura === 'texto' && (
+                    <div style={{
+                      marginBottom: '1rem',
+                      padding: '1rem',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '8px',
+                      backgroundColor: '#fff'
+                    }}>
+                      <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem', color: '#1e293b' }}>
+                        Digite sua assinatura
+                      </h3>
+                      <input
+                        type="text"
+                        value={textoAssinatura}
+                        onChange={(e) => setTextoAssinatura(e.target.value)}
+                        placeholder="Digite seu nome completo"
                         style={{
                           width: '100%',
-                          padding: '1rem',
-                          backgroundColor: '#059669',
-                          color: 'white',
-                          border: 'none',
+                          padding: '0.875rem',
+                          border: '2px solid #e2e8f0',
                           borderRadius: '8px',
                           fontSize: '1rem',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          touchAction: 'manipulation',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '0.5rem'
+                          outline: 'none',
+                          transition: 'all 0.2s',
+                          fontFamily: '"Brush Script MT", "Lucida Handwriting", cursive, sans-serif',
+                          textAlign: 'center'
                         }}
-                      >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                          <polyline points="17 8 12 3 7 8"></polyline>
-                          <line x1="12" y1="3" x2="12" y2="15"></line>
-                        </svg>
-                        Criar Assinatura
-                      </button>
+                        onFocus={(e) => e.target.style.borderColor = '#059669'}
+                        onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                      />
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={salvarAssinaturaTemporaria}
+                          disabled={!textoAssinatura.trim()}
+                          style={{
+                            flex: 1,
+                            minWidth: '120px',
+                            padding: '0.75rem',
+                            backgroundColor: textoAssinatura.trim() ? '#059669' : '#9ca3af',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            cursor: textoAssinatura.trim() ? 'pointer' : 'not-allowed',
+                            touchAction: 'manipulation'
+                          }}
+                        >
+                          Salvar Assinatura
+                        </button>
+                        <button
+                          onClick={() => {
+                            setModoAssinatura(null);
+                            setTextoAssinatura('');
+                          }}
+                          style={{
+                            flex: 1,
+                            minWidth: '120px',
+                            padding: '0.75rem',
+                            backgroundColor: '#6b7280',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            touchAction: 'manipulation'
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
                     </div>
                   )}
                   
@@ -2106,9 +2273,14 @@ const ModalCadastroCompletoPaciente = ({ paciente, onClose, onComplete }) => {
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <button
                           onClick={() => {
-                            setMostrarCanvasAssinatura(true);
                             setAssinaturaBase64(null);
                             setHasAssinatura(false);
+                            setModoAssinatura(null);
+                            setTextoAssinatura('');
+                            if (!isMobile) {
+                              setMostrarCanvasAssinatura(true);
+                              setModoAssinatura('desenhar');
+                            }
                           }}
                           style={{
                             flex: 1,

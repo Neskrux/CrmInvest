@@ -34,6 +34,8 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
   const [dadosClinica, setDadosClinica] = useState(null); // Dados completos da clínica
   const assinaturaCanvasContainerRef = useRef(null);
   const [assinaturaCanvasSize, setAssinaturaCanvasSize] = useState({ width: 400, height: 150 });
+  const [modoAssinatura, setModoAssinatura] = useState(null); // 'texto' ou 'desenhar'
+  const [textoAssinatura, setTextoAssinatura] = useState('');
   
   // Log quando componente é montado
   useEffect(() => {
@@ -514,17 +516,54 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
     });
   };
 
+  // Converter texto em imagem de assinatura
+  const converterTextoEmImagem = (texto) => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Configurar canvas com tamanho adequado
+      canvas.width = 400;
+      canvas.height = 150;
+      
+      // Estilo da assinatura em texto
+      ctx.font = 'bold 48px "Brush Script MT", "Lucida Handwriting", cursive, sans-serif';
+      ctx.fillStyle = '#000000';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      // Desenhar texto centralizado
+      ctx.fillText(texto, canvas.width / 2, canvas.height / 2);
+      
+      // Converter para base64
+      const base64 = canvas.toDataURL('image/png');
+      resolve(base64);
+    });
+  };
+
   // Salvar assinatura temporariamente
-  const salvarAssinaturaTemporaria = () => {
-    if (!hasAssinatura || !assinaturaRef) {
-      showErrorToast('Por favor, desenhe sua assinatura primeiro.');
-      return;
+  const salvarAssinaturaTemporaria = async () => {
+    if (modoAssinatura === 'texto') {
+      if (!textoAssinatura.trim()) {
+        showErrorToast('Por favor, digite sua assinatura primeiro.');
+        return;
+      }
+      
+      const assinaturaBase64Temp = await converterTextoEmImagem(textoAssinatura.trim());
+      setAssinaturaBase64(assinaturaBase64Temp);
+      setModoAssinatura(null);
+      showSuccessToast('Assinatura salva! Pronta para ser aplicada ao contrato.');
+    } else {
+      if (!hasAssinatura || !assinaturaRef) {
+        showErrorToast('Por favor, desenhe sua assinatura primeiro.');
+        return;
+      }
+      
+      const assinaturaBase64Temp = assinaturaRef.toDataURL('image/png');
+      setAssinaturaBase64(assinaturaBase64Temp);
+      setMostrarCanvasAssinatura(false);
+      showSuccessToast('Assinatura salva! Pronta para ser aplicada ao contrato.');
     }
-    
-    const assinaturaBase64Temp = assinaturaRef.toDataURL('image/png');
-    setAssinaturaBase64(assinaturaBase64Temp);
-    setMostrarCanvasAssinatura(false);
-    showSuccessToast('Assinatura salva! Pronta para ser aplicada ao contrato.');
   };
   
   // Aplicar assinatura ao contrato PDF com áreas fixas para assinaturas
@@ -1862,12 +1901,13 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
                       </h3>
                       
                       {/* Botões de assinatura */}
-                      {!assinaturaBase64 && (
+                      {!assinaturaBase64 && !modoAssinatura && (
                         <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          {!mostrarCanvasAssinatura ? (
+                          {/* Mobile: apenas texto */}
+                          {isMobile ? (
                             <button
                               type="button"
-                              onClick={() => setMostrarCanvasAssinatura(true)}
+                              onClick={() => setModoAssinatura('texto')}
                               style={{
                                 padding: '0.75rem 1.5rem',
                                 backgroundColor: '#059669',
@@ -1877,39 +1917,22 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
                                 fontSize: '0.875rem',
                                 fontWeight: '600',
                                 cursor: 'pointer',
-                                transition: 'all 0.2s'
+                                transition: 'all 0.2s',
+                                width: '100%'
                               }}
-                              onMouseEnter={(e) => e.target.style.backgroundColor = '#047857'}
-                              onMouseLeave={(e) => e.target.style.backgroundColor = '#059669'}
                             >
-                              Criar Assinatura
+                              Digitar Assinatura
                             </button>
                           ) : (
+                            /* Desktop: opção de texto ou desenhar */
                             <>
                               <button
                                 type="button"
-                                onClick={salvarAssinaturaTemporaria}
-                                disabled={!hasAssinatura}
+                                onClick={() => setModoAssinatura('texto')}
                                 style={{
+                                  flex: 1,
                                   padding: '0.75rem 1.5rem',
-                                  backgroundColor: hasAssinatura ? '#059669' : '#9ca3af',
-                                  color: 'white',
-                                  border: 'none',
-                                  borderRadius: '8px',
-                                  fontSize: '0.875rem',
-                                  fontWeight: '600',
-                                  cursor: hasAssinatura ? 'pointer' : 'not-allowed',
-                                  transition: 'all 0.2s'
-                                }}
-                              >
-                                Salvar Assinatura
-                              </button>
-                              <button
-                                type="button"
-                                onClick={limparAssinaturaContrato}
-                                style={{
-                                  padding: '0.75rem 1.5rem',
-                                  backgroundColor: '#dc2626',
+                                  backgroundColor: '#059669',
                                   color: 'white',
                                   border: 'none',
                                   borderRadius: '8px',
@@ -1918,18 +1941,21 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
                                   cursor: 'pointer',
                                   transition: 'all 0.2s'
                                 }}
+                                onMouseEnter={(e) => e.target.style.backgroundColor = '#047857'}
+                                onMouseLeave={(e) => e.target.style.backgroundColor = '#059669'}
                               >
-                                Limpar
+                                Digitar Assinatura
                               </button>
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setMostrarCanvasAssinatura(false);
-                                  limparAssinaturaContrato();
+                                  setModoAssinatura('desenhar');
+                                  setMostrarCanvasAssinatura(true);
                                 }}
                                 style={{
+                                  flex: 1,
                                   padding: '0.75rem 1.5rem',
-                                  backgroundColor: '#6b7280',
+                                  backgroundColor: '#3b82f6',
                                   color: 'white',
                                   border: 'none',
                                   borderRadius: '8px',
@@ -1938,16 +1964,96 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
                                   cursor: 'pointer',
                                   transition: 'all 0.2s'
                                 }}
+                                onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
+                                onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
                               >
-                                Cancelar
+                                Desenhar Assinatura
                               </button>
                             </>
                           )}
                         </div>
                       )}
                       
-                      {/* Canvas de assinatura */}
-                      {mostrarCanvasAssinatura && (
+                      {/* Campo de texto para assinatura (mobile e desktop) */}
+                      {modoAssinatura === 'texto' && (
+                        <div style={{
+                          marginBottom: '1rem',
+                          padding: '1rem',
+                          border: '2px solid #e2e8f0',
+                          borderRadius: '8px',
+                          backgroundColor: '#f9fafb'
+                        }}>
+                          <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.5rem', color: '#1e293b' }}>
+                            Digite sua assinatura:
+                          </label>
+                          <input
+                            type="text"
+                            value={textoAssinatura}
+                            onChange={(e) => setTextoAssinatura(e.target.value)}
+                            placeholder="Digite seu nome completo"
+                            style={{
+                              width: '100%',
+                              padding: '0.875rem',
+                              border: '2px solid #e2e8f0',
+                              borderRadius: '8px',
+                              fontSize: '1rem',
+                              outline: 'none',
+                              transition: 'all 0.2s',
+                              fontFamily: '"Brush Script MT", "Lucida Handwriting", cursive, sans-serif',
+                              textAlign: 'center'
+                            }}
+                            onFocus={(e) => e.target.style.borderColor = '#059669'}
+                            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                          />
+                          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              onClick={salvarAssinaturaTemporaria}
+                              disabled={!textoAssinatura.trim()}
+                              style={{
+                                flex: 1,
+                                minWidth: '120px',
+                                padding: '0.75rem 1.5rem',
+                                backgroundColor: textoAssinatura.trim() ? '#059669' : '#9ca3af',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                cursor: textoAssinatura.trim() ? 'pointer' : 'not-allowed',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              Salvar Assinatura
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setModoAssinatura(null);
+                                setTextoAssinatura('');
+                              }}
+                              style={{
+                                flex: 1,
+                                minWidth: '120px',
+                                padding: '0.75rem 1.5rem',
+                                backgroundColor: '#6b7280',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Canvas de assinatura (apenas desktop) */}
+                      {modoAssinatura === 'desenhar' && mostrarCanvasAssinatura && (
                         <div style={{
                           marginBottom: '1rem',
                           padding: '1rem',
@@ -2000,6 +2106,70 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
                               throttle={0}
                               velocityFilterWeight={0.7}
                             />
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              onClick={salvarAssinaturaTemporaria}
+                              disabled={!hasAssinatura}
+                              style={{
+                                flex: 1,
+                                minWidth: '120px',
+                                padding: '0.75rem 1.5rem',
+                                backgroundColor: hasAssinatura ? '#059669' : '#9ca3af',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                cursor: hasAssinatura ? 'pointer' : 'not-allowed',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              Salvar Assinatura
+                            </button>
+                            <button
+                              type="button"
+                              onClick={limparAssinaturaContrato}
+                              style={{
+                                flex: 1,
+                                minWidth: '100px',
+                                padding: '0.75rem 1.5rem',
+                                backgroundColor: '#dc2626',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              Limpar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setModoAssinatura(null);
+                                setMostrarCanvasAssinatura(false);
+                                limparAssinaturaContrato();
+                              }}
+                              style={{
+                                flex: 1,
+                                minWidth: '100px',
+                                padding: '0.75rem 1.5rem',
+                                backgroundColor: '#6b7280',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              Cancelar
+                            </button>
                           </div>
                         </div>
                       )}
@@ -2057,6 +2227,8 @@ const ModalCadastroPacienteClinica = ({ onClose, onComplete }) => {
                               setAssinaturaBase64(null);
                               setHasAssinatura(false);
                               setMostrarCanvasAssinatura(false);
+                              setModoAssinatura(null);
+                              setTextoAssinatura('');
                             }}
                             style={{
                               padding: '0.75rem 1.5rem',
